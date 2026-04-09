@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contacts & Notifications — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
+    --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
+    --amber:#F5A623;--red:#E74C3C;--purple:#7F77DD;
+    --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
+    --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
+    --sidebar-w:240px;--radius:14px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+  .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-mark{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-icon svg{width:18px;height:18px;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
+  .sidebar-brand{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:8px;}
+  .admin-badge{font-size:10px;font-weight:700;background:var(--amber);color:#fff;padding:2px 8px;border-radius:10px;letter-spacing:0.04em;}
+  .sidebar-brand-label{font-size:12px;color:rgba(255,255,255,0.6);}
+  .sidebar-nav{padding:20px 12px;flex:1;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
+  .nav-group-label:first-child{margin-top:0;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.8;}
+  .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--navy);flex-shrink:0;}
+  .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .footer-role{font-size:10px;color:var(--green);}
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
+  .content{padding:32px;flex:1;}
+  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:14px;color:var(--text-muted);}
+  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
+  .btn-primary:hover{background:var(--navy-mid);}
+  .btn-primary svg{width:16px;height:16px;}
+  .tabs{display:flex;gap:4px;margin-bottom:28px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px;width:fit-content;}
+  .tab{padding:8px 20px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-muted);transition:all 0.15s;border:none;background:transparent;font-family:'DM Sans',sans-serif;}
+  .tab.active{background:var(--navy);color:#fff;}
+  .contacts-toolbar{display:flex;gap:12px;margin-bottom:20px;align-items:center;}
+  .search-wrap{flex:1;position:relative;max-width:360px;}
+  .search-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
+  .search-input{width:100%;height:42px;padding:0 14px 0 40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .search-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .search-input::placeholder{color:var(--text-muted);}
+  .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .table-head{display:grid;grid-template-columns:2fr 1.5fr 1.5fr 1.2fr 1fr 0.8fr;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
+  .table-row{display:grid;grid-template-columns:2fr 1.5fr 1.5fr 1.2fr 1fr 0.8fr;gap:8px;padding:13px 22px;border-top:1px solid var(--border);align-items:center;transition:background 0.1s;}
+  .table-row:hover{background:var(--bg);}
+  .contact-name{font-size:13px;font-weight:500;color:var(--text);}
+  .contact-role{font-size:11px;color:var(--text-muted);margin-top:1px;}
+  .contact-email{font-size:12px;color:var(--text-mid);}
+  .contact-tel{font-size:12px;color:var(--text-mid);}
+  .client-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#EBF0F5;color:var(--navy);}
+  .btn-icon{width:30px;height:30px;border:1px solid var(--border);background:transparent;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.1s;flex-shrink:0;}
+  .btn-icon:hover{background:var(--bg);}
+  .btn-icon svg{width:14px;height:14px;color:var(--text-mid);}
+  .btn-icon.send{background:var(--green-pale);border-color:rgba(46,204,143,0.3);}
+  .btn-icon.send:hover{background:#C8F0E1;}
+  .btn-icon.send svg{color:var(--green-dark);}
+  .btn-icon.del:hover{background:#FDECEA;}
+  .btn-icon.del:hover svg{color:var(--red);}
+  .row-actions{display:flex;gap:6px;align-items:center;}
+  .empty-state{text-align:center;padding:48px 20px;color:var(--text-muted);}
+  .empty-state p{font-size:14px;}
+  .templates-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
+  .template-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .template-top{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .template-icon{width:38px;height:38px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .ti-rapport{background:var(--green-pale);}
+  .ti-garantie{background:#EEEDFE;}
+  .ti-absent{background:#FEF5E4;}
+  .template-icon svg{width:18px;height:18px;}
+  .ti-rapport svg{color:var(--green-dark);}
+  .ti-garantie svg{color:var(--purple);}
+  .ti-absent svg{color:var(--amber);}
+  .template-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);flex:1;}
+  .btn-edit-tpl{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--text-mid);background:var(--bg);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .btn-edit-tpl:hover{background:#E5EAF0;}
+  .btn-edit-tpl svg{width:12px;height:12px;}
+  .template-body{padding:16px 20px;}
+  .template-subject{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;}
+  .template-subject-val{font-size:13px;font-weight:500;color:var(--text);margin-bottom:12px;}
+  .template-msg{font-size:12px;color:var(--text-mid);line-height:1.6;background:var(--bg);border-radius:var(--radius-sm);padding:12px 14px;white-space:pre-line;}
+  .template-vars{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center;}
+  .var-chip{font-size:10px;font-weight:600;background:#EBF0F5;color:var(--navy);padding:2px 8px;border-radius:10px;}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border-radius:var(--radius);width:520px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);animation:fadeUp 0.2s ease;}
+  .modal-lg{width:620px;}
+  .modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
+  .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;}
+  .modal-close:hover{background:#E5EAF0;}
+  .modal-body{padding:24px 26px;}
+  .modal-footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;}
+  .form-group{margin-bottom:16px;}
+  .form-label{display:block;font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;}
+  .form-input{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .form-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-select{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;cursor:pointer;}
+  .form-select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;resize:vertical;min-height:140px;line-height:1.6;transition:border-color 0.15s;}
+  .form-textarea:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-hint{font-size:11px;color:var(--text-muted);margin-top:5px;}
+  .btn-cancel{height:40px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  .btn-cancel:hover{background:var(--bg);}
+  .btn-save{height:40px;padding:0 22px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .btn-save:hover{background:var(--navy-mid);}
+  .btn-green{height:40px;padding:0 22px;border:none;background:var(--green);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .btn-green:hover{background:var(--green-dark);color:#fff;}
+  .send-context{background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:20px;border-left:3px solid var(--green);}
+  .send-context-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:4px;}
+  .send-context-val{font-size:13px;font-weight:500;color:var(--text);}
+  .contacts-checkboxes{display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;margin-bottom:4px;}
+  .contact-check{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:background 0.1s,border-color 0.1s;}
+  .contact-check:hover{background:var(--bg);}
+  .contact-check.selected{border-color:var(--green);background:var(--green-pale);}
+  .contact-check input[type="checkbox"]{width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0;}
+  .contact-check-name{font-size:13px;font-weight:500;color:var(--text);}
+  .contact-check-email{font-size:11px;color:var(--text-muted);}
+  .message-preview{background:var(--bg);border-radius:var(--radius-sm);padding:14px 16px;font-size:12px;color:var(--text-mid);line-height:1.7;white-space:pre-line;border:1px solid var(--border);margin-top:8px;max-height:150px;overflow-y:auto;}
+  .send-success{display:none;text-align:center;padding:20px 0;}
+  .send-success svg{width:48px;height:48px;color:var(--green);margin-bottom:10px;}
+  .send-success-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;}
+  .send-success-sub{font-size:13px;color:var(--text-muted);}
+  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);z-index:300;transform:translateY(80px);opacity:0;transition:transform 0.3s ease,opacity 0.3s ease;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast svg{width:16px;height:16px;color:var(--green);flex-shrink:0;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+    </div>
+  </div>
+  <div class="sidebar-brand"><span class="admin-badge">ADMIN</span><span class="sidebar-brand-label">Interface interne</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Gestion</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Administration</div>
+    <a class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & Notifications</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar">BM</div>
+      <div><div class="footer-name">Belledonne Multiservices</div><div class="footer-role">Administrateur</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Admin</span><span>›</span><span>Contacts & Notifications</span></div>
+    <div class="date-chip">Jeudi 9 avril 2025</div>
+  </header>
+  <div class="content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Contacts & Notifications</div>
+        <div class="page-sub">Carnet de contacts par client bailleur et modèles d'emails</div>
+      </div>
+      <button class="btn-primary" id="btnAddContact">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Ajouter un contact
+      </button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('contacts')">Carnet de contacts</button>
+      <button class="tab" onclick="switchTab('templates')">Modèles d'emails</button>
+    </div>
+    <div id="sectionContacts">
+      <div class="contacts-toolbar">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input class="search-input" type="text" id="searchContacts" placeholder="Rechercher un contact..." />
+        </div>
+        <select class="filter-select" id="filterClient"><option value="">Tous les clients</option></select>
+      </div>
+      <div class="table-wrap">
+        <div class="table-head">
+          <span>Nom / Rôle</span><span>Client bailleur</span><span>Email</span><span>Téléphone</span><span>Notifié pour</span><span>Actions</span>
+        </div>
+        <div id="contactsBody"></div>
+      </div>
+    </div>
+    <div id="sectionTemplates" style="display:none;">
+      <div class="templates-grid" id="templatesGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONTACT -->
+<div class="modal-overlay" id="modalContact">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalContactTitle">Ajouter un contact</div>
+      <button class="modal-close" onclick="closeModal('modalContact')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nom complet *</label><input class="form-input" type="text" id="cNom" placeholder="ex: Marc Renaud" /></div>
+        <div class="form-group"><label class="form-label">Rôle / Fonction</label><input class="form-input" type="text" id="cRole" placeholder="ex: Chargé de secteur" /></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Client bailleur *</label>
+        <select class="form-select" id="cClient" onchange="handleClientChange()">
+          <option value="">— Sélectionner —</option>
+          <option value="OPH Isère Habitat">OPH Isère Habitat</option>
+          <option value="Grenoble Habitat">Grenoble Habitat</option>
+          <option value="Actis">Actis</option>
+          <option value="SDH">SDH</option>
+          <option value="__new__">+ Nouveau client bailleur...</option>
+        </select>
+        <div id="newClientWrap" style="display:none;margin-top:8px;"><input class="form-input" type="text" id="cClientNew" placeholder="Nom du client bailleur..." /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Email *</label><input class="form-input" type="email" id="cEmail" placeholder="ex: m.renaud@oph-isere.fr" /></div>
+        <div class="form-group"><label class="form-label">Téléphone</label><input class="form-input" type="tel" id="cTel" placeholder="ex: 04 76 12 34 56" /></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Notifier pour</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-mid);"><input type="checkbox" id="cNotifRapport" checked style="width:16px;height:16px;accent-color:var(--green);" />Nouveaux rapports d'intervention</label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-mid);"><input type="checkbox" id="cNotifGarantie" checked style="width:16px;height:16px;accent-color:var(--green);" />Passages garantie effectués</label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-mid);"><input type="checkbox" id="cNotifAbsent" style="width:16px;height:16px;accent-color:var(--green);" />Absents / Annulations</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modalContact')">Annuler</button>
+      <button class="btn-save" id="saveContact"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENVOI -->
+<div class="modal-overlay" id="modalSend">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title">Envoyer une notification email</div>
+      <button class="modal-close" onclick="closeModal('modalSend')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="send-context" id="sendContextBlock">
+        <div class="send-context-label">Document concerné</div>
+        <div class="send-context-val" id="sendContextVal">—</div>
+      </div>
+      <div class="form-group" id="sendContactsGroup">
+        <label class="form-label">Destinataires *</label>
+        <div class="contacts-checkboxes" id="sendContactsList"></div>
+      </div>
+      <div class="form-group" id="sendTemplateGroup">
+        <label class="form-label">Modèle de message</label>
+        <select class="form-select" id="sendTemplate" onchange="updatePreview()" style="margin-bottom:10px;">
+          <option value="rapport">Nouveau rapport d'intervention</option>
+          <option value="garantie">Passage garantie effectué</option>
+          <option value="absent">Absent / Annulation</option>
+        </select>
+        <div class="message-preview" id="messagePreview"></div>
+        <div class="form-hint">Le message sera personnalisé automatiquement avec les données du document.</div>
+      </div>
+      <div class="send-success" id="sendSuccess">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        <div class="send-success-title">Email(s) envoyé(s) avec succès !</div>
+        <div class="send-success-sub" id="sendSuccessSub"></div>
+      </div>
+    </div>
+    <div class="modal-footer" id="sendFooter">
+      <button class="btn-cancel" onclick="closeModal('modalSend')">Annuler</button>
+      <button class="btn-green" id="btnConfirmSend"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer l'email</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MODÈLE -->
+<div class="modal-overlay" id="modalTemplate">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="tplModalTitle">Modifier le modèle</div>
+      <button class="modal-close" onclick="closeModal('modalTemplate')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Objet de l'email *</label><input class="form-input" type="text" id="tplSubject" /></div>
+      <div class="form-group" style="margin-bottom:8px;"><label class="form-label">Corps du message *</label><textarea class="form-textarea" id="tplBody"></textarea></div>
+      <div class="form-hint">Variables disponibles :
+        <span style="display:inline-flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <span class="var-chip">{{contact}}</span><span class="var-chip">{{client}}</span><span class="var-chip">{{bc}}</span><span class="var-chip">{{adresse}}</span><span class="var-chip">{{date}}</span><span class="var-chip">{{lien}}</span>
+        </span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('modalTemplate')">Annuler</button>
+      <button class="btn-save" id="saveTpl"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span id="toastMsg"></span></div>
+
+<script>
+let contacts = [
+  { id:1, nom:'Marc Renaud', role:'Responsable patrimoine', client:'OPH Isère Habitat', email:'m.renaud@oph-isere.fr', tel:'04 76 12 34 56', notif:['rapport','garantie'] },
+  { id:2, nom:'Sophie Girard', role:'Chargée de secteur', client:'OPH Isère Habitat', email:'s.girard@oph-isere.fr', tel:'06 78 90 12 34', notif:['rapport','garantie','absent'] },
+  { id:3, nom:'Thomas Blanc', role:'Directeur technique', client:'Grenoble Habitat', email:'t.blanc@grenoble-habitat.fr', tel:'04 76 98 76 54', notif:['rapport'] },
+  { id:4, nom:'Nadia Oumari', role:'Responsable hygiène', client:'Actis', email:'n.oumari@actis38.fr', tel:'06 11 22 33 44', notif:['rapport','garantie','absent'] },
+];
+
+let templates = {
+  rapport:{ id:'rapport', name:'Nouveau rapport d\'intervention', icon:'ti-rapport',
+    subject:'[Belledonne Multiservices] Rapport d\'intervention disponible — {{bc}}',
+    body:`Bonjour {{contact}},
+
+Nous vous informons qu'un nouveau rapport d'intervention est disponible sur votre espace client.
+
+📋 Bon de commande : {{bc}}
+📍 Adresse : {{adresse}}
+📅 Date d'intervention : {{date}}
+
+Consultez et téléchargez ce rapport ici :
+👉 {{lien}}
+
+Cordialement,
+L'équipe Belledonne Multiservices — 06 95 67 26 03`},
+  garantie:{ id:'garantie', name:'Passage garantie effectué', icon:'ti-garantie',
+    subject:'[Belledonne Multiservices] Passage garantie effectué — {{adresse}}',
+    body:`Bonjour {{contact}},
+
+Suite à votre demande, nous confirmons qu'un passage en garantie a été effectué. Le rapport est disponible sur votre espace client.
+
+📍 Adresse : {{adresse}}
+📅 Date d'intervention : {{date}}
+🔗 Bon de commande d'origine : {{bc}}
+
+Accéder au rapport :
+👉 {{lien}}
+
+Cordialement,
+L'équipe Belledonne Multiservices — 06 95 67 26 03`},
+  absent:{ id:'absent', name:'Absent / Annulation', icon:'ti-absent',
+    subject:'[Belledonne Multiservices] Passage non effectué — {{adresse}}',
+    body:`Bonjour {{contact}},
+
+Notre technicien s'est présenté au logement ci-dessous mais n'a pas pu effectuer l'intervention.
+
+📍 Adresse : {{adresse}}
+📅 Date prévue : {{date}}
+📋 Bon de commande : {{bc}}
+
+Merci de nous contacter pour convenir d'un nouveau rendez-vous.
+
+Cordialement,
+L'équipe Belledonne Multiservices — 06 95 67 26 03`}
+};
+
+let editContactId = null;
+let editTplId = null;
+let activeSendClientFilter = null;
+
+window.switchTab = function(tab) {
+  document.getElementById('sectionContacts').style.display = tab==='contacts'?'block':'none';
+  document.getElementById('sectionTemplates').style.display = tab==='templates'?'block':'none';
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&tab==='contacts')||(i===1&&tab==='templates')));
+  if(tab==='templates') renderTemplates();
+};
+
+function notifLabels(n){ const m={rapport:'Rapports',garantie:'Garanties',absent:'Absents'}; return n.map(x=>m[x]||x).join(', ')||'—'; }
+
+function renderContacts(){
+  const q=document.getElementById('searchContacts').value.toLowerCase();
+  const cl=document.getElementById('filterClient').value;
+  const body=document.getElementById('contactsBody');
+  const list=contacts.filter(c=>{
+    const mq=!q||c.nom.toLowerCase().includes(q)||c.email.toLowerCase().includes(q)||(c.role||'').toLowerCase().includes(q);
+    const mc=!cl||c.client===cl;
+    return mq&&mc;
+  });
+  if(list.length===0){body.innerHTML='<div class="empty-state"><p>Aucun contact trouvé.</p></div>';return;}
+  body.innerHTML=list.map(c=>`
+    <div class="table-row">
+      <div><div class="contact-name">${c.nom}</div><div class="contact-role">${c.role||'—'}</div></div>
+      <div><span class="client-pill">${c.client}</span></div>
+      <div class="contact-email">${c.email}</div>
+      <div class="contact-tel">${c.tel||'—'}</div>
+      <div style="font-size:11px;color:var(--text-muted);">${notifLabels(c.notif)}</div>
+      <div class="row-actions">
+        <button class="btn-icon send" title="Envoyer une notification" onclick="openSendModal(${c.id})"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
+        <button class="btn-icon" title="Modifier" onclick="openEditContact(${c.id})"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+        <button class="btn-icon del" title="Supprimer" onclick="deleteContact(${c.id})"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+      </div>
+    </div>`).join('');
+}
+
+function refreshClientFilter(){
+  const clients=[...new Set(contacts.map(c=>c.client))].sort();
+  const sel=document.getElementById('filterClient');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Tous les clients</option>'+clients.map(c=>`<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+}
+
+document.getElementById('searchContacts').addEventListener('input',renderContacts);
+document.getElementById('filterClient').addEventListener('change',renderContacts);
+
+document.getElementById('btnAddContact').addEventListener('click',()=>{
+  editContactId=null;
+  document.getElementById('modalContactTitle').textContent='Ajouter un contact';
+  ['cNom','cRole','cEmail','cTel','cClientNew'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cClient').value='';
+  document.getElementById('cNotifRapport').checked=true;
+  document.getElementById('cNotifGarantie').checked=true;
+  document.getElementById('cNotifAbsent').checked=false;
+  document.getElementById('newClientWrap').style.display='none';
+  document.getElementById('modalContact').classList.add('open');
+});
+
+window.handleClientChange=function(){
+  document.getElementById('newClientWrap').style.display=document.getElementById('cClient').value==='__new__'?'block':'none';
+};
+
+window.openEditContact=function(id){
+  editContactId=id;
+  const c=contacts.find(x=>x.id===id);
+  document.getElementById('modalContactTitle').textContent='Modifier le contact';
+  document.getElementById('cNom').value=c.nom;
+  document.getElementById('cRole').value=c.role||'';
+  document.getElementById('cEmail').value=c.email;
+  document.getElementById('cTel').value=c.tel||'';
+  const sel=document.getElementById('cClient');
+  if(!Array.from(sel.options).some(o=>o.value===c.client)){const opt=document.createElement('option');opt.value=c.client;opt.textContent=c.client;sel.insertBefore(opt,sel.querySelector('option[value="__new__"]'));}
+  sel.value=c.client;
+  document.getElementById('newClientWrap').style.display='none';
+  document.getElementById('cNotifRapport').checked=c.notif.includes('rapport');
+  document.getElementById('cNotifGarantie').checked=c.notif.includes('garantie');
+  document.getElementById('cNotifAbsent').checked=c.notif.includes('absent');
+  document.getElementById('modalContact').classList.add('open');
+};
+
+window.deleteContact=function(id){
+  if(!confirm('Supprimer ce contact ?'))return;
+  contacts=contacts.filter(c=>c.id!==id);
+  renderContacts();refreshClientFilter();
+  showToast('Contact supprimé.');
+};
+
+document.getElementById('saveContact').addEventListener('click',()=>{
+  const nom=document.getElementById('cNom').value.trim();
+  const email=document.getElementById('cEmail').value.trim();
+  let client=document.getElementById('cClient').value;
+  if(client==='__new__') client=document.getElementById('cClientNew').value.trim();
+  if(!nom||!email||!client){alert('Veuillez renseigner nom, email et client bailleur.');return;}
+  const notif=[];
+  if(document.getElementById('cNotifRapport').checked)notif.push('rapport');
+  if(document.getElementById('cNotifGarantie').checked)notif.push('garantie');
+  if(document.getElementById('cNotifAbsent').checked)notif.push('absent');
+  if(editContactId){
+    Object.assign(contacts.find(x=>x.id===editContactId),{nom,role:document.getElementById('cRole').value.trim(),client,email,tel:document.getElementById('cTel').value.trim(),notif});
+  } else {
+    contacts.push({id:Date.now(),nom,role:document.getElementById('cRole').value.trim(),client,email,tel:document.getElementById('cTel').value.trim(),notif});
+    const sel=document.getElementById('cClient');
+    if(!Array.from(sel.options).some(o=>o.value===client)){const opt=document.createElement('option');opt.value=client;opt.textContent=client;sel.insertBefore(opt,sel.querySelector('option[value="__new__"]'));}
+  }
+  closeModal('modalContact');renderContacts();refreshClientFilter();
+  showToast((editContactId?'Contact modifié':'Contact ajouté')+' — '+nom);
+});
+
+// ── ENVOI ──
+window.openSendModal=function(contactId){
+  const c=contacts.find(x=>x.id===contactId);
+  activeSendClientFilter=c.client;
+  const ctx={type:'rapport',bc:'BC-2025-0142',adresse:'8 bis Avenue Marie Reynoard 38100 Grenoble',date:'02/04/2025'};
+  document.getElementById('sendContextVal').textContent=`${ctx.bc} — ${ctx.adresse} — ${ctx.date}`;
+  const clientContacts=contacts.filter(x=>x.client===c.client);
+  document.getElementById('sendContactsList').innerHTML=clientContacts.map(x=>`
+    <label class="contact-check${x.id===contactId?' selected':''}">
+      <input type="checkbox" value="${x.id}" ${x.id===contactId?'checked':''} onchange="this.closest('.contact-check').classList.toggle('selected',this.checked)" />
+      <div><div class="contact-check-name">${x.nom}${x.role?` <span style="font-weight:400;color:var(--text-muted)">· ${x.role}</span>`:''}</div><div class="contact-check-email">${x.email}</div></div>
+    </label>`).join('');
+  document.getElementById('sendTemplate').value=ctx.type;
+  document.getElementById('sendSuccess').style.display='none';
+  document.getElementById('sendContactsGroup').style.display='block';
+  document.getElementById('sendTemplateGroup').style.display='block';
+  document.getElementById('sendContextBlock').style.display='block';
+  document.getElementById('sendFooter').innerHTML=`<button class="btn-cancel" onclick="closeModal('modalSend')">Annuler</button><button class="btn-green" id="btnConfirmSend"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer l'email</button>`;
+  document.getElementById('btnConfirmSend').addEventListener('click',confirmSend);
+  updatePreview(c,ctx);
+  document.getElementById('modalSend').classList.add('open');
+};
+
+window.updatePreview=function(c,ctx){
+  const tplKey=document.getElementById('sendTemplate').value;
+  const tpl=templates[tplKey];
+  if(!tpl)return;
+  const contact=c||contacts[0];
+  const context=ctx||{bc:'BC-2025-0142',adresse:'[Adresse]',date:'[Date]'};
+  const body=tpl.body
+    .replace(/{{contact}}/g,contact?contact.nom.split(' ')[0]:'Madame, Monsieur')
+    .replace(/{{client}}/g,contact?contact.client:'[Client]')
+    .replace(/{{bc}}/g,context.bc||'[BC]')
+    .replace(/{{adresse}}/g,context.adresse||'[Adresse]')
+    .replace(/{{date}}/g,context.date||'[Date]')
+    .replace(/{{lien}}/g,'https://clients-belledonne-multiservices.com');
+  document.getElementById('messagePreview').textContent=body;
+};
+
+function confirmSend(){
+  const checked=document.querySelectorAll('#sendContactsList input[type="checkbox"]:checked');
+  if(checked.length===0){alert('Sélectionnez au moins un destinataire.');return;}
+  const names=Array.from(checked).map(cb=>{const c=contacts.find(x=>x.id===parseInt(cb.value));return c?c.nom:'';}).filter(Boolean);
+  document.getElementById('sendSuccess').style.display='block';
+  document.getElementById('sendSuccessSub').textContent='Email envoyé à : '+names.join(', ');
+  document.getElementById('sendContactsGroup').style.display='none';
+  document.getElementById('sendTemplateGroup').style.display='none';
+  document.getElementById('sendContextBlock').style.display='none';
+  document.getElementById('sendFooter').innerHTML=`<button class="btn-save" onclick="closeModal('modalSend')">Fermer</button>`;
+  showToast('Email envoyé à '+names.length+' destinataire'+(names.length>1?'s':'')+' !');
+}
+
+// ── MODÈLES ──
+function renderTemplates(){
+  document.getElementById('templatesGrid').innerHTML=Object.values(templates).map(t=>`
+    <div class="template-card">
+      <div class="template-top">
+        <div class="template-icon ${t.icon}">
+          ${t.id==='rapport'?'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>':t.id==='garantie'?'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>':'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>'}
+        </div>
+        <div class="template-name">${t.name}</div>
+        <button class="btn-edit-tpl" onclick="openEditTemplate('${t.id}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> Modifier</button>
+      </div>
+      <div class="template-body">
+        <div class="template-subject">Objet</div>
+        <div class="template-subject-val">${t.subject}</div>
+        <div class="template-msg">${t.body.substring(0,180)}${t.body.length>180?'…':''}</div>
+        <div class="template-vars"><span style="font-size:11px;color:var(--text-muted);">Variables :</span><span class="var-chip">{{contact}}</span><span class="var-chip">{{bc}}</span><span class="var-chip">{{adresse}}</span><span class="var-chip">{{date}}</span><span class="var-chip">{{lien}}</span></div>
+      </div>
+    </div>`).join('');
+}
+
+window.openEditTemplate=function(id){
+  editTplId=id;
+  const t=templates[id];
+  document.getElementById('tplModalTitle').textContent='Modifier — '+t.name;
+  document.getElementById('tplSubject').value=t.subject;
+  document.getElementById('tplBody').value=t.body;
+  document.getElementById('modalTemplate').classList.add('open');
+};
+
+document.getElementById('saveTpl').addEventListener('click',()=>{
+  const subject=document.getElementById('tplSubject').value.trim();
+  const body=document.getElementById('tplBody').value.trim();
+  if(!subject||!body){alert('Veuillez remplir l\'objet et le corps du message.');return;}
+  templates[editTplId].subject=subject;
+  templates[editTplId].body=body;
+  closeModal('modalTemplate');renderTemplates();
+  showToast('Modèle mis à jour !');
+});
+
+window.closeModal=function(id){document.getElementById(id).classList.remove('open');};
+document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+
+function showToast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+
+refreshClientFilter();
+renderContacts();
+</script>
+</body>
+</html>

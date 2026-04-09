@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garanties — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
+    --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
+    --amber:#F5A623;--red:#E74C3C;
+    --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
+    --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
+    --sidebar-w:240px;--radius:14px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+
+  /* SIDEBAR */
+  .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-mark{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-icon svg{width:18px;height:18px;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
+  .sidebar-client{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:12px 14px;}
+  .client-label{font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;}
+  .client-name{font-size:13px;font-weight:500;color:#fff;}
+  .client-contract{font-size:11px;color:var(--green);margin-top:2px;}
+  .sidebar-nav{padding:20px 12px;flex:1;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
+  .nav-group-label:first-child{margin-top:0;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.8;}
+  .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;}
+  .footer-user:hover{background:rgba(255,255,255,0.05);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--navy-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--green);flex-shrink:0;}
+  .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .footer-role{font-size:10px;color:rgba(255,255,255,0.3);}
+
+  /* MAIN */
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
+  .content{padding:32px;flex:1;}
+  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:14px;color:var(--text-muted);}
+
+  /* KPI */
+  .kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;position:relative;overflow:hidden;}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+  .kpi.green::before{background:var(--green);}
+  .kpi.amber::before{background:var(--amber);}
+  .kpi.navy::before{background:var(--navy);}
+  .kpi-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px;}
+  .kpi-lbl{font-size:12px;color:var(--text-muted);}
+
+  /* BOUTON */
+  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
+  .btn-primary:hover{background:var(--navy-mid);}
+  .btn-primary svg{width:16px;height:16px;}
+
+  /* SEARCH */
+  .search-bar{display:flex;gap:12px;margin-bottom:24px;align-items:center;}
+  .search-wrap{flex:1;position:relative;max-width:420px;}
+  .search-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
+  .search-input{width:100%;height:42px;padding:0 14px 0 40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .search-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .search-input::placeholder{color:var(--text-muted);}
+  .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
+  .results-count{font-size:13px;color:var(--text-muted);white-space:nowrap;margin-left:auto;}
+
+  /* TABLE */
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .table-head{display:grid;grid-template-columns:2.4fr 1.2fr 1fr 1fr 0.8fr;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
+  .table-row{display:grid;grid-template-columns:2.4fr 1.2fr 1fr 1fr 0.8fr;gap:8px;padding:14px 22px;border-top:1px solid var(--border);align-items:center;cursor:pointer;transition:background 0.1s;}
+  .table-row:hover{background:var(--bg);}
+
+  .addr-main{font-size:13px;font-weight:500;color:var(--text);}
+  .addr-sub{font-size:11px;color:var(--text-muted);margin-top:1px;}
+  .bc-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--navy);background:#EBF0F5;padding:3px 9px;border-radius:20px;}
+  .cell-date{font-size:12px;color:var(--text-mid);}
+  .cell-tech{display:flex;align-items:center;gap:6px;}
+  .tech-av{width:24px;height:24px;border-radius:50%;background:var(--navy);font-size:9px;font-weight:600;color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .tech-nm{font-size:12px;color:var(--text-mid);}
+
+  .nuisible-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;}
+  .n-punaise{background:#FBEAF0;color:#722440;}
+  .n-rongeur{background:#FAEEDA;color:#854F0B;}
+  .n-blatte{background:#EBF0F5;color:#1A5F8A;}
+  .n-pigeon{background:#EAF3DE;color:#3B6D11;}
+
+  .btn-rapport{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background 0.15s;white-space:nowrap;}
+  .btn-rapport:hover{background:#C8F0E1;}
+  .btn-rapport svg{width:11px;height:11px;}
+  .no-rapport{font-size:11px;color:var(--text-muted);}
+
+  /* EMPTY */
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+  .empty-state svg{width:44px;height:44px;margin-bottom:12px;opacity:0.25;}
+  .empty-state p{font-size:14px;}
+
+  /* MODAL */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border-radius:var(--radius);width:540px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);animation:fadeUp 0.2s ease;}
+  .modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
+  .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;}
+  .modal-close:hover{background:#E5EAF0;}
+  .modal-body{padding:24px 26px;}
+  .modal-footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;}
+  .form-group{margin-bottom:16px;}
+  .form-label{display:block;font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;}
+  .form-input{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .form-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-select{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;cursor:pointer;}
+  .form-select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;resize:vertical;min-height:72px;transition:border-color 0.15s;}
+  .form-textarea:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+
+  .drop-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;position:relative;}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--green);background:var(--green-pale);}
+  .drop-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .drop-text{font-size:13px;color:var(--text-mid);margin-bottom:2px;}
+  .drop-sub{font-size:11px;color:var(--text-muted);}
+  .drop-chosen{font-size:13px;color:var(--green-dark);font-weight:500;margin-top:6px;display:none;}
+
+  .btn-cancel{height:40px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  .btn-cancel:hover{background:var(--bg);}
+  .btn-save{height:40px;padding:0 22px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .btn-save:hover{background:var(--navy-mid);}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);z-index:300;transform:translateY(80px);opacity:0;transition:transform 0.3s ease,opacity 0.3s ease;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast svg{width:16px;height:16px;color:var(--green);flex-shrink:0;}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+  .nuisible-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;}
+  .n-punaise{background:#FBEAF0;color:#722440;}
+  .n-rongeur{background:#FAEEDA;color:#854F0B;}
+  .n-blatte{background:#EBF0F5;color:#1A5F8A;}
+  .n-pigeon{background:#EAF3DE;color:#3B6D11;}
+  .n-custom{background:#F1EFE8;color:#5F5E5A;}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+    </div>
+  </div>
+  <div class="sidebar-client">
+    <div class="client-label">Client</div>
+    <div class="client-name">OPH Isère Habitat</div>
+    <div class="client-contract">Contrat #2024-0089</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg><span>Garanties</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits</span></a>
+    <a class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg><span>Fiches sécurité (FDS)</span></a>
+    <div class="nav-group-label">Compte</div>
+    <a class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Messages</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar">MR</div>
+      <div><div class="footer-name">Marc Renaud</div><div class="footer-role">Responsable patrimoine</div></div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Espace client</span><span>›</span><span>Garanties</span></div>
+    <div class="date-chip">Jeudi 9 avril 2025</div>
+  </header>
+
+  <div class="content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Interventions sous garantie</div>
+        <div class="page-sub">Passages effectués suite aux demandes de rappel des bailleurs</div>
+      </div>
+      <button class="btn-primary" id="btnAjouter">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Ajouter un passage garantie
+      </button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+      <div class="kpi green">
+        <div class="kpi-val" id="kpiTotal">0</div>
+        <div class="kpi-lbl">Passages garantie effectués</div>
+      </div>
+      <div class="kpi navy">
+        <div class="kpi-val" id="kpiAnnee">0</div>
+        <div class="kpi-lbl">Cette année</div>
+      </div>
+      <div class="kpi amber">
+        <div class="kpi-val" id="kpiRapports">0</div>
+        <div class="kpi-lbl">Rapports joints</div>
+      </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="search-bar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input class="search-input" type="text" id="searchInput" placeholder="Rechercher par adresse, bon de commande..." />
+      </div>
+      <select class="filter-select" id="filterNuisible">
+        <option value="">Tous types d'intervention</option>
+        <option value="punaise">Punaises de lit</option>
+        <option value="rongeur">Rongeurs</option>
+        <option value="blatte">Blattes / Insectes</option>
+        <option value="pigeon">Dépigeonnage</option>
+      </select>
+      <select class="filter-select" id="filterAnnee">
+        <option value="">Toutes les années</option>
+        <option value="2025">2025</option>
+        <option value="2024">2024</option>
+      </select>
+      <span class="results-count" id="resultsCount"></span>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap">
+      <div class="table-head">
+        <span>Adresse</span>
+        <span>Bon de commande</span>
+        <span>Date intervention</span>
+        <span>Type d'intervention</span>
+        <span>Rapport</span>
+      </div>
+      <div id="tableBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Ajouter un passage garantie</div>
+      <button class="modal-close" id="closeModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Client bailleur *</label>
+        <select class="form-select" id="inClient" onchange="handleClientSelect()">
+          <option value="">— Sélectionner le client —</option>
+          <option value="OPH Isère Habitat">OPH Isère Habitat</option>
+          <option value="Grenoble Habitat">Grenoble Habitat</option>
+          <option value="Actis">Actis</option>
+          <option value="SDH">SDH</option>
+          <option value="__new__">+ Nouveau client bailleur...</option>
+        </select>
+        <div id="newClientWrap" style="display:none;margin-top:8px;">
+          <input class="form-input" type="text" id="inClientNew" placeholder="Nom du client bailleur..." />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adresse du logement *</label>
+        <input class="form-input" type="text" id="inAdresse" placeholder="ex: 8 bis Avenue Marie Reynoard 38100 Grenoble" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Bon de commande initial</label>
+          <input class="form-input" type="text" id="inBC" placeholder="ex: BC-2025-0142" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date d'intervention *</label>
+          <input class="form-input" type="date" id="inDate" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Type d'intervention *</label>
+          <select class="form-select" id="inNuisible" onchange="handleTypeChange()">
+            <option value="">— Sélectionner —</option>
+            <option value="punaise">Punaises de lit</option>
+            <option value="rongeur">Rongeurs</option>
+            <option value="blatte">Blattes / Insectes</option>
+            <option value="pigeon">Dépigeonnage</option>
+            <option value="__autre__">+ Autre type...</option>
+          </select>
+          <div id="inNuisibleCustomWrap" style="display:none;flex-direction:row;gap:8px;margin-top:8px;">
+            <input class="form-input" type="text" id="inNuisibleCustom" placeholder="ex: Désinfection, Nettoyage..." style="flex:1;" />
+            <button type="button" onclick="addCustomType()" style="height:42px;padding:0 14px;border:none;background:var(--green);color:white;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Ajouter</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Note / Observations</label>
+        <textarea class="form-textarea" id="inNote" placeholder="ex: Retraitement partiel chambre principale, présence résiduelle détectée..."></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Rapport d'intervention PDF</label>
+        <div class="drop-zone" id="dropZone">
+          <input type="file" accept=".pdf" id="fileInput" />
+          <div class="drop-text">Glissez le rapport PDF ici ou cliquez pour choisir</div>
+          <div class="drop-sub">Fichier PDF uniquement · Max 20 Mo</div>
+          <div class="drop-chosen" id="dropChosen"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="cancelModal">Annuler</button>
+      <button class="btn-save" id="saveModal">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="modalSend" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;width:520px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);">
+    <div style="padding:22px 26px 18px;border-bottom:1px solid rgba(13,27,42,0.09);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;">Notifier le client bailleur</div>
+      <button style="width:32px;height:32px;border:none;background:#F2F5F8;border-radius:6px;cursor:pointer;font-size:18px;" onclick="document.getElementById('modalSend').style.display='none'">✕</button>
+    </div>
+    <div style="padding:24px 26px;">
+      <div style="background:#F2F5F8;border-radius:8px;padding:12px 16px;margin-bottom:18px;border-left:3px solid #2ECC8F;">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#8FA4B8;margin-bottom:4px;">Document concerné</div>
+        <div style="font-size:13px;font-weight:500;color:#0D1B2A;" id="sendCtxVal">—</div>
+      </div>
+      <div id="sendMainContent">
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:500;color:#4A6078;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Destinataires</div>
+          <div style="display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;" id="sendContactsList"></div>
+          <div style="margin-top:10px;border-top:1px dashed rgba(13,27,42,0.09);padding-top:10px;">
+            <div style="font-size:11px;color:#8FA4B8;margin-bottom:6px;">Ajouter un destinataire ponctuel (non enregistré)</div>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="extraNom" placeholder="Nom (optionnel)" style="flex:1;height:36px;padding:0 12px;border:1px solid rgba(13,27,42,0.09);border-radius:8px;background:#F2F5F8;font-family:'DM Sans',sans-serif;font-size:13px;color:#0D1B2A;outline:none;" onfocus="this.style.borderColor='#2ECC8F'" onblur="this.style.borderColor=''" />
+              <input type="email" id="extraEmail" placeholder="Email *" style="flex:1.5;height:36px;padding:0 12px;border:1px solid rgba(13,27,42,0.09);border-radius:8px;background:#F2F5F8;font-family:'DM Sans',sans-serif;font-size:13px;color:#0D1B2A;outline:none;" onfocus="this.style.borderColor='#2ECC8F'" onblur="this.style.borderColor=''" />
+              <button type="button" onclick="addExtraRecipient()" style="height:36px;padding:0 14px;border:none;background:#0D1B2A;color:#fff;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">+ Ajouter</button>
+            </div>
+            <div id="extraList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div style="font-size:12px;font-weight:500;color:#4A6078;text-transform:uppercase;letter-spacing:0.05em;">Message</div>
+            <span style="font-size:11px;color:#8FA4B8;">Modifiable avant envoi</span>
+          </div>
+          <textarea id="sendMsgPreview" style="width:100%;padding:12px 14px;border:1px solid rgba(13,27,42,0.09);border-radius:8px;background:#F2F5F8;font-family:'DM Sans',sans-serif;font-size:12px;color:#4A6078;line-height:1.7;resize:vertical;min-height:160px;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='#2ECC8F';this.style.background='#fff'" onblur="this.style.borderColor='';this.style.background='#F2F5F8'"></textarea>
+        </div>
+      </div>
+      <div id="sendSuccessBlock" style="display:none;text-align:center;padding:16px 0;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:44px;height:44px;color:#2ECC8F;margin-bottom:8px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px;">Email envoyé !</div>
+        <div style="font-size:13px;color:#8FA4B8;" id="sendSuccessMsg"></div>
+      </div>
+    </div>
+    <div style="padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;" id="sendModalFooter"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<script>
+const TYPE_LABELS = { punaise:'Punaises de lit', rongeur:'Rongeurs', blatte:'Blattes / Insectes', pigeon:'Dépigeonnage' };
+const TYPE_COLORS = { punaise:'n-punaise', rongeur:'n-rongeur', blatte:'n-blatte', pigeon:'n-pigeon' };
+
+function getTypeLabel(val) { return TYPE_LABELS[val] || val; }
+function getTypeColor(val) { return TYPE_COLORS[val] || 'n-custom'; }
+
+window.handleTypeChange = function() {
+  const val = document.getElementById('inNuisible').value;
+  const wrap = document.getElementById('inNuisibleCustomWrap');
+  wrap.style.display = val === '__autre__' ? 'flex' : 'none';
+  if (val === '__autre__') document.getElementById('inNuisibleCustom').focus();
+};
+
+window.addCustomType = function() {
+  const input = document.getElementById('inNuisibleCustom');
+  const label = input.value.trim();
+  if (!label) return;
+  const val = label.toLowerCase().replace(/\s+/g, '_');
+  if (!TYPE_LABELS[val]) {
+    TYPE_LABELS[val] = label;
+    const sel = document.getElementById('inNuisible');
+    const opt = document.createElement('option');
+    opt.value = val; opt.textContent = label;
+    sel.insertBefore(opt, sel.querySelector('option[value="__autre__"]'));
+    const fopt = document.createElement('option');
+    fopt.value = val; fopt.textContent = label;
+    document.getElementById('filterNuisible').appendChild(fopt);
+  }
+  document.getElementById('inNuisible').value = val;
+  document.getElementById('inNuisibleCustomWrap').style.display = 'none';
+  input.value = '';
+};
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement.id === 'inNuisibleCustom') {
+    e.preventDefault(); window.addCustomType();
+  }
+});
+
+let garanties = [
+  { id:1, adresse:'8 bis Avenue Marie Reynoard 38100 Grenoble', bc:'BC-2025-0142', date:'2025-03-15', nuisible:'punaise', tech:'J. Dupont', note:'Retraitement chambre principale, infestation résiduelle détectée lors du contrôle.', rapport:true, notifs:0 },
+  { id:2, adresse:'12 rue des Tilleuls 38000 Grenoble', bc:'BC-2025-0129', date:'2025-02-20', nuisible:'rongeur', tech:'A. Lebrun', note:'Intervention rapide suite signalement locataire. Piège repositionné.', rapport:true, notifs:0 },
+  { id:3, adresse:'45 Avenue de la Paix 38000 Grenoble', bc:'BC-2024-0098', date:'2024-12-10', nuisible:'blatte', tech:'M. Faure', note:'', rapport:false, notifs:0 },
+  { id:4, adresse:'3 rue Victor Hugo 38000 Grenoble', bc:'BC-2024-0087', date:'2024-11-05', nuisible:'punaise', tech:'J. Dupont', note:'Deuxième retraitement, amélioration constatée.', rapport:true, notifs:0 },
+];
+
+function formatDate(d) {
+  if (!d) return '—';
+  const [y,m,day] = d.split('-');
+  const mois = ['jan.','fév.','mars','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
+  return `${parseInt(day)} ${mois[parseInt(m)-1]} ${y}`;
+}
+
+function initiales(nom) {
+  if (!nom) return '?';
+  return nom.split(' ').filter(Boolean).map(p => p[0].toUpperCase()).join('').slice(0,2);
+}
+
+function updateKPIs(list) {
+  const annee = new Date().getFullYear().toString();
+  document.getElementById('kpiTotal').textContent = garanties.length;
+  document.getElementById('kpiAnnee').textContent = garanties.filter(g => g.date.startsWith(annee)).length;
+  document.getElementById('kpiRapports').textContent = garanties.filter(g => g.rapport).length;
+}
+
+function renderTable(list) {
+  const body = document.getElementById('tableBody');
+  const count = document.getElementById('resultsCount');
+  count.textContent = list.length + ' résultat' + (list.length > 1 ? 's' : '');
+
+  if (list.length === 0) {
+    body.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><p>Aucun passage garantie trouvé.</p></div>`;
+    return;
+  }
+
+  body.innerHTML = list.map(g => `
+    <div class="table-row">
+      <div>
+        <div class="addr-main">${g.adresse.split(',')[0]}</div>
+        <div class="addr-sub">${g.adresse.includes(',') ? g.adresse.split(',').slice(1).join(',').trim() : g.adresse.substring(g.adresse.indexOf(' ', 10))}</div>
+        ${g.note ? `<div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;">${g.note}</div>` : ''}
+      </div>
+      ${g.bc ? `<span class="bc-chip">${g.bc}</span>` : `<span style="font-size:12px;color:var(--text-muted);">—</span>`}
+      <span class="cell-date">${formatDate(g.date)}</span>
+      <span class="nuisible-pill ${getTypeColor(g.nuisible)}">${getTypeLabel(g.nuisible)}</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        ${g.notifs > 0 ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifié${g.notifs > 1 ? ' ×'+g.notifs : ''}</span>` : ''}
+        ${g.rapport
+          ? `<button class="btn-rapport"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</button>`
+          : `<span class="no-rapport">Non joint</span>`}
+        <button onclick="openSendModal('garantie','${g.bc||''}','${g.adresse}','${g.date}',${g.id})" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:var(--green-dark);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+function filter() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const n = document.getElementById('filterNuisible').value;
+  const y = document.getElementById('filterAnnee').value;
+  const filtered = garanties.filter(g => {
+    const mq = !q || g.adresse.toLowerCase().includes(q) || g.bc.toLowerCase().includes(q);
+    const mn = !n || g.nuisible === n;
+    const my = !y || g.date.startsWith(y);
+    return mq && mn && my;
+  });
+  renderTable(filtered);
+}
+
+document.getElementById('searchInput').addEventListener('input', filter);
+document.getElementById('filterNuisible').addEventListener('change', filter);
+document.getElementById('filterAnnee').addEventListener('change', filter);
+
+// MODAL
+const modal = document.getElementById('modal');
+document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
+document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
+document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
+modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+
+window.handleClientSelect = function() {
+  document.getElementById('newClientWrap').style.display = document.getElementById('inClient').value === '__new__' ? 'block' : 'none';
+};
+
+const fileInput = document.getElementById('fileInput');
+const dropChosen = document.getElementById('dropChosen');
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) { dropChosen.textContent = '✓ ' + fileInput.files[0].name; dropChosen.style.display = 'block'; }
+});
+
+document.getElementById('saveModal').addEventListener('click', () => {
+  const adresse = document.getElementById('inAdresse').value.trim();
+  const bc = document.getElementById('inBC').value.trim();
+  const date = document.getElementById('inDate').value;
+  const nuisible = document.getElementById('inNuisible').value;
+  let client = document.getElementById('inClient').value;
+  if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
+  if (!client || !adresse || !date || !nuisible) { alert('Veuillez remplir les champs obligatoires : client bailleur, adresse, date et type d\'intervention.'); return; }
+  garanties.unshift({
+    id: Date.now(),
+    adresse, bc, date, nuisible, client,
+    tech: '—',
+    note: document.getElementById('inNote').value.trim(),
+    rapport: !!fileInput.files[0],
+    notifs: 0
+  });
+  filter();
+  updateKPIs();
+  modal.classList.remove('open');
+  ['inAdresse','inBC','inDate','inNote'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inNuisible').value = '';
+  fileInput.value = ''; dropChosen.style.display = 'none';
+  showToast('Passage garantie ajouté — ' + adresse.substring(0,40));
+});
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+updateKPIs();
+filter();
+
+// ── MODAL ENVOI ──
+const CONTACTS_DB = [
+  { nom:'Marc Renaud', role:'Responsable patrimoine', client:'OPH Isère Habitat', email:'m.renaud@oph-isere.fr', notif:['rapport','garantie'] },
+  { nom:'Sophie Girard', role:'Chargée de secteur', client:'OPH Isère Habitat', email:'s.girard@oph-isere.fr', notif:['rapport','garantie','absent'] },
+  { nom:'Thomas Blanc', role:'Directeur technique', client:'Grenoble Habitat', email:'t.blanc@grenoble-habitat.fr', notif:['rapport'] },
+  { nom:'Nadia Oumari', role:'Responsable hygiène', client:'Actis', email:'n.oumari@actis38.fr', notif:['rapport','garantie','absent'] },
+];
+const CLIENT_PAR_DEFAUT = 'OPH Isère Habitat';
+
+let currentSendId = null;
+let extraRecipients = [];
+
+window.addExtraRecipient = function() {
+  const nom = document.getElementById('extraNom').value.trim();
+  const email = document.getElementById('extraEmail').value.trim();
+  if (!email || !email.includes('@')) { alert('Veuillez saisir un email valide.'); return; }
+  if (extraRecipients.find(r => r.email === email)) { alert('Cet email est déjà ajouté.'); return; }
+  extraRecipients.push({ nom: nom || email, email });
+  document.getElementById('extraNom').value = '';
+  document.getElementById('extraEmail').value = '';
+  renderExtraList();
+};
+
+window.removeExtra = function(email) {
+  extraRecipients = extraRecipients.filter(r => r.email !== email);
+  renderExtraList();
+};
+
+function renderExtraList() {
+  const container = document.getElementById('extraList');
+  container.innerHTML = extraRecipients.map(r => `
+    <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:#E8F9F2;border:1px solid rgba(46,204,143,0.25);border-radius:8px;">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;color:#1DA870;flex-shrink:0;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+      <span style="flex:1;font-size:12px;font-weight:500;color:#1DA870;">${r.nom} <span style="font-weight:400;opacity:0.8;">&lt;${r.email}&gt;</span></span>
+      <button onclick="removeExtra('${r.email}')" style="border:none;background:transparent;cursor:pointer;color:#1DA870;font-size:16px;line-height:1;padding:0 2px;opacity:0.7;">×</button>
+    </div>`).join('');
+}
+
+window.openSendModal = function(type, bc, adresse, date, id) {
+  currentSendId = id;
+  extraRecipients = [];
+  if (document.getElementById('extraList')) document.getElementById('extraList').innerHTML = '';
+  if (document.getElementById('extraNom')) document.getElementById('extraNom').value = '';
+  if (document.getElementById('extraEmail')) document.getElementById('extraEmail').value = '';
+  const ctx = document.getElementById('sendCtxVal');
+  if(ctx) ctx.textContent = `${bc||'—'} — ${adresse} — ${formatDate(date)}`;
+  const clientContacts = CONTACTS_DB.filter(c => c.client === CLIENT_PAR_DEFAUT);
+  const list = document.getElementById('sendContactsList');
+  list.innerHTML = clientContacts.length === 0
+    ? '<div style="font-size:13px;color:#8FA4B8;text-align:center;padding:16px;">Aucun contact.<br><a href="contacts.html" style="color:#1DA870;font-weight:500;">Ajouter →</a></div>'
+    : clientContacts.map(c => {
+        const preChecked = c.notif && c.notif.includes(type);
+        return `<label style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid ${preChecked?'#2ECC8F':'rgba(13,27,42,0.09)'};border-radius:8px;cursor:pointer;background:${preChecked?'#E8F9F2':'transparent'};" onclick="this.querySelector('input').checked=!this.querySelector('input').checked;this.style.borderColor=this.querySelector('input').checked?'#2ECC8F':'rgba(13,27,42,0.09)';this.style.background=this.querySelector('input').checked?'#E8F9F2':'transparent';">
+          <input type="checkbox" ${preChecked?'checked':''} value="${c.email}" style="width:16px;height:16px;accent-color:#2ECC8F;cursor:pointer;flex-shrink:0;" onclick="event.stopPropagation();" />
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:500;color:#0D1B2A;">${c.nom} <span style="font-weight:400;color:#8FA4B8;">· ${c.role}</span>${!preChecked?` <span style="font-size:10px;background:#EBF0F5;color:#4A6078;padding:1px 6px;border-radius:8px;margin-left:4px;">Hors liste habituelle</span>`:''}</div>
+            <div style="font-size:11px;color:#8FA4B8;">${c.email}</div>
+          </div>
+        </label>`;
+      }).join('');
+
+  const msgType = type === 'garantie' ? 'passage en garantie' : 'absent/annulation';
+  const prenom = clientContacts.length > 0 ? clientContacts[0].nom.split(' ')[0] : 'Madame, Monsieur';
+  document.getElementById('sendMsgPreview').value =
+`Bonjour ${prenom},
+
+Nous vous confirmons qu'un ${msgType} a été enregistré sur votre espace client.
+
+📍 Adresse : ${adresse}
+📅 Date : ${formatDate(date)}${bc ? '\n📋 Bon de commande : '+bc : ''}
+
+Consultez le détail ici :
+👉 https://clients-belledonne-multiservices.com
+
+Cordialement,
+L'équipe Belledonne Multiservices — 06 95 67 26 03`;
+
+  document.getElementById('sendMainContent').style.display = 'block';
+  document.getElementById('sendSuccessBlock').style.display = 'none';
+  document.getElementById('sendModalFooter').innerHTML = `
+    <button style="height:40px;padding:0 18px;border:1px solid rgba(13,27,42,0.09);background:transparent;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;color:#4A6078;cursor:pointer;" onclick="document.getElementById('modalSend').classList.remove('open')">Annuler</button>
+    <button style="height:40px;padding:0 22px;border:none;background:#2ECC8F;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#0D1B2A;cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="confirmSend()">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer l'email
+    </button>`;
+  document.getElementById('modalSend').style.display = 'flex';
+};
+
+window.confirmSend = function() {
+  const checked = document.querySelectorAll('#sendContactsList input:checked');
+  if (checked.length === 0 && extraRecipients.length === 0) { alert('Sélectionnez au moins un destinataire.'); return; }
+  const names = [
+    ...Array.from(checked).map(cb => (CONTACTS_DB.find(c=>c.email===cb.value)||{nom:cb.value}).nom),
+    ...extraRecipients.map(r => r.nom)
+  ];
+  if (currentSendId !== null) {
+    const g = garanties.find(x => x.id === currentSendId);
+    if (g) g.notifs = (g.notifs || 0) + 1;
+  }
+  document.getElementById('sendMainContent').style.display = 'none';
+  document.getElementById('sendSuccessBlock').style.display = 'block';
+  document.getElementById('sendSuccessMsg').textContent = 'Email envoyé à : ' + names.join(', ');
+  document.getElementById('sendModalFooter').innerHTML = `<button style="height:40px;padding:0 22px;border:none;background:#0D1B2A;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;" onclick="document.getElementById('modalSend').style.display='none';filter()">Fermer</button>`;
+  showToast('Email envoyé à ' + names.length + ' destinataire' + (names.length>1?'s':'') + ' !');
+};
+
+document.getElementById('modalSend').addEventListener('click', e => { if(e.target===document.getElementById('modalSend')) document.getElementById('modalSend').style.display='none'; });
+</script>
+</body>
+</html>

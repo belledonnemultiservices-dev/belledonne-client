@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Protocoles d'intervention — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
+    --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
+    --amber:#F5A623;--red:#E74C3C;
+    --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
+    --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
+    --sidebar-w:240px;--radius:14px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+
+  .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-mark{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-icon svg{width:18px;height:18px;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
+  .sidebar-client{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:12px 14px;}
+  .client-label{font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;}
+  .client-name{font-size:13px;font-weight:500;color:#fff;}
+  .client-contract{font-size:11px;color:var(--green);margin-top:2px;}
+  .sidebar-nav{padding:20px 12px;flex:1;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
+  .nav-group-label:first-child{margin-top:0;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.8;}
+  .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;}
+  .footer-user:hover{background:rgba(255,255,255,0.05);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--navy-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--green);flex-shrink:0;}
+  .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .footer-role{font-size:10px;color:rgba(255,255,255,0.3);}
+
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
+  .content{padding:32px;flex:1;}
+  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:14px;color:var(--text-muted);}
+
+  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
+  .btn-primary:hover{background:var(--navy-mid);}
+  .btn-primary svg{width:16px;height:16px;}
+
+  /* INFO BANNER */
+  .info-banner{display:flex;align-items:center;gap:12px;background:var(--green-pale);border:1px solid rgba(46,204,143,0.2);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:28px;font-size:13px;color:var(--green-dark);}
+  .info-banner svg{width:16px;height:16px;flex-shrink:0;}
+
+  /* SEARCH */
+  .search-bar{display:flex;gap:12px;margin-bottom:24px;align-items:center;}
+  .search-wrap{flex:1;position:relative;max-width:400px;}
+  .search-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
+  .search-input{width:100%;height:42px;padding:0 14px 0 40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .search-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .search-input::placeholder{color:var(--text-muted);}
+  .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
+  .results-count{font-size:13px;color:var(--text-muted);white-space:nowrap;margin-left:auto;}
+
+  /* GRILLE */
+  .protocols-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+
+  .protocol-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:transform 0.12s,box-shadow 0.12s,border-color 0.12s;}
+  .protocol-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(13,27,42,0.07);}
+
+  .card-color-bar{height:4px;}
+  .bar-punaise{background:#D4537E;}
+  .bar-rongeur{background:var(--amber);}
+  .bar-blatte{background:#378ADD;}
+  .bar-pigeon{background:var(--green);}
+  .bar-desinfection{background:#7F77DD;}
+  .bar-autre{background:var(--text-muted);}
+
+  .card-body{padding:20px 22px;}
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;gap:12px;}
+
+  .card-icon{width:44px;height:44px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .ic-punaise{background:#FBEAF0;}
+  .ic-rongeur{background:#FEF5E4;}
+  .ic-blatte{background:#E6F1FB;}
+  .ic-pigeon{background:var(--green-pale);}
+  .ic-desinfection{background:#EEEDFE;}
+  .ic-autre{background:#F1EFE8;}
+  .card-icon svg{width:22px;height:22px;}
+
+  .type-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:0.04em;text-transform:uppercase;}
+  .tb-punaise{background:#FBEAF0;color:#722440;}
+  .tb-rongeur{background:#FEF5E4;color:#854F0B;}
+  .tb-blatte{background:#E6F1FB;color:#185FA5;}
+  .tb-pigeon{background:var(--green-pale);color:var(--green-dark);}
+  .tb-desinfection{background:#EEEDFE;color:#3C3489;}
+  .tb-autre{background:#F1EFE8;color:#5F5E5A;}
+
+  .card-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;}
+  .card-desc{font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:16px;}
+
+  .card-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .meta-info{display:flex;gap:14px;}
+  .meta-chip{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;}
+  .meta-chip svg{width:12px;height:12px;}
+  .meta-chip strong{color:var(--text-mid);font-weight:500;}
+
+  .version-badge{font-size:10px;font-weight:600;background:#EBF0F5;color:var(--text-mid);padding:2px 8px;border-radius:10px;}
+
+  .card-actions{display:flex;gap:8px;}
+  .btn-dl{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:8px 16px;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:background 0.15s;border:none;flex:1;justify-content:center;}
+  .btn-dl.primary{background:var(--navy);color:#fff;}
+  .btn-dl.primary:hover{background:var(--navy-mid);}
+  .btn-dl.secondary{background:var(--bg);color:var(--text-mid);border:1px solid var(--border);}
+  .btn-dl.secondary:hover{background:#E5EAF0;}
+  .btn-dl svg{width:13px;height:13px;}
+
+  /* EMPTY */
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+  .empty-state svg{width:44px;height:44px;margin-bottom:12px;opacity:0.25;}
+  .empty-state p{font-size:14px;}
+
+  /* MODAL */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border-radius:var(--radius);width:540px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);animation:fadeUp 0.2s ease;}
+  .modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
+  .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;}
+  .modal-close:hover{background:#E5EAF0;}
+  .modal-body{padding:24px 26px;}
+  .modal-footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;}
+
+  .form-group{margin-bottom:16px;}
+  .form-label{display:block;font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;}
+  .form-input{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .form-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-select{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;cursor:pointer;}
+  .form-select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;resize:vertical;min-height:72px;transition:border-color 0.15s;}
+  .form-textarea:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+  .drop-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:22px 20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;position:relative;}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--green);background:var(--green-pale);}
+  .drop-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .drop-text{font-size:13px;color:var(--text-mid);margin-bottom:3px;}
+  .drop-sub{font-size:11px;color:var(--text-muted);}
+  .drop-chosen{font-size:13px;color:var(--green-dark);font-weight:500;margin-top:8px;display:none;}
+
+  .btn-cancel{height:40px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  .btn-cancel:hover{background:var(--bg);}
+  .btn-save{height:40px;padding:0 22px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .btn-save:hover{background:var(--navy-mid);}
+
+  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);z-index:300;transform:translateY(80px);opacity:0;transition:transform 0.3s ease,opacity 0.3s ease;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast svg{width:16px;height:16px;color:var(--green);flex-shrink:0;}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+    </div>
+  </div>
+  <div class="sidebar-client">
+    <div class="client-label">Client</div>
+    <div class="client-name">OPH Isère Habitat</div>
+    <div class="client-contract">Contrat #2024-0089</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
+    <a class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8zm2-8h5.5L16 4.5V2H10v2z"/></svg><span>Protocoles d'intervention</span></a>
+    <div class="nav-group-label">Compte</div>
+    <a class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Messages</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar">MR</div>
+      <div><div class="footer-name">Marc Renaud</div><div class="footer-role">Responsable patrimoine</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Espace client</span><span>›</span><span>Protocoles d'intervention</span></div>
+    <div class="date-chip">Jeudi 9 avril 2025</div>
+  </header>
+
+  <div class="content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Protocoles d'intervention</div>
+        <div class="page-sub">Procédures officielles par type d'intervention — téléchargeables en PDF</div>
+      </div>
+      <button class="btn-primary" id="btnAjouter">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Ajouter un protocole
+      </button>
+    </div>
+
+    <!-- BANNIÈRE INFO -->
+    <div class="info-banner">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+      Ces protocoles sont mis à disposition par Belledonne Multiservices. Vous pouvez les consulter et les télécharger librement.
+    </div>
+
+    <!-- SEARCH -->
+    <div class="search-bar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input class="search-input" type="text" id="searchInput" placeholder="Rechercher un protocole..." />
+      </div>
+      <select class="filter-select" id="filterType">
+        <option value="">Tous les types</option>
+        <option value="punaise">Punaises de lit</option>
+        <option value="rongeur">Rongeurs</option>
+        <option value="blatte">Blattes / Insectes</option>
+        <option value="pigeon">Dépigeonnage</option>
+        <option value="desinfection">Désinfection</option>
+        <option value="autre">Autre</option>
+      </select>
+      <span class="results-count" id="resultsCount"></span>
+    </div>
+
+    <div class="protocols-grid" id="protocolsGrid"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z"/></svg>
+      <p>Aucun protocole trouvé.</p>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Ajouter un protocole</div>
+      <button class="modal-close" id="closeModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Client bailleur *</label>
+        <select class="form-select" id="inClient" onchange="document.getElementById('newClientProtWrap').style.display=this.value==='__new__'?'block':'none'">
+          <option value="">— Sélectionner le client —</option>
+          <option value="OPH Isère Habitat">OPH Isère Habitat</option>
+          <option value="Grenoble Habitat">Grenoble Habitat</option>
+          <option value="Actis">Actis</option>
+          <option value="SDH">SDH</option>
+          <option value="__new__">+ Nouveau client bailleur...</option>
+        </select>
+        <div id="newClientProtWrap" style="display:none;margin-top:8px;">
+          <input class="form-input" type="text" id="inClientNew" placeholder="Nom du client bailleur..." />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Titre du protocole *</label>
+        <input class="form-input" type="text" id="inTitre" placeholder="ex: Protocole traitement punaises de lit" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Type d'intervention *</label>
+          <select class="form-select" id="inType" onchange="handleTypeChange()">
+            <option value="">— Sélectionner —</option>
+            <option value="punaise">Punaises de lit</option>
+            <option value="rongeur">Rongeurs</option>
+            <option value="blatte">Blattes / Insectes</option>
+            <option value="pigeon">Dépigeonnage</option>
+            <option value="desinfection">Désinfection</option>
+            <option value="autre">Autre</option>
+            <option value="__custom__">+ Autre type...</option>
+          </select>
+          <div id="typeCustomWrap" style="display:none;flex-direction:row;gap:8px;margin-top:8px;">
+            <input class="form-input" type="text" id="inTypeCustom" placeholder="ex: Nettoyage, Débarrassage..." style="flex:1;" />
+            <button type="button" onclick="addCustomType()" style="height:42px;padding:0 14px;border:none;background:var(--green);color:white;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Ajouter</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Version</label>
+          <input class="form-input" type="text" id="inVersion" placeholder="ex: v1.2" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" id="inDesc" placeholder="ex: Procédure complète pour le traitement des punaises de lit en logement social, incluant la préparation, les produits et les consignes post-traitement..."></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Fichier PDF *</label>
+        <div class="drop-zone" id="dropZone">
+          <input type="file" accept=".pdf" id="fileInput" />
+          <div class="drop-text">Glissez le protocole PDF ici ou cliquez pour choisir</div>
+          <div class="drop-sub">Fichier PDF uniquement · Max 20 Mo</div>
+          <div class="drop-chosen" id="dropChosen"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="cancelModal">Annuler</button>
+      <button class="btn-save" id="saveModal">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<script>
+const TYPE_CONFIG = {
+  punaise:    { label:'Punaises de lit', badge:'tb-punaise', bar:'bar-punaise', icon:'ic-punaise', color:'#D4537E' },
+  rongeur:    { label:'Rongeurs',        badge:'tb-rongeur', bar:'bar-rongeur', icon:'ic-rongeur', color:'#F5A623' },
+  blatte:     { label:'Blattes / Insectes', badge:'tb-blatte', bar:'bar-blatte', icon:'ic-blatte', color:'#378ADD' },
+  pigeon:     { label:'Dépigeonnage',    badge:'tb-pigeon',  bar:'bar-pigeon',  icon:'ic-pigeon',  color:'#2ECC8F' },
+  desinfection:{ label:'Désinfection',  badge:'tb-desinfection', bar:'bar-desinfection', icon:'ic-desinfection', color:'#7F77DD' },
+  autre:      { label:'Autre',           badge:'tb-autre',   bar:'bar-autre',   icon:'ic-autre',   color:'#8FA4B8' },
+};
+
+function getCfg(type) { return TYPE_CONFIG[type] || TYPE_CONFIG['autre']; }
+
+function iconSvg(type) {
+  const icons = {
+    punaise: '<path d="M12 2a5 5 0 1 0 0 10A5 5 0 0 0 12 2zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm-7 8c0 3.31 3.13 6 7 6s7-2.69 7-6H5z" fill="currentColor"/>',
+    rongeur: '<path d="M4.5 6.375a4.125 4.125 0 118.25 0 4.125 4.125 0 01-8.25 0zM14.25 8.625a3.375 3.375 0 116.75 0 3.375 3.375 0 01-6.75 0zM1.5 19.125a7.125 7.125 0 0114.25 0v.003l-.001.119a.75.75 0 01-.363.63 13.067 13.067 0 01-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 01-.364-.63l-.001-.122zM17.25 19.128l-.001.144a2.25 2.25 0 01-.233.96 10.088 10.088 0 005.06-1.01.75.75 0 00.42-.643 4.875 4.875 0 00-6.957-4.611 8.586 8.586 0 011.71 5.157v.003z" fill="currentColor"/>',
+    blatte:  '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="currentColor"/>',
+    pigeon:  '<path d="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z" fill="currentColor"/>',
+    desinfection: '<path d="M17 8C8 10 5.9 16.17 3.82 21h3.7l1-2.5c.3-.09.62-.17.96-.22L10 21h3.5l-.5-3.5c.5-.17.97-.37 1.41-.59L16 21h3.5c-1-4-1-8-2.5-13z" fill="currentColor"/>',
+    autre:   '<path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z" fill="currentColor"/>',
+  };
+  return icons[type] || icons['autre'];
+}
+
+let protocoles = [
+  { id:1, titre:'Protocole traitement punaises de lit', type:'punaise', version:'v2.1', desc:'Procédure complète de traitement en logement social : préparation du logement, produits homologués, consignes locataires avant et après traitement.', date:'2025-03-01', pages:8 },
+  { id:2, titre:'Protocole dératisation', type:'rongeur', version:'v1.3', desc:'Procédure de lutte contre les rongeurs en habitat collectif : inspection, pose de pièges et appâts, suivi des stations, compte-rendu.', date:'2025-01-15', pages:6 },
+  { id:3, titre:'Protocole désinsectisation blattes', type:'blatte', version:'v1.0', desc:'Traitement des blattes et cafards en cuisine et sanitaires : gel insecticide, spray résiduel, protocole de retraitement si nécessaire.', date:'2024-11-20', pages:5 },
+  { id:4, titre:'Protocole dépigeonnage', type:'pigeon', version:'v1.1', desc:'Mise en place de systèmes anti-pigeons sur façades et balcons. Pose de filets, pics et systèmes électriques. Consignes de sécurité.', date:'2024-10-05', pages:7 },
+  { id:5, titre:'Protocole désinfection logement', type:'desinfection', version:'v1.0', desc:'Désinfection complète après sinistre, décès ou insalubrité. Produits biocides homologués, équipement de protection individuelle obligatoire.', date:'2025-02-10', pages:10 },
+];
+
+function formatDate(d) {
+  if (!d) return '—';
+  const [y,m,day] = d.split('-');
+  const mois = ['jan.','fév.','mars','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
+  return `${parseInt(day)} ${mois[parseInt(m)-1]} ${y}`;
+}
+
+function renderProtocols(list) {
+  const grid = document.getElementById('protocolsGrid');
+  const empty = document.getElementById('emptyState');
+  const count = document.getElementById('resultsCount');
+  count.textContent = list.length + ' protocole' + (list.length > 1 ? 's' : '');
+
+  if (list.length === 0) { grid.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  grid.innerHTML = list.map(p => {
+    const cfg = getCfg(p.type);
+    return `
+    <div class="protocol-card">
+      <div class="card-color-bar ${cfg.bar}"></div>
+      <div class="card-body">
+        <div class="card-top">
+          <div class="card-icon ${cfg.icon}">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;color:${cfg.color};">${iconSvg(p.type)}</svg>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+            ${p.client ? `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;">${p.client}</span>` : ''}
+            <span class="type-badge ${cfg.badge}">${cfg.label}</span>
+          </div>
+        </div>
+        <div class="card-name">${p.titre}</div>
+        <div class="card-desc">${p.desc}</div>
+        <div class="card-meta">
+          <div class="meta-info">
+            <span class="meta-chip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><strong>${formatDate(p.date)}</strong></span>
+            ${p.pages ? `<span class="meta-chip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><strong>${p.pages} pages</strong></span>` : ''}
+          </div>
+          ${p.version ? `<span class="version-badge">${p.version}</span>` : ''}
+        </div>
+        <div class="card-actions">
+          <button class="btn-dl primary">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            Télécharger le PDF
+          </button>
+          <button class="btn-dl secondary">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            Aperçu
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filter() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const t = document.getElementById('filterType').value;
+  const list = protocoles.filter(p => {
+    const mq = !q || p.titre.toLowerCase().includes(q) || (p.desc||'').toLowerCase().includes(q);
+    const mt = !t || p.type === t;
+    return mq && mt;
+  });
+  renderProtocols(list);
+}
+
+document.getElementById('searchInput').addEventListener('input', filter);
+document.getElementById('filterType').addEventListener('change', filter);
+
+// TYPE PERSONNALISÉ
+window.handleTypeChange = function() {
+  const val = document.getElementById('inType').value;
+  document.getElementById('typeCustomWrap').style.display = val === '__custom__' ? 'flex' : 'none';
+  if (val === '__custom__') document.getElementById('inTypeCustom').focus();
+};
+
+window.addCustomType = function() {
+  const input = document.getElementById('inTypeCustom');
+  const label = input.value.trim();
+  if (!label) return;
+  const val = label.toLowerCase().replace(/\s+/g,'_');
+  if (!TYPE_CONFIG[val]) {
+    TYPE_CONFIG[val] = { label, badge:'tb-autre', bar:'bar-autre', icon:'ic-autre', color:'#8FA4B8' };
+    const sel = document.getElementById('inType');
+    const opt = document.createElement('option');
+    opt.value = val; opt.textContent = label;
+    sel.insertBefore(opt, sel.querySelector('option[value="__custom__"]'));
+    const fopt = document.createElement('option');
+    fopt.value = val; fopt.textContent = label;
+    document.getElementById('filterType').appendChild(fopt);
+  }
+  document.getElementById('inType').value = val;
+  document.getElementById('typeCustomWrap').style.display = 'none';
+  input.value = '';
+};
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement.id === 'inTypeCustom') { e.preventDefault(); window.addCustomType(); }
+});
+
+// FILE INPUT
+const fileInput = document.getElementById('fileInput');
+const dropChosen = document.getElementById('dropChosen');
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) { dropChosen.textContent = '✓ ' + fileInput.files[0].name; dropChosen.style.display = 'block'; }
+});
+
+// MODAL
+const modal = document.getElementById('modal');
+document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
+document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
+document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
+modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+
+document.getElementById('saveModal').addEventListener('click', () => {
+  const titre = document.getElementById('inTitre').value.trim();
+  let type = document.getElementById('inType').value;
+  let client = document.getElementById('inClient').value;
+  if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
+  if (!titre || !type || type === '__custom__' || !client) { alert('Veuillez renseigner le client, le titre et le type.'); return; }
+  protocoles.unshift({
+    id: Date.now(), titre, type, client,
+    version: document.getElementById('inVersion').value.trim() || null,
+    desc: document.getElementById('inDesc').value.trim(),
+    date: new Date().toISOString().split('T')[0],
+    pages: null
+  });
+  filter();
+  modal.classList.remove('open');
+  ['inTitre','inVersion','inDesc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inType').value = '';
+  document.getElementById('inClient').value = '';
+  document.getElementById('newClientProtWrap').style.display = 'none';
+  document.getElementById('typeCustomWrap').style.display = 'none';
+  fileInput.value = ''; dropChosen.style.display = 'none';
+  showToast('Protocole "' + titre + '" ajouté pour ' + client + ' !');
+  document.getElementById('inType').value = '';
+  document.getElementById('typeCustomWrap').style.display = 'none';
+  fileInput.value = ''; dropChosen.style.display = 'none';
+  showToast('Protocole "' + titre + '" ajouté !');
+});
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+filter();
+</script>
+</body>
+</html>

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tableau de bord — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;--green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;--amber:#F5A623;--red:#E74C3C;--purple:#7F77DD;--text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;--border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;--sidebar-w:240px;--radius:14px;--radius-sm:8px;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+  .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-mark{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-icon svg{width:18px;height:18px;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
+  .sidebar-client{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:12px 14px;}
+  .client-label{font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;}
+  .client-name{font-size:13px;font-weight:500;color:#fff;}
+  .client-contract{font-size:11px;color:var(--green);margin-top:2px;}
+  .sidebar-nav{padding:20px 12px;flex:1;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
+  .nav-group-label:first-child{margin-top:0;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.8;}
+  .nav-badge{margin-left:auto;background:var(--amber);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;}
+  .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--navy-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--green);flex-shrink:0;}
+  .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .footer-role{font-size:10px;color:rgba(255,255,255,0.3);}
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .topbar-right{display:flex;align-items:center;gap:12px;}
+  .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
+  .notif-btn{width:36px;height:36px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;}
+  .notif-btn svg{width:16px;height:16px;color:var(--text-mid);}
+  .notif-dot{position:absolute;top:6px;right:7px;width:7px;height:7px;background:var(--red);border-radius:50%;border:1.5px solid #fff;}
+  .content{padding:32px;flex:1;}
+
+  /* HERO */
+  .hero{background:var(--navy);border-radius:var(--radius);padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;}
+  .hero::before{content:'';position:absolute;top:-40px;right:-40px;width:220px;height:220px;border-radius:50%;background:rgba(46,204,143,0.07);}
+  .hero-greeting{font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:6px;}
+  .hero-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fff;margin-bottom:6px;}
+  .hero-title span{color:var(--green);}
+  .hero-sub{font-size:13px;color:rgba(255,255,255,0.4);}
+  .hero-right{display:flex;gap:12px;flex-shrink:0;z-index:1;}
+  .hero-stat{background:rgba(255,255,255,0.07);border-radius:var(--radius-sm);padding:14px 20px;text-align:center;min-width:90px;}
+  .hero-stat-val{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#fff;line-height:1;}
+  .hero-stat-lbl{font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px;text-transform:uppercase;letter-spacing:0.05em;}
+
+  /* KPIs */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;transition:transform 0.15s,box-shadow 0.15s;animation:fadeUp 0.35s ease both;}
+  .kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(13,27,42,0.07);}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+  .kpi.k-green::before{background:var(--green);}
+  .kpi.k-amber::before{background:var(--amber);}
+  .kpi.k-navy::before{background:var(--navy);}
+  .kpi.k-purple::before{background:var(--purple);}
+  .kpi:nth-child(1){animation-delay:0.05s;}
+  .kpi:nth-child(2){animation-delay:0.1s;}
+  .kpi:nth-child(3){animation-delay:0.15s;}
+  .kpi:nth-child(4){animation-delay:0.2s;}
+  .kpi-icon{width:36px;height:36px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+  .kpi-icon.k-green{background:var(--green-pale);}
+  .kpi-icon.k-amber{background:#FEF5E4;}
+  .kpi-icon.k-navy{background:#EBF0F5;}
+  .kpi-icon.k-purple{background:#EEEDFE;}
+  .kpi-icon svg{width:17px;height:17px;}
+  .kpi-icon.k-green svg{color:var(--green-dark);}
+  .kpi-icon.k-amber svg{color:var(--amber);}
+  .kpi-icon.k-navy svg{color:var(--navy);}
+  .kpi-icon.k-purple svg{color:var(--purple);}
+  .kpi-val{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;color:var(--text);line-height:1;margin-bottom:3px;}
+  .kpi-lbl{font-size:12px;color:var(--text-muted);margin-bottom:8px;}
+  .kpi-trend{font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;display:inline-block;}
+  .trend-up{background:var(--green-pale);color:var(--green-dark);}
+  .trend-neutral{background:#EBF0F5;color:var(--navy);}
+  .trend-warn{background:#FEF5E4;color:#C27D0A;}
+
+  /* NEXT */
+  .next-interv{background:var(--navy);border-radius:var(--radius);padding:20px 22px;margin-bottom:20px;position:relative;overflow:hidden;display:flex;align-items:center;gap:20px;}
+  .next-interv::before{content:'';position:absolute;right:-20px;top:-20px;width:100px;height:100px;border-radius:50%;background:rgba(46,204,143,0.08);}
+  .ni-date{flex-shrink:0;text-align:center;background:rgba(255,255,255,0.07);border-radius:var(--radius-sm);padding:10px 16px;}
+  .ni-day{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#fff;line-height:1;}
+  .ni-month{font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+  .ni-info{flex:1;}
+  .ni-label{font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;}
+  .ni-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#fff;margin-bottom:3px;}
+  .ni-sub{font-size:12px;color:rgba(255,255,255,0.5);}
+  .ni-badge{font-size:11px;font-weight:600;background:rgba(46,204,143,0.15);color:var(--green);padding:4px 12px;border-radius:20px;flex-shrink:0;}
+
+  /* GRILLES */
+  .grid-main{display:grid;grid-template-columns:1fr 340px;gap:20px;margin-bottom:20px;}
+  .grid-bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}
+
+  /* CARD */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;animation:fadeUp 0.4s ease both;animation-delay:0.25s;}
+  .card-header{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+  .card-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:600;color:var(--text);}
+  .card-link{font-size:12px;color:var(--green-dark);font-weight:500;text-decoration:none;cursor:pointer;}
+  .card-link:hover{text-decoration:underline;}
+
+  /* RAPPORTS */
+  .rapport-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;}
+  .rapport-row:last-child{border-bottom:none;}
+  .rapport-row:hover{background:var(--bg);}
+  .r-icon{width:36px;height:36px;background:#FDECEA;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .r-icon svg{width:16px;height:16px;color:var(--red);}
+  .r-info{flex:1;min-width:0;}
+  .r-title{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .r-meta{display:flex;gap:6px;margin-top:2px;align-items:center;flex-wrap:wrap;}
+  .r-bc{font-size:11px;font-weight:600;color:var(--navy);background:#EBF0F5;padding:1px 7px;border-radius:10px;}
+  .r-date{font-size:11px;color:var(--text-muted);}
+  .r-type{font-size:11px;font-weight:500;padding:1px 7px;border-radius:10px;}
+  .rt-punaise{background:#FBEAF0;color:#722440;}
+  .rt-rongeur{background:#FEF5E4;color:#854F0B;}
+  .rt-blatte{background:#EBF0F5;color:#185FA5;}
+  .rt-pigeon{background:var(--green-pale);color:var(--green-dark);}
+  .btn-dl-sm{width:28px;height:28px;border:1px solid var(--border);background:transparent;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+  .btn-dl-sm:hover{background:var(--bg);}
+  .btn-dl-sm svg{width:12px;height:12px;color:var(--text-mid);}
+
+  /* CAMPAGNES */
+  .camp-item{padding:14px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;}
+  .camp-item:last-child{border-bottom:none;}
+  .camp-item:hover{background:var(--bg);}
+  .camp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;}
+  .camp-name{font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .camp-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;flex-shrink:0;}
+  .cb-active{background:var(--green-pale);color:var(--green-dark);}
+  .cb-closed{background:#EBF0F5;color:#1A5F8A;}
+  .camp-prog-wrap{display:flex;align-items:center;gap:10px;}
+  .camp-bar{flex:1;height:4px;background:var(--bg);border-radius:4px;overflow:hidden;}
+  .camp-fill{height:100%;background:var(--green);border-radius:4px;}
+  .camp-pct{font-size:11px;font-weight:600;color:var(--green-dark);width:32px;text-align:right;flex-shrink:0;}
+  .camp-docs{font-size:11px;color:var(--text-muted);margin-top:4px;}
+
+  /* ALERTES */
+  .alert-item{display:flex;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);}
+  .alert-item:last-child{border-bottom:none;}
+  .alert-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+  .alert-text{font-size:12px;color:var(--text);line-height:1.5;}
+  .alert-unread .alert-text{font-weight:500;}
+  .alert-time{font-size:10px;color:var(--text-muted);margin-top:2px;}
+
+  /* RÉSUMÉ */
+  .summary-row{display:flex;align-items:center;justify-content:space-between;padding:11px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;}
+  .summary-row:last-child{border-bottom:none;}
+  .summary-row:hover{background:var(--bg);}
+  .sr-left{display:flex;align-items:center;gap:10px;}
+  .sr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .sr-addr{font-size:12px;font-weight:500;color:var(--text);}
+  .sr-date{font-size:11px;color:var(--text-muted);margin-top:1px;}
+  .sr-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;}
+  .sb-garantie{background:#EEEDFE;color:#3C3489;}
+  .sb-absent{background:#FEF5E4;color:#854F0B;}
+  .sb-annulation{background:#FDECEA;color:#B03030;}
+
+  /* DOCS */
+  .doc-item{display:flex;align-items:center;gap:10px;padding:11px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;}
+  .doc-item:last-child{border-bottom:none;}
+  .doc-item:hover{background:var(--bg);}
+  .doc-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .di-pdf{background:#FDECEA;}
+  .di-xls{background:var(--green-pale);}
+  .di-shield{background:#EEEDFE;}
+  .doc-icon svg{width:15px;height:15px;}
+  .di-pdf svg{color:var(--red);}
+  .di-xls svg{color:var(--green-dark);}
+  .di-shield svg{color:var(--purple);}
+  .doc-name{font-size:12px;font-weight:500;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .doc-date{font-size:11px;color:var(--text-muted);flex-shrink:0;}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+    </div>
+  </div>
+  <div class="sidebar-client">
+    <div class="client-label">Client</div>
+    <div class="client-name">OPH Isère Habitat</div>
+    <div class="client-contract">Contrat #2024-0089</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span><span class="nav-badge">3</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
+    <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
+    <div class="nav-group-label">Compte</div>
+    <a class="nav-item"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Messages</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar">MR</div>
+      <div><div class="footer-name">Marc Renaud</div><div class="footer-role">Responsable patrimoine</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Espace client</span><span>›</span><span>Tableau de bord</span></div>
+    <div class="topbar-right">
+      <div class="date-chip">Jeudi 9 avril 2025</div>
+      <button class="notif-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg><span class="notif-dot"></span></button>
+    </div>
+  </header>
+  <div class="content">
+
+    <!-- HERO -->
+    <div class="hero">
+      <div>
+        <div class="hero-greeting">Bonjour, Marc 👋</div>
+        <div class="hero-title">OPH <span>Isère Habitat</span></div>
+        <div class="hero-sub">Contrat #2024-0089 · Depuis janvier 2024</div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi k-green">
+        <div class="kpi-icon k-green"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg></div>
+        <div class="kpi-val">14</div><div class="kpi-lbl">Interventions ce mois</div>
+        <span class="kpi-trend trend-up">↑ +2 vs mars</span>
+      </div>
+      <div class="kpi k-navy">
+        <div class="kpi-icon k-navy"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg></div>
+        <div class="kpi-val">8</div><div class="kpi-lbl">Logements traités ce mois</div>
+        <span class="kpi-trend trend-neutral">Sur 3 résidences</span>
+      </div>
+      <div class="kpi k-purple">
+        <div class="kpi-icon k-purple"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
+        <div class="kpi-val">4</div><div class="kpi-lbl">Passages garantie</div>
+        <span class="kpi-trend trend-neutral">Cette année</span>
+      </div>
+      <div class="kpi k-purple">
+        <div class="kpi-icon k-purple"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
+        <div class="kpi-val">2</div><div class="kpi-lbl">Passages garantie ce mois</div>
+        <span class="kpi-trend trend-neutral">Avril 2025</span>
+      </div>
+      <div class="kpi k-amber">
+        <div class="kpi-icon k-amber"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg></div>
+        <div class="kpi-val">3</div><div class="kpi-lbl">Absents / Annulations ce mois</div>
+        <span class="kpi-trend trend-warn">Avril 2025</span>
+      </div>
+    </div>
+
+    <!-- GRILLE PRINCIPALE -->
+    <div class="grid-main">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Derniers rapports d'intervention</div><a class="card-link" href="rapports.html">Voir tous →</a></div>
+        <div class="rapport-row"><div class="r-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div><div class="r-info"><div class="r-title">Rés. Les Tilleuls — Bât. A</div><div class="r-meta"><span class="r-bc">BC-2025-0142</span><span class="r-type rt-punaise">Punaises de lit</span><span class="r-date">02/04/2025</span></div></div><button class="btn-dl-sm"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button></div>
+        <div class="rapport-row"><div class="r-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div><div class="r-info"><div class="r-title">Rés. Champ de Mars</div><div class="r-meta"><span class="r-bc">BC-2025-0138</span><span class="r-type rt-rongeur">Rongeurs</span><span class="r-date">28/03/2025</span></div></div><button class="btn-dl-sm"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button></div>
+        <div class="rapport-row"><div class="r-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div><div class="r-info"><div class="r-title">Rés. Les Acacias, Meylan</div><div class="r-meta"><span class="r-bc">BC-2025-0131</span><span class="r-type rt-blatte">Blattes</span><span class="r-date">21/03/2025</span></div></div><button class="btn-dl-sm"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button></div>
+        <div class="rapport-row"><div class="r-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div><div class="r-info"><div class="r-title">Rés. Bellevue — Bât. B</div><div class="r-meta"><span class="r-bc">BC-2025-0129</span><span class="r-type rt-punaise">Punaises de lit</span><span class="r-date">18/03/2025</span></div></div><button class="btn-dl-sm"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button></div>
+        <div class="rapport-row"><div class="r-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div><div class="r-info"><div class="r-title">Rés. Les Tilleuls — Bât. A</div><div class="r-meta"><span class="r-bc">BC-2025-0115</span><span class="r-type rt-punaise">Punaises de lit</span><span class="r-date">14/02/2025</span></div></div><button class="btn-dl-sm"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Campagnes</div><a class="card-link" href="reportings.html">Voir →</a></div>
+          <div class="camp-item"><div class="camp-top"><div class="camp-name">Désinsectisation Printemps 2025</div><span class="camp-badge cb-active">En cours</span></div><div class="camp-prog-wrap"><div class="camp-bar"><div class="camp-fill" style="width:68%"></div></div><span class="camp-pct">68%</span></div><div class="camp-docs">5 fichiers · avr. – juin 2025</div></div>
+          <div class="camp-item"><div class="camp-top"><div class="camp-name">Dératisation Hiver 2024-2025</div><span class="camp-badge cb-closed">Terminée</span></div><div class="camp-prog-wrap"><div class="camp-bar"><div class="camp-fill" style="width:100%"></div></div><span class="camp-pct">100%</span></div><div class="camp-docs">2 fichiers · nov. 2024 – fév. 2025</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Notifications</div><a class="card-link">Tout marquer lu</a></div>
+          <div class="alert-item alert-unread"><div class="alert-dot" style="background:var(--green);"></div><div><div class="alert-text">Rapport disponible — Rés. Les Tilleuls Bât. A</div><div class="alert-time">Il y a 2 heures</div></div></div>
+          <div class="alert-item alert-unread"><div class="alert-dot" style="background:var(--purple);"></div><div><div class="alert-text">Passage garantie — 8 bis Av. Marie Reynoard</div><div class="alert-time">Hier à 14h30</div></div></div>
+          <div class="alert-item"><div class="alert-dot" style="background:var(--amber);"></div><div><div class="alert-text">Absent signalé — 12 rue des Tilleuls</div><div class="alert-time">Il y a 3 jours</div></div></div>
+          <div class="alert-item"><div class="alert-dot" style="background:var(--green);"></div><div><div class="alert-text">Nouveau protocole désinfection ajouté</div><div class="alert-time">Il y a 5 jours</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRILLE BAS -->
+    <div class="grid-bottom">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Garanties récentes</div><a class="card-link" href="garanties.html">Voir →</a></div>
+        <div class="summary-row"><div class="sr-left"><div class="sr-dot" style="background:var(--purple);"></div><div><div class="sr-addr">8 bis Av. Marie Reynoard</div><div class="sr-date">15/03/2025 · Punaises</div></div></div><span class="sr-badge sb-garantie">Garantie</span></div>
+        <div class="summary-row"><div class="sr-left"><div class="sr-dot" style="background:var(--purple);"></div><div><div class="sr-addr">12 rue des Tilleuls</div><div class="sr-date">20/02/2025 · Rongeurs</div></div></div><span class="sr-badge sb-garantie">Garantie</span></div>
+        <div class="summary-row"><div class="sr-left"><div class="sr-dot" style="background:var(--purple);"></div><div><div class="sr-addr">45 Av. de la Paix</div><div class="sr-date">10/12/2024 · Blattes</div></div></div><span class="sr-badge sb-garantie">Garantie</span></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Absents / Annulations récents</div><a class="card-link" href="absents.html">Voir →</a></div>
+        <div class="summary-row"><div class="sr-left"><div class="sr-dot" style="background:var(--amber);"></div><div><div class="sr-addr">8 bis Av. Marie Reynoard</div><div class="sr-date">02/04/2025 · Pas de réponse</div></div></div><span class="sr-badge sb-absent">Absent</span></div>
+        <div class="summary-row"><div class="sr-left"><div class="sr-dot" style="background:var(--red);"></div><div><div class="sr-addr">12 rue des Tilleuls</div><div class="sr-date">28/03/2025 · Annulation</div></div></div><span class="sr-badge sb-annulation">Annulation</span></div>
+        <div class="summary-row"><div class="sr-left"><div class="sr-dot" style="background:var(--amber);"></div><div><div class="sr-addr">45 Av. de la Paix</div><div class="sr-date">21/03/2025 · RDV oublié</div></div></div><span class="sr-badge sb-absent">Absent</span></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Documents récents</div><a class="card-link" href="produits.html">Voir →</a></div>
+        <div class="doc-item"><div class="doc-icon di-pdf"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div><div class="doc-name">Protocole punaises de lit v2.1</div><div class="doc-date">02/04</div></div>
+        <div class="doc-item"><div class="doc-icon di-xls"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg></div><div class="doc-name">Reporting Printemps 2025</div><div class="doc-date">31/03</div></div>
+        <div class="doc-item"><div class="doc-icon di-pdf"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div><div class="doc-name">FDS — Detia Ratex B</div><div class="doc-date">28/03</div></div>
+        <div class="doc-item"><div class="doc-icon di-shield"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div><div class="doc-name">Fiche produit K-Othrine SC 25</div><div class="doc-date">15/03</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

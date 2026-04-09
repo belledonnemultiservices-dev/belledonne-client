@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapports d'intervention — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0D1B2A;
+    --navy-mid: #1A2E42;
+    --navy-light: #243B52;
+    --green: #2ECC8F;
+    --green-dark: #1DA870;
+    --green-pale: #E8F9F2;
+    --amber: #F5A623;
+    --red: #E74C3C;
+    --text: #0D1B2A;
+    --text-mid: #4A6078;
+    --text-muted: #8FA4B8;
+    --border: rgba(13,27,42,0.09);
+    --surface: #FFFFFF;
+    --bg: #F2F5F8;
+    --sidebar-w: 240px;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+  /* SIDEBAR */
+  .sidebar { width: var(--sidebar-w); background: var(--navy); min-height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 100; }
+  .sidebar-logo { padding: 28px 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .logo-mark { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 36px; height: 36px; background: var(--green); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon svg { width: 18px; height: 18px; }
+  .logo-name { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2; }
+  .logo-tagline { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; text-transform: uppercase; margin-top: 2px; }
+  .sidebar-client { margin: 16px 16px 0; background: rgba(255,255,255,0.05); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .client-label { font-size: 10px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .client-name { font-size: 13px; font-weight: 500; color: #fff; }
+  .client-contract { font-size: 11px; color: var(--green); margin-top: 2px; }
+  .sidebar-nav { padding: 20px 12px; flex: 1; }
+  .nav-group-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.25); padding: 0 12px; margin-bottom: 6px; margin-top: 18px; }
+  .nav-group-label:first-child { margin-top: 0; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px; color: rgba(255,255,255,0.55); cursor: pointer; transition: all 0.15s ease; margin-bottom: 2px; text-decoration: none; }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+  .nav-item.active { background: var(--green); color: var(--navy); font-weight: 500; }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.8; }
+  .nav-badge { margin-left: auto; background: var(--amber); color: #fff; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; }
+  .sidebar-footer { padding: 16px 12px; border-top: 1px solid rgba(255,255,255,0.07); }
+  .footer-user { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; }
+  .footer-user:hover { background: rgba(255,255,255,0.05); }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--navy-light); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--green); flex-shrink: 0; }
+  .footer-name { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.8); }
+  .footer-role { font-size: 10px; color: rgba(255,255,255,0.3); }
+
+  /* MAIN */
+  .main { margin-left: var(--sidebar-w); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+  .breadcrumb span:last-child { color: var(--text); font-weight: 500; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .date-chip { font-size: 12px; color: var(--text-muted); background: var(--bg); border: 1px solid var(--border); padding: 6px 12px; border-radius: 20px; }
+  .content { padding: 32px; flex: 1; }
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; }
+  .page-title { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .page-sub { font-size: 14px; color: var(--text-muted); }
+
+  /* BOUTON UPLOAD */
+  .btn-upload { display: inline-flex; align-items: center; gap: 8px; background: var(--navy); color: #fff; border: none; padding: 11px 20px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: background 0.15s; }
+  .btn-upload:hover { background: var(--navy-mid); }
+  .btn-upload svg { width: 16px; height: 16px; }
+
+  /* BARRE RECHERCHE + FILTRES */
+  .search-bar { display: flex; gap: 12px; margin-bottom: 24px; align-items: center; }
+  .search-wrap { flex: 1; position: relative; }
+  .search-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted); pointer-events: none; }
+  .search-input { width: 100%; height: 42px; padding: 0 14px 0 40px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); outline: none; transition: border-color 0.15s; }
+  .search-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(46,204,143,0.12); }
+  .search-input::placeholder { color: var(--text-muted); }
+  .filter-select { height: 42px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text-mid); outline: none; cursor: pointer; }
+  .filter-select:focus { border-color: var(--green); }
+  .results-count { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+
+  /* LISTE RAPPORTS */
+  .reports-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .report-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; display: grid; grid-template-columns: 48px 1fr auto; gap: 16px; align-items: center; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; }
+  .report-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(13,27,42,0.06); border-color: rgba(46,204,143,0.3); }
+
+  .pdf-icon { width: 48px; height: 48px; background: #FDECEA; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .pdf-icon svg { width: 22px; height: 22px; color: var(--red); }
+
+  .report-info { min-width: 0; }
+  .report-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .report-meta { display: flex; gap: 16px; flex-wrap: wrap; }
+  .meta-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+  .meta-chip svg { width: 12px; height: 12px; flex-shrink: 0; }
+  .meta-chip strong { color: var(--text-mid); font-weight: 500; }
+
+  .bc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--navy); background: #EBF0F5; padding: 3px 10px; border-radius: 20px; }
+
+  .passage-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .p1 { background: var(--green-pale); color: var(--green-dark); }
+  .p2 { background: #EBF0F5; color: #1A5F8A; }
+  .p3 { background: #FEF5E4; color: #C27D0A; }
+
+  .report-actions { display: flex; gap: 8px; align-items: center; }
+  .btn-dl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--green-dark); background: var(--green-pale); border: none; padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; white-space: nowrap; }
+  .btn-dl:hover { background: #C8F0E1; }
+  .btn-dl svg { width: 13px; height: 13px; }
+  .btn-view { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text-mid); background: var(--bg); border: 1px solid var(--border); padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; white-space: nowrap; }
+  .btn-view:hover { background: #E5EAF0; }
+  .btn-view svg { width: 13px; height: 13px; }
+
+  /* EMPTY STATE */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.3; }
+  .empty-state p { font-size: 14px; }
+
+  /* MODAL UPLOAD */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(13,27,42,0.5); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius); width: 520px; max-width: 95vw; box-shadow: 0 24px 60px rgba(13,27,42,0.2); animation: fadeUp 0.2s ease; }
+  .modal-header { padding: 22px 26px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; color: var(--text); }
+  .modal-close { width: 32px; height: 32px; border: none; background: var(--bg); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-mid); font-size: 18px; transition: background 0.1s; }
+  .modal-close:hover { background: #E5EAF0; }
+  .modal-body { padding: 24px 26px; }
+  .modal-footer { padding: 16px 26px 22px; display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* FORM */
+  .form-group { margin-bottom: 18px; }
+  .form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text-mid); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .form-input { width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); outline: none; transition: border-color 0.15s, background 0.15s; }
+  .form-input:focus { border-color: var(--green); background: #fff; box-shadow: 0 0 0 3px rgba(46,204,143,0.12); }
+  .form-select { width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); outline: none; cursor: pointer; transition: border-color 0.15s; }
+  .form-select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(46,204,143,0.12); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* DROP ZONE */
+  .drop-zone { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 28px 20px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--green); background: var(--green-pale); }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-icon { width: 40px; height: 40px; background: var(--bg); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+  .drop-icon svg { width: 20px; height: 20px; color: var(--text-muted); }
+  .drop-text { font-size: 13px; color: var(--text-mid); margin-bottom: 4px; }
+  .drop-sub { font-size: 11px; color: var(--text-muted); }
+  .drop-chosen { font-size: 13px; color: var(--green-dark); font-weight: 500; margin-top: 8px; display: none; }
+
+  /* BOUTONS MODAL */
+  .btn-cancel { height: 40px; padding: 0 18px; border: 1px solid var(--border); background: transparent; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text-mid); cursor: pointer; transition: background 0.1s; }
+  .btn-cancel:hover { background: var(--bg); }
+  .btn-save { height: 40px; padding: 0 22px; border: none; background: var(--navy); border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: #fff; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 8px; }
+  .btn-save:hover { background: var(--navy-mid); }
+  .btn-save svg { width: 14px; height: 14px; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 28px; right: 28px; background: var(--navy); color: #fff; padding: 12px 20px; border-radius: var(--radius-sm); font-size: 13px; display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 24px rgba(13,27,42,0.2); z-index: 300; transform: translateY(80px); opacity: 0; transition: transform 0.3s ease, opacity 0.3s ease; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast svg { width: 16px; height: 16px; color: var(--green); flex-shrink: 0; }
+
+  .btn-send { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #fff; background: var(--green-dark); border: none; padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; white-space: nowrap; }
+  .btn-send:hover { background: #179060; }
+  .btn-send svg { width: 13px; height: 13px; }
+  .modal-overlay-send { display: none; position: fixed; inset: 0; background: rgba(13,27,42,0.5); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay-send.open { display: flex; }
+  .modal-send { background: var(--surface); border-radius: var(--radius); width: 520px; max-width: 95vw; box-shadow: 0 24px 60px rgba(13,27,42,0.2); animation: fadeUp 0.2s ease; }
+  .send-context { background: var(--bg); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 18px; border-left: 3px solid var(--green); }
+  .send-context-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 4px; }
+  .send-context-val { font-size: 13px; font-weight: 500; color: var(--text); }
+  .contacts-checkboxes { display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto; }
+  .contact-check { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; transition: background 0.1s, border-color 0.1s; }
+  .contact-check:hover { background: var(--bg); }
+  .contact-check.selected { border-color: var(--green); background: var(--green-pale); }
+  .contact-check input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--green); cursor: pointer; flex-shrink: 0; }
+  .contact-check-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .contact-check-email { font-size: 11px; color: var(--text-muted); }
+  .msg-preview { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 12px; color: var(--text-mid); line-height: 1.7; white-space: pre-line; max-height: 140px; overflow-y: auto; margin-top: 8px; }
+  .send-success-block { display: none; text-align: center; padding: 16px 0; }
+  .send-success-block svg { width: 44px; height: 44px; color: var(--green); margin-bottom: 8px; }
+  .send-success-block p { font-size: 13px; color: var(--text-muted); }
+  .send-success-block strong { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; color: var(--text); display: block; margin-bottom: 4px; }
+  .n-punaise { background:#FBEAF0;color:#722440; }
+  .n-rongeur { background:#FAEEDA;color:#854F0B; }
+  .n-blatte { background:#EBF0F5;color:#1A5F8A; }
+  .n-pigeon { background:#EAF3DE;color:#3B6D11; }
+  .n-custom { background:#F1EFE8;color:#5F5E5A; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      </div>
+      <div>
+        <div class="logo-name">BELLEDONNE</div>
+        <div class="logo-tagline">Multiservices</div>
+      </div>
+    </div>
+  </div>
+  <div class="sidebar-client">
+    <div class="client-label">Client</div>
+    <div class="client-name">OPH Isère Habitat</div>
+    <div class="client-contract">Contrat #2024-0089</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      <span>Tableau de bord</span>
+    </a>
+    <a class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg>
+      <span>Rapports d'intervention</span>
+    </a>
+    <a class="nav-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+      <span>Reportings campagnes</span>
+    </a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+      <span>Fiches produits</span>
+    </a>
+    <a class="nav-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+      <span>Fiches sécurité (FDS)</span>
+    </a>
+    <div class="nav-group-label">Compte</div>
+    <a class="nav-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+      <span>Messages</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="avatar">MR</div>
+      <div>
+        <div class="footer-name">Marc Renaud</div>
+        <div class="footer-role">Responsable patrimoine</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb">
+      <span>Espace client</span>
+      <span>›</span>
+      <span>Rapports d'intervention</span>
+    </div>
+    <div class="topbar-right">
+      <div class="date-chip">Jeudi 9 avril 2025</div>
+    </div>
+  </header>
+
+  <div class="content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Rapports d'intervention</div>
+        <div class="page-sub">Déposez et consultez tous les rapports PDF par bon de commande</div>
+      </div>
+      <button class="btn-upload" id="btnOpenModal">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+        Déposer un rapport
+      </button>
+    </div>
+
+    <!-- BARRE DE RECHERCHE -->
+    <div class="search-bar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input class="search-input" type="text" id="searchInput" placeholder="Rechercher par bon de commande, date..." />
+      </div>
+      <select class="filter-select" id="filterPassage">
+        <option value="">Tous les passages</option>
+        <option value="1er passage">1er passage</option>
+        <option value="2ème passage">2ème passage</option>
+        <option value="3ème passage">3ème passage</option>
+      </select>
+      <select class="filter-select" id="filterNuisible">
+        <option value="">Tous types</option>
+        <option value="punaise">Punaises de lit</option>
+        <option value="rongeur">Rongeurs</option>
+        <option value="blatte">Blattes / Insectes</option>
+        <option value="pigeon">Dépigeonnage</option>
+      </select>
+      </select>
+      <select class="filter-select" id="filterYear">
+        <option value="">Toutes les années</option>
+        <option value="2025">2025</option>
+        <option value="2024">2024</option>
+      </select>
+      <span class="results-count" id="resultsCount">6 rapports</span>
+    </div>
+
+    <!-- LISTE -->
+    <div class="reports-list" id="reportsList"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg>
+      <p>Aucun rapport ne correspond à votre recherche.</p>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL UPLOAD -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Déposer un rapport PDF</div>
+      <button class="modal-close" id="btnCloseModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Client bailleur *</label>
+        <select class="form-select" id="inputClient" onchange="handleClientSelect()">
+          <option value="">— Sélectionner le client —</option>
+          <option value="OPH Isère Habitat">OPH Isère Habitat</option>
+          <option value="Grenoble Habitat">Grenoble Habitat</option>
+          <option value="Actis">Actis</option>
+          <option value="SDH">SDH</option>
+          <option value="__new__">+ Nouveau client bailleur...</option>
+        </select>
+        <div id="newClientWrap" style="display:none;margin-top:8px;">
+          <input class="form-input" type="text" id="inputClientNew" placeholder="Nom du client bailleur..." />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fichier PDF</label>
+        <div class="drop-zone" id="dropZone">
+          <input type="file" accept=".pdf" id="fileInput" />
+          <div class="drop-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg></div>
+          <div class="drop-text">Glissez votre PDF ici ou cliquez pour choisir</div>
+          <div class="drop-sub">Fichiers PDF uniquement · Max 20 Mo</div>
+          <div class="drop-chosen" id="dropChosen"></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Bon de commande *</label>
+          <input class="form-input" type="text" id="inputBC" placeholder="ex: BC-2025-0142" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date d'intervention *</label>
+          <input class="form-input" type="date" id="inputDate" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Numéro de passage *</label>
+          <select class="form-select" id="inputPassage">
+            <option value="">— Sélectionner —</option>
+            <option value="1er passage">1er passage</option>
+            <option value="2ème passage">2ème passage</option>
+            <option value="3ème passage">3ème passage</option>
+            <option value="4ème passage">4ème passage</option>
+            <option value="5ème passage">5ème passage</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type d'intervention</label>
+          <select class="form-select" id="inputNuisible" onchange="handleTypeChange()">
+            <option value="">— Sélectionner —</option>
+            <option value="punaise">Punaises de lit</option>
+            <option value="rongeur">Rongeurs</option>
+            <option value="blatte">Blattes / Insectes</option>
+            <option value="pigeon">Dépigeonnage</option>
+            <option value="__autre__">+ Autre type...</option>
+          </select>
+          <div id="inputNuisibleCustomWrap" style="display:none;margin-top:8px;display:none;flex-direction:row;gap:8px;">
+            <input class="form-input" type="text" id="inputNuisibleCustom" placeholder="ex: Désinfection, Nettoyage..." style="flex:1;" />
+            <button type="button" onclick="addCustomType()" style="height:42px;padding:0 14px;border:none;background:var(--green);color:white;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Ajouter</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Adresse / Résidence</label>
+        <input class="form-input" type="text" id="inputSite" placeholder="ex: Rés. Les Tilleuls — Bât. A, Grenoble" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="btnCancelModal">Annuler</button>
+      <button class="btn-save" id="btnSave">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Enregistrer le rapport
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENVOI NOTIFICATION -->
+<div class="modal-overlay-send" id="modalSend">
+  <div class="modal-send">
+    <div style="padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;">Notifier le client bailleur</div>
+      <button style="width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-mid);" onclick="document.getElementById('modalSend').classList.remove('open')">✕</button>
+    </div>
+    <div style="padding:24px 26px;">
+      <div class="send-context">
+        <div class="send-context-label">Document concerné</div>
+        <div class="send-context-val" id="sendCtxVal">—</div>
+      </div>
+      <div id="sendMainContent">
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:500;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Destinataires</div>
+          <div class="contacts-checkboxes" id="sendContactsList">
+            <div style="font-size:13px;color:var(--text-muted);text-align:center;padding:16px;">Aucun contact trouvé pour ce client bailleur.<br><a href="contacts.html" style="color:var(--green-dark);font-weight:500;">Ajouter des contacts →</a></div>
+          </div>
+          <div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:10px;">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Ajouter un destinataire ponctuel (non enregistré)</div>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="extraNom" placeholder="Nom (optionnel)" style="flex:1;height:36px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor=''" />
+              <input type="email" id="extraEmail" placeholder="Email *" style="flex:1.5;height:36px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor=''" />
+              <button type="button" onclick="addExtraRecipient()" style="height:36px;padding:0 14px;border:none;background:var(--navy);color:#fff;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">+ Ajouter</button>
+            </div>
+            <div id="extraList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div style="font-size:12px;font-weight:500;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;">Message</div>
+            <span style="font-size:11px;color:var(--text-muted);">Modifiable avant envoi</span>
+          </div>
+          <textarea id="sendMsgPreview" style="width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-mid);line-height:1.7;resize:vertical;min-height:160px;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--green)';this.style.background='#fff'" onblur="this.style.borderColor='';this.style.background='var(--bg)'"></textarea>
+        </div>
+      </div>
+      <div class="send-success-block" id="sendSuccessBlock">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        <strong>Email envoyé !</strong>
+        <p id="sendSuccessMsg"></p>
+      </div>
+    </div>
+    <div style="padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;" id="sendModalFooter">
+      <button style="height:40px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;" onclick="document.getElementById('modalSend').classList.remove('open')">Annuler</button>
+      <button style="height:40px;padding:0 22px;border:none;background:var(--green);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:8px;" id="btnDoSend">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        Envoyer l'email
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+  <span id="toastMsg">Rapport ajouté avec succès !</span>
+</div>
+
+<script>
+  // TYPES D'INTERVENTION dynamiques
+  const TYPE_LABELS = { punaise:'Punaises de lit', rongeur:'Rongeurs', blatte:'Blattes / Insectes', pigeon:'Dépigeonnage' };
+  const TYPE_COLORS = { punaise:'n-punaise', rongeur:'n-rongeur', blatte:'n-blatte', pigeon:'n-pigeon' };
+
+  function getTypeLabel(val) { return TYPE_LABELS[val] || val; }
+  function getTypeColor(val) { return TYPE_COLORS[val] || 'n-custom'; }
+
+  window.handleTypeChange = function() {
+    const val = document.getElementById('inputNuisible').value;
+    const wrap = document.getElementById('inputNuisibleCustomWrap');
+    wrap.style.display = val === '__autre__' ? 'flex' : 'none';
+    if (val === '__autre__') document.getElementById('inputNuisibleCustom').focus();
+  };
+
+  window.addCustomType = function() {
+    const input = document.getElementById('inputNuisibleCustom');
+    const label = input.value.trim();
+    if (!label) return;
+    const val = label.toLowerCase().replace(/\s+/g, '_');
+    if (!TYPE_LABELS[val]) {
+      TYPE_LABELS[val] = label;
+      const sel = document.getElementById('inputNuisible');
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = label;
+      sel.insertBefore(opt, sel.querySelector('option[value="__autre__"]'));
+      const fopt = document.createElement('option');
+      fopt.value = val; fopt.textContent = label;
+      document.getElementById('filterNuisible').appendChild(fopt);
+    }
+    document.getElementById('inputNuisible').value = val;
+    document.getElementById('inputNuisibleCustomWrap').style.display = 'none';
+    input.value = '';
+  };
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement.id === 'inputNuisibleCustom') {
+      e.preventDefault(); window.addCustomType();
+    }
+  });
+
+  // Données de démo
+  const reports = [
+    { id: 1, filename: 'Rapport_Tilleuls_BatA_avr2025.pdf', bc: 'BC-2025-0142', date: '2025-04-02', passage: '2ème passage', site: 'Rés. Les Tilleuls — Bât. A, Grenoble', size: '1.2 Mo', nuisible: 'punaise', notifs: 0 },
+    { id: 2, filename: 'Rapport_ChampDeMars_mars2025.pdf', bc: 'BC-2025-0138', date: '2025-03-28', passage: '1er passage', site: 'Rés. Champ de Mars, Grenoble', size: '980 Ko', nuisible: 'rongeur', notifs: 0 },
+    { id: 3, filename: 'Rapport_Acacias_mars2025.pdf', bc: 'BC-2025-0131', date: '2025-03-21', passage: '3ème passage', site: 'Rés. Les Acacias, Meylan', size: '1.5 Mo', nuisible: 'blatte', notifs: 0 },
+    { id: 4, filename: 'Rapport_Bellevue_BatB_mars2025.pdf', bc: 'BC-2025-0129', date: '2025-03-18', passage: '1er passage', site: 'Rés. Bellevue — Bât. B, Échirolles', size: '870 Ko', nuisible: 'punaise', notifs: 0 },
+    { id: 5, filename: 'Rapport_Tilleuls_BatA_fev2025.pdf', bc: 'BC-2025-0115', date: '2025-02-14', passage: '1er passage', site: 'Rés. Les Tilleuls — Bât. A, Grenoble', size: '1.1 Mo', nuisible: 'punaise', notifs: 0 },
+    { id: 6, filename: 'Rapport_VictorHugo_BatC_jan2025.pdf', bc: 'BC-2025-0098', date: '2025-01-22', passage: '2ème passage', site: 'Rés. Victor Hugo — Bât. C, Grenoble', size: '760 Ko', nuisible: 'rongeur', notifs: 0 },
+  ];
+
+  let allReports = [...reports];
+
+  function passageClass(p) {
+    if (p.startsWith('1')) return 'p1';
+    if (p.startsWith('2')) return 'p2';
+    return 'p3';
+  }
+
+  function formatDate(d) {
+    const [y, m, day] = d.split('-');
+    return `${day}/${m}/${y}`;
+  }
+
+  function renderReports(list) {
+    const container = document.getElementById('reportsList');
+    const empty = document.getElementById('emptyState');
+    const count = document.getElementById('resultsCount');
+    count.textContent = list.length + ' rapport' + (list.length > 1 ? 's' : '');
+    if (list.length === 0) {
+      container.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    container.innerHTML = list.map(r => `
+      <div class="report-card">
+        <div class="pdf-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2zm-9 12H9v-2h2v2zm0-4H9V8h2v2zm4 4h-2v-2h2v2zm0-4h-2V8h2v2zm4 4h-2v-2h2v2zm0-4h-2V8h2v2z"/></svg>
+        </div>
+        <div class="report-info">
+          <div class="report-title">${r.site || r.filename}</div>
+          <div class="report-meta">
+            ${r.client ? `<span style="display:inline-flex;align-items:center;font-size:11px;font-weight:600;background:#EBF0F5;color:#0D1B2A;padding:3px 9px;border-radius:20px;">${r.client}</span>` : ''}
+            <span class="bc-chip">
+              <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+              ${r.bc}
+            </span>
+            <span class="passage-chip ${passageClass(r.passage)}">${r.passage}</span>
+            ${r.nuisible ? `<span class="nuisible-pill ${getTypeColor(r.nuisible)}">${getTypeLabel(r.nuisible)}</span>` : ''}
+            <span class="meta-chip">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+              <strong>${formatDate(r.date)}</strong>
+            </span>
+            ${r.notifs > 0 ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifié${r.notifs > 1 ? ' ×'+r.notifs : ''}</span>` : ''}
+            <span class="meta-chip">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg>
+              ${r.size}
+            </span>
+          </div>
+        </div>
+        <div class="report-actions">
+          <button class="btn-send" onclick="openSendModal('rapport','${r.bc}','${r.site||r.filename}','${r.date}',${r.id})">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            Notifier
+          </button>
+          <button class="btn-view">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            Consulter
+          </button>
+          <button class="btn-dl">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            Télécharger
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function filterReports() {
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+    const passage = document.getElementById('filterPassage').value;
+    const year = document.getElementById('filterYear').value;
+    const nuisible = document.getElementById('filterNuisible').value;
+    let filtered = allReports.filter(r => {
+      const matchQ = !q || r.bc.toLowerCase().includes(q) || (r.site || '').toLowerCase().includes(q) || formatDate(r.date).includes(q);
+      const matchP = !passage || r.passage === passage;
+      const matchY = !year || r.date.startsWith(year);
+      const matchN = !nuisible || r.nuisible === nuisible;
+      return matchQ && matchP && matchY && matchN;
+    });
+    renderReports(filtered);
+  }
+
+  document.getElementById('searchInput').addEventListener('input', filterReports);
+  document.getElementById('filterPassage').addEventListener('change', filterReports);
+  document.getElementById('filterYear').addEventListener('change', filterReports);
+  document.getElementById('filterNuisible').addEventListener('change', filterReports);
+
+  // ── CONTACTS (partagés depuis la base contacts) ──
+  const CONTACTS_DB = [
+    { nom:'Marc Renaud', role:'Responsable patrimoine', client:'OPH Isère Habitat', email:'m.renaud@oph-isere.fr', notif:['rapport','garantie'] },
+    { nom:'Sophie Girard', role:'Chargée de secteur', client:'OPH Isère Habitat', email:'s.girard@oph-isere.fr', notif:['rapport','garantie','absent'] },
+    { nom:'Thomas Blanc', role:'Directeur technique', client:'Grenoble Habitat', email:'t.blanc@grenoble-habitat.fr', notif:['rapport'] },
+    { nom:'Nadia Oumari', role:'Responsable hygiène', client:'Actis', email:'n.oumari@actis38.fr', notif:['rapport','garantie','absent'] },
+  ];
+
+  // Pour la démo tous les rapports sont rattachés à OPH Isère Habitat
+  const CLIENT_PAR_DEFAUT = 'OPH Isère Habitat';
+
+  let extraRecipients = [];
+
+  window.addExtraRecipient = function() {
+    const nom = document.getElementById('extraNom').value.trim();
+    const email = document.getElementById('extraEmail').value.trim();
+    if (!email || !email.includes('@')) { alert('Veuillez saisir un email valide.'); return; }
+    if (extraRecipients.find(r => r.email === email)) { alert('Cet email est déjà ajouté.'); return; }
+    extraRecipients.push({ nom: nom || email, email });
+    document.getElementById('extraNom').value = '';
+    document.getElementById('extraEmail').value = '';
+    renderExtraList();
+  };
+
+  window.removeExtra = function(email) {
+    extraRecipients = extraRecipients.filter(r => r.email !== email);
+    renderExtraList();
+  };
+
+  function renderExtraList() {
+    const container = document.getElementById('extraList');
+    container.innerHTML = extraRecipients.map(r => `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--green-pale);border:1px solid rgba(46,204,143,0.25);border-radius:var(--radius-sm);">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;color:var(--green-dark);flex-shrink:0;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        <span style="flex:1;font-size:12px;font-weight:500;color:var(--green-dark);">${r.nom} <span style="font-weight:400;opacity:0.8;">&lt;${r.email}&gt;</span></span>
+        <button onclick="removeExtra('${r.email}')" style="border:none;background:transparent;cursor:pointer;color:var(--green-dark);font-size:16px;line-height:1;padding:0 2px;opacity:0.7;">×</button>
+      </div>`).join('');
+  }
+
+  window.openSendModal = function(type, bc, adresse, date, id) {
+    currentSendId = id;
+    extraRecipients = [];
+    if (document.getElementById('extraList')) document.getElementById('extraList').innerHTML = '';
+    if (document.getElementById('extraNom')) document.getElementById('extraNom').value = '';
+    if (document.getElementById('extraEmail')) document.getElementById('extraEmail').value = '';
+    const modal = document.getElementById('modalSend');
+    document.getElementById('sendCtxVal').textContent = `${bc} — ${adresse} — ${formatDate(date)}`;
+
+    // Tous les contacts du client — pré-cochés si notif rapport, visibles sinon
+    const clientContacts = CONTACTS_DB.filter(c => c.client === CLIENT_PAR_DEFAUT);
+    const list = document.getElementById('sendContactsList');
+    if (clientContacts.length === 0) {
+      list.innerHTML = '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:16px;">Aucun contact pour ce client.<br><a href="contacts.html" style="color:var(--green-dark);font-weight:500;">Ajouter des contacts →</a></div>';
+    } else {
+      list.innerHTML = clientContacts.map(c => {
+        const preChecked = c.notif && c.notif.includes(type);
+        return `
+        <label class="contact-check${preChecked?' selected':''}">
+          <input type="checkbox" ${preChecked?'checked':''} value="${c.email}" onchange="this.closest('.contact-check').classList.toggle('selected',this.checked);updateSendPreview('${bc}','${adresse}','${date}')"/>
+          <div>
+            <div class="contact-check-name">${c.nom} <span style="font-weight:400;color:var(--text-muted);">· ${c.role}</span>${!preChecked ? ' <span style="font-size:10px;background:#EBF0F5;color:#4A6078;padding:1px 6px;border-radius:8px;margin-left:4px;">Hors liste habituelle</span>' : ''}</div>
+            <div class="contact-check-email">${c.email}</div>
+          </div>
+        </label>`;
+      }).join('');
+    }
+
+    updateSendPreview(bc, adresse, date);
+    document.getElementById('sendMainContent').style.display = 'block';
+    document.getElementById('sendSuccessBlock').style.display = 'none';
+    document.getElementById('sendModalFooter').innerHTML = `
+      <button style="height:40px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;" onclick="document.getElementById('modalSend').classList.remove('open')">Annuler</button>
+      <button style="height:40px;padding:0 22px;border:none;background:var(--green);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="confirmSend('${bc}')">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer l'email
+      </button>`;
+    modal.classList.add('open');
+  };
+
+  window.updateSendPreview = function(bc, adresse, date) {
+    const checked = document.querySelectorAll('#sendContactsList input:checked');
+    const firstName = checked.length > 0
+      ? (CONTACTS_DB.find(c => c.email === checked[0].value)||{nom:'Madame, Monsieur'}).nom.split(' ')[0]
+      : 'Madame, Monsieur';
+    document.getElementById('sendMsgPreview').value =
+`Bonjour ${firstName},
+
+Un nouveau rapport d'intervention est disponible sur votre espace client.
+
+📋 Bon de commande : ${bc}
+📍 Adresse : ${adresse}
+📅 Date : ${formatDate(date)}
+
+Consultez-le ici :
+👉 https://clients-belledonne-multiservices.com
+
+Cordialement,
+L'équipe Belledonne Multiservices — 06 95 67 26 03`;
+  };
+
+  window.confirmSend = function(bc) {
+    const checked = document.querySelectorAll('#sendContactsList input:checked');
+    if (checked.length === 0 && extraRecipients.length === 0) { alert('Sélectionnez au moins un destinataire.'); return; }
+    const names = [
+      ...Array.from(checked).map(cb => (CONTACTS_DB.find(c=>c.email===cb.value)||{nom:cb.value}).nom),
+      ...extraRecipients.map(r => r.nom)
+    ];
+    if (currentSendId !== null) {
+      const r = allReports.find(x => x.id === currentSendId);
+      if (r) { r.notifs = (r.notifs || 0) + 1; }
+    }
+    document.getElementById('sendMainContent').style.display = 'none';
+    document.getElementById('sendSuccessBlock').style.display = 'block';
+    document.getElementById('sendSuccessMsg').textContent = 'Email envoyé à : ' + names.join(', ');
+    document.getElementById('sendModalFooter').innerHTML = `<button style="height:40px;padding:0 22px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;" onclick="document.getElementById('modalSend').classList.remove('open');filterReports()">Fermer</button>`;
+    const toast = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = 'Email envoyé pour le rapport ' + bc + ' !';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3500);
+  };
+
+  document.getElementById('modalSend').addEventListener('click', e => {
+    if (e.target === document.getElementById('modalSend')) document.getElementById('modalSend').classList.remove('open');
+  });
+
+  renderReports(allReports);
+
+  // MODAL
+  const modal = document.getElementById('modalOverlay');
+  document.getElementById('btnOpenModal').addEventListener('click', () => modal.classList.add('open'));
+  document.getElementById('btnCloseModal').addEventListener('click', () => modal.classList.remove('open'));
+  document.getElementById('btnCancelModal').addEventListener('click', () => modal.classList.remove('open'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+
+  // FILE INPUT
+  const fileInput = document.getElementById('fileInput');
+  const dropChosen = document.getElementById('dropChosen');
+  const dropZone = document.getElementById('dropZone');
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) {
+      dropChosen.textContent = '✓ ' + fileInput.files[0].name;
+      dropChosen.style.display = 'block';
+    }
+  });
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type === 'application/pdf') {
+      dropChosen.textContent = '✓ ' + f.name;
+      dropChosen.style.display = 'block';
+    }
+  });
+
+  window.handleClientSelect = function() {
+    const val = document.getElementById('inputClient').value;
+    document.getElementById('newClientWrap').style.display = val === '__new__' ? 'block' : 'none';
+  };
+
+  // SAVE
+  document.getElementById('btnSave').addEventListener('click', () => {
+    const bc = document.getElementById('inputBC').value.trim();
+    const date = document.getElementById('inputDate').value;
+    const passage = document.getElementById('inputPassage').value;
+    const site = document.getElementById('inputSite').value.trim();
+    const nuisible = document.getElementById('inputNuisible').value;
+    const file = fileInput.files[0];
+    let client = document.getElementById('inputClient').value;
+    if (client === '__new__') client = document.getElementById('inputClientNew').value.trim();
+
+    if (!client || !bc || !date || !passage) {
+      alert('Veuillez remplir les champs obligatoires : client bailleur, bon de commande, date et numéro de passage.');
+      return;
+    }
+
+    // Ajouter le nouveau client dans le select si besoin
+    if (document.getElementById('inputClientNew').value.trim() && client !== 'OPH Isère Habitat') {
+      const sel = document.getElementById('inputClient');
+      if (!Array.from(sel.options).some(o => o.value === client)) {
+        const opt = document.createElement('option');
+        opt.value = client; opt.textContent = client;
+        sel.insertBefore(opt, sel.querySelector('option[value="__new__"]'));
+      }
+    }
+
+    const newReport = {
+      id: allReports.length + 1,
+      filename: file ? file.name : 'rapport.pdf',
+      bc, date, passage, nuisible, client,
+      site: site || 'Non renseigné',
+      size: file ? (file.size > 1024*1024 ? (file.size/1024/1024).toFixed(1)+' Mo' : Math.round(file.size/1024)+' Ko') : '—',
+      notifs: 0
+    };
+
+    allReports.unshift(newReport);
+    filterReports();
+    modal.classList.remove('open');
+
+    document.getElementById('inputClient').value = '';
+    document.getElementById('inputClientNew').value = '';
+    document.getElementById('newClientWrap').style.display = 'none';
+    document.getElementById('inputBC').value = '';
+    document.getElementById('inputDate').value = '';
+    document.getElementById('inputPassage').value = '';
+    document.getElementById('inputSite').value = '';
+    document.getElementById('inputNuisible').value = '';
+    fileInput.value = '';
+    dropChosen.style.display = 'none';
+    dropChosen.textContent = '';
+
+    const toast = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = 'Rapport ' + bc + ' ajouté pour ' + client + ' !';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3500);
+  });
+</script>
+</body>
+</html>

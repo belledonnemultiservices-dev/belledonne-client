@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reportings campagnes — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0D1B2A; --navy-mid: #1A2E42; --navy-light: #243B52;
+    --green: #2ECC8F; --green-dark: #1DA870; --green-pale: #E8F9F2;
+    --amber: #F5A623; --red: #E74C3C;
+    --text: #0D1B2A; --text-mid: #4A6078; --text-muted: #8FA4B8;
+    --border: rgba(13,27,42,0.09); --surface: #FFFFFF; --bg: #F2F5F8;
+    --sidebar-w: 240px; --radius: 14px; --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+  /* SIDEBAR */
+  .sidebar { width: var(--sidebar-w); background: var(--navy); min-height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 100; }
+  .sidebar-logo { padding: 28px 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .logo-mark { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 36px; height: 36px; background: var(--green); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon svg { width: 18px; height: 18px; }
+  .logo-name { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: #fff; }
+  .logo-tagline { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 0.05em; text-transform: uppercase; margin-top: 2px; }
+  .sidebar-client { margin: 16px 16px 0; background: rgba(255,255,255,0.05); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .client-label { font-size: 10px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .client-name { font-size: 13px; font-weight: 500; color: #fff; }
+  .client-contract { font-size: 11px; color: var(--green); margin-top: 2px; }
+  .sidebar-nav { padding: 20px 12px; flex: 1; }
+  .nav-group-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.25); padding: 0 12px; margin-bottom: 6px; margin-top: 18px; }
+  .nav-group-label:first-child { margin-top: 0; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px; color: rgba(255,255,255,0.55); cursor: pointer; transition: all 0.15s; margin-bottom: 2px; text-decoration: none; }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+  .nav-item.active { background: var(--green); color: var(--navy); font-weight: 500; }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.8; }
+  .sidebar-footer { padding: 16px 12px; border-top: 1px solid rgba(255,255,255,0.07); }
+  .footer-user { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; }
+  .footer-user:hover { background: rgba(255,255,255,0.05); }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--navy-light); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--green); flex-shrink: 0; }
+  .footer-name { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.8); }
+  .footer-role { font-size: 10px; color: rgba(255,255,255,0.3); }
+
+  /* MAIN */
+  .main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+  .breadcrumb span:last-child { color: var(--text); font-weight: 500; }
+  .date-chip { font-size: 12px; color: var(--text-muted); background: var(--bg); border: 1px solid var(--border); padding: 6px 12px; border-radius: 20px; }
+  .content { padding: 32px; flex: 1; }
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; }
+  .page-title { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  .page-sub { font-size: 14px; color: var(--text-muted); }
+
+  .btn-primary { display: inline-flex; align-items: center; gap: 8px; background: var(--navy); color: #fff; border: none; padding: 11px 20px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: background 0.15s; }
+  .btn-primary:hover { background: var(--navy-mid); }
+  .btn-primary svg { width: 16px; height: 16px; }
+
+  /* SEARCH */
+  .search-bar { display: flex; gap: 12px; margin-bottom: 24px; align-items: center; }
+  .search-wrap { flex: 1; position: relative; max-width: 400px; }
+  .search-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted); pointer-events: none; }
+  .search-input { width: 100%; height: 42px; padding: 0 14px 0 40px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); outline: none; transition: border-color 0.15s; }
+  .search-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(46,204,143,0.12); }
+  .search-input::placeholder { color: var(--text-muted); }
+  .filter-select { height: 42px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text-mid); outline: none; cursor: pointer; }
+  .results-count { font-size: 13px; color: var(--text-muted); white-space: nowrap; margin-left: auto; }
+
+  /* CAMPAGNES */
+  .campagnes-list { display: flex; flex-direction: column; gap: 16px; }
+
+  .campagne-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: box-shadow 0.15s; }
+  .campagne-card:hover { box-shadow: 0 6px 20px rgba(13,27,42,0.06); }
+
+  .campagne-header { padding: 20px 24px; display: flex; align-items: center; gap: 16px; cursor: pointer; user-select: none; }
+
+  .campagne-color { width: 4px; border-radius: 4px; align-self: stretch; flex-shrink: 0; }
+
+  .campagne-header-info { flex: 1; min-width: 0; }
+  .campagne-name { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+  .campagne-meta { display: flex; gap: 16px; flex-wrap: wrap; }
+  .cmeta { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); }
+  .cmeta svg { width: 12px; height: 12px; }
+  .cmeta strong { color: var(--text-mid); font-weight: 500; }
+
+  .campagne-status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 20px; flex-shrink: 0; }
+  .campagne-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+  .cs-active { background: var(--green-pale); color: var(--green-dark); }
+  .cs-active::before { background: var(--green-dark); }
+  .cs-closed { background: #EBF0F5; color: #1A5F8A; }
+  .cs-closed::before { background: #1A5F8A; }
+
+  .campagne-toggle { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.1s, transform 0.2s; }
+  .campagne-toggle svg { width: 14px; height: 14px; color: var(--text-muted); transition: transform 0.2s; }
+  .campagne-toggle.open svg { transform: rotate(180deg); }
+
+  /* DOCS SECTION */
+  .campagne-docs { display: none; border-top: 1px solid var(--border); }
+  .campagne-docs.open { display: block; }
+
+  .docs-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .docs-toolbar-title { font-size: 12px; font-weight: 500; color: var(--text-mid); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .btn-add-doc { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--green-dark); background: var(--green-pale); border: none; padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; }
+  .btn-add-doc:hover { background: #C8F0E1; }
+  .btn-add-doc svg { width: 13px; height: 13px; }
+
+  .docs-grid { padding: 16px 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+
+  .doc-card { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.1s, border-color 0.1s; }
+  .doc-card:hover { background: var(--bg); border-color: rgba(46,204,143,0.3); }
+
+  .doc-icon { width: 40px; height: 40px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .doc-icon.xls { background: #EAF3DE; }
+  .doc-icon.pdf { background: #FDECEA; }
+  .doc-icon.xls svg { color: #3B6D11; }
+  .doc-icon.pdf svg { color: var(--red); }
+  .doc-icon svg { width: 20px; height: 20px; }
+
+  .doc-info { flex: 1; min-width: 0; }
+  .doc-type-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; margin-bottom: 2px; }
+  .doc-type-label.xls { color: #3B6D11; }
+  .doc-type-label.pdf { color: #993C1D; }
+  .doc-name { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc-date { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .doc-dl { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.1s; }
+  .doc-dl:hover { background: var(--bg); }
+  .doc-dl svg { width: 13px; height: 13px; color: var(--text-mid); }
+
+  .docs-empty { padding: 28px 24px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+  /* PROGRESS BAR dans campagne */
+  .campagne-progress { padding: 0 24px 18px; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 5px; }
+  .progress-label span:last-child { font-weight: 600; color: var(--green-dark); }
+  .progress-bar { height: 5px; background: var(--bg); border-radius: 10px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 10px; transition: width 0.4s ease; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(13,27,42,0.5); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius); width: 540px; max-width: 95vw; box-shadow: 0 24px 60px rgba(13,27,42,0.2); animation: fadeUp 0.2s ease; }
+  .modal-header { padding: 22px 26px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; }
+  .modal-close { width: 32px; height: 32px; border: none; background: var(--bg); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-mid); font-size: 18px; }
+  .modal-close:hover { background: #E5EAF0; }
+  .modal-body { padding: 24px 26px; }
+  .modal-footer { padding: 16px 26px 22px; display: flex; gap: 10px; justify-content: flex-end; }
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text-mid); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .form-input { width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); outline: none; transition: border-color 0.15s; }
+  .form-input:focus { border-color: var(--green); background: #fff; box-shadow: 0 0 0 3px rgba(46,204,143,0.12); }
+  .form-select { width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); outline: none; cursor: pointer; }
+  .form-select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(46,204,143,0.12); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .drop-zone { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 22px 20px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--green); background: var(--green-pale); }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-text { font-size: 13px; color: var(--text-mid); margin-bottom: 3px; }
+  .drop-sub { font-size: 11px; color: var(--text-muted); }
+  .drop-chosen { font-size: 13px; color: var(--green-dark); font-weight: 500; margin-top: 8px; display: none; }
+
+  .btn-cancel { height: 40px; padding: 0 18px; border: 1px solid var(--border); background: transparent; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text-mid); cursor: pointer; }
+  .btn-cancel:hover { background: var(--bg); }
+  .btn-save { height: 40px; padding: 0 22px; border: none; background: var(--navy); border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .btn-save:hover { background: var(--navy-mid); }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 28px; right: 28px; background: var(--navy); color: #fff; padding: 12px 20px; border-radius: var(--radius-sm); font-size: 13px; display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 24px rgba(13,27,42,0.2); z-index: 300; transform: translateY(80px); opacity: 0; transition: transform 0.3s ease, opacity 0.3s ease; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast svg { width: 16px; height: 16px; color: var(--green); flex-shrink: 0; }
+
+  /* COULEURS CAMPAGNE */
+  .color-green { background: var(--green); }
+  .color-blue { background: #378ADD; }
+  .color-amber { background: var(--amber); }
+  .color-purple { background: #7F77DD; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      </div>
+      <div>
+        <div class="logo-name">BELLEDONNE</div>
+        <div class="logo-tagline">Multiservices</div>
+      </div>
+    </div>
+  </div>
+  <div class="sidebar-client">
+    <div class="client-label">Client</div>
+    <div class="client-name">OPH Isère Habitat</div>
+    <div class="client-contract">Contrat #2024-0089</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      <span>Tableau de bord</span>
+    </a>
+    <a class="nav-item" href="rapports.html">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg>
+      <span>Rapports d'intervention</span>
+    </a>
+    <a class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+      <span>Reportings campagnes</span>
+    </a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+      <span>Fiches produits</span>
+    </a>
+    <a class="nav-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+      <span>Fiches sécurité (FDS)</span>
+    </a>
+    <div class="nav-group-label">Compte</div>
+    <a class="nav-item">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+      <span>Messages</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="avatar">MR</div>
+      <div>
+        <div class="footer-name">Marc Renaud</div>
+        <div class="footer-role">Responsable patrimoine</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb">
+      <span>Espace client</span><span>›</span><span>Reportings campagnes</span>
+    </div>
+    <div class="date-chip">Jeudi 9 avril 2025</div>
+  </header>
+
+  <div class="content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Reportings campagnes</div>
+        <div class="page-sub">Fichiers Excel et feuilles d'émargement par campagne</div>
+      </div>
+      <button class="btn-primary" id="btnNewCampagne">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Nouvelle campagne
+      </button>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="search-bar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input class="search-input" type="text" id="searchInput" placeholder="Rechercher une campagne..." />
+      </div>
+      <select class="filter-select" id="filterStatus">
+        <option value="">Tous les statuts</option>
+        <option value="active">En cours</option>
+        <option value="closed">Terminée</option>
+      </select>
+      <span class="results-count" id="resultsCount"></span>
+    </div>
+
+    <div class="campagnes-list" id="campagnesList"></div>
+  </div>
+</div>
+
+<!-- MODAL NOUVELLE CAMPAGNE -->
+<div class="modal-overlay" id="modalCampagne">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nouvelle campagne</div>
+      <button class="modal-close" id="closeCampagne">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Client bailleur *</label>
+        <select class="form-select" id="inputClient" onchange="document.getElementById('newClientCampWrap').style.display=this.value==='__new__'?'block':'none'">
+          <option value="">— Sélectionner le client —</option>
+          <option value="OPH Isère Habitat">OPH Isère Habitat</option>
+          <option value="Grenoble Habitat">Grenoble Habitat</option>
+          <option value="Actis">Actis</option>
+          <option value="SDH">SDH</option>
+          <option value="__new__">+ Nouveau client bailleur...</option>
+        </select>
+        <div id="newClientCampWrap" style="display:none;margin-top:8px;">
+          <input class="form-input" type="text" id="inputClientNew" placeholder="Nom du client bailleur..." />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nom de la campagne *</label>
+        <input class="form-input" type="text" id="inputNom" placeholder="ex: Campagne punaises de lit Printemps 2025" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date de début *</label>
+          <input class="form-input" type="date" id="inputDebut" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date de fin</label>
+          <input class="form-input" type="date" id="inputFin" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nombre de sites</label>
+          <input class="form-input" type="number" id="inputSites" placeholder="ex: 8" min="1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Statut</label>
+          <select class="form-select" id="inputStatut">
+            <option value="active">En cours</option>
+            <option value="closed">Terminée</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="cancelCampagne">Annuler</button>
+      <button class="btn-save" id="saveCampagne">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Créer la campagne
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AJOUT DOCUMENT -->
+<div class="modal-overlay" id="modalDoc">
+  <div class="modal" style="width:580px;">
+    <div class="modal-header">
+      <div class="modal-title" id="modalDocTitle">Ajouter des documents</div>
+      <button class="modal-close" id="closeDoc">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Fichiers PDF ou Excel *</label>
+        <div class="drop-zone" id="dropZoneDoc">
+          <input type="file" id="fileInputDoc" accept=".pdf,.xls,.xlsx" multiple />
+          <div class="drop-text">Glissez vos fichiers ici ou cliquez pour choisir</div>
+          <div class="drop-sub">Sélection multiple possible · PDF et Excel acceptés · Max 20 Mo/fichier</div>
+        </div>
+      </div>
+      <div id="pendingList" style="display:none;max-height:280px;overflow-y:auto;"></div>
+      <div style="margin-top:10px;padding:10px 12px;background:var(--green-pale);border-radius:var(--radius-sm);font-size:12px;color:var(--green-dark);display:flex;gap:8px;align-items:flex-start;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;margin-top:1px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        L'adresse et le numéro de passage sont extraits automatiquement du nom du fichier.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="cancelDoc">Annuler</button>
+      <button class="btn-save" id="saveDoc">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Ajouter les documents
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+  <span id="toastMsg">Action réalisée avec succès !</span>
+</div>
+
+<script>
+const COLORS = ['color-green','color-blue','color-amber','color-purple'];
+
+let campagnes = [
+  {
+    id: 1, nom: 'Campagne désinsectisation Printemps 2025',
+    debut: '2025-04-01', fin: '2025-06-30', sites: 8, statut: 'active',
+    color: 'color-green',
+    docs: [
+      { id: 1, type: 'xls', name: 'Reporting_Desinsect_Printemps2025.xlsx', adresse: 'Reporting Désinsectisation Printemps 2025', passage: null, date: '2025-04-02' },
+      { id: 2, type: 'pdf', name: '8_bis_AVENUE_MARIE_REYNOARD_38100_GRENOBLE_passage_N_1_Technicien3.pdf', adresse: '8 bis Avenue Marie Reynoard 38100 Grenoble', passage: 'Passage N°1', date: '2025-04-02' },
+      { id: 3, type: 'pdf', name: '8_bis_AVENUE_MARIE_REYNOARD_38100_GRENOBLE_passage_N_2_Technicien3.pdf', adresse: '8 bis Avenue Marie Reynoard 38100 Grenoble', passage: 'Passage N°2', date: '2025-04-15' },
+      { id: 4, type: 'pdf', name: '12_RUE_DES_TILLEULS_38000_GRENOBLE_passage_N_1_Technicien1.pdf', adresse: '12 rue des Tilleuls 38000 Grenoble', passage: 'Passage N°1', date: '2025-03-28' },
+    ]
+  },
+  {
+    id: 2, nom: 'Campagne dératisation Hiver 2024-2025',
+    debut: '2024-11-01', fin: '2025-02-28', sites: 5, statut: 'closed',
+    color: 'color-blue',
+    docs: [
+      { id: 4, type: 'xls', name: 'Reporting_Derat_Hiver2024.xlsx', adresse: 'Reporting Dératisation Hiver 2024', passage: null, date: '2025-02-28' },
+      { id: 5, type: 'pdf', name: '45_AVENUE_DE_LA_PAIX_38000_GRENOBLE_passage_N_1_Technicien2.pdf', adresse: '45 Avenue de la Paix 38000 Grenoble', passage: 'Passage N°1', date: '2025-02-15' },
+    ]
+  },
+  {
+    id: 3, nom: 'Campagne punaises de lit Automne 2024',
+    debut: '2024-09-01', fin: '2024-11-30', sites: 3, statut: 'closed',
+    color: 'color-amber',
+    docs: [
+      { id: 6, type: 'xls', name: 'Reporting_Punaises_Automne2024.xlsx', adresse: 'Reporting Punaises de lit Automne 2024', passage: null, date: '2024-11-30' },
+    ]
+  },
+];
+
+let currentCampagneId = null;
+let colorIndex = campagnes.length % COLORS.length;
+
+function formatDate(d) {
+  if (!d) return '—';
+  const [y,m,day] = d.split('-');
+  const mois = ['jan.','fév.','mars','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
+  return `${parseInt(day)} ${mois[parseInt(m)-1]} ${y}`;
+}
+
+function progressPct(c) {
+  if (c.statut === 'closed') return 100;
+  if (!c.debut || !c.fin) return 0;
+  const start = new Date(c.debut), end = new Date(c.fin), now = new Date();
+  if (now <= start) return 0;
+  if (now >= end) return 100;
+  return Math.round((now - start) / (end - start) * 100);
+}
+
+function docIcon(type) {
+  if (type === 'xls') return `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg>`;
+  return `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2zm-9 12H9v-2h2v2zm0-4H9V8h2v2zm4 4h-2v-2h2v2zm0-4h-2V8h2v2zm4 4h-2v-2h2v2zm0-4h-2V8h2v2z"/></svg>`;
+}
+
+function renderCampagnes(list) {
+  const container = document.getElementById('campagnesList');
+  const count = document.getElementById('resultsCount');
+  count.textContent = list.length + ' campagne' + (list.length > 1 ? 's' : '');
+
+  if (list.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);font-size:14px;">Aucune campagne trouvée.</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(c => {
+    const pct = progressPct(c);
+    const nbPdf = c.docs.filter(d=>d.type==='pdf').length;
+    const nbXls = c.docs.filter(d=>d.type==='xls').length;
+    const docsHtml = c.docs.length === 0
+      ? `<div class="docs-empty">Aucun document pour cette campagne — cliquez sur "Ajouter un document".</div>`
+      : `
+        <div style="padding:12px 24px 0;">
+          <div style="position:relative;">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-muted);pointer-events:none;"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <input type="text" placeholder="Rechercher par adresse..." oninput="filterDocs(${c.id}, this.value)"
+              style="width:100%;height:36px;padding:0 12px 0 34px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;" />
+          </div>
+        </div>
+        <div class="docs-grid" id="docsgrid-${c.id}">${renderDocCards(c.docs)}</div>`;
+
+    return `
+    <div class="campagne-card" data-id="${c.id}">
+      <div class="campagne-header" onclick="toggleCampagne(${c.id})">
+        <div class="campagne-color ${c.color}"></div>
+        <div class="campagne-header-info">
+          <div class="campagne-name">${c.nom}</div>
+          <div class="campagne-meta">
+            <span class="cmeta"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><strong>${formatDate(c.debut)}</strong> → <strong>${formatDate(c.fin)}</strong></span>
+            <span class="cmeta"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg><strong>${c.sites}</strong> site${c.sites > 1 ? 's' : ''}</span>
+            <span class="cmeta"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z"/></svg><strong>${c.docs.length}</strong> document${c.docs.length > 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <span class="campagne-status ${c.statut === 'active' ? 'cs-active' : 'cs-closed'}">${c.statut === 'active' ? 'En cours' : 'Terminée'}</span>
+        <button class="campagne-toggle" id="toggle-${c.id}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></button>
+      </div>
+      ${c.statut === 'active' ? `
+      <div class="campagne-progress">
+        <div class="progress-label"><span>Avancement temporel</span><span>${pct}%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>` : ''}
+      <div class="campagne-docs" id="docs-${c.id}">
+        <div class="docs-toolbar">
+          <span class="docs-toolbar-title">${nbXls} Excel · ${nbPdf} feuille${nbPdf>1?'s':''} d'émargement</span>
+          <button class="btn-add-doc" onclick="openAddDoc(${c.id}, event)">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Ajouter des documents
+          </button>
+        </div>
+        ${docsHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCampagne(id) {
+  const docs = document.getElementById('docs-' + id);
+  const toggle = document.getElementById('toggle-' + id);
+  docs.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+function filterCampagnes() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const s = document.getElementById('filterStatus').value;
+  const filtered = campagnes.filter(c => {
+    const matchQ = !q || c.nom.toLowerCase().includes(q);
+    const matchS = !s || c.statut === s;
+    return matchQ && matchS;
+  });
+  renderCampagnes(filtered);
+}
+
+document.getElementById('searchInput').addEventListener('input', filterCampagnes);
+document.getElementById('filterStatus').addEventListener('change', filterCampagnes);
+
+// MODAL CAMPAGNE
+const modalCampagne = document.getElementById('modalCampagne');
+document.getElementById('btnNewCampagne').addEventListener('click', () => modalCampagne.classList.add('open'));
+document.getElementById('closeCampagne').addEventListener('click', () => modalCampagne.classList.remove('open'));
+document.getElementById('cancelCampagne').addEventListener('click', () => modalCampagne.classList.remove('open'));
+modalCampagne.addEventListener('click', e => { if (e.target === modalCampagne) modalCampagne.classList.remove('open'); });
+
+document.getElementById('saveCampagne').addEventListener('click', () => {
+  const nom = document.getElementById('inputNom').value.trim();
+  const debut = document.getElementById('inputDebut').value;
+  const fin = document.getElementById('inputFin').value;
+  const sites = parseInt(document.getElementById('inputSites').value) || 0;
+  const statut = document.getElementById('inputStatut').value;
+  let client = document.getElementById('inputClient').value;
+  if (client === '__new__') client = document.getElementById('inputClientNew').value.trim();
+  if (!nom || !debut || !client) { alert('Veuillez renseigner au moins le client, le nom et la date de début.'); return; }
+  const newC = { id: Date.now(), nom, debut, fin, sites, statut, client, color: COLORS[colorIndex % COLORS.length], docs: [] };
+  colorIndex++;
+  campagnes.unshift(newC);
+  filterCampagnes();
+  modalCampagne.classList.remove('open');
+  document.getElementById('inputNom').value = '';
+  document.getElementById('inputDebut').value = '';
+  document.getElementById('inputFin').value = '';
+  document.getElementById('inputSites').value = '';
+  document.getElementById('inputClient').value = '';
+  document.getElementById('newClientCampWrap').style.display = 'none';
+  showToast('Campagne "' + nom + '" créée !');
+});
+
+// ── PARSING NOM DE FICHIER ──
+function parseFilename(filename) {
+  const base = filename.replace(/\.[^.]+$/, '');
+  const passageMatch = base.match(/passage[_\s]N[_°\s]?(\d+)/i);
+  const passage = passageMatch ? 'Passage N°' + passageMatch[1] : null;
+  let addrRaw = base;
+  addrRaw = addrRaw.replace(/[_\s]passage[_\s]N[_°\s]?\d+.*/i, '');
+  addrRaw = addrRaw.replace(/[_\s]passage.*/i, '');
+  addrRaw = addrRaw.replace(/[_\s]Technicien.*/i, '');
+  const petits = ['BIS','TER','DE','DU','DES','LA','LE','LES','EN','ET','SUR','SOUS','A','AU'];
+  const adresse = addrRaw.replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
+    .split(' ')
+    .map((w, i) => (i > 0 && petits.includes(w.toUpperCase())) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+  return { adresse, passage };
+}
+
+function renderDocCards(docs) {
+  if (docs.length === 0) return '<div class="docs-empty" style="padding:20px 0;">Aucun résultat pour cette recherche.</div>';
+  return docs.map(d => `
+    <div class="doc-card">
+      <div class="doc-icon ${d.type}">${docIcon(d.type)}</div>
+      <div class="doc-info">
+        <div class="doc-type-label ${d.type}">${d.type === 'xls' ? 'Reporting Excel' : 'Émargement PDF'}</div>
+        <div class="doc-name" title="${d.adresse || d.name}">${d.adresse || d.name}</div>
+        <div class="doc-date" style="display:flex;gap:8px;align-items:center;">
+          ${d.passage ? `<span style="color:var(--green-dark);font-weight:600;font-size:11px;">${d.passage}</span> ·` : ''}
+          ${formatDate(d.date)}
+        </div>
+      </div>
+      <button class="doc-dl"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button>
+    </div>`).join('');
+}
+
+window.filterDocs = function(campagneId, q) {
+  const c = campagnes.find(x => x.id === campagneId);
+  if (!c) return;
+  const grid = document.getElementById('docsgrid-' + campagneId);
+  if (!grid) return;
+  const filtered = q.trim() === '' ? c.docs : c.docs.filter(d => (d.adresse || d.name || '').toLowerCase().includes(q.toLowerCase()));
+  grid.innerHTML = renderDocCards(filtered);
+};
+
+// ── MODAL DOC ──
+const modalDoc = document.getElementById('modalDoc');
+let pendingFiles = [];
+
+window.openAddDoc = function(campagneId, e) {
+  e.stopPropagation();
+  currentCampagneId = campagneId;
+  const c = campagnes.find(x => x.id === campagneId);
+  document.getElementById('modalDocTitle').textContent = 'Ajouter des documents — ' + c.nom.substring(0, 36) + (c.nom.length > 36 ? '…' : '');
+  pendingFiles = [];
+  renderPendingFiles();
+  modalDoc.classList.add('open');
+};
+document.getElementById('closeDoc').addEventListener('click', () => modalDoc.classList.remove('open'));
+document.getElementById('cancelDoc').addEventListener('click', () => modalDoc.classList.remove('open'));
+modalDoc.addEventListener('click', e => { if (e.target === modalDoc) modalDoc.classList.remove('open'); });
+
+function renderPendingFiles() {
+  const container = document.getElementById('pendingList');
+  if (pendingFiles.length === 0) { container.innerHTML = ''; container.style.display = 'none'; return; }
+  container.style.display = 'block';
+  container.innerHTML = `
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:8px;">${pendingFiles.length} fichier${pendingFiles.length>1?'s':''} sélectionné${pendingFiles.length>1?'s':''}</div>
+    ${pendingFiles.map((f,i) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;background:var(--bg);">
+        <div style="width:32px;height:32px;border-radius:6px;background:${f.type==='xls'?'#EAF3DE':'#FDECEA'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          ${f.type==='xls'
+            ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="#3B6D11"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg>'
+            : '<svg width="14" height="14" viewBox="0 0 24 24" fill="#E74C3C"><path d="M20 2H8L2 8v14h20V2zm-9 12H9v-2h2v2zm0-4H9V8h2v2zm4 4h-2v-2h2v2zm0-4h-2V8h2v2zm4 4h-2v-2h2v2zm0-4h-2V8h2v2z"/></svg>'}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.adresse || f.name}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+            ${f.passage ? `<span style="color:var(--green-dark);font-weight:600;">${f.passage}</span> · ` : '<span>Pas de passage détecté</span> · '}${f.type==='xls'?'Reporting Excel':'Émargement PDF'}
+          </div>
+        </div>
+        <button onclick="removePending(${i})" style="width:22px;height:22px;border:none;background:transparent;cursor:pointer;color:var(--text-muted);font-size:18px;line-height:1;border-radius:4px;">×</button>
+      </div>`).join('')}`;
+}
+
+window.removePending = function(i) { pendingFiles.splice(i,1); renderPendingFiles(); };
+
+const fileInputDoc = document.getElementById('fileInputDoc');
+fileInputDoc.addEventListener('change', () => {
+  Array.from(fileInputDoc.files).forEach(file => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const type = (ext==='xls'||ext==='xlsx') ? 'xls' : 'pdf';
+    const { adresse, passage } = parseFilename(file.name);
+    pendingFiles.push({ name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
+  });
+  renderPendingFiles();
+  fileInputDoc.value = '';
+});
+
+const dropZoneDoc = document.getElementById('dropZoneDoc');
+dropZoneDoc.addEventListener('dragover', e => { e.preventDefault(); dropZoneDoc.classList.add('dragover'); });
+dropZoneDoc.addEventListener('dragleave', () => dropZoneDoc.classList.remove('dragover'));
+dropZoneDoc.addEventListener('drop', e => {
+  e.preventDefault(); dropZoneDoc.classList.remove('dragover');
+  Array.from(e.dataTransfer.files).forEach(file => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const type = (ext==='xls'||ext==='xlsx') ? 'xls' : 'pdf';
+    const { adresse, passage } = parseFilename(file.name);
+    pendingFiles.push({ name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
+  });
+  renderPendingFiles();
+});
+
+document.getElementById('saveDoc').addEventListener('click', () => {
+  if (pendingFiles.length === 0) { alert('Veuillez sélectionner au moins un fichier.'); return; }
+  const c = campagnes.find(x => x.id === currentCampagneId);
+  if (!c) return;
+  pendingFiles.forEach(f => c.docs.push({ id: Date.now()+Math.random(), ...f }));
+  const nb = pendingFiles.length;
+  filterCampagnes();
+  setTimeout(() => {
+    const docs = document.getElementById('docs-' + currentCampagneId);
+    const toggle = document.getElementById('toggle-' + currentCampagneId);
+    if (docs) { docs.classList.add('open'); toggle.classList.add('open'); }
+  }, 50);
+  modalDoc.classList.remove('open');
+  pendingFiles = [];
+  showToast(nb + ' document' + (nb>1?'s':'') + ' ajouté' + (nb>1?'s':'') + ' !');
+});
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+renderCampagnes(campagnes);
+</script>
+</body>
+</html>

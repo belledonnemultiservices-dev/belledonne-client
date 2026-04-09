@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connexion — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
+    --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
+    --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
+    --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
+    --red:#E74C3C;--radius:14px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+
+  /* FOND DÉCORATIF */
+  .bg-circle{position:absolute;border-radius:50%;pointer-events:none;}
+  .bg-circle-1{width:500px;height:500px;background:rgba(46,204,143,0.05);top:-120px;right:-100px;}
+  .bg-circle-2{width:350px;height:350px;background:rgba(46,204,143,0.04);bottom:-80px;left:-60px;}
+  .bg-circle-3{width:200px;height:200px;background:rgba(46,204,143,0.06);top:40%;left:10%;}
+
+  /* GRILLE DE POINTS */
+  .bg-dots{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,0.04) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;}
+
+  /* CONTAINER PRINCIPAL */
+  .login-wrap{position:relative;z-index:10;display:flex;width:100%;max-width:960px;min-height:560px;border-radius:20px;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,0.4);}
+
+  /* PANNEAU GAUCHE */
+  .left-panel{flex:1;background:linear-gradient(145deg,#1A2E42 0%,#0D1B2A 100%);padding:48px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;border-right:1px solid rgba(255,255,255,0.06);}
+
+  .left-panel::before{content:'';position:absolute;top:-60px;right:-60px;width:260px;height:260px;border-radius:50%;background:rgba(46,204,143,0.07);}
+  .left-panel::after{content:'';position:absolute;bottom:-40px;left:-40px;width:180px;height:180px;border-radius:50%;background:rgba(46,204,143,0.05);}
+
+  .brand{display:flex;align-items:center;gap:12px;margin-bottom:48px;}
+  .brand-icon{width:44px;height:44px;background:var(--green);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .brand-icon svg{width:22px;height:22px;}
+  .brand-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:#fff;line-height:1.2;}
+  .brand-tagline{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+
+  .left-content{flex:1;display:flex;flex-direction:column;justify-content:center;}
+  .left-title{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:16px;}
+  .left-title span{color:var(--green);}
+  .left-desc{font-size:14px;color:rgba(255,255,255,0.5);line-height:1.7;max-width:280px;margin-bottom:36px;}
+
+  .features{display:flex;flex-direction:column;gap:12px;}
+  .feature{display:flex;align-items:center;gap:12px;}
+  .feature-dot{width:28px;height:28px;border-radius:8px;background:rgba(46,204,143,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .feature-dot svg{width:13px;height:13px;color:var(--green);}
+  .feature-text{font-size:13px;color:rgba(255,255,255,0.55);}
+
+  .left-footer{font-size:11px;color:rgba(255,255,255,0.2);margin-top:36px;}
+
+  /* PANNEAU DROIT */
+  .right-panel{width:420px;background:var(--surface);padding:48px 44px;display:flex;flex-direction:column;justify-content:center;}
+
+  .login-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:var(--text);margin-bottom:6px;}
+  .login-sub{font-size:13px;color:var(--text-muted);margin-bottom:36px;line-height:1.5;}
+
+  .form-group{margin-bottom:18px;}
+  .form-label{display:block;font-size:11px;font-weight:600;color:var(--text-mid);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.06em;}
+
+  .input-wrap{position:relative;}
+  .input-wrap svg.input-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
+  .form-input{width:100%;height:46px;padding:0 14px 0 42px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.2s,background 0.2s,box-shadow 0.2s;}
+  .form-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-input::placeholder{color:var(--text-muted);}
+  .form-input.error{border-color:var(--red);background:#fff;}
+
+  .eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;display:flex;align-items:center;justify-content:center;}
+  .eye-btn:hover{color:var(--text-mid);}
+  .eye-btn svg{width:16px;height:16px;}
+
+  .error-msg{font-size:12px;color:var(--red);margin-top:6px;display:none;align-items:center;gap:5px;}
+  .error-msg.show{display:flex;}
+  .error-msg svg{width:13px;height:13px;flex-shrink:0;}
+
+  .form-options{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+  .remember{display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .remember input[type="checkbox"]{width:16px;height:16px;accent-color:var(--green);cursor:pointer;}
+  .remember span{font-size:13px;color:var(--text-mid);}
+  .forgot{font-size:13px;color:var(--green-dark);text-decoration:none;font-weight:500;}
+  .forgot:hover{text-decoration:underline;}
+
+  .btn-login{width:100%;height:48px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:#fff;cursor:pointer;transition:background 0.15s,transform 0.1s;display:flex;align-items:center;justify-content:center;gap:10px;letter-spacing:0.01em;}
+  .btn-login:hover{background:var(--navy-mid);}
+  .btn-login:active{transform:scale(0.99);}
+  .btn-login svg{width:16px;height:16px;}
+  .btn-login.loading{opacity:0.7;cursor:not-allowed;}
+
+  /* SPINNER */
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:none;}
+  .btn-login.loading .spinner{display:block;}
+  .btn-login.loading .btn-text{display:none;}
+
+  .login-footer{margin-top:28px;text-align:center;font-size:12px;color:var(--text-muted);}
+  .login-footer a{color:var(--green-dark);font-weight:500;text-decoration:none;}
+  .login-footer a:hover{text-decoration:underline;}
+
+  /* ALERT ERREUR GLOBAL */
+  .alert-error{background:#FDECEA;border:1px solid rgba(231,76,60,0.2);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:#A32D2D;display:none;align-items:center;gap:10px;margin-bottom:20px;}
+  .alert-error.show{display:flex;}
+  .alert-error svg{width:16px;height:16px;flex-shrink:0;}
+
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+  .right-panel{animation:fadeUp 0.4s ease both;}
+
+  @media(max-width:780px){
+    .login-wrap{flex-direction:column;max-width:420px;min-height:auto;}
+    .left-panel{padding:32px;min-height:180px;}
+    .left-content{display:none;}
+    .right-panel{width:100%;padding:32px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-dots"></div>
+<div class="bg-circle bg-circle-1"></div>
+<div class="bg-circle bg-circle-2"></div>
+<div class="bg-circle bg-circle-3"></div>
+
+<div class="login-wrap">
+
+  <!-- PANNEAU GAUCHE -->
+  <div class="left-panel">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">BELLEDONNE</div>
+        <div class="brand-tagline">Multiservices</div>
+      </div>
+    </div>
+
+    <div class="left-content">
+      <div class="left-title">Votre espace<br><span>client bailleur</span></div>
+      <div class="left-desc">Accédez à tous vos rapports d'intervention, reportings et documents en toute sécurité.</div>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-dot"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg></div>
+          <span class="feature-text">Rapports d'intervention</span>
+        </div>
+        <div class="feature">
+          <div class="feature-dot"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg></div>
+          <span class="feature-text">Reportings de campagne</span>
+        </div>
+        <div class="feature">
+          <div class="feature-dot"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
+          <span class="feature-text">Suivi des garanties</span>
+        </div>
+        <div class="feature">
+          <div class="feature-dot"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg></div>
+          <span class="feature-text">Fiches produits & FDS</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="left-footer">© 2025 Belledonne Multiservices · Tous droits réservés</div>
+  </div>
+
+  <!-- PANNEAU DROIT -->
+  <div class="right-panel">
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Entrez vos identifiants pour accéder à votre espace client.</div>
+
+    <div class="alert-error" id="alertError">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>
+      <span id="alertMsg">Identifiant ou mot de passe incorrect.</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Identifiant</label>
+      <div class="input-wrap">
+        <svg class="input-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        <input class="form-input" type="text" id="inputEmail" placeholder="ex: oph-isere" autocomplete="username" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Mot de passe</label>
+      <div class="input-wrap">
+        <svg class="input-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+        <input class="form-input" type="password" id="inputPassword" placeholder="••••••••" autocomplete="current-password" />
+        <button class="eye-btn" id="eyeBtn" onclick="togglePassword()" tabindex="-1">
+          <svg id="eyeIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="form-options">
+      <label class="remember">
+        <input type="checkbox" id="rememberMe" />
+        <span>Se souvenir de moi</span>
+      </label>
+      <a href="#" class="forgot">Mot de passe oublié ?</a>
+    </div>
+
+    <button class="btn-login" id="btnLogin" onclick="handleLogin()">
+      <span class="btn-text" style="display:flex;align-items:center;gap:10px;">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 7L9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z"/></svg>
+        Se connecter
+      </span>
+      <div class="spinner"></div>
+    </button>
+
+    <div class="login-footer">
+      Un problème de connexion ? <a href="mailto:belledonne.multiservices@gmail.com">Contactez-nous</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Afficher/masquer mot de passe
+  window.togglePassword = function() {
+    const input = document.getElementById('inputPassword');
+    const icon = document.getElementById('eyeIcon');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.innerHTML = '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>';
+    } else {
+      input.type = 'password';
+      icon.innerHTML = '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>';
+    }
+  };
+
+  // Connexion — simulation (sera remplacée par Firebase)
+  window.handleLogin = function() {
+    const email = document.getElementById('inputEmail').value.trim();
+    const password = document.getElementById('inputPassword').value;
+    const btn = document.getElementById('btnLogin');
+    const alert = document.getElementById('alertError');
+
+    alert.classList.remove('show');
+
+    if (!email || !password) {
+      document.getElementById('alertMsg').textContent = 'Veuillez remplir tous les champs.';
+      alert.classList.add('show');
+      return;
+    }
+
+    // Animation chargement
+    btn.classList.add('loading');
+
+    setTimeout(() => {
+      btn.classList.remove('loading');
+      // SIMULATION : identifiants de démo
+      if (email === 'demo' && password === 'demo1234') {
+        window.location.href = 'dashboard.html';
+      } else {
+        document.getElementById('alertMsg').textContent = 'Identifiant ou mot de passe incorrect.';
+        alert.classList.add('show');
+        document.getElementById('inputPassword').classList.add('error');
+        setTimeout(() => document.getElementById('inputPassword').classList.remove('error'), 2000);
+      }
+    }, 1200);
+  };
+
+  // Touche Entrée
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.handleLogin();
+  });
+
+  // Effacer erreur au retaper
+  ['inputEmail','inputPassword'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      document.getElementById('alertError').classList.remove('show');
+    });
+  });
+</script>
+</body>
+</html>
