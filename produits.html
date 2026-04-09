@@ -205,7 +205,7 @@
         <div class="page-title">Fiches produits & FDS</div>
         <div class="page-sub">Documentation des produits utilisés lors des interventions</div>
       </div>
-      <button class="btn-primary" id="btnAjouter">
+      <button class="btn-primary" id="btnAjouter" style="display:none;">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         Ajouter un produit
       </button>
@@ -332,7 +332,7 @@ onAuthStateChanged(_auth,async(user)=>{
   if(!user){window.location.href="login.html";return;}
   try{const snap=await getDocs(query(collection(_db,"users"),where("uid","==",user.uid)));
   const role=snap.empty?"client":snap.docs[0].data().role;
-  if(role==="client"){const btn=document.getElementById("btnAjouter");if(btn)btn.style.display="none";}}catch(e){}
+  if(role==="admin"){const btn=document.getElementById("btnAjouter");if(btn)btn.style.display="";}}catch(e){}
 });
 </script>
 <script>

@@ -269,7 +269,7 @@
         <div class="page-title">Rapports d'intervention</div>
         <div class="page-sub">Déposez et consultez tous les rapports PDF par bon de commande</div>
       </div>
-      <button class="btn-upload" id="btnOpenModal">
+      <button class="btn-upload" id="btnOpenModal" style="display:none;">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
         Déposer un rapport
       </button>
@@ -469,9 +469,9 @@ onAuthStateChanged(_auth, async (user) => {
   try {
     const snap = await getDocs(query(collection(_db, 'users'), where('uid', '==', user.uid)));
     const role = snap.empty ? 'client' : snap.docs[0].data().role;
-    if (role === 'client') {
+    if (role === 'admin') {
       const btn = document.getElementById('btnOpenModal');
-      if (btn) btn.style.display = 'none';
+      if (btn) btn.style.display = '';
     }
   } catch(e) {}
 });
