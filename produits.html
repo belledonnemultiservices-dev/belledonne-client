@@ -258,17 +258,16 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Client bailleur *</label>
-        <select class="form-select" id="inClient" onchange="document.getElementById('newClientProdWrap').style.display=this.value==='__new__'?'block':'none'">
-          <option value="">— Sélectionner le client —</option>
-          <option value="OPH Isère Habitat">OPH Isère Habitat</option>
-          <option value="Grenoble Habitat">Grenoble Habitat</option>
-          <option value="Actis">Actis</option>
-          <option value="SDH">SDH</option>
-          <option value="__new__">+ Nouveau client bailleur...</option>
-        </select>
-        <div id="newClientProdWrap" style="display:none;margin-top:8px;">
-          <input class="form-input" type="text" id="inClientNew" placeholder="Nom du client bailleur..." />
+        <label class="form-label">Clients bailleurs * <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--text-muted);">(plusieurs possibles)</span></label>
+        <div style="display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);" id="clientCheckboxes">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" value="Alpes Isère Habitat DT Échirolles" style="accent-color:var(--green);width:15px;height:15px;"> Alpes Isère Habitat DT Échirolles</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" value="ACTIS Agence TMR" style="accent-color:var(--green);width:15px;height:15px;"> ACTIS Agence TMR</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" value="ACTIS Agence TPC" style="accent-color:var(--green);width:15px;height:15px;"> ACTIS Agence TPC</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" value="__tous__" id="checkTous" onchange="toggleTousClients(this)"> <span style="font-weight:500;color:var(--green-dark);">Tous les clients</span></label>
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <input class="form-input" type="text" id="inClientNew" placeholder="+ Ajouter un client..." style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addClientCheckbox()}" />
+          <button type="button" onclick="addClientCheckbox()" style="height:42px;padding:0 14px;border:none;background:var(--navy);color:#fff;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">+ Ajouter</button>
         </div>
       </div>
       <div class="form-group">
@@ -463,31 +462,52 @@ document.getElementById('closeModal').addEventListener('click', () => modal.clas
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
 modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
 
+window.toggleTousClients = function(cb) {
+  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous)').forEach(c => c.checked = cb.checked);
+};
+
+window.addClientCheckbox = function() {
+  const val = document.getElementById('inClientNew').value.trim();
+  if (!val) return;
+  const box = document.getElementById('clientCheckboxes');
+  const id = 'client_' + Date.now();
+  const lbl = document.createElement('label');
+  lbl.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;';
+  lbl.innerHTML = `<input type="checkbox" value="${val}" checked style="accent-color:var(--green);width:15px;height:15px;"> ${val}`;
+  box.insertBefore(lbl, box.lastElementChild);
+  document.getElementById('inClientNew').value = '';
+};
+
 document.getElementById('saveModal').addEventListener('click', () => {
   const nom = document.getElementById('inNom').value.trim();
   let type = document.getElementById('inType').value;
-  let client = document.getElementById('inClient').value;
-  if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
-  if (!nom || !type || type === '__custom__' || !client) { alert('Veuillez renseigner le client, le nom et le type du produit.'); return; }
-  produits.unshift({
-    id: Date.now(), nom, type, client,
-    usage: document.getElementById('inUsage').value.trim(),
-    fiche: !!document.getElementById('fileFiche').files[0],
-    fds: !!document.getElementById('fileFds').files[0]
+  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
+  if (!nom || !type || type === '__custom__' || clients.length === 0) { alert('Veuillez renseigner au moins un client, le nom et le type.'); return; }
+  
+  // Créer une entrée par client
+  clients.forEach(client => {
+    produits.unshift({
+      id: Date.now() + Math.random(), nom, type, client,
+      usage: document.getElementById('inUsage').value.trim(),
+      fiche: !!document.getElementById('fileFiche').files[0],
+      fds: !!document.getElementById('fileFds').files[0]
+    });
   });
+  
   filter();
   modal.classList.remove('open');
-  ['inNom','inUsage'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inNom').value = '';
+  document.getElementById('inUsage').value = '';
   document.getElementById('inType').value = '';
-  document.getElementById('inClient').value = '';
-  document.getElementById('newClientProdWrap').style.display = 'none';
+  document.getElementById('inClientNew').value = '';
+  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
   document.getElementById('typeCustomWrap').style.display = 'none';
   ['Fiche','Fds'].forEach(n => {
     document.getElementById('file'+n).value = '';
     const c = document.getElementById('chosen'+n);
     c.style.display = 'none'; c.textContent = '';
   });
-  showToast('Produit "' + nom + '" ajouté pour ' + client + ' !');
+  showToast(`Produit "${nom}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
 });
 
 function showToast(msg) {
