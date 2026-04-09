@@ -496,22 +496,18 @@ filter();
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
 (function() {
   if (!firebase.apps.length) {
     firebase.initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
   }
-  firebase.auth().onAuthStateChanged(async function(user) {
+  firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = "login.html"; return; }
-    try {
-      var snap = await firebase.firestore().collection("users").where("uid","==",user.uid).get();
-      var role = snap.empty ? "client" : snap.docs[0].data().role;
-      if (role === "admin") {
-        var btn = document.getElementById("btnAjouter");
-        if (btn) btn.style.display = "";
-      }
-    } catch(e) {}
+    // Admin reconnu par email directement — pas besoin de Firestore
+    if (user.email === "belledonne.multiservices@gmail.com") {
+      var btn = document.getElementById("btnAjouter");
+      if (btn) btn.style.display = "";
+    }
   });
 })();
 </script>
