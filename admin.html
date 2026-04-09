@@ -247,9 +247,14 @@ const firebaseConfig = {
   appId: "1:737384028313:web:700aee1467ac27d0c58008"
 };
 
+// App principale (admin connecté)
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+
+// App secondaire pour créer des comptes SANS déconnecter l'admin
+const appSecondary = initializeApp(firebaseConfig, "secondary");
+const authSecondary = getAuth(appSecondary);
 
 // Vérifier que l'utilisateur connecté est admin
 onAuthStateChanged(auth, async (user) => {
@@ -310,7 +315,11 @@ window.createAccount = async function() {
   const email = `${identifiant}@belledonne.client`;
 
   try {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    // Créer avec l'app secondaire → l'admin reste connecté sur l'app principale
+    const cred = await createUserWithEmailAndPassword(authSecondary, email, password);
+    // Déconnecter immédiatement le compte secondaire
+    await signOut(authSecondary);
+    
     await addDoc(collection(db, 'users'), {
       uid: cred.user.uid,
       identifiant,
