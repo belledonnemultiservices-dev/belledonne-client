@@ -209,12 +209,12 @@
     </button>
 
     <div class="login-footer">
-      Un problème de connexion ? <a href="mailto:belledonne.multiservices@gmail.com">Contactez-nous</a>
+      Un problème de connexion ? <a href="/cdn-cgi/l/email-protection#bcded9d0d0d9d8d3d2d2d992d1c9d0c8d5cfd9cecad5dfd9cffcdbd1ddd5d092dfd3d1">Contactez-nous</a>
     </div>
   </div>
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"><script type="module">
   // Afficher/masquer mot de passe
   window.togglePassword = function() {
     const input = document.getElementById('inputPassword');
@@ -228,36 +228,40 @@
     }
   };
 
-  // Connexion — simulation (sera remplacée par Firebase)
-  window.handleLogin = function() {
-    const email = document.getElementById('inputEmail').value.trim();
-    const password = document.getElementById('inputPassword').value;
-    const btn = document.getElementById('btnLogin');
-    const alert = document.getElementById('alertError');
+  // ── FIREBASE AUTH ──
+  import { login } from './firebase.js';
 
-    alert.classList.remove('show');
+  window.handleLogin = async function() {
+    const identifiant = document.getElementById('inputEmail').value.trim().toLowerCase();
+    const password    = document.getElementById('inputPassword').value;
+    const btn         = document.getElementById('btnLogin');
+    const alertEl     = document.getElementById('alertError');
 
-    if (!email || !password) {
+    alertEl.classList.remove('show');
+
+    if (!identifiant || !password) {
       document.getElementById('alertMsg').textContent = 'Veuillez remplir tous les champs.';
-      alert.classList.add('show');
+      alertEl.classList.add('show');
       return;
     }
 
-    // Animation chargement
     btn.classList.add('loading');
 
-    setTimeout(() => {
+    // Transformer l'identifiant en email Firebase
+    const email = identifiant.includes('@') ? identifiant : `${identifiant}@belledonne.client`;
+
+    try {
+      await login(email, password);
+      window.location.href = 'dashboard.html';
+    } catch (err) {
       btn.classList.remove('loading');
-      // SIMULATION : identifiants de démo
-      if (email === 'demo' && password === 'demo1234') {
-        window.location.href = 'dashboard.html';
-      } else {
-        document.getElementById('alertMsg').textContent = 'Identifiant ou mot de passe incorrect.';
-        alert.classList.add('show');
-        document.getElementById('inputPassword').classList.add('error');
-        setTimeout(() => document.getElementById('inputPassword').classList.remove('error'), 2000);
-      }
-    }, 1200);
+      let msg = 'Identifiant ou mot de passe incorrect.';
+      if (err.code === 'auth/too-many-requests') msg = 'Trop de tentatives. Réessayez plus tard.';
+      document.getElementById('alertMsg').textContent = msg;
+      alertEl.classList.add('show');
+      document.getElementById('inputPassword').classList.add('error');
+      setTimeout(() => document.getElementById('inputPassword').classList.remove('error'), 2000);
+    }
   };
 
   // Touche Entrée
@@ -267,10 +271,4 @@
 
   // Effacer erreur au retaper
   ['inputEmail','inputPassword'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      document.getElementById('alertError').classList.remove('show');
-    });
-  });
-</script>
-</body>
-</html>
+    documen
