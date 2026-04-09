@@ -380,6 +380,19 @@
   <span id="toastMsg">Action réalisée avec succès !</span>
 </div>
 
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const _app=initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
+const _auth=getAuth(_app);const _db=getFirestore(_app);
+onAuthStateChanged(_auth,async(user)=>{
+  if(!user){window.location.href="login.html";return;}
+  try{const snap=await getDocs(query(collection(_db,"users"),where("uid","==",user.uid)));
+  const role=snap.empty?"client":snap.docs[0].data().role;
+  if(role==="client"){const btn=document.getElementById("btnNewCampagne");if(btn)btn.style.display="none";}}catch(e){}
+});
+</script>
 <script>
 const COLORS = ['color-green','color-blue','color-amber','color-purple'];
 
