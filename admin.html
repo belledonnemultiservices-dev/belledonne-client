@@ -254,7 +254,8 @@ const firebaseConfig = {
 // App principale
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-const db   = firebase.firestore();
+const db   = firebase.app().firestore('belledonne-client');
+db.settings({});
 
 // App secondaire pour créer des comptes sans déconnecter l'admin
 const secondary = firebase.initializeApp(firebaseConfig, 'secondary');
