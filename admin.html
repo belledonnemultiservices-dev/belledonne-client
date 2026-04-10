@@ -167,8 +167,8 @@
       <div class="card">
         <div class="card-header">
           <div>
-            <div class="card-title">Créer un compte client</div>
-            <div class="card-sub">Le client se connectera avec cet identifiant et mot de passe.</div>
+            <div class="card-title">Créer un compte</div>
+            <div class="card-sub">Client bailleur ou administrateur Belledonne.</div>
           </div>
         </div>
         <div class="form-body">
@@ -181,23 +181,38 @@
             <span id="alertErrorMsg">Une erreur est survenue.</span>
           </div>
           <div class="form-group">
-            <label class="form-label">Client bailleur *</label>
-            <select class="form-select" id="inClient">
-              <option value="">— Sélectionner —</option>
-              <option value="Alpes Isère Habitat DT Échirolles">Alpes Isère Habitat DT Échirolles</option>
-              <option value="ACTIS Agence TMR">ACTIS Agence TMR</option>
-              <option value="ACTIS Agence TPC">ACTIS Agence TPC</option>
-              <option value="__new__">+ Nouveau client...</option>
-            </select>
+            <label class="form-label">Rôle *</label>
+            <div style="display:flex;gap:10px;">
+              <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:2px solid var(--green);border-radius:var(--radius-sm);cursor:pointer;background:var(--green-pale);" id="roleClientLabel">
+                <input type="radio" name="inRole" value="client" checked style="accent-color:var(--green);" onchange="handleRoleChange()" />
+                <span style="font-size:13px;font-weight:500;">Client bailleur</span>
+              </label>
+              <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 14px;border:2px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;" id="roleAdminLabel">
+                <input type="radio" name="inRole" value="admin" style="accent-color:var(--amber);" onchange="handleRoleChange()" />
+                <span style="font-size:13px;font-weight:500;color:var(--amber);">Administrateur</span>
+              </label>
+            </div>
           </div>
-          <div id="newClientWrap" style="display:none;" class="form-group">
-            <label class="form-label">Nom du nouveau client *</label>
-            <input class="form-input" type="text" id="inClientNew" placeholder="ex: SDH Grenoble" />
+          <div id="clientFields">
+            <div class="form-group">
+              <label class="form-label">Client bailleur *</label>
+              <select class="form-select" id="inClient">
+                <option value="">— Sélectionner —</option>
+                <option value="Alpes Isère Habitat DT Échirolles">Alpes Isère Habitat DT Échirolles</option>
+                <option value="ACTIS Agence TMR">ACTIS Agence TMR</option>
+                <option value="ACTIS Agence TPC">ACTIS Agence TPC</option>
+                <option value="__new__">+ Nouveau client...</option>
+              </select>
+            </div>
+            <div id="newClientWrap" style="display:none;" class="form-group">
+              <label class="form-label">Nom du nouveau client *</label>
+              <input class="form-input" type="text" id="inClientNew" placeholder="ex: SDH Grenoble" />
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Identifiant de connexion *</label>
             <input class="form-input" type="text" id="inIdentifiant" placeholder="ex: sdh-grenoble" />
-            <div class="form-hint">Lettres minuscules et tirets uniquement. Le client tapera cet identifiant pour se connecter.</div>
+            <div class="form-hint">Lettres minuscules et tirets uniquement.</div>
           </div>
           <div class="form-group">
             <label class="form-label">Mot de passe *</label>
@@ -279,56 +294,90 @@ window.togglePwd = function() {
   inp.type = inp.type === "password" ? "text" : "password";
 };
 
+window.handleRoleChange = function() {
+  const role = document.querySelector('input[name="inRole"]:checked').value;
+  const clientFields = document.getElementById('clientFields');
+  const roleClientLabel = document.getElementById('roleClientLabel');
+  const roleAdminLabel = document.getElementById('roleAdminLabel');
+  if (role === 'admin') {
+    clientFields.style.display = 'none';
+    roleAdminLabel.style.border = '2px solid var(--amber)';
+    roleAdminLabel.style.background = '#FEF5E4';
+    roleClientLabel.style.border = '2px solid var(--border)';
+    roleClientLabel.style.background = 'transparent';
+    document.getElementById('inIdentifiant').placeholder = 'ex: belledonne-admin2';
+  } else {
+    clientFields.style.display = 'block';
+    roleClientLabel.style.border = '2px solid var(--green)';
+    roleClientLabel.style.background = 'var(--green-pale)';
+    roleAdminLabel.style.border = '2px solid var(--border)';
+    roleAdminLabel.style.background = 'transparent';
+    document.getElementById('inIdentifiant').placeholder = 'ex: sdh-grenoble';
+  }
+};
+
 window.createAccount = async function() {
-  let client = document.getElementById("inClient").value;
-  if (client === "__new__") client = document.getElementById("inClientNew").value.trim();
-  const identifiant = document.getElementById("inIdentifiant").value.trim().toLowerCase();
-  const password = document.getElementById("inPassword").value;
-  document.getElementById("alertSuccess").classList.remove("show");
-  document.getElementById("alertError").classList.remove("show");
-  if (!client || !identifiant || !password) {
-    document.getElementById("alertErrorMsg").textContent = "Veuillez remplir tous les champs.";
-    document.getElementById("alertError").classList.add("show"); return;
+  const role = document.querySelector('input[name="inRole"]:checked').value;
+  let client = role === 'admin' ? 'Belledonne Multiservices' : document.getElementById('inClient').value;
+  if (role === 'client' && client === '__new__') client = document.getElementById('inClientNew').value.trim();
+  const identifiant = document.getElementById('inIdentifiant').value.trim().toLowerCase();
+  const password = document.getElementById('inPassword').value;
+
+  document.getElementById('alertSuccess').classList.remove('show');
+  document.getElementById('alertError').classList.remove('show');
+
+  if ((role === 'client' && !client) || !identifiant || !password) {
+    document.getElementById('alertErrorMsg').textContent = 'Veuillez remplir tous les champs.';
+    document.getElementById('alertError').classList.add('show'); return;
   }
   if (password.length < 8) {
-    document.getElementById("alertErrorMsg").textContent = "Mot de passe trop court (min. 8 caractères).";
-    document.getElementById("alertError").classList.add("show"); return;
+    document.getElementById('alertErrorMsg').textContent = 'Mot de passe trop court (min. 8 caractères).';
+    document.getElementById('alertError').classList.add('show'); return;
   }
-  const email = identifiant + "@belledonne.client";
+
+  const email = identifiant + '@belledonne.client';
   try {
     const cred = await createUserWithEmailAndPassword(authSecondary, email, password);
     await signOut(authSecondary);
-    await addDoc(collection(db, "users"), { uid: cred.user.uid, identifiant, email, client, role: "client", createdAt: new Date().toISOString() });
-    document.getElementById("alertSuccessMsg").textContent = "Compte \"" + identifiant + "\" créé pour " + client + " !";
-    document.getElementById("alertSuccess").classList.add("show");
-    ["inClient","inIdentifiant","inPassword","inClientNew"].forEach(id => document.getElementById(id).value = "");
-    document.getElementById("newClientWrap").style.display = "none";
-    showToast("Compte créé — " + identifiant);
+    await addDoc(collection(db, 'users'), {
+      uid: cred.user.uid, identifiant, email, client, role,
+      createdAt: new Date().toISOString()
+    });
+    document.getElementById('alertSuccessMsg').textContent = 'Compte "' + identifiant + '" créé (' + (role === 'admin' ? 'Administrateur' : client) + ') !';
+    document.getElementById('alertSuccess').classList.add('show');
+    ['inClient','inIdentifiant','inPassword','inClientNew'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    document.getElementById('newClientWrap').style.display = 'none';
+    showToast('Compte créé — ' + identifiant);
     loadAccounts();
   } catch(err) {
-    let msg = "Erreur lors de la création.";
-    if (err.code === "auth/email-already-in-use") msg = "Cet identifiant est déjà utilisé.";
-    document.getElementById("alertErrorMsg").textContent = msg;
-    document.getElementById("alertError").classList.add("show");
+    let msg = 'Erreur lors de la création.';
+    if (err.code === 'auth/email-already-in-use') msg = 'Cet identifiant est déjà utilisé.';
+    document.getElementById('alertErrorMsg').textContent = msg;
+    document.getElementById('alertError').classList.add('show');
   }
 };
 
 async function loadAccounts() {
   try {
-    const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
-    const accounts = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-    document.getElementById("statTotal").textContent = accounts.length;
-    document.getElementById("statClients").textContent = [...new Set(accounts.map(a => a.client))].length;
-    const list = document.getElementById("accountsList");
-    if (accounts.length === 0) { list.innerHTML = "<div class=\"empty-accounts\">Aucun compte client créé.</div>"; return; }
+    const snap = await getDocs(query(collection(db, 'users'), where('role', 'in', ['client', 'admin'])));
+    const accounts = snap.docs.map(d => ({ docId: d.id, ...d.data() })).filter(a => a.email !== 'belledonne.multiservices@gmail.com');
+    document.getElementById('statTotal').textContent = accounts.filter(a => a.role === 'client').length;
+    document.getElementById('statClients').textContent = [...new Set(accounts.filter(a=>a.role==='client').map(a => a.client))].length;
+    const list = document.getElementById('accountsList');
+    if (accounts.length === 0) { list.innerHTML = '<div class="empty-accounts">Aucun compte créé.</div>'; return; }
     list.innerHTML = accounts.map(a => `
       <div class="account-row">
-        <div class="acc-avatar">${a.identifiant.substring(0,2).toUpperCase()}</div>
-        <div class="acc-info"><div class="acc-name">${a.identifiant}</div><div class="acc-id">${a.email}</div></div>
-        <span class="acc-client">${a.client}</span>
-        <div class="acc-actions"><button class="btn-delete" onclick="deleteAccount('${a.docId}','${a.identifiant}')">Supprimer</button></div>
-      </div>`).join("");
-  } catch(e) { console.error("loadAccounts error:", e); }
+        <div class="acc-avatar" style="background:${a.role==='admin'?'var(--amber)':'var(--navy)'};">${a.identifiant.substring(0,2).toUpperCase()}</div>
+        <div class="acc-info">
+          <div class="acc-name">${a.identifiant}</div>
+          <div class="acc-id">${a.email || a.identifiant + '@belledonne.client'}</div>
+        </div>
+        <span class="acc-client" style="background:${a.role==='admin'?'#FEF5E4':'#EBF0F5'};color:${a.role==='admin'?'var(--amber)':'var(--navy)'};">${a.role === 'admin' ? '⚙ Admin' : a.client}</span>
+        <div class="acc-actions">
+          <button class="btn-delete" onclick="deleteAccount('${a.docId}','${a.identifiant}')">Supprimer</button>
+        </div>
+      </div>`).join('');
+  } catch(e) { console.error('loadAccounts error:', e); }
 }
 
 window.deleteAccount = async function(docId, identifiant) {
