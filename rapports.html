@@ -310,17 +310,17 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Client bailleur *</label>
+        <label class="form-label">Client *</label>
         <select class="form-select" id="inputClient" onchange="handleClientSelect()">
           <option value="">— Sélectionner le client —</option>
           <option value="OPH Isère Habitat">OPH Isère Habitat</option>
           <option value="Grenoble Habitat">Grenoble Habitat</option>
           <option value="Actis">Actis</option>
           <option value="SDH">SDH</option>
-          <option value="__new__">+ Nouveau client bailleur...</option>
+          <option value="__new__">+ Nouveau client...</option>
         </select>
         <div id="newClientWrap" style="display:none;margin-top:8px;">
-          <input class="form-input" type="text" id="inputClientNew" placeholder="Nom du client bailleur..." />
+          <input class="form-input" type="text" id="inputClientNew" placeholder="Nom du client..." />
         </div>
       </div>
       <div class="form-group">
@@ -390,7 +390,7 @@
 <div class="modal-overlay-send" id="modalSend">
   <div class="modal-send">
     <div style="padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;">Notifier le client bailleur</div>
+      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;">Notifier le client</div>
       <button style="width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-mid);" onclick="document.getElementById('modalSend').classList.remove('open')">✕</button>
     </div>
     <div style="padding:24px 26px;">
@@ -402,7 +402,7 @@
         <div style="margin-bottom:16px;">
           <div style="font-size:12px;font-weight:500;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Destinataires</div>
           <div class="contacts-checkboxes" id="sendContactsList">
-            <div style="font-size:13px;color:var(--text-muted);text-align:center;padding:16px;">Aucun contact trouvé pour ce client bailleur.<br><a href="contacts.html" style="color:var(--green-dark);font-weight:500;">Ajouter des contacts →</a></div>
+            <div style="font-size:13px;color:var(--text-muted);text-align:center;padding:16px;">Aucun contact trouvé pour ce client.<br><a href="contacts.html" style="color:var(--green-dark);font-weight:500;">Ajouter des contacts →</a></div>
           </div>
           <div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:10px;">
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Ajouter un destinataire ponctuel (non enregistré)</div>

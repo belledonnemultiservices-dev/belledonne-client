@@ -193,7 +193,7 @@
     <div class="page-header">
       <div>
         <div class="page-title">Contacts & Notifications</div>
-        <div class="page-sub">Carnet de contacts par client bailleur et modèles d'emails</div>
+        <div class="page-sub">Carnet de contacts par client et modèles d'emails</div>
       </div>
       <button class="btn-primary" id="btnAddContact">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -214,7 +214,7 @@
       </div>
       <div class="table-wrap">
         <div class="table-head">
-          <span>Nom / Rôle</span><span>Client bailleur</span><span>Email</span><span>Téléphone</span><span>Notifié pour</span><span>Actions</span>
+          <span>Nom / Rôle</span><span>Client</span><span>Email</span><span>Téléphone</span><span>Notifié pour</span><span>Actions</span>
         </div>
         <div id="contactsBody"></div>
       </div>
@@ -238,16 +238,16 @@
         <div class="form-group"><label class="form-label">Rôle / Fonction</label><input class="form-input" type="text" id="cRole" placeholder="ex: Chargé de secteur" /></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Client bailleur *</label>
+        <label class="form-label">Client *</label>
         <select class="form-select" id="cClient" onchange="handleClientChange()">
           <option value="">— Sélectionner —</option>
           <option value="OPH Isère Habitat">OPH Isère Habitat</option>
           <option value="Grenoble Habitat">Grenoble Habitat</option>
           <option value="Actis">Actis</option>
           <option value="SDH">SDH</option>
-          <option value="__new__">+ Nouveau client bailleur...</option>
+          <option value="__new__">+ Nouveau client...</option>
         </select>
-        <div id="newClientWrap" style="display:none;margin-top:8px;"><input class="form-input" type="text" id="cClientNew" placeholder="Nom du client bailleur..." /></div>
+        <div id="newClientWrap" style="display:none;margin-top:8px;"><input class="form-input" type="text" id="cClientNew" placeholder="Nom du client..." /></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Email *</label><input class="form-input" type="email" id="cEmail" placeholder="ex: m.renaud@oph-isere.fr" /></div>
@@ -482,7 +482,7 @@ document.getElementById('saveContact').addEventListener('click',()=>{
   const email=document.getElementById('cEmail').value.trim();
   let client=document.getElementById('cClient').value;
   if(client==='__new__') client=document.getElementById('cClientNew').value.trim();
-  if(!nom||!email||!client){alert('Veuillez renseigner nom, email et client bailleur.');return;}
+  if(!nom||!email||!client){alert('Veuillez renseigner nom, email et client.');return;}
   const notif=[];
   if(document.getElementById('cNotifRapport').checked)notif.push('rapport');
   if(document.getElementById('cNotifGarantie').checked)notif.push('garantie');

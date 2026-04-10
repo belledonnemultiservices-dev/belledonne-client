@@ -263,17 +263,17 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Client bailleur *</label>
+        <label class="form-label">Client *</label>
         <select class="form-select" id="inClient" onchange="handleClientSelect()">
           <option value="">— Sélectionner le client —</option>
           <option value="OPH Isère Habitat">OPH Isère Habitat</option>
           <option value="Grenoble Habitat">Grenoble Habitat</option>
           <option value="Actis">Actis</option>
           <option value="SDH">SDH</option>
-          <option value="__new__">+ Nouveau client bailleur...</option>
+          <option value="__new__">+ Nouveau client...</option>
         </select>
         <div id="newClientWrap" style="display:none;margin-top:8px;">
-          <input class="form-input" type="text" id="inClientNew" placeholder="Nom du client bailleur..." />
+          <input class="form-input" type="text" id="inClientNew" placeholder="Nom du client..." />
         </div>
       </div>
       <div class="form-group">
@@ -333,7 +333,7 @@
 <div id="modalSend" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:14px;width:520px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);">
     <div style="padding:22px 26px 18px;border-bottom:1px solid rgba(13,27,42,0.09);display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;">Notifier le client bailleur</div>
+      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;">Notifier le client</div>
       <button style="width:32px;height:32px;border:none;background:#F2F5F8;border-radius:6px;cursor:pointer;font-size:18px;" onclick="document.getElementById('modalSend').style.display='none'">✕</button>
     </div>
     <div style="padding:24px 26px;">
@@ -497,7 +497,7 @@ document.getElementById('saveModal').addEventListener('click', () => {
   let client = document.getElementById('inClient').value;
   if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
   if (!client || !statut || !adresse || !date) {
-    alert('Veuillez remplir les champs obligatoires : client bailleur, statut, adresse et date.');
+    alert('Veuillez remplir les champs obligatoires : client, statut, adresse et date.');
     return;
   }
   const motifVal = document.getElementById('inMotifSelect').value;

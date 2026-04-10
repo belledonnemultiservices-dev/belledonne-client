@@ -280,17 +280,17 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Client bailleur *</label>
+        <label class="form-label">Client *</label>
         <select class="form-select" id="inputClient" onchange="document.getElementById('newClientCampWrap').style.display=this.value==='__new__'?'block':'none'">
           <option value="">— Sélectionner le client —</option>
           <option value="OPH Isère Habitat">OPH Isère Habitat</option>
           <option value="Grenoble Habitat">Grenoble Habitat</option>
           <option value="Actis">Actis</option>
           <option value="SDH">SDH</option>
-          <option value="__new__">+ Nouveau client bailleur...</option>
+          <option value="__new__">+ Nouveau client...</option>
         </select>
         <div id="newClientCampWrap" style="display:none;margin-top:8px;">
-          <input class="form-input" type="text" id="inputClientNew" placeholder="Nom du client bailleur..." />
+          <input class="form-input" type="text" id="inputClientNew" placeholder="Nom du client..." />
         </div>
       </div>
       <div class="form-group">
