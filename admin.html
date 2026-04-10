@@ -238,10 +238,12 @@
   <span id="toastMsg"></span>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
   authDomain: "belledonne-client.firebaseapp.com",
@@ -251,134 +253,101 @@ const firebaseConfig = {
   appId: "1:737384028313:web:700aee1467ac27d0c58008"
 };
 
-// App principale
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db   = firebase.firestore();
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+const appSecondary = initializeApp(firebaseConfig, "secondary");
+const authSecondary = getAuth(appSecondary);
 
-// App secondaire pour créer des comptes sans déconnecter l'admin
-const secondary = firebase.initializeApp(firebaseConfig, 'secondary');
-const authSecondary = secondary.auth();
-
-// Vérifier admin
-firebase.auth().onAuthStateChanged(function(user) {
-  if (!user) { window.location.href = 'login.html'; return; }
-  if (user.email !== 'belledonne.multiservices@gmail.com') {
-    window.location.href = 'dashboard.html'; return;
-  }
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href = "login.html"; return; }
+  if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
   loadAccounts();
 });
 
-// Sélecteur nouveau client
-document.getElementById('inClient').addEventListener('change', function() {
-  document.getElementById('newClientWrap').style.display = this.value === '__new__' ? 'block' : 'none';
+document.getElementById("inClient").addEventListener("change", function() {
+  document.getElementById("newClientWrap").style.display = this.value === "__new__" ? "block" : "none";
 });
 
-// Auto-générer l'identifiant
-document.getElementById('inClientNew').addEventListener('input', function() {
-  const val = this.value.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-  document.getElementById('inIdentifiant').value = val;
+document.getElementById("inClientNew").addEventListener("input", function() {
+  const val = this.value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+  document.getElementById("inIdentifiant").value = val;
 });
 
 window.togglePwd = function() {
-  const inp = document.getElementById('inPassword');
-  const ico = document.getElementById('eyeIconAdmin');
-  if (inp.type === 'password') {
-    inp.type = 'text';
-    ico.innerHTML = '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27z"/>';
-  } else {
-    inp.type = 'password';
-    ico.innerHTML = '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>';
-  }
+  const inp = document.getElementById("inPassword");
+  inp.type = inp.type === "password" ? "text" : "password";
 };
 
 window.createAccount = async function() {
-  let client = document.getElementById('inClient').value;
-  if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
-  const identifiant = document.getElementById('inIdentifiant').value.trim().toLowerCase();
-  const password    = document.getElementById('inPassword').value;
-
-  document.getElementById('alertSuccess').classList.remove('show');
-  document.getElementById('alertError').classList.remove('show');
-
+  let client = document.getElementById("inClient").value;
+  if (client === "__new__") client = document.getElementById("inClientNew").value.trim();
+  const identifiant = document.getElementById("inIdentifiant").value.trim().toLowerCase();
+  const password = document.getElementById("inPassword").value;
+  document.getElementById("alertSuccess").classList.remove("show");
+  document.getElementById("alertError").classList.remove("show");
   if (!client || !identifiant || !password) {
-    document.getElementById('alertErrorMsg').textContent = 'Veuillez remplir tous les champs.';
-    document.getElementById('alertError').classList.add('show'); return;
+    document.getElementById("alertErrorMsg").textContent = "Veuillez remplir tous les champs.";
+    document.getElementById("alertError").classList.add("show"); return;
   }
   if (password.length < 8) {
-    document.getElementById('alertErrorMsg').textContent = 'Mot de passe trop court (min. 8 caractères).';
-    document.getElementById('alertError').classList.add('show'); return;
+    document.getElementById("alertErrorMsg").textContent = "Mot de passe trop court (min. 8 caractères).";
+    document.getElementById("alertError").classList.add("show"); return;
   }
-
-  const email = identifiant + '@belledonne.client';
+  const email = identifiant + "@belledonne.client";
   try {
-    const cred = await authSecondary.createUserWithEmailAndPassword(email, password);
-    await authSecondary.signOut();
-    await db.collection('users').add({
-      uid: cred.user.uid, identifiant, email, client,
-      role: 'client', createdAt: new Date().toISOString()
-    });
-    document.getElementById('alertSuccessMsg').textContent = 'Compte "' + identifiant + '" créé pour ' + client + ' !';
-    document.getElementById('alertSuccess').classList.add('show');
-    document.getElementById('inClient').value = '';
-    document.getElementById('inIdentifiant').value = '';
-    document.getElementById('inPassword').value = '';
-    document.getElementById('inClientNew').value = '';
-    document.getElementById('newClientWrap').style.display = 'none';
-    showToast('Compte créé — ' + identifiant);
+    const cred = await createUserWithEmailAndPassword(authSecondary, email, password);
+    await signOut(authSecondary);
+    await addDoc(collection(db, "users"), { uid: cred.user.uid, identifiant, email, client, role: "client", createdAt: new Date().toISOString() });
+    document.getElementById("alertSuccessMsg").textContent = "Compte \"" + identifiant + "\" créé pour " + client + " !";
+    document.getElementById("alertSuccess").classList.add("show");
+    ["inClient","inIdentifiant","inPassword","inClientNew"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("newClientWrap").style.display = "none";
+    showToast("Compte créé — " + identifiant);
     loadAccounts();
   } catch(err) {
-    let msg = 'Erreur lors de la création.';
-    if (err.code === 'auth/email-already-in-use') msg = 'Cet identifiant est déjà utilisé.';
-    if (err.code === 'auth/weak-password') msg = 'Mot de passe trop faible.';
-    document.getElementById('alertErrorMsg').textContent = msg;
-    document.getElementById('alertError').classList.add('show');
+    let msg = "Erreur lors de la création.";
+    if (err.code === "auth/email-already-in-use") msg = "Cet identifiant est déjà utilisé.";
+    document.getElementById("alertErrorMsg").textContent = msg;
+    document.getElementById("alertError").classList.add("show");
   }
 };
 
 async function loadAccounts() {
-  const snap = await db.collection('users').where('role','==','client').get();
-  const accounts = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-  document.getElementById('statTotal').textContent = accounts.length;
-  const clients = [...new Set(accounts.map(a => a.client))];
-  document.getElementById('statClients').textContent = clients.length;
-  const list = document.getElementById('accountsList');
-  if (accounts.length === 0) {
-    list.innerHTML = '<div class="empty-accounts">Aucun compte client créé.</div>'; return;
-  }
-  list.innerHTML = accounts.map(a => `
-    <div class="account-row">
-      <div class="acc-avatar">${a.identifiant.substring(0,2).toUpperCase()}</div>
-      <div class="acc-info">
-        <div class="acc-name">${a.identifiant}</div>
-        <div class="acc-id">${a.email}</div>
-      </div>
-      <span class="acc-client">${a.client}</span>
-      <div class="acc-actions">
-        <button class="btn-delete" onclick="deleteAccount('${a.docId}','${a.identifiant}')">Supprimer</button>
-      </div>
-    </div>`).join('');
+  try {
+    const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+    const accounts = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
+    document.getElementById("statTotal").textContent = accounts.length;
+    document.getElementById("statClients").textContent = [...new Set(accounts.map(a => a.client))].length;
+    const list = document.getElementById("accountsList");
+    if (accounts.length === 0) { list.innerHTML = "<div class=\"empty-accounts\">Aucun compte client créé.</div>"; return; }
+    list.innerHTML = accounts.map(a => `
+      <div class="account-row">
+        <div class="acc-avatar">${a.identifiant.substring(0,2).toUpperCase()}</div>
+        <div class="acc-info"><div class="acc-name">${a.identifiant}</div><div class="acc-id">${a.email}</div></div>
+        <span class="acc-client">${a.client}</span>
+        <div class="acc-actions"><button class="btn-delete" onclick="deleteAccount('${a.docId}','${a.identifiant}')">Supprimer</button></div>
+      </div>`).join("");
+  } catch(e) { console.error("loadAccounts error:", e); }
 }
 
 window.deleteAccount = async function(docId, identifiant) {
-  if (!confirm('Supprimer le compte "' + identifiant + '" ?')) return;
-  await db.collection('users').doc(docId).delete();
-  showToast('Compte supprimé — ' + identifiant);
+  if (!confirm("Supprimer le compte \"" + identifiant + "\" ?")) return;
+  await deleteDoc(doc(db, "users", docId));
+  showToast("Compte supprimé — " + identifiant);
   loadAccounts();
 };
 
 window.handleLogout = async function() {
-  await auth.signOut();
-  window.location.href = 'login.html';
+  await signOut(auth);
+  window.location.href = "login.html";
 };
 
 function showToast(msg) {
-  const t = document.getElementById('toast');
-  document.getElementById('toastMsg').textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3500);
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3500);
 }
 </script>
 </body>
