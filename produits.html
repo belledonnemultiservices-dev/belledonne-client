@@ -333,14 +333,8 @@ const TYPE_LABELS = { rodenticide:'Rodenticide', insecticide:'Insecticide', desi
 const TYPE_CSS = { rodenticide:'tb-rodenticide', insecticide:'tb-insecticide', desinfectant:'tb-desinfectant', repulsif:'tb-repulsif', autre:'tb-autre' };
 const CARD_CSS = { rodenticide:'t-rodenticide', insecticide:'t-insecticide', desinfectant:'t-desinfectant', repulsif:'t-repulsif', autre:'t-autre' };
 
-let produits = [
-  { id:1, nom:'Detia Ratex B', type:'rodenticide', usage:'Rodenticide anticoagulant de 2ème génération. Utilisé en dératisation pour les rongeurs résistants en espaces communs et caves.', fiche:true, fds:true },
-  { id:2, nom:'K-Othrine SC 25', type:'insecticide', usage:'Insecticide à base de deltaméthrine. Efficace contre punaises de lit, cafards, fourmis. Utilisé en désinsectisation préventive et curative.', fiche:true, fds:true },
-  { id:3, nom:'Solfac EW 50', type:'insecticide', usage:'Insecticide concentré émulsifiable à base de cyfluthrine pour le traitement des blattes et insectes rampants.', fiche:false, fds:true },
-  { id:4, nom:'Anios DDP 4', type:'desinfectant', usage:'Désinfectant de surface à large spectre virucide, bactéricide et fongicide. Utilisé après interventions dans les logements contaminés.', fiche:true, fds:true },
-  { id:5, nom:'Antinuisibles gel', type:'insecticide', usage:'Gel insecticide par ingestion pour cafards et blattes. Appliqué en points dans les cuisines et sanitaires.', fiche:true, fds:false },
-  { id:6, nom:'NetBird', type:'repulsif', usage:'Filet anti-pigeon et système de pose pour dépigeonnage sur façades, balcons et toitures.', fiche:true, fds:false },
-];
+let produits = [];
+
 
 let currentTab = 'tous';
 
@@ -519,21 +513,36 @@ function showToast(msg) {
 
 filter();
 </script>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
 
-onAuthStateChanged(auth, function(user) {
+onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
+  const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+  if (!snap.empty) {
+    const profil = snap.docs[0].data();
+    const clientName = document.querySelector(".client-name");
+    if (clientName) clientName.textContent = profil.client || "Client";
+    const clientContract = document.querySelector(".client-contract");
+    if (clientContract) clientContract.textContent = profil.identifiant || "";
+    const footerName = document.querySelector(".footer-name");
+    if (footerName) footerName.textContent = profil.client || user.email;
+    const footerRole = document.querySelector(".footer-role");
+    if (footerRole) footerRole.textContent = profil.role === "admin" ? "Administrateur" : "Client";
+    const avatar = document.querySelector(".avatar");
+    if (avatar) avatar.textContent = (profil.client || "CL").substring(0,2).toUpperCase();
+  }
   if (user.email === "belledonne.multiservices@gmail.com") {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
-      var btn = document.getElementById("btnAjouter");
-      if (btn) btn.style.display = "";
+    var btn = document.getElementById("btnAjouter");
+    if (btn) btn.style.display = "";
   }
 });
 </script>

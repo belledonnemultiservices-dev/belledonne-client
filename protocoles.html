@@ -360,13 +360,8 @@ function iconSvg(type) {
   return icons[type] || icons['autre'];
 }
 
-let protocoles = [
-  { id:1, titre:'Protocole traitement punaises de lit', type:'punaise', version:'v2.1', desc:'Procédure complète de traitement en logement social : préparation du logement, produits homologués, consignes locataires avant et après traitement.', date:'2025-03-01', pages:8 },
-  { id:2, titre:'Protocole dératisation', type:'rongeur', version:'v1.3', desc:'Procédure de lutte contre les rongeurs en habitat collectif : inspection, pose de pièges et appâts, suivi des stations, compte-rendu.', date:'2025-01-15', pages:6 },
-  { id:3, titre:'Protocole désinsectisation blattes', type:'blatte', version:'v1.0', desc:'Traitement des blattes et cafards en cuisine et sanitaires : gel insecticide, spray résiduel, protocole de retraitement si nécessaire.', date:'2024-11-20', pages:5 },
-  { id:4, titre:'Protocole dépigeonnage', type:'pigeon', version:'v1.1', desc:'Mise en place de systèmes anti-pigeons sur façades et balcons. Pose de filets, pics et systèmes électriques. Consignes de sécurité.', date:'2024-10-05', pages:7 },
-  { id:5, titre:'Protocole désinfection logement', type:'desinfection', version:'v1.0', desc:'Désinfection complète après sinistre, décès ou insalubrité. Produits biocides homologués, équipement de protection individuelle obligatoire.', date:'2025-02-10', pages:10 },
-];
+let protocoles = [];
+
 
 function formatDate(d) {
   if (!d) return '—';
@@ -533,21 +528,36 @@ function showToast(msg) {
 
 filter();
 </script>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
 
-onAuthStateChanged(auth, function(user) {
+onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
+  const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+  if (!snap.empty) {
+    const profil = snap.docs[0].data();
+    const clientName = document.querySelector(".client-name");
+    if (clientName) clientName.textContent = profil.client || "Client";
+    const clientContract = document.querySelector(".client-contract");
+    if (clientContract) clientContract.textContent = profil.identifiant || "";
+    const footerName = document.querySelector(".footer-name");
+    if (footerName) footerName.textContent = profil.client || user.email;
+    const footerRole = document.querySelector(".footer-role");
+    if (footerRole) footerRole.textContent = profil.role === "admin" ? "Administrateur" : "Client";
+    const avatar = document.querySelector(".avatar");
+    if (avatar) avatar.textContent = (profil.client || "CL").substring(0,2).toUpperCase();
+  }
   if (user.email === "belledonne.multiservices@gmail.com") {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
-      var btn = document.getElementById("btnAjouter");
-      if (btn) btn.style.display = "";
+    var btn = document.getElementById("btnAjouter");
+    if (btn) btn.style.display = "";
   }
 });
 </script>

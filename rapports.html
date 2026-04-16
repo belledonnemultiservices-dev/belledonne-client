@@ -447,17 +447,40 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
 
-onAuthStateChanged(auth, function(user) {
+onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
+  
+  // Récupérer le profil depuis Firestore
+  const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+  if (!snap.empty) {
+    const profil = snap.docs[0].data();
+    // Mettre à jour la sidebar avec le vrai nom du client
+    const clientName = document.querySelector(".client-name");
+    if (clientName) clientName.textContent = profil.client || "Client";
+    const clientContract = document.querySelector(".client-contract");
+    if (clientContract) clientContract.textContent = profil.identifiant || "";
+    // Mettre à jour le footer
+    const footerName = document.querySelector(".footer-name");
+    if (footerName) footerName.textContent = profil.client || user.email;
+    const footerRole = document.querySelector(".footer-role");
+    if (footerRole) footerRole.textContent = profil.role === "admin" ? "Administrateur" : "Client";
+    // Initiales avatar
+    const avatar = document.querySelector(".avatar");
+    if (avatar) avatar.textContent = (profil.client || "CL").substring(0,2).toUpperCase();
+  }
+
+  // Admin : afficher section admin + bouton ajout
   if (user.email === "belledonne.multiservices@gmail.com") {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
-      var btn = document.getElementById("btnOpenModal");
-      if (btn) btn.style.display = "";
+    var btn = document.getElementById("btnOpenModal");
+    if (btn) btn.style.display = "";
   }
 });
 </script>

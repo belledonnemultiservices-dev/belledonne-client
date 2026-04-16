@@ -380,13 +380,8 @@
 
 <script>
 
-let entries = [
-  { id:1, statut:'absent', adresse:'8 bis Avenue Marie Reynoard 38100 Grenoble', nom:'M. Bernard', date:'2025-04-02', bc:'BC-2025-0142', motif:'Pas de réponse à la porte', notifs:0 },
-  { id:2, statut:'annulation', adresse:'12 rue des Tilleuls 38000 Grenoble', nom:'Mme Lefèvre', date:'2025-03-28', bc:'BC-2025-0138', motif:'Annulation locataire', notifs:0 },
-  { id:3, statut:'absent', adresse:'45 Avenue de la Paix 38000 Grenoble', nom:'', date:'2025-03-21', bc:'', motif:'Rendez-vous oublié', notifs:0 },
-  { id:4, statut:'annulation', adresse:'3 rue Victor Hugo 38000 Grenoble', nom:'M. Roux', date:'2025-02-14', bc:'BC-2025-0115', motif:'Problème d\'accès', notifs:0 },
-  { id:5, statut:'absent', adresse:'22 chemin de Bellevue 38130 Échirolles', nom:'Mme Martin', date:'2025-01-18', bc:'BC-2025-0098', motif:'', notifs:0 },
-];
+let entries = [];
+
 
 function formatDate(d) {
   if (!d) return '—';
@@ -640,21 +635,36 @@ window.confirmSend = function() {
 
 document.getElementById('modalSend').addEventListener('click', e => { if(e.target===document.getElementById('modalSend')) document.getElementById('modalSend').style.display='none'; });
 </script>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
 
-onAuthStateChanged(auth, function(user) {
+onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
+  const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+  if (!snap.empty) {
+    const profil = snap.docs[0].data();
+    const clientName = document.querySelector(".client-name");
+    if (clientName) clientName.textContent = profil.client || "Client";
+    const clientContract = document.querySelector(".client-contract");
+    if (clientContract) clientContract.textContent = profil.identifiant || "";
+    const footerName = document.querySelector(".footer-name");
+    if (footerName) footerName.textContent = profil.client || user.email;
+    const footerRole = document.querySelector(".footer-role");
+    if (footerRole) footerRole.textContent = profil.role === "admin" ? "Administrateur" : "Client";
+    const avatar = document.querySelector(".avatar");
+    if (avatar) avatar.textContent = (profil.client || "CL").substring(0,2).toUpperCase();
+  }
   if (user.email === "belledonne.multiservices@gmail.com") {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
-      var btn = document.getElementById("btnAjouter");
-      if (btn) btn.style.display = "";
+    var btn = document.getElementById("btnAjouter");
+    if (btn) btn.style.display = "";
   }
 });
 </script>

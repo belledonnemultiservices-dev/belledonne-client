@@ -432,12 +432,8 @@ document.addEventListener('keydown', e => {
   }
 });
 
-let garanties = [
-  { id:1, adresse:'8 bis Avenue Marie Reynoard 38100 Grenoble', bc:'BC-2025-0142', date:'2025-03-15', nuisible:'punaise', tech:'J. Dupont', note:'Retraitement chambre principale, infestation résiduelle détectée lors du contrôle.', rapport:true, notifs:0 },
-  { id:2, adresse:'12 rue des Tilleuls 38000 Grenoble', bc:'BC-2025-0129', date:'2025-02-20', nuisible:'rongeur', tech:'A. Lebrun', note:'Intervention rapide suite signalement locataire. Piège repositionné.', rapport:true, notifs:0 },
-  { id:3, adresse:'45 Avenue de la Paix 38000 Grenoble', bc:'BC-2024-0098', date:'2024-12-10', nuisible:'blatte', tech:'M. Faure', note:'', rapport:false, notifs:0 },
-  { id:4, adresse:'3 rue Victor Hugo 38000 Grenoble', bc:'BC-2024-0087', date:'2024-11-05', nuisible:'punaise', tech:'J. Dupont', note:'Deuxième retraitement, amélioration constatée.', rapport:true, notifs:0 },
-];
+let garanties = [];
+
 
 function formatDate(d) {
   if (!d) return '—';
@@ -666,21 +662,36 @@ window.confirmSend = function() {
 
 document.getElementById('modalSend').addEventListener('click', e => { if(e.target===document.getElementById('modalSend')) document.getElementById('modalSend').style.display='none'; });
 </script>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
 
-onAuthStateChanged(auth, function(user) {
+onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
+  const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+  if (!snap.empty) {
+    const profil = snap.docs[0].data();
+    const clientName = document.querySelector(".client-name");
+    if (clientName) clientName.textContent = profil.client || "Client";
+    const clientContract = document.querySelector(".client-contract");
+    if (clientContract) clientContract.textContent = profil.identifiant || "";
+    const footerName = document.querySelector(".footer-name");
+    if (footerName) footerName.textContent = profil.client || user.email;
+    const footerRole = document.querySelector(".footer-role");
+    if (footerRole) footerRole.textContent = profil.role === "admin" ? "Administrateur" : "Client";
+    const avatar = document.querySelector(".avatar");
+    if (avatar) avatar.textContent = (profil.client || "CL").substring(0,2).toUpperCase();
+  }
   if (user.email === "belledonne.multiservices@gmail.com") {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
-      var btn = document.getElementById("btnAjouter");
-      if (btn) btn.style.display = "";
+    var btn = document.getElementById("btnAjouter");
+    if (btn) btn.style.display = "";
   }
 });
 </script>

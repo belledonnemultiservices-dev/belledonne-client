@@ -373,39 +373,10 @@
 
 const COLORS = ['color-green','color-blue','color-amber','color-purple'];
 
-let campagnes = [
-  {
-    id: 1, nom: 'Campagne désinsectisation Printemps 2025',
-    debut: '2025-04-01', fin: '2025-06-30', sites: 8, statut: 'active',
-    color: 'color-green',
-    docs: [
-      { id: 1, type: 'xls', name: 'Reporting_Desinsect_Printemps2025.xlsx', adresse: 'Reporting Désinsectisation Printemps 2025', passage: null, date: '2025-04-02' },
-      { id: 2, type: 'pdf', name: '8_bis_AVENUE_MARIE_REYNOARD_38100_GRENOBLE_passage_N_1_Technicien3.pdf', adresse: '8 bis Avenue Marie Reynoard 38100 Grenoble', passage: 'Passage N°1', date: '2025-04-02' },
-      { id: 3, type: 'pdf', name: '8_bis_AVENUE_MARIE_REYNOARD_38100_GRENOBLE_passage_N_2_Technicien3.pdf', adresse: '8 bis Avenue Marie Reynoard 38100 Grenoble', passage: 'Passage N°2', date: '2025-04-15' },
-      { id: 4, type: 'pdf', name: '12_RUE_DES_TILLEULS_38000_GRENOBLE_passage_N_1_Technicien1.pdf', adresse: '12 rue des Tilleuls 38000 Grenoble', passage: 'Passage N°1', date: '2025-03-28' },
-    ]
-  },
-  {
-    id: 2, nom: 'Campagne dératisation Hiver 2024-2025',
-    debut: '2024-11-01', fin: '2025-02-28', sites: 5, statut: 'closed',
-    color: 'color-blue',
-    docs: [
-      { id: 4, type: 'xls', name: 'Reporting_Derat_Hiver2024.xlsx', adresse: 'Reporting Dératisation Hiver 2024', passage: null, date: '2025-02-28' },
-      { id: 5, type: 'pdf', name: '45_AVENUE_DE_LA_PAIX_38000_GRENOBLE_passage_N_1_Technicien2.pdf', adresse: '45 Avenue de la Paix 38000 Grenoble', passage: 'Passage N°1', date: '2025-02-15' },
-    ]
-  },
-  {
-    id: 3, nom: 'Campagne punaises de lit Automne 2024',
-    debut: '2024-09-01', fin: '2024-11-30', sites: 3, statut: 'closed',
-    color: 'color-amber',
-    docs: [
-      { id: 6, type: 'xls', name: 'Reporting_Punaises_Automne2024.xlsx', adresse: 'Reporting Punaises de lit Automne 2024', passage: null, date: '2024-11-30' },
-    ]
-  },
-];
+let campagnes = [];
 
 let currentCampagneId = null;
-let colorIndex = campagnes.length % COLORS.length;
+let colorIndex = 0;
 
 function formatDate(d) {
   if (!d) return '—';
@@ -676,21 +647,36 @@ function showToast(msg) {
 
 renderCampagnes(campagnes);
 </script>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
 
-onAuthStateChanged(auth, function(user) {
+onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
+  const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+  if (!snap.empty) {
+    const profil = snap.docs[0].data();
+    const clientName = document.querySelector(".client-name");
+    if (clientName) clientName.textContent = profil.client || "Client";
+    const clientContract = document.querySelector(".client-contract");
+    if (clientContract) clientContract.textContent = profil.identifiant || "";
+    const footerName = document.querySelector(".footer-name");
+    if (footerName) footerName.textContent = profil.client || user.email;
+    const footerRole = document.querySelector(".footer-role");
+    if (footerRole) footerRole.textContent = profil.role === "admin" ? "Administrateur" : "Client";
+    const avatar = document.querySelector(".avatar");
+    if (avatar) avatar.textContent = (profil.client || "CL").substring(0,2).toUpperCase();
+  }
   if (user.email === "belledonne.multiservices@gmail.com") {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
-      var btn = document.getElementById("btnNewCampagne");
-      if (btn) btn.style.display = "";
+    var btn = document.getElementById("btnNewCampagne");
+    if (btn) btn.style.display = "";
   }
 });
 </script>
