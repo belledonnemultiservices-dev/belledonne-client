@@ -540,18 +540,6 @@ const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 
 
-async function loadClientsIntoSelect(selectId) {
-  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
-  const sel = document.getElementById(selectId);
-  if (!sel) return;
-  sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
-  snap.docs.forEach(d => {
-    const opt = document.createElement("option");
-    opt.value = d.data().client;
-    opt.textContent = d.data().client;
-    sel.appendChild(opt);
-  });
-}
 window.handleLogout = async function() {
   await signOut(auth);
   window.location.href = "login.html";
