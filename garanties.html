@@ -502,6 +502,38 @@ document.getElementById('filterAnnee').addEventListener('change', filter);
 
 // MODAL
 const modal = document.getElementById('modal');
+
+let _editGarantieId = null;
+
+function resetModal() {
+  _editGarantieId = null;
+  document.getElementById('modalTitle').textContent = 'Ajouter un passage garantie';
+  document.getElementById('saveModal').textContent = 'Enregistrer';
+  ['inAdresse','inBC','inDate'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('inNuisible').value = '';
+  document.getElementById('inClient').value = '';
+  document.getElementById('newClientWrap').style.display = 'none';
+  fileInput.value = '';
+  dropChosen.style.display = 'none'; dropChosen.textContent = ''; dropChosen.style.color = '';
+}
+
+window.openEditGarantie = function(id) {
+  const g = garanties.find(x => x.id === id);
+  if (!g) return;
+  _editGarantieId = id;
+  document.getElementById('modalTitle').textContent = 'Modifier la garantie';
+  document.getElementById('saveModal').textContent = 'Mettre à jour';
+  document.getElementById('inAdresse').value = g.adresse || '';
+  document.getElementById('inBC').value = g.bc || '';
+  document.getElementById('inDate').value = g.date || '';
+  document.getElementById('inNuisible').value = g.nuisible || '';
+  document.getElementById('inClient').value = g.client || '';
+  fileInput.value = '';
+  if (g.rapportUrl) { dropChosen.textContent = '✓ Fichier existant (remplacer si besoin)'; dropChosen.style.display = 'block'; }
+  else { dropChosen.style.display = 'none'; }
+  modal.classList.add('open');
+};
+
 document.getElementById('btnAjouter').addEventListener('click', () => { resetModal(); modal.classList.add('open'); });
 document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
@@ -598,37 +630,6 @@ document.getElementById('dropZone').addEventListener('drop', e => {
 });
 
 let _savingGarantie = false;
-let _editGarantieId = null;
-
-function resetModal() {
-  _editGarantieId = null;
-  document.getElementById('modalTitle').textContent = 'Ajouter un passage garantie';
-  document.getElementById('saveModal').textContent = 'Enregistrer';
-  ['inAdresse','inBC','inDate'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-  document.getElementById('inNuisible').value = '';
-  document.getElementById('inClient').value = '';
-  document.getElementById('newClientWrap').style.display = 'none';
-  fileInput.value = '';
-  dropChosen.style.display = 'none'; dropChosen.textContent = ''; dropChosen.style.color = '';
-}
-
-window.openEditGarantie = function(id) {
-  const g = garanties.find(x => x.id === id);
-  if (!g) return;
-  _editGarantieId = id;
-  document.getElementById('modalTitle').textContent = 'Modifier la garantie';
-  document.getElementById('saveModal').textContent = 'Mettre à jour';
-  document.getElementById('inAdresse').value = g.adresse || '';
-  document.getElementById('inBC').value = g.bc || '';
-  document.getElementById('inDate').value = g.date || '';
-  document.getElementById('inNuisible').value = g.nuisible || '';
-  document.getElementById('inClient').value = g.client || '';
-  fileInput.value = '';
-  if (g.rapportUrl) { dropChosen.textContent = '✓ Fichier existant (remplacer si besoin)'; dropChosen.style.display = 'block'; }
-  else { dropChosen.style.display = 'none'; }
-  modal.classList.add('open');
-};
-
 let _savingGarantie = false;
 document.getElementById('saveModal').addEventListener('click', async () => {
   if (_savingGarantie) return;
