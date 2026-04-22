@@ -165,10 +165,10 @@
       <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
     </div>
   </div>
-      <div class="sidebar-client">
+        <div class="sidebar-client">
     <div class="client-label">Client</div>
-    <div class="client-name">OPH Isère Habitat</div>
-    <div class="client-contract">Contrat #2024-0089</div>
+    <div class="client-name" id="sideClientName">—</div>
+    <div class="client-contract" id="sideClientId"></div>
   </div>
   <nav class="sidebar-nav">
     <div class="nav-group-label">Principal</div>
@@ -180,8 +180,6 @@
     <div class="nav-group-label">Documentation</div>
     <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
     <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
-    <div class="nav-group-label">Compte</div>
-    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Messages</span></a>
     <div id="adminNav" style="display:none;">
       <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
       <a class="nav-item" href="admin.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
@@ -190,9 +188,13 @@
   </nav>
   <div class="sidebar-footer">
     <div class="footer-user">
-      <div class="f-avatar">MR</div>
-      <div><div class="footer-name">Marc Renaud</div><div class="footer-role">Responsable patrimoine</div></div>
+      <div class="f-avatar" id="sideAvatar">—</div>
+      <div><div class="footer-name" id="sideFooterName">—</div><div class="footer-role" id="sideFooterRole">Client</div></div>
     </div>
+    <button onclick="handleLogout()" style="width:100%;margin-top:8px;padding:8px 12px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(231,76,60,0.15)';this.style.color='#E74C3C'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.5)'">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Se déconnecter
+    </button>
   </div>
 </aside>
 
@@ -664,34 +666,41 @@ document.getElementById('modalSend').addEventListener('click', e => { if(e.targe
 </script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 
+window.handleLogout = async function() {
+  await signOut(auth);
+  window.location.href = "login.html";
+};
+
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
-  const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
-  if (!snap.empty) {
-    const profil = snap.docs[0].data();
-    const clientName = document.querySelector(".client-name");
-    if (clientName) clientName.textContent = profil.client || "Client";
-    const clientContract = document.querySelector(".client-contract");
-    if (clientContract) clientContract.textContent = profil.identifiant || "";
-    const footerName = document.querySelector(".footer-name");
-    if (footerName) footerName.textContent = profil.client || user.email;
-    const footerRole = document.querySelector(".footer-role");
-    if (footerRole) footerRole.textContent = profil.role === "admin" ? "Administrateur" : "Client";
-    const avatar = document.querySelector(".avatar");
-    if (avatar) avatar.textContent = (profil.client || "CL").substring(0,2).toUpperCase();
-  }
+  try {
+    const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+    if (!snap.empty) {
+      const p = snap.docs[0].data();
+      const name = document.getElementById("sideClientName");
+      const id = document.getElementById("sideClientId");
+      const avatar = document.getElementById("sideAvatar");
+      const fname = document.getElementById("sideFooterName");
+      const frole = document.getElementById("sideFooterRole");
+      if (name) name.textContent = p.client || "Client";
+      if (id) id.textContent = p.identifiant || "";
+      if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
+      if (fname) fname.textContent = p.client || user.email;
+      if (frole) frole.textContent = p.role === "admin" ? "Administrateur" : "Client";
+      
+    }
+  } catch(e) { console.error(e); }
   if (user.email === "belledonne.multiservices@gmail.com") {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
-    var btn = document.getElementById("btnAjouter");
-    if (btn) btn.style.display = "";
+    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
   }
 });
 </script>
