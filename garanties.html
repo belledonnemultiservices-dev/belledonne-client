@@ -154,6 +154,7 @@
   .n-pigeon{background:#EAF3DE;color:#3B6D11;}
   .n-custom{background:#F1EFE8;color:#5F5E5A;}
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -318,11 +319,12 @@
       </div>
 
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Rapport d'intervention PDF</label>
+        <label class="form-label">Rapport d'intervention Excel</label>
         <div class="drop-zone" id="dropZone">
-          <input type="file" accept=".pdf" id="fileInput" />
-          <div class="drop-text">Glissez le rapport PDF ici ou cliquez pour choisir</div>
-          <div class="drop-sub">Fichier PDF uniquement · Max 20 Mo</div>
+          <input type="file" accept=".xlsx,.xls" id="fileInput" />
+          <div class="drop-icon" style="margin-bottom:6px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:28px;height:28px;color:#3B6D11;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg></div>
+          <div class="drop-text">Glissez le rapport Excel ici ou cliquez pour choisir</div>
+          <div class="drop-sub">Fichiers .xlsx / .xls · Les champs seront remplis automatiquement</div>
           <div class="drop-chosen" id="dropChosen"></div>
         </div>
       </div>
@@ -511,8 +513,88 @@ window.handleClientSelect = function() {
 
 const fileInput = document.getElementById('fileInput');
 const dropChosen = document.getElementById('dropChosen');
+
+// Mapping des types d'intervention Excel → valeurs du select
+const TYPE_MAP = {
+  'blattes': 'blatte', 'blatte': 'blatte', 'insecte': 'blatte', 'insectes': 'blatte',
+  'punaise': 'punaise', 'punaises': 'punaise',
+  'rongeur': 'rongeur', 'rongeurs': 'rongeur', 'rat': 'rongeur', 'souris': 'rongeur',
+  'pigeon': 'pigeon', 'pigeons': 'pigeon', 'dépigeonage': 'pigeon', 'depigeonnage': 'pigeon',
+};
+
+function parseExcelAndFill(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+
+      // Lecture des cellules selon la structure fixe du rapport Belledonne
+      const type    = ws['B5'] ? ws['B5'].v : '';   // Type d'intervention
+      const adresse = ws['D5'] ? ws['D5'].v : '';   // Adresse
+      const nom     = ws['B6'] ? ws['B6'].v : '';   // Nom locataire
+      const dateVal = ws['D6'] ? ws['D6'].v : '';   // Date / Heure
+
+      // Remplir Adresse
+      if (adresse) document.getElementById('inAdresse').value = adresse;
+
+      // Remplir Nom locataire
+      if (nom) document.getElementById('inBC').value = nom;
+
+      // Remplir Date (format Excel → YYYY-MM-DD)
+      if (dateVal) {
+        let dateStr = '';
+        if (dateVal instanceof Date) {
+          dateStr = dateVal.toISOString().split('T')[0];
+        } else if (typeof dateVal === 'string') {
+          // Format "22/04/2026 19:39" ou "22/04/2026"
+          const parts = dateVal.split(' ')[0].split('/');
+          if (parts.length === 3) dateStr = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        if (dateStr) document.getElementById('inDate').value = dateStr;
+      }
+
+      // Remplir Type d'intervention
+      if (type) {
+        const typeKey = type.toString().toLowerCase().trim();
+        const mapped = TYPE_MAP[typeKey] || null;
+        const sel = document.getElementById('inNuisible');
+        if (mapped) {
+          sel.value = mapped;
+        } else {
+          // Type personnalisé — essayer de sélectionner __autre__ et pré-remplir
+          sel.value = '__autre__';
+          handleTypeChange && handleTypeChange();
+          const custom = document.getElementById('inNuisibleCustom');
+          if (custom) custom.value = type;
+        }
+      }
+
+      dropChosen.textContent = '✓ ' + file.name + ' — champs pré-remplis !';
+      dropChosen.style.display = 'block';
+      dropChosen.style.color = 'var(--green-dark)';
+    } catch(err) {
+      console.error('Erreur lecture Excel:', err);
+      dropChosen.textContent = '✓ ' + file.name + ' (lecture auto échouée)';
+      dropChosen.style.display = 'block';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) { dropChosen.textContent = '✓ ' + fileInput.files[0].name; dropChosen.style.display = 'block'; }
+  if (fileInput.files[0]) parseExcelAndFill(fileInput.files[0]);
+});
+
+// Drag & drop avec parsing
+document.getElementById('dropZone').addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const dt = new DataTransfer(); dt.items.add(file);
+    fileInput.files = dt.files;
+    parseExcelAndFill(file);
+  }
 });
 
 let _savingGarantie = false;
