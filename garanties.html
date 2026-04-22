@@ -502,7 +502,7 @@ document.getElementById('filterAnnee').addEventListener('change', filter);
 
 // MODAL
 const modal = document.getElementById('modal');
-document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
+document.getElementById('btnAjouter').addEventListener('click', () => { resetModal(); modal.classList.add('open'); });
 document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
 modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
@@ -598,31 +598,65 @@ document.getElementById('dropZone').addEventListener('drop', e => {
 });
 
 let _savingGarantie = false;
-document.getElementById('saveModal').addEventListener('click', () => {
+let _editGarantieId = null;
+
+function resetModal() {
+  _editGarantieId = null;
+  document.getElementById('modalTitle').textContent = 'Ajouter un passage garantie';
+  document.getElementById('saveModal').textContent = 'Enregistrer';
+  ['inAdresse','inBC','inDate'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('inNuisible').value = '';
+  document.getElementById('inClient').value = '';
+  document.getElementById('newClientWrap').style.display = 'none';
+  fileInput.value = '';
+  dropChosen.style.display = 'none'; dropChosen.textContent = ''; dropChosen.style.color = '';
+}
+
+window.openEditGarantie = function(id) {
+  const g = garanties.find(x => x.id === id);
+  if (!g) return;
+  _editGarantieId = id;
+  document.getElementById('modalTitle').textContent = 'Modifier la garantie';
+  document.getElementById('saveModal').textContent = 'Mettre à jour';
+  document.getElementById('inAdresse').value = g.adresse || '';
+  document.getElementById('inBC').value = g.bc || '';
+  document.getElementById('inDate').value = g.date || '';
+  document.getElementById('inNuisible').value = g.nuisible || '';
+  document.getElementById('inClient').value = g.client || '';
+  fileInput.value = '';
+  if (g.rapportUrl) { dropChosen.textContent = '✓ Fichier existant (remplacer si besoin)'; dropChosen.style.display = 'block'; }
+  else { dropChosen.style.display = 'none'; }
+  modal.classList.add('open');
+};
+
+let _savingGarantie = false;
+document.getElementById('saveModal').addEventListener('click', async () => {
   if (_savingGarantie) return;
-  _savingGarantie = true;
-  setTimeout(() => { _savingGarantie = false; }, 2000);
   const adresse = document.getElementById('inAdresse').value.trim();
   const bc = document.getElementById('inBC').value.trim();
   const date = document.getElementById('inDate').value;
   const nuisible = document.getElementById('inNuisible').value;
   let client = document.getElementById('inClient').value;
   if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
-  if (!client || !adresse || !date || !nuisible) { alert('Veuillez remplir les champs obligatoires : client, adresse, date et type d\'intervention.'); return; }
-  garanties.unshift({
-    id: Date.now(),
-    adresse, bc, date, nuisible, client,
-    tech: '—',
-    rapport: !!fileInput.files[0],
-    notifs: 0
-  });
-  filter();
-  updateKPIs();
-  modal.classList.remove('open');
-  ['inAdresse','inBC','inDate'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('inNuisible').value = '';
-  fileInput.value = ''; dropChosen.style.display = 'none';
-  showToast('Passage garantie ajouté — ' + adresse.substring(0,40));
+  if (!client || !adresse || !date || !nuisible) { alert('Veuillez remplir les champs obligatoires : client, adresse, date et type d'intervention.'); return; }
+
+  _savingGarantie = true;
+  const btn = document.getElementById('saveModal');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+  try {
+    const currentEditId = _editGarantieId;
+    await window._saveGarantie({
+      adresse, bc, date, nuisible, client, note: '',
+      file: fileInput.files[0] || null,
+      editId: currentEditId
+    });
+    modal.classList.remove('open');
+    resetModal();
+    await window._loadGaranties(window._currentClientFilter);
+    showToast(currentEditId ? 'Garantie mise à jour !' : 'Passage garantie ajouté — ' + adresse.substring(0,40));
+  } catch(e) { alert('Erreur : ' + e.message); }
+  btn.disabled = false; btn.textContent = _editGarantieId ? 'Mettre à jour' : 'Enregistrer';
+  _savingGarantie = false;
 });
 
 function showToast(msg) {
@@ -632,8 +666,6 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-updateKPIs();
-filter();
 
 // ── MODAL ENVOI ──
 const CONTACTS_DB = [];
@@ -740,80 +772,117 @@ document.getElementById('modalSend').addEventListener('click', e => { if(e.targe
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
 
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
+window._currentClientFilter = null;
 
+// ── Charger les garanties depuis Firestore ──
+window._loadGaranties = async function(clientFilter) {
+  try {
+    const snap = await getDocs(collection(db, "garanties"));
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (clientFilter) docs = docs.filter(g => g.client === clientFilter);
+    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    garanties = docs;
+    if (window._isAdmin) populateClientFilter();
+    updateKPIs();
+    filter();
+  } catch(e) { console.error(e); }
+};
+
+function populateClientFilter() {
+  const sel = document.getElementById('filterClient');
+  if (!sel) return;
+  sel.style.display = '';
+  const current = sel.value;
+  const allClients = new Set(garanties.map(g => g.client).filter(Boolean));
+  sel.innerHTML = '<option value="">Tous les clients</option>';
+  [...allClients].sort().forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    if (c === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Sauvegarder (ajout ou mise à jour) ──
+window._saveGarantie = async function({ adresse, bc, date, nuisible, client, note, file, editId }) {
+  const ts = Date.now();
+  let rapportUrl = null;
+  if (editId) rapportUrl = (garanties.find(g => g.id === editId) || {}).rapportUrl || null;
+  if (file) {
+    const storageRef = ref(storage, `garanties/${client}/${ts}_${file.name}`);
+    const snap = await uploadBytesResumable(storageRef, file);
+    rapportUrl = await getDownloadURL(snap.ref);
+  }
+  const data = { adresse, bc, date, nuisible, client, note: note||'', rapportUrl, rapport: !!rapportUrl };
+  if (editId) {
+    await updateDoc(doc(db, "garanties", editId), { ...data, updatedAt: new Date().toISOString() });
+  } else {
+    await addDoc(collection(db, "garanties"), { ...data, notifs: 0, createdAt: new Date().toISOString() });
+  }
+};
+
+// ── Supprimer ──
+window.deleteGarantie = async function(id) {
+  if (!confirm('Supprimer cette garantie ?')) return;
+  try {
+    await deleteDoc(doc(db, "garanties", String(id)));
+    garanties = garanties.filter(g => g.id !== id);
+    updateKPIs(); filter();
+    showToast('Garantie supprimée !');
+  } catch(e) { alert('Erreur : ' + e.message); }
+};
+
+// ── Charger les clients dans le select ──
 async function loadClientsIntoSelect(selectId) {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
   const sel = document.getElementById(selectId);
   if (!sel) return;
   sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
   snap.docs.forEach(d => {
+    const c = d.data().client; if (!c) return;
     const opt = document.createElement("option");
-    opt.value = d.data().client;
-    opt.textContent = d.data().client;
+    opt.value = c; opt.textContent = c;
     sel.appendChild(opt);
   });
 }
-window.handleLogout = async function() {
-  await signOut(auth);
-  window.location.href = "login.html";
-};
-
-window.deleteGarantie = async function(id) {
-  if (!confirm('Supprimer cette garantie ?')) return;
-  try {
-    const { deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    await deleteDoc(doc(db, "garanties", String(id)));
-    garanties = garanties.filter(g => g.id !== id);
-    filter();
-    showToast('Garantie supprimée !');
-  } catch(e) { alert('Erreur : ' + e.message); }
-};
 
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
-  
-  // Admin reconnu directement par email
   if (user.email === "belledonne.multiservices@gmail.com") {
     window._isAdmin = true;
-    const name = document.getElementById("sideClientName");
-    const id = document.getElementById("sideClientId");
-    const avatar = document.getElementById("sideAvatar");
-    const fname = document.getElementById("sideFooterName");
-    const frole = document.getElementById("sideFooterRole");
-    if (name) name.textContent = "Belledonne Multiservices";
-    if (id) id.textContent = "belledonne-admin";
-    if (avatar) avatar.textContent = "BM";
-    if (fname) fname.textContent = "Belledonne Multiservices";
-    if (frole) frole.textContent = "Administrateur";
+    const name = document.getElementById("sideClientName"); if (name) name.textContent = "Belledonne Multiservices";
+    const id = document.getElementById("sideClientId"); if (id) id.textContent = "belledonne-admin";
+    const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = "BM";
+    const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = "Belledonne Multiservices";
+    const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Administrateur";
+    var adminNav = document.getElementById("adminNav"); if (adminNav) adminNav.style.display = "block";
+    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
+    loadClientsIntoSelect("inClient");
+    window._currentClientFilter = null;
+    await window._loadGaranties(null);
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
       if (!snap.empty) {
         const p = snap.docs[0].data();
-        const name = document.getElementById("sideClientName");
-        const id = document.getElementById("sideClientId");
-        const avatar = document.getElementById("sideAvatar");
-        const fname = document.getElementById("sideFooterName");
-        const frole = document.getElementById("sideFooterRole");
-        if (name) name.textContent = p.client || "Client";
-        if (id) id.textContent = p.identifiant || "";
-        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
-        if (fname) fname.textContent = p.client || user.email;
-        if (frole) frole.textContent = "Client";
+        const name = document.getElementById("sideClientName"); if (name) name.textContent = p.client || "Client";
+        const id = document.getElementById("sideClientId"); if (id) id.textContent = p.identifiant || "";
+        const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = (p.client||"CL").substring(0,2).toUpperCase();
+        const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = p.client || user.email;
+        const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Client";
+        window._currentClientFilter = p.client;
+        await window._loadGaranties(p.client);
       }
     } catch(e) { console.error(e); }
-  }
-  if (user.email === "belledonne.multiservices@gmail.com") {
-    var adminNav = document.getElementById("adminNav");
-    if (adminNav) adminNav.style.display = "block";
-    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
-    loadClientsIntoSelect("inClient");
   }
 });
 </script>
