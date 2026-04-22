@@ -275,7 +275,7 @@
 <div class="modal-overlay" id="modalCampagne">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Nouvelle campagne</div>
+      <div class="modal-title" id="modalCampagneTitle">Nouvelle campagne</div>
       <button class="modal-close" id="closeCampagne">✕</button>
     </div>
     <div class="modal-body">
@@ -414,7 +414,7 @@ function renderCampagnes(list) {
               style="width:100%;height:36px;padding:0 12px 0 34px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;" />
           </div>
         </div>
-        <div class="docs-grid" id="docsgrid-${c.id}">${renderDocCards(c.docs)}</div>`;
+        <div id="docsgrid-${c.id}" style="padding-bottom:16px;">${renderDocsSection(c.docs, '', c.id)}</div>`;
 
     return `
     <div class="campagne-card" data-id="${c.id}">
@@ -430,7 +430,13 @@ function renderCampagnes(list) {
           </div>
         </div>
         <span class="campagne-status ${c.statut === 'active' ? 'cs-active' : 'cs-closed'}">${c.statut === 'active' ? 'En cours' : 'Terminée'}</span>
-        ${window._isAdmin ? `<button onclick="deleteCampagne('${c.id}', event)" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
+        ${window._isAdmin ? `
+          <button onclick="openEditCampagne('${c.id}', event)" style="width:28px;height:28px;border:none;background:#EBF0F5;color:#1A2E42;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Modifier">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          </button>
+          <button onclick="deleteCampagne('${c.id}', event)" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </button>` : ''}
         <button class="campagne-toggle" id="toggle-${c.id}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></button>
       </div>
       ${c.statut === 'active' ? `
@@ -478,9 +484,45 @@ document.getElementById('filterClient').addEventListener('change', filterCampagn
 
 // MODAL CAMPAGNE
 const modalCampagne = document.getElementById('modalCampagne');
-document.getElementById('btnNewCampagne').addEventListener('click', () => {
+let _editCampagneId = null;
+
+function resetCampagneModal() {
+  _editCampagneId = null;
+  document.getElementById('modalCampagneTitle').textContent = 'Nouvelle campagne';
+  document.getElementById('saveCampagne').textContent = 'Créer la campagne';
+  document.getElementById('inputNom').value = '';
+  document.getElementById('inputDebut').value = '';
+  document.getElementById('inputFin').value = '';
+  document.getElementById('inputClient').value = '';
+  document.getElementById('inputStatut').value = 'active';
+  document.getElementById('newClientCampWrap').style.display = 'none';
+}
+
+window.openEditCampagne = function(id, e) {
+  e.stopPropagation();
+  const c = campagnes.find(x => x.id === id);
+  if (!c) return;
+  _editCampagneId = id;
+  document.getElementById('modalCampagneTitle').textContent = 'Modifier la campagne';
+  document.getElementById('saveCampagne').textContent = 'Mettre à jour';
+  document.getElementById('inputNom').value = c.nom || '';
+  document.getElementById('inputDebut').value = c.debut || '';
+  document.getElementById('inputFin').value = c.fin || '';
+  document.getElementById('inputStatut').value = c.statut || 'active';
+  // Client
+  if (window._reloadClients) {
+    window._reloadClients().then(() => {
+      document.getElementById('inputClient').value = c.client || '';
+    });
+  } else {
+    document.getElementById('inputClient').value = c.client || '';
+  }
   modalCampagne.classList.add('open');
-  // Recharger les clients à chaque ouverture (au cas où pas encore chargés)
+};
+
+document.getElementById('btnNewCampagne').addEventListener('click', () => {
+  resetCampagneModal();
+  modalCampagne.classList.add('open');
   if (window._reloadClients) window._reloadClients();
 });
 document.getElementById('closeCampagne').addEventListener('click', () => modalCampagne.classList.remove('open'));
@@ -502,19 +544,20 @@ document.getElementById('saveCampagne').addEventListener('click', async () => {
   const btn = document.getElementById('saveCampagne');
   btn.disabled = true; btn.textContent = 'Enregistrement...';
   try {
-    await window._addCampagne({ nom, debut, fin, statut, client,
-      color: COLORS[colorIndex % COLORS.length], docs: [], createdAt: new Date().toISOString() });
-    colorIndex++;
+    if (_editCampagneId) {
+      await window._updateCampagne(_editCampagneId, { nom, debut, fin, statut, client });
+      showToast('Campagne "' + nom + '" mise à jour !');
+    } else {
+      await window._addCampagne({ nom, debut, fin, statut, client,
+        color: COLORS[colorIndex % COLORS.length], docs: [], createdAt: new Date().toISOString() });
+      colorIndex++;
+      showToast('Campagne "' + nom + '" créée !');
+    }
     modalCampagne.classList.remove('open');
-    document.getElementById('inputNom').value = '';
-    document.getElementById('inputDebut').value = '';
-    document.getElementById('inputFin').value = '';
-    document.getElementById('inputClient').value = '';
-    document.getElementById('newClientCampWrap').style.display = 'none';
-    showToast('Campagne "' + nom + '" créée !');
+    resetCampagneModal();
     await window._loadCampagnes(window._currentClientFilter);
   } catch(e) { alert('Erreur : ' + e.message); }
-  btn.disabled = false; btn.textContent = 'Créer la campagne';
+  btn.disabled = false; btn.textContent = _editCampagneId ? 'Mettre à jour' : 'Créer la campagne';
   _savingCampagne = false;
 });
 
@@ -535,9 +578,8 @@ function parseFilename(filename) {
   return { adresse, passage };
 }
 
-function renderDocCards(docs) {
-  if (docs.length === 0) return '<div class="docs-empty" style="padding:20px 0;">Aucun résultat pour cette recherche.</div>';
-  return docs.map(d => `
+function renderDocCard(d, campagneId) {
+  return `
     <div class="doc-card">
       <div class="doc-icon ${d.type}">${docIcon(d.type)}</div>
       <div class="doc-info">
@@ -548,17 +590,67 @@ function renderDocCards(docs) {
           ${formatDate(d.date)}
         </div>
       </div>
-      ${d.url ? `<a href="${d.url}" target="_blank" class="doc-dl" title="Télécharger"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></a>` : `<span class="doc-dl" style="opacity:0.3;cursor:default;" title="Pas de fichier"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>`}
-    </div>`).join('');
+      <div style="display:flex;gap:4px;align-items:center;">
+        ${d.url ? `<a href="${d.url}" target="_blank" class="doc-dl" title="Télécharger"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></a>` : `<span class="doc-dl" style="opacity:0.3;cursor:default;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>`}
+        ${window._isAdmin && campagneId ? `<button onclick="deleteDoc('${campagneId}','${d.id}',event)" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer ce document"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderDocsSection(docs, q, campagneId) {
+  const filtered = q ? docs.filter(d => (d.adresse || d.name || '').toLowerCase().includes(q.toLowerCase())) : docs;
+  if (filtered.length === 0) return '<div class="docs-empty">Aucun résultat pour cette recherche.</div>';
+
+  const xlsDocs = filtered.filter(d => d.type === 'xls');
+  const pdfDocs = filtered.filter(d => d.type === 'pdf');
+
+  let html = '';
+
+  // ── Reporting(s) Excel en haut ──
+  if (xlsDocs.length > 0) {
+    html += `<div style="padding:16px 24px 0;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#3B6D11;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        Reporting${xlsDocs.length > 1 ? 's' : ''} Excel
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${xlsDocs.map(d => `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--green-pale);border:1px solid rgba(46,204,143,0.2);border-radius:var(--radius-sm);">
+          <div style="width:40px;height:40px;background:#EAF3DE;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${docIcon('xls')}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.adresse || d.name}</div>
+            <div style="font-size:11px;color:var(--green-dark);margin-top:2px;">${formatDate(d.date)}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            ${d.url ? `<a href="${d.url}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--green-dark);background:#C8F0E1;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;text-decoration:none;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
+            ${window._isAdmin && campagneId ? `<button onclick="deleteDoc('${campagneId}','${d.id}',event)" style="width:32px;height:32px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // ── Feuilles d'émargement en grille dessous ──
+  if (pdfDocs.length > 0) {
+    html += `<div style="padding:16px 24px 0;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#993C1D;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M20 2H8L2 8v14h20V2z"/></svg>
+        Feuille${pdfDocs.length > 1 ? 's' : ''} d'émargement (${pdfDocs.length})
+      </div>
+      <div class="docs-grid" style="padding:0;">${pdfDocs.map(d => renderDocCard(d, campagneId)).join('')}</div>
+    </div>`;
+  }
+
+  if (!html) return '<div class="docs-empty">Aucun document.</div>';
+  return html;
 }
 
 window.filterDocs = function(campagneId, q) {
   const c = campagnes.find(x => x.id === campagneId);
   if (!c) return;
-  const grid = document.getElementById('docsgrid-' + campagneId);
-  if (!grid) return;
-  const filtered = q.trim() === '' ? c.docs : c.docs.filter(d => (d.adresse || d.name || '').toLowerCase().includes(q.toLowerCase()));
-  grid.innerHTML = renderDocCards(filtered);
+  const container = document.getElementById('docsgrid-' + campagneId);
+  if (!container) return;
+  container.innerHTML = renderDocsSection(c.docs, q, campagneId);
 };
 
 // ── MODAL DOC ──
@@ -658,6 +750,22 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 3500);
 }
 
+window.deleteDoc = async function(campagneId, docId, e) {
+  e.stopPropagation();
+  if (!confirm('Supprimer ce document ?')) return;
+  try {
+    await window.deleteDoc_camp(campagneId, docId);
+    showToast('Document supprimé !');
+    await window._loadCampagnes(window._currentClientFilter);
+    // Réouvrir la campagne après rechargement
+    setTimeout(() => {
+      const docs = document.getElementById('docs-' + campagneId);
+      const toggle = document.getElementById('toggle-' + campagneId);
+      if (docs) { docs.classList.add('open'); if (toggle) toggle.classList.add('open'); }
+    }, 100);
+  } catch(err) { alert('Erreur : ' + err.message); }
+};
+
 // Chargement déclenché par Firebase
 </script>
 <script type="module">
@@ -706,6 +814,20 @@ function populateClientFilter() {
 // ── Créer une campagne dans Firestore ──
 window._addCampagne = async function(data) {
   await addDoc(collection(db, "campagnes"), data);
+};
+
+// ── Mettre à jour les infos d'une campagne ──
+window._updateCampagne = async function(id, data) {
+  const { updateDoc: upd } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  await upd(doc(db, "campagnes", String(id)), { ...data, updatedAt: new Date().toISOString() });
+};
+
+// ── Supprimer un document d'une campagne ──
+window.deleteDoc_camp = async function(campagneId, docId) {
+  const c = campagnes.find(x => x.id === campagneId);
+  if (!c) return;
+  const newDocs = c.docs.filter(d => String(d.id) !== String(docId));
+  await updateDoc(doc(db, "campagnes", String(campagneId)), { docs: newDocs });
 };
 
 // ── Supprimer une campagne ──
