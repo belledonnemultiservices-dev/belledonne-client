@@ -258,7 +258,7 @@
     <div class="table-wrap">
       <div class="table-head">
         <span>Adresse</span>
-        <span>Nom</span>
+        <span>Nom locataire</span>
         <span>Date intervention</span>
         <span>Type d'intervention</span>
         <span>Rapport</span>
@@ -291,7 +291,7 @@
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Nom *</label>
+          <label class="form-label">Nom du locataire</label>
           <input class="form-input" type="text" id="inBC" placeholder="ex: Jean Dupont" />
         </div>
         <div class="form-group">
@@ -531,7 +531,6 @@ document.getElementById('saveModal').addEventListener('click', () => {
     id: Date.now(),
     adresse, bc, date, nuisible, client,
     tech: '—',
-    note: document.getElementById('inNote').value.trim(),
     rapport: !!fileInput.files[0],
     notifs: 0
   });
