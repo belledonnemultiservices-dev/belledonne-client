@@ -523,7 +523,10 @@ async function uploadFile(file, path) {
 }
 
 // Sauvegarder produit dans Firestore avec upload PDF
+let _saving = false;
 async function saveProduit() {
+  if (_saving) return;
+  _saving = true;
   const nom = document.getElementById('inNom').value.trim();
   let type = document.getElementById('inType').value;
   const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
@@ -576,6 +579,7 @@ async function saveProduit() {
 
   btnSave.disabled = false;
   btnSave.textContent = 'Enregistrer';
+  _saving = false;
 }
 
 // Remplacer le listener save
