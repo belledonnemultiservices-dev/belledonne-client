@@ -459,16 +459,25 @@ const fileInput = document.getElementById('fileInput');
 const dropMsg = document.getElementById('dropChosen');
 
 if (dropZone) {
-  dropZone.addEventListener('click', () => fileInput && fileInput.click());
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--green)'; });
-  dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+  // Pas de listener click sur dropZone — le fileInput en position absolute gère déjà le clic nativement
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
   dropZone.addEventListener('drop', e => {
-    e.preventDefault(); dropZone.style.borderColor = '';
-    if (e.dataTransfer.files[0] && dropMsg) dropMsg.textContent = e.dataTransfer.files[0].name;
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f && fileInput) {
+      // Injecter le fichier glissé dans le fileInput
+      const dt = new DataTransfer(); dt.items.add(f);
+      fileInput.files = dt.files;
+      if (dropMsg) { dropMsg.textContent = '✓ ' + f.name; dropMsg.style.display = 'block'; }
+    }
   });
 }
 if (fileInput) fileInput.addEventListener('change', () => {
-  if (fileInput.files[0] && dropMsg) dropMsg.textContent = fileInput.files[0].name;
+  if (fileInput.files[0] && dropMsg) {
+    dropMsg.textContent = '✓ ' + fileInput.files[0].name;
+    dropMsg.style.display = 'block';
+  }
 });
 
 function showToast(msg) {
