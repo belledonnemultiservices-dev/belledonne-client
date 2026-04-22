@@ -500,6 +500,9 @@ document.getElementById('searchInput').addEventListener('input', filter);
 document.getElementById('filterNuisible').addEventListener('change', filter);
 document.getElementById('filterAnnee').addEventListener('change', filter);
 
+const fileInput = document.getElementById('fileInput');
+const dropChosen = document.getElementById('dropChosen');
+
 // MODAL
 const modal = document.getElementById('modal');
 
@@ -543,8 +546,6 @@ window.handleClientSelect = function() {
   document.getElementById('newClientWrap').style.display = document.getElementById('inClient').value === '__new__' ? 'block' : 'none';
 };
 
-const fileInput = document.getElementById('fileInput');
-const dropChosen = document.getElementById('dropChosen');
 
 // Mapping des types d'intervention Excel → valeurs du select
 const TYPE_MAP = {
