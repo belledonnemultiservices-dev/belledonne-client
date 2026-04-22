@@ -374,11 +374,11 @@ function renderProducts(list) {
       </div>
       <div class="product-usage">${p.usage || '<em style="color:var(--text-muted)">Aucune description</em>'}</div>
       <div class="product-docs">
-        ${p.fiche
-          ? `<button class="doc-btn fiche"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Fiche produit</button>`
+        ${p.ficheUrl
+          ? `<a href="${p.ficheUrl}" target="_blank" class="doc-btn fiche"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Fiche produit</a>`
           : `<span class="doc-missing"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>Fiche non disponible</span>`}
-        ${p.fds
-          ? `<button class="doc-btn fds"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>FDS</button>`
+        ${p.fdsUrl
+          ? `<a href="${p.fdsUrl}" target="_blank" class="doc-btn fds"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>FDS</a>`
           : `<span class="doc-missing"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>FDS non disponible</span>`}
       </div>
     </div>`).join('');
@@ -466,45 +466,12 @@ window.addClientCheckbox = function() {
   const val = document.getElementById('inClientNew').value.trim();
   if (!val) return;
   const box = document.getElementById('clientCheckboxes');
-  const id = 'client_' + Date.now();
   const lbl = document.createElement('label');
   lbl.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;';
   lbl.innerHTML = `<input type="checkbox" value="${val}" checked style="accent-color:var(--green);width:15px;height:15px;"> ${val}`;
   box.insertBefore(lbl, box.lastElementChild);
   document.getElementById('inClientNew').value = '';
 };
-
-document.getElementById('saveModal').addEventListener('click', () => {
-  const nom = document.getElementById('inNom').value.trim();
-  let type = document.getElementById('inType').value;
-  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
-  if (!nom || !type || type === '__custom__' || clients.length === 0) { alert('Veuillez renseigner au moins un client, le nom et le type.'); return; }
-  
-  // Créer une entrée par client
-  clients.forEach(client => {
-    produits.unshift({
-      id: Date.now() + Math.random(), nom, type, client,
-      usage: document.getElementById('inUsage').value.trim(),
-      fiche: !!document.getElementById('fileFiche').files[0],
-      fds: !!document.getElementById('fileFds').files[0]
-    });
-  });
-  
-  filter();
-  modal.classList.remove('open');
-  document.getElementById('inNom').value = '';
-  document.getElementById('inUsage').value = '';
-  document.getElementById('inType').value = '';
-  document.getElementById('inClientNew').value = '';
-  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
-  document.getElementById('typeCustomWrap').style.display = 'none';
-  ['Fiche','Fds'].forEach(n => {
-    document.getElementById('file'+n).value = '';
-    const c = document.getElementById('chosen'+n);
-    c.style.display = 'none'; c.textContent = '';
-  });
-  showToast(`Produit "${nom}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
-});
 
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -515,26 +482,109 @@ function showToast(msg) {
 
 filter();
 </script>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
-
+const storage = getStorage(app);
 
 window.handleLogout = async function() {
   await signOut(auth);
   window.location.href = "login.html";
 };
 
+// Charger les produits depuis Firestore
+async function loadProduits(clientFilter) {
+  try {
+    let q;
+    if (clientFilter) {
+      q = query(collection(db, "produits"), where("client", "==", clientFilter));
+    } else {
+      q = query(collection(db, "produits"));
+    }
+    const snap = await getDocs(q);
+    produits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    filter();
+  } catch(e) { console.error(e); }
+}
+
+// Upload un fichier dans Storage et retourner l'URL
+async function uploadFile(file, path) {
+  if (!file) return null;
+  const storageRef = ref(storage, path);
+  const snap = await uploadBytesResumable(storageRef, file);
+  return await getDownloadURL(snap.ref);
+}
+
+// Sauvegarder produit dans Firestore avec upload PDF
+async function saveProduit() {
+  const nom = document.getElementById('inNom').value.trim();
+  let type = document.getElementById('inType').value;
+  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
+  if (!nom || !type || type === '__custom__' || clients.length === 0) {
+    alert('Veuillez renseigner au moins un client, le nom et le type.'); return;
+  }
+
+  const btnSave = document.getElementById('saveModal');
+  btnSave.disabled = true;
+  btnSave.textContent = 'Enregistrement...';
+
+  try {
+    const fileFiche = document.getElementById('fileFiche').files[0];
+    const fileFds = document.getElementById('fileFds').files[0];
+
+    for (const client of clients) {
+      const ts = Date.now();
+      const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/${client}/${ts}_fiche_${fileFiche.name}`) : null;
+      const fdsUrl = fileFds ? await uploadFile(fileFds, `produits/${client}/${ts}_fds_${fileFds.name}`) : null;
+
+      await addDoc(collection(db, "produits"), {
+        nom, type, client,
+        usage: document.getElementById('inUsage').value.trim(),
+        ficheUrl, fdsUrl,
+        fiche: !!ficheUrl,
+        fds: !!fdsUrl,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    modal.classList.remove('open');
+    document.getElementById('inNom').value = '';
+    document.getElementById('inUsage').value = '';
+    document.getElementById('inType').value = '';
+    document.getElementById('inClientNew').value = '';
+    document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
+    document.getElementById('typeCustomWrap').style.display = 'none';
+    ['Fiche','Fds'].forEach(n => {
+      document.getElementById('file'+n).value = '';
+      const c = document.getElementById('chosen'+n);
+      if (c) { c.style.display = 'none'; c.textContent = ''; }
+    });
+
+    showToast(`Produit "${nom}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
+    await loadProduits(window._currentClientFilter);
+  } catch(e) {
+    console.error(e);
+    alert('Erreur lors de la sauvegarde : ' + e.message);
+  }
+
+  btnSave.disabled = false;
+  btnSave.textContent = 'Enregistrer';
+}
+
+// Remplacer le listener save
+document.getElementById('saveModal').addEventListener('click', saveProduit);
+
 async function loadClientsIntoSelect() {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
   const box = document.getElementById("clientCheckboxes");
   if (!box) return;
-  // Garder seulement la case "Tous les clients"
   const tous = box.lastElementChild;
   box.innerHTML = "";
   snap.docs.forEach(d => {
@@ -548,11 +598,9 @@ async function loadClientsIntoSelect() {
   if (tous) box.appendChild(tous);
 }
 
-
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
-  
-  // Admin reconnu directement par email
+
   if (user.email === "belledonne.multiservices@gmail.com") {
     const name = document.getElementById("sideClientName");
     const id = document.getElementById("sideClientId");
@@ -564,6 +612,12 @@ onAuthStateChanged(auth, async function(user) {
     if (avatar) avatar.textContent = "BM";
     if (fname) fname.textContent = "Belledonne Multiservices";
     if (frole) frole.textContent = "Administrateur";
+    var adminNav = document.getElementById("adminNav");
+    if (adminNav) adminNav.style.display = "block";
+    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
+    loadClientsIntoSelect();
+    window._currentClientFilter = null;
+    await loadProduits(null);
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
@@ -579,14 +633,10 @@ onAuthStateChanged(auth, async function(user) {
         if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
         if (fname) fname.textContent = p.client || user.email;
         if (frole) frole.textContent = "Client";
+        window._currentClientFilter = p.client;
+        await loadProduits(p.client);
       }
     } catch(e) { console.error(e); }
-  }
-  if (user.email === "belledonne.multiservices@gmail.com") {
-    var adminNav = document.getElementById("adminNav");
-    if (adminNav) adminNav.style.display = "block";
-    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
-    loadClientsIntoSelect();
   }
 });
 </script>
