@@ -280,13 +280,8 @@
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Client *</label>
-        <select class="form-select" id="inputClient" onchange="document.getElementById('newClientCampWrap').style.display=this.value==='__new__'?'block':'none'">
+        <select class="form-select" id="inputClient">
           <option value="">— Sélectionner le client —</option>
-          <option value="OPH Isère Habitat">OPH Isère Habitat</option>
-          <option value="Grenoble Habitat">Grenoble Habitat</option>
-          <option value="Actis">Actis</option>
-          <option value="SDH">SDH</option>
-          <option value="__new__">+ Nouveau client...</option>
         </select>
         <div id="newClientCampWrap" style="display:none;margin-top:8px;">
           <input class="form-input" type="text" id="inputClientNew" placeholder="Nom du client..." />
@@ -660,6 +655,19 @@ window.handleLogout = async function() {
   window.location.href = "login.html";
 };
 
+async function loadClientsIntoSelect(selectId) {
+  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
+  snap.docs.forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d.data().client;
+    opt.textContent = d.data().client;
+    sel.appendChild(opt);
+  });
+}
+
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
   try {
@@ -676,13 +684,13 @@ onAuthStateChanged(auth, async function(user) {
       if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
       if (fname) fname.textContent = p.client || user.email;
       if (frole) frole.textContent = p.role === "admin" ? "Administrateur" : "Client";
-      
     }
   } catch(e) { console.error(e); }
   if (user.email === "belledonne.multiservices@gmail.com") {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
     var btn = document.getElementById("btnNewCampagne"); if (btn) btn.style.display = "";
+    loadClientsIntoSelect("inputClient");
   }
 });
 </script>

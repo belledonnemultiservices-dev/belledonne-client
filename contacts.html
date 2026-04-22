@@ -171,8 +171,7 @@
     <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
     <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
     <div class="nav-group-label">Compte</div>
-    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Messages</span></a>
-    <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+        <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
     <a class="nav-item" href="admin.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
     <a class="nav-item active" style="color:var(--navy);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
   </nav>
@@ -181,6 +180,10 @@
       <div class="f-avatar">BM</div>
       <div><div class="footer-name">Belledonne Multiservices</div><div class="footer-role">Administrateur</div></div>
     </div>
+    <button onclick="handleLogout()" style="width:100%;margin-top:8px;padding:8px 12px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(231,76,60,0.15)';this.style.color='#E74C3C'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.5)'">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Se déconnecter
+    </button>
   </div>
 </aside>
 
@@ -239,15 +242,9 @@
       </div>
       <div class="form-group">
         <label class="form-label">Client *</label>
-        <select class="form-select" id="cClient" onchange="handleClientChange()">
+        <select class="form-select" id="cClient">
           <option value="">— Sélectionner —</option>
-          <option value="OPH Isère Habitat">OPH Isère Habitat</option>
-          <option value="Grenoble Habitat">Grenoble Habitat</option>
-          <option value="Actis">Actis</option>
-          <option value="SDH">SDH</option>
-          <option value="__new__">+ Nouveau client...</option>
         </select>
-        <div id="newClientWrap" style="display:none;margin-top:8px;"><input class="form-input" type="text" id="cClientNew" placeholder="Nom du client..." /></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Email *</label><input class="form-input" type="email" id="cEmail" placeholder="ex: m.renaud@oph-isere.fr" /></div>
@@ -334,12 +331,8 @@
 <div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span id="toastMsg"></span></div>
 
 <script>
-let contacts = [
-  { id:1, nom:'Marc Renaud', role:'Responsable patrimoine', client:'OPH Isère Habitat', email:'m.renaud@oph-isere.fr', tel:'04 76 12 34 56', notif:['rapport','garantie'] },
-  { id:2, nom:'Sophie Girard', role:'Chargée de secteur', client:'OPH Isère Habitat', email:'s.girard@oph-isere.fr', tel:'06 78 90 12 34', notif:['rapport','garantie','absent'] },
-  { id:3, nom:'Thomas Blanc', role:'Directeur technique', client:'Grenoble Habitat', email:'t.blanc@grenoble-habitat.fr', tel:'04 76 98 76 54', notif:['rapport'] },
-  { id:4, nom:'Nadia Oumari', role:'Responsable hygiène', client:'Actis', email:'n.oumari@actis38.fr', tel:'06 11 22 33 44', notif:['rapport','garantie','absent'] },
-];
+let contacts = [];
+
 
 let templates = {
   rapport:{ id:'rapport', name:'Nouveau rapport d\'intervention', icon:'ti-rapport',
@@ -596,6 +589,44 @@ function showToast(msg){const t=document.getElementById('toast');document.getEle
 
 refreshClientFilter();
 renderContacts();
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+
+window.handleLogout = async function() {
+  await signOut(auth);
+  window.location.href = "login.html";
+};
+
+async function loadClientsIntoSelects() {
+  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+  const clients = snap.docs.map(d => d.data().client).filter(Boolean);
+  const sel = document.getElementById("cClient");
+  if (sel) {
+    sel.innerHTML = '<option value="">— Sélectionner —</option>';
+    clients.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+onAuthStateChanged(auth, function(user) {
+  if (!user) { window.location.href = "login.html"; return; }
+  if (user.email !== "belledonne.multiservices@gmail.com") {
+    window.location.href = "dashboard.html";
+  } else {
+    loadClientsIntoSelects();
+  }
+});
 </script>
 </body>
 </html>

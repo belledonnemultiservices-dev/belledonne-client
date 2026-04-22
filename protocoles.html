@@ -539,6 +539,19 @@ const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",auth
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 
+
+async function loadClientsIntoSelect(selectId) {
+  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
+  snap.docs.forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d.data().client;
+    opt.textContent = d.data().client;
+    sel.appendChild(opt);
+  });
+}
 window.handleLogout = async function() {
   await signOut(auth);
   window.location.href = "login.html";
@@ -567,6 +580,7 @@ onAuthStateChanged(auth, async function(user) {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
     var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
+    
   }
 });
 </script>
