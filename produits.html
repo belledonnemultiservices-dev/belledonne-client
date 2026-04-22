@@ -332,6 +332,8 @@
 
 <script>
 
+window._isAdmin = false;
+
 const TYPE_LABELS = { rodenticide:'Rodenticide', insecticide:'Insecticide', desinfectant:'Désinfectant', repulsif:'Répulsif', autre:'Autre' };
 const TYPE_CSS = { rodenticide:'tb-rodenticide', insecticide:'tb-insecticide', desinfectant:'tb-desinfectant', repulsif:'tb-repulsif', autre:'tb-autre' };
 const CARD_CSS = { rodenticide:'t-rodenticide', insecticide:'t-insecticide', desinfectant:'t-desinfectant', repulsif:'t-repulsif', autre:'t-autre' };
@@ -366,9 +368,10 @@ function renderProducts(list) {
 
   grid.innerHTML = list.map(p => {
     const clientList = Array.isArray(p.clients) ? p.clients : (p.client ? [p.client] : []);
-    const clientBadges = clientList.map(c =>
-      `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;white-space:nowrap;">${c}</span>`
-    ).join('');
+    // Badges clients visibles uniquement pour l'admin
+    const clientBadges = window._isAdmin
+      ? clientList.map(c => `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;white-space:nowrap;">${c}</span>`).join('')
+      : '';
     return `
     <div class="product-card ${getCardCss(p.type)}">
       <div class="product-header">
@@ -384,7 +387,7 @@ function renderProducts(list) {
             </button>` : ''}
         </div>
       </div>
-      ${clientList.length > 0 ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">${clientBadges}</div>` : ''}
+      ${window._isAdmin && clientList.length > 0 ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">${clientBadges}</div>` : ''}
       <div class="product-usage">${p.usage || '<em style="color:var(--text-muted)">Aucune description</em>'}</div>
       <div class="product-docs">
         ${p.ficheUrl
@@ -471,7 +474,7 @@ document.addEventListener('keydown', e => {
 
 // MODAL
 const modal = document.getElementById('modal');
-let _editId = null; // null = mode ajout, sinon = id du produit à modifier
+let _editId = null;
 
 function resetModal() {
   _editId = null;
@@ -498,16 +501,12 @@ window.openEditModal = function(id) {
   document.getElementById('saveModal').textContent = 'Mettre à jour';
   document.getElementById('inNom').value = p.nom || '';
   document.getElementById('inUsage').value = p.usage || '';
-  // Type
-  const sel = document.getElementById('inType');
-  sel.value = p.type || '';
+  document.getElementById('inType').value = p.type || '';
   document.getElementById('typeCustomWrap').style.display = 'none';
-  // Clients — cocher les bons
   const clientList = Array.isArray(p.clients) ? p.clients : (p.client ? [p.client] : []);
   document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous)').forEach(cb => {
     cb.checked = clientList.includes(cb.value);
   });
-  // Afficher les PDFs existants
   ['Fiche','Fds'].forEach(n => {
     document.getElementById('file'+n).value = '';
     const c = document.getElementById('chosen'+n);
@@ -547,7 +546,7 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-filter();
+// Rendu déclenché par Firebase après auth
 </script>
 
 <script type="module">
@@ -587,15 +586,14 @@ async function loadProduits(clientFilter) {
       });
     }
     produits = docs;
-    populateClientFilter();
+    if (window._isAdmin) populateClientFilter();
     filter();
   } catch(e) { console.error(e); }
 }
 
-// Peupler le filtre client (admin seulement) avec les clients présents dans les produits
 function populateClientFilter() {
   const sel = document.getElementById('filterClient');
-  if (!sel || !window._isAdmin) return;
+  if (!sel) return;
   sel.style.display = '';
   const current = sel.value;
   const allClients = new Set();
@@ -620,7 +618,7 @@ async function uploadFile(file, path) {
   return await getDownloadURL(snap.ref);
 }
 
-// Sauvegarder ou mettre à jour un produit
+// Sauvegarder produit dans Firestore avec upload PDF
 let _saving = false;
 async function saveProduit() {
   if (_saving) return;
@@ -629,8 +627,7 @@ async function saveProduit() {
   let type = document.getElementById('inType').value;
   const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
   if (!nom || !type || type === '__custom__' || clients.length === 0) {
-    alert('Veuillez renseigner au moins un client, le nom et le type.');
-    _saving = false; return;
+    alert('Veuillez renseigner au moins un client, le nom et le type.'); return;
   }
 
   const btnSave = document.getElementById('saveModal');
@@ -639,22 +636,20 @@ async function saveProduit() {
 
   try {
     const fileFiche = document.getElementById('fileFiche').files[0];
-    const fileFds = document.getElementById('fileFds').files[0];
+    const fileFds   = document.getElementById('fileFds').files[0];
     const ts = Date.now();
 
     if (_editId) {
-      // MODE MISE À JOUR — on récupère les URLs existantes si pas de nouveau fichier
+      // MODE MISE À JOUR
       const existing = produits.find(x => x.id === _editId) || {};
       const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/commun/${ts}_fiche_${fileFiche.name}`) : (existing.ficheUrl || null);
       const fdsUrl   = fileFds   ? await uploadFile(fileFds,   `produits/commun/${ts}_fds_${fileFds.name}`)   : (existing.fdsUrl   || null);
-
       const { updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
       await updateDoc(doc(db, "produits", _editId), {
         nom, type, clients,
         usage: document.getElementById('inUsage').value.trim(),
         ficheUrl, fdsUrl,
-        fiche: !!ficheUrl,
-        fds: !!fdsUrl,
+        fiche: !!ficheUrl, fds: !!fdsUrl,
         updatedAt: new Date().toISOString()
       });
       showToast(`Produit "${nom}" mis à jour !`);
@@ -662,13 +657,11 @@ async function saveProduit() {
       // MODE AJOUT — un seul document pour tous les clients
       const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/commun/${ts}_fiche_${fileFiche.name}`) : null;
       const fdsUrl   = fileFds   ? await uploadFile(fileFds,   `produits/commun/${ts}_fds_${fileFds.name}`)   : null;
-
       await addDoc(collection(db, "produits"), {
         nom, type, clients,
         usage: document.getElementById('inUsage').value.trim(),
         ficheUrl, fdsUrl,
-        fiche: !!ficheUrl,
-        fds: !!fdsUrl,
+        fiche: !!ficheUrl, fds: !!fdsUrl,
         createdAt: new Date().toISOString()
       });
       showToast(`Produit "${nom}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
