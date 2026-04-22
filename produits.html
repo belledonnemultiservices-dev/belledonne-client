@@ -335,6 +335,9 @@ const TYPE_LABELS = { rodenticide:'Rodenticide', insecticide:'Insecticide', desi
 const TYPE_CSS = { rodenticide:'tb-rodenticide', insecticide:'tb-insecticide', desinfectant:'tb-desinfectant', repulsif:'tb-repulsif', autre:'tb-autre' };
 const CARD_CSS = { rodenticide:'t-rodenticide', insecticide:'t-insecticide', desinfectant:'t-desinfectant', repulsif:'t-repulsif', autre:'t-autre' };
 
+// Initialisé à false dès le départ — sera mis à true par Firebase si admin reconnu
+window._isAdmin = false;
+
 let produits = [];
 
 
@@ -370,6 +373,7 @@ function renderProducts(list) {
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
           ${p.client ? `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;">${p.client}</span>` : ''}
           <span class="type-badge ${getTypeCss(p.type)}">${getTypeLabel(p.type)}</span>
+          ${window._isAdmin ? `<button onclick="deleteProduit('${p.id}')" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
         </div>
       </div>
       <div class="product-usage">${p.usage || '<em style="color:var(--text-muted)">Aucune description</em>'}</div>
@@ -480,13 +484,13 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-filter();
+// Ne pas appeler filter() ici — les produits sont chargés depuis Firestore après l'auth
 </script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
@@ -497,6 +501,15 @@ const storage = getStorage(app);
 window.handleLogout = async function() {
   await signOut(auth);
   window.location.href = "login.html";
+};
+
+window.deleteProduit = async function(id) {
+  if (!confirm('Supprimer ce produit ?')) return;
+  try {
+    await deleteDoc(doc(db, "produits", id));
+    showToast('Produit supprimé !');
+    await loadProduits(window._currentClientFilter);
+  } catch(e) { console.error(e); alert('Erreur : ' + e.message); }
 };
 
 // Charger les produits depuis Firestore
@@ -606,6 +619,7 @@ onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
 
   if (user.email === "belledonne.multiservices@gmail.com") {
+    window._isAdmin = true;
     const name = document.getElementById("sideClientName");
     const id = document.getElementById("sideClientId");
     const avatar = document.getElementById("sideAvatar");
