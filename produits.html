@@ -584,7 +584,7 @@ onAuthStateChanged(auth, async function(user) {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
     var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
-    
+    loadClientsIntoSelect();
   }
 });
 </script>
