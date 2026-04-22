@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fiches produits & FDS — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
+    --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
+    --amber:#F5A623;--red:#E74C3C;
+    --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
+    --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
+    --sidebar-w:240px;--radius:14px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+
+  .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-mark{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-icon svg{width:18px;height:18px;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
+  .sidebar-client{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:12px 14px;}
+  .client-label{font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;}
+  .client-name{font-size:13px;font-weight:500;color:#fff;}
+  .client-contract{font-size:11px;color:var(--green);margin-top:2px;}
+  .sidebar-nav{padding:20px 12px;flex:1;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
+  .nav-group-label:first-child{margin-top:0;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.8;}
+  .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;}
+  .footer-user:hover{background:rgba(255,255,255,0.05);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--navy-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--green);flex-shrink:0;}
+  .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .footer-role{font-size:10px;color:rgba(255,255,255,0.3);}
+
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
+  .content{padding:32px;flex:1;}
+  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:14px;color:var(--text-muted);}
+
+  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
+  .btn-primary:hover{background:var(--navy-mid);}
+  .btn-primary svg{width:16px;height:16px;}
+
+  /* ONGLETS */
+  .tabs{display:flex;gap:4px;margin-bottom:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px;width:fit-content;}
+  .tab{padding:8px 20px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-muted);transition:all 0.15s;border:none;background:transparent;font-family:'DM Sans',sans-serif;}
+  .tab.active{background:var(--navy);color:#fff;}
+  .tab-count{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:700;margin-left:6px;}
+  .tab.active .tab-count{background:rgba(255,255,255,0.2);color:#fff;}
+  .tab:not(.active) .tab-count{background:var(--bg);color:var(--text-muted);}
+
+  /* SEARCH */
+  .search-bar{display:flex;gap:12px;margin-bottom:20px;align-items:center;}
+  .search-wrap{flex:1;position:relative;max-width:400px;}
+  .search-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
+  .search-input{width:100%;height:42px;padding:0 14px 0 40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .search-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .search-input::placeholder{color:var(--text-muted);}
+  .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
+  .results-count{font-size:13px;color:var(--text-muted);white-space:nowrap;margin-left:auto;}
+
+  /* GRILLE PRODUITS */
+  .products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+
+  .product-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:transform 0.12s,box-shadow 0.12s,border-color 0.12s;position:relative;overflow:hidden;}
+  .product-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(13,27,42,0.07);border-color:rgba(46,204,143,0.25);}
+  .product-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+  .product-card.t-rodenticide::before{background:#E74C3C;}
+  .product-card.t-insecticide::before{background:#F5A623;}
+  .product-card.t-desinfectant::before{background:#2ECC8F;}
+  .product-card.t-repulsif::before{background:#7F77DD;}
+  .product-card.t-autre::before{background:#8FA4B8;}
+
+  .product-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;gap:10px;}
+  .product-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);line-height:1.3;}
+
+  /* BADGES TYPE */
+  .type-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:0.04em;text-transform:uppercase;white-space:nowrap;flex-shrink:0;}
+  .tb-rodenticide{background:#FDECEA;color:#A32D2D;}
+  .tb-insecticide{background:#FEF5E4;color:#854F0B;}
+  .tb-desinfectant{background:var(--green-pale);color:var(--green-dark);}
+  .tb-repulsif{background:#EEEDFE;color:#3C3489;}
+  .tb-autre{background:#F1EFE8;color:#5F5E5A;}
+
+  .product-usage{font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.5;}
+
+  .product-docs{display:flex;gap:8px;flex-wrap:wrap;}
+  .doc-btn{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;padding:6px 12px;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:background 0.15s;border:none;white-space:nowrap;}
+  .doc-btn.fiche{background:var(--green-pale);color:var(--green-dark);}
+  .doc-btn.fiche:hover{background:#C8F0E1;}
+  .doc-btn.fds{background:#FDECEA;color:#A32D2D;}
+  .doc-btn.fds:hover{background:#FBCBC9;}
+  .doc-btn svg{width:12px;height:12px;}
+  .doc-missing{font-size:11px;color:var(--text-muted);padding:6px 0;display:flex;align-items:center;gap:4px;}
+  .doc-missing svg{width:12px;height:12px;}
+
+  /* EMPTY */
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+  .empty-state svg{width:44px;height:44px;margin-bottom:12px;opacity:0.25;}
+  .empty-state p{font-size:14px;}
+
+  /* MODAL */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border-radius:var(--radius);width:560px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);animation:fadeUp 0.2s ease;}
+  .modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
+  .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;}
+  .modal-close:hover{background:#E5EAF0;}
+  .modal-body{padding:24px 26px;}
+  .modal-footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;}
+
+  .form-group{margin-bottom:16px;}
+  .form-label{display:block;font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;}
+  .form-input{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .form-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-select{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;cursor:pointer;}
+  .form-select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;resize:vertical;min-height:72px;transition:border-color 0.15s;}
+  .form-textarea:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+
+  .upload-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .upload-box{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;position:relative;}
+  .upload-box:hover,.upload-box.dragover{border-color:var(--green);background:var(--green-pale);}
+  .upload-box input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .upload-box-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;}
+  .upload-box-label.fiche{color:var(--green-dark);}
+  .upload-box-label.fds{color:var(--red);}
+  .upload-box-sub{font-size:11px;color:var(--text-muted);}
+  .upload-chosen{font-size:11px;font-weight:500;margin-top:6px;display:none;}
+  .upload-chosen.fiche{color:var(--green-dark);}
+  .upload-chosen.fds{color:var(--red);}
+
+  .btn-cancel{height:40px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  .btn-cancel:hover{background:var(--bg);}
+  .btn-save{height:40px;padding:0 22px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .btn-save:hover{background:var(--navy-mid);}
+
+  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);z-index:300;transform:translateY(80px);opacity:0;transition:transform 0.3s ease,opacity 0.3s ease;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast svg{width:16px;height:16px;color:var(--green);flex-shrink:0;}
+
+  .section-hidden{display:none;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+    </div>
+  </div>
+        <div class="sidebar-client">
+    <div class="client-label">Client</div>
+    <div class="client-name" id="sideClientName">—</div>
+    <div class="client-contract" id="sideClientId"></div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item active" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
+    <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
+    <div id="adminNav" style="display:none;">
+      <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+      <a class="nav-item" href="admin.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+      <a class="nav-item" href="contacts.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar" id="sideAvatar">—</div>
+      <div><div class="footer-name" id="sideFooterName">—</div><div class="footer-role" id="sideFooterRole">Client</div></div>
+    </div>
+    <button onclick="handleLogout()" style="width:100%;margin-top:8px;padding:8px 12px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(231,76,60,0.15)';this.style.color='#E74C3C'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.5)'">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Se déconnecter
+    </button>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Espace client</span><span>›</span><span>Fiches produits & FDS</span></div>
+    <div class="date-chip">Jeudi 9 avril 2025</div>
+  </header>
+
+  <div class="content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Fiches produits & FDS</div>
+        <div class="page-sub">Documentation des produits utilisés lors des interventions</div>
+      </div>
+      <button class="btn-primary" id="btnAjouter" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Ajouter un produit
+      </button>
+    </div>
+
+    <!-- ONGLETS -->
+    <div class="tabs">
+      <button class="tab active" id="tabTous" onclick="switchTab('tous')">Tous <span class="tab-count" id="countTous">0</span></button>
+      <button class="tab" id="tabFiche" onclick="switchTab('fiche')">Fiches produits <span class="tab-count" id="countFiche">0</span></button>
+      <button class="tab" id="tabFds" onclick="switchTab('fds')">FDS <span class="tab-count" id="countFds">0</span></button>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="search-bar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input class="search-input" type="text" id="searchInput" placeholder="Rechercher un produit..." />
+      </div>
+      <select class="filter-select" id="filterType">
+        <option value="">Tous les types</option>
+        <option value="rodenticide">Rodenticide</option>
+        <option value="insecticide">Insecticide</option>
+        <option value="desinfectant">Désinfectant</option>
+        <option value="repulsif">Répulsif</option>
+        <option value="autre">Autre</option>
+      </select>
+      <span class="results-count" id="resultsCount"></span>
+    </div>
+
+    <div class="products-grid" id="productsGrid"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+      <p>Aucun produit trouvé.</p>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Ajouter un produit</div>
+      <button class="modal-close" id="closeModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Clients * <span style="font-weight:400;text-transform:none;font-size:11px;color:var(--text-muted);">(plusieurs possibles)</span></label>
+        <div style="display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);" id="clientCheckboxes">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" value="Alpes Isère Habitat DT Échirolles" style="accent-color:var(--green);width:15px;height:15px;"> Alpes Isère Habitat DT Échirolles</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" value="ACTIS Agence TMR" style="accent-color:var(--green);width:15px;height:15px;"> ACTIS Agence TMR</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" value="ACTIS Agence TPC" style="accent-color:var(--green);width:15px;height:15px;"> ACTIS Agence TPC</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;"><input type="checkbox" value="__tous__" id="checkTous" onchange="toggleTousClients(this)"> <span style="font-weight:500;color:var(--green-dark);">Tous les clients</span></label>
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+          <input class="form-input" type="text" id="inClientNew" placeholder="+ Ajouter un client..." style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addClientCheckbox()}" />
+          <button type="button" onclick="addClientCheckbox()" style="height:42px;padding:0 14px;border:none;background:var(--navy);color:#fff;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">+ Ajouter</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nom du produit *</label>
+        <input class="form-input" type="text" id="inNom" placeholder="ex: Detia Ratex B" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Type *</label>
+        <select class="form-select" id="inType" onchange="handleTypeChange()">
+          <option value="">— Sélectionner —</option>
+          <option value="rodenticide">Rodenticide</option>
+          <option value="insecticide">Insecticide</option>
+          <option value="desinfectant">Désinfectant</option>
+          <option value="repulsif">Répulsif</option>
+          <option value="autre">Autre</option>
+          <option value="__custom__">+ Autre type personnalisé...</option>
+        </select>
+        <div id="typeCustomWrap" style="display:none;flex-direction:row;gap:8px;margin-top:8px;">
+          <input class="form-input" type="text" id="inTypeCustom" placeholder="ex: Gel insecticide, Piège..." style="flex:1;" />
+          <button type="button" onclick="addCustomType()" style="height:42px;padding:0 14px;border:none;background:var(--green);color:white;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Ajouter</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Usage / Description</label>
+        <textarea class="form-textarea" id="inUsage" placeholder="ex: Rodenticide anticoagulant, utilisé pour les interventions dératisation en espaces communs..."></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Documents PDF</label>
+        <div class="upload-row">
+          <div class="upload-box" id="dropFiche">
+            <input type="file" accept=".pdf" id="fileFiche" />
+            <div class="upload-box-label fiche">Fiche produit</div>
+            <div class="upload-box-sub">PDF · Max 20 Mo</div>
+            <div class="upload-chosen fiche" id="chosenFiche"></div>
+          </div>
+          <div class="upload-box" id="dropFds">
+            <input type="file" accept=".pdf" id="fileFds" />
+            <div class="upload-box-label fds">Fiche FDS</div>
+            <div class="upload-box-sub">PDF · Max 20 Mo</div>
+            <div class="upload-chosen fds" id="chosenFds"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="cancelModal">Annuler</button>
+      <button class="btn-save" id="saveModal">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<script>
+
+const TYPE_LABELS = { rodenticide:'Rodenticide', insecticide:'Insecticide', desinfectant:'Désinfectant', repulsif:'Répulsif', autre:'Autre' };
+const TYPE_CSS = { rodenticide:'tb-rodenticide', insecticide:'tb-insecticide', desinfectant:'tb-desinfectant', repulsif:'tb-repulsif', autre:'tb-autre' };
+const CARD_CSS = { rodenticide:'t-rodenticide', insecticide:'t-insecticide', desinfectant:'t-desinfectant', repulsif:'t-repulsif', autre:'t-autre' };
+
+let produits = [];
+
+
+let currentTab = 'tous';
+
+function getTypeLabel(t) { return TYPE_LABELS[t] || t; }
+function getTypeCss(t) { return TYPE_CSS[t] || 'tb-autre'; }
+function getCardCss(t) { return CARD_CSS[t] || 't-autre'; }
+
+function updateCounts(filtered) {
+  const all = filtered;
+  document.getElementById('countTous').textContent = produits.length;
+  document.getElementById('countFiche').textContent = produits.filter(p => p.fiche).length;
+  document.getElementById('countFds').textContent = produits.filter(p => p.fds).length;
+  document.getElementById('resultsCount').textContent = filtered.length + ' produit' + (filtered.length > 1 ? 's' : '');
+}
+
+function renderProducts(list) {
+  const grid = document.getElementById('productsGrid');
+  const empty = document.getElementById('emptyState');
+
+  if (list.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = list.map(p => `
+    <div class="product-card ${getCardCss(p.type)}">
+      <div class="product-header">
+        <div class="product-name">${p.nom}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          ${p.client ? `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;">${p.client}</span>` : ''}
+          <span class="type-badge ${getTypeCss(p.type)}">${getTypeLabel(p.type)}</span>
+        </div>
+      </div>
+      <div class="product-usage">${p.usage || '<em style="color:var(--text-muted)">Aucune description</em>'}</div>
+      <div class="product-docs">
+        ${p.ficheUrl
+          ? `<a href="${p.ficheUrl}" target="_blank" class="doc-btn fiche"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Fiche produit</a>`
+          : `<span class="doc-missing"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>Fiche non disponible</span>`}
+        ${p.fdsUrl
+          ? `<a href="${p.fdsUrl}" target="_blank" class="doc-btn fds"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>FDS</a>`
+          : `<span class="doc-missing"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>FDS non disponible</span>`}
+      </div>
+    </div>`).join('');
+}
+
+function filter() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const t = document.getElementById('filterType').value;
+  let list = produits.filter(p => {
+    const mq = !q || p.nom.toLowerCase().includes(q) || (p.usage||'').toLowerCase().includes(q);
+    const mt = !t || p.type === t;
+    const mTab = currentTab === 'tous' || (currentTab === 'fiche' && p.fiche) || (currentTab === 'fds' && p.fds);
+    return mq && mt && mTab;
+  });
+  updateCounts(list);
+  renderProducts(list);
+}
+
+window.switchTab = function(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+  filter();
+};
+
+document.getElementById('searchInput').addEventListener('input', filter);
+document.getElementById('filterType').addEventListener('change', filter);
+
+// TYPE PERSONNALISÉ
+window.handleTypeChange = function() {
+  const val = document.getElementById('inType').value;
+  const wrap = document.getElementById('typeCustomWrap');
+  wrap.style.display = val === '__custom__' ? 'flex' : 'none';
+  if (val === '__custom__') document.getElementById('inTypeCustom').focus();
+};
+
+window.addCustomType = function() {
+  const input = document.getElementById('inTypeCustom');
+  const label = input.value.trim();
+  if (!label) return;
+  const val = label.toLowerCase().replace(/\s+/g, '_');
+  if (!TYPE_LABELS[val]) {
+    TYPE_LABELS[val] = label;
+    TYPE_CSS[val] = 'tb-autre';
+    CARD_CSS[val] = 't-autre';
+    const sel = document.getElementById('inType');
+    const opt = document.createElement('option');
+    opt.value = val; opt.textContent = label;
+    sel.insertBefore(opt, sel.querySelector('option[value="__custom__"]'));
+    const fopt = document.createElement('option');
+    fopt.value = val; fopt.textContent = label;
+    document.getElementById('filterType').appendChild(fopt);
+  }
+  document.getElementById('inType').value = val;
+  document.getElementById('typeCustomWrap').style.display = 'none';
+  input.value = '';
+};
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement.id === 'inTypeCustom') {
+    e.preventDefault(); window.addCustomType();
+  }
+});
+
+// FILE INPUTS
+['Fiche','Fds'].forEach(name => {
+  document.getElementById('file'+name).addEventListener('change', function() {
+    const chosen = document.getElementById('chosen'+name);
+    if (this.files[0]) { chosen.textContent = '✓ ' + this.files[0].name; chosen.style.display = 'block'; }
+  });
+});
+
+// MODAL
+const modal = document.getElementById('modal');
+document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
+document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
+document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
+modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+
+window.toggleTousClients = function(cb) {
+  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous)').forEach(c => c.checked = cb.checked);
+};
+
+window.addClientCheckbox = function() {
+  const val = document.getElementById('inClientNew').value.trim();
+  if (!val) return;
+  const box = document.getElementById('clientCheckboxes');
+  const lbl = document.createElement('label');
+  lbl.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;';
+  lbl.innerHTML = `<input type="checkbox" value="${val}" checked style="accent-color:var(--green);width:15px;height:15px;"> ${val}`;
+  box.insertBefore(lbl, box.lastElementChild);
+  document.getElementById('inClientNew').value = '';
+};
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+filter();
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, addDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
+
+window.handleLogout = async function() {
+  await signOut(auth);
+  window.location.href = "login.html";
+};
+
+// Charger les produits depuis Firestore
+async function loadProduits(clientFilter) {
+  try {
+    let q;
+    if (clientFilter) {
+      q = query(collection(db, "produits"), where("client", "==", clientFilter));
+    } else {
+      q = query(collection(db, "produits"));
+    }
+    const snap = await getDocs(q);
+    produits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    filter();
+  } catch(e) { console.error(e); }
+}
+
+// Upload un fichier dans Storage et retourner l'URL
+async function uploadFile(file, path) {
+  if (!file) return null;
+  const storageRef = ref(storage, path);
+  const snap = await uploadBytesResumable(storageRef, file);
+  return await getDownloadURL(snap.ref);
+}
+
+// Sauvegarder produit dans Firestore avec upload PDF
+let _saving = false;
+async function saveProduit() {
+  if (_saving) return;
+  _saving = true;
+  const nom = document.getElementById('inNom').value.trim();
+  let type = document.getElementById('inType').value;
+  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
+  if (!nom || !type || type === '__custom__' || clients.length === 0) {
+    alert('Veuillez renseigner au moins un client, le nom et le type.'); return;
+  }
+
+  const btnSave = document.getElementById('saveModal');
+  btnSave.disabled = true;
+  btnSave.textContent = 'Enregistrement...';
+
+  try {
+    const fileFiche = document.getElementById('fileFiche').files[0];
+    const fileFds = document.getElementById('fileFds').files[0];
+
+    for (const client of clients) {
+      const ts = Date.now();
+      const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/${client}/${ts}_fiche_${fileFiche.name}`) : null;
+      const fdsUrl = fileFds ? await uploadFile(fileFds, `produits/${client}/${ts}_fds_${fileFds.name}`) : null;
+
+      await addDoc(collection(db, "produits"), {
+        nom, type, client,
+        usage: document.getElementById('inUsage').value.trim(),
+        ficheUrl, fdsUrl,
+        fiche: !!ficheUrl,
+        fds: !!fdsUrl,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    modal.classList.remove('open');
+    document.getElementById('inNom').value = '';
+    document.getElementById('inUsage').value = '';
+    document.getElementById('inType').value = '';
+    document.getElementById('inClientNew').value = '';
+    document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
+    document.getElementById('typeCustomWrap').style.display = 'none';
+    ['Fiche','Fds'].forEach(n => {
+      document.getElementById('file'+n).value = '';
+      const c = document.getElementById('chosen'+n);
+      if (c) { c.style.display = 'none'; c.textContent = ''; }
+    });
+
+    showToast(`Produit "${nom}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
+    await loadProduits(window._currentClientFilter);
+  } catch(e) {
+    console.error(e);
+    alert('Erreur lors de la sauvegarde : ' + e.message);
+  }
+
+  btnSave.disabled = false;
+  btnSave.textContent = 'Enregistrer';
+  _saving = false;
+}
+
+// Remplacer le listener save
+document.getElementById('saveModal').addEventListener('click', saveProduit);
+
+async function loadClientsIntoSelect() {
+  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+  const box = document.getElementById("clientCheckboxes");
+  if (!box) return;
+  const tous = box.lastElementChild;
+  box.innerHTML = "";
+  snap.docs.forEach(d => {
+    const c = d.data().client;
+    if (!c) return;
+    const lbl = document.createElement("label");
+    lbl.style.cssText = "display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;";
+    lbl.innerHTML = `<input type="checkbox" value="${c}" style="accent-color:var(--green);width:15px;height:15px;"> ${c}`;
+    box.appendChild(lbl);
+  });
+  if (tous) box.appendChild(tous);
+}
+
+onAuthStateChanged(auth, async function(user) {
+  if (!user) { window.location.href = "login.html"; return; }
+
+  if (user.email === "belledonne.multiservices@gmail.com") {
+    const name = document.getElementById("sideClientName");
+    const id = document.getElementById("sideClientId");
+    const avatar = document.getElementById("sideAvatar");
+    const fname = document.getElementById("sideFooterName");
+    const frole = document.getElementById("sideFooterRole");
+    if (name) name.textContent = "Belledonne Multiservices";
+    if (id) id.textContent = "belledonne-admin";
+    if (avatar) avatar.textContent = "BM";
+    if (fname) fname.textContent = "Belledonne Multiservices";
+    if (frole) frole.textContent = "Administrateur";
+    var adminNav = document.getElementById("adminNav");
+    if (adminNav) adminNav.style.display = "block";
+    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
+    loadClientsIntoSelect();
+    window._currentClientFilter = null;
+    await loadProduits(null);
+  } else {
+    try {
+      const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+      if (!snap.empty) {
+        const p = snap.docs[0].data();
+        const name = document.getElementById("sideClientName");
+        const id = document.getElementById("sideClientId");
+        const avatar = document.getElementById("sideAvatar");
+        const fname = document.getElementById("sideFooterName");
+        const frole = document.getElementById("sideFooterRole");
+        if (name) name.textContent = p.client || "Client";
+        if (id) id.textContent = p.identifiant || "";
+        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
+        if (fname) fname.textContent = p.client || user.email;
+        if (frole) frole.textContent = "Client";
+        window._currentClientFilter = p.client;
+        await loadProduits(p.client);
+      }
+    } catch(e) { console.error(e); }
+  }
+});
+</script>
+</body>
+</html>
