@@ -598,11 +598,14 @@ function renderDocCard(d, campagneId) {
 }
 
 function renderDocsSection(docs, q, campagneId) {
-  const filtered = q ? docs.filter(d => (d.adresse || d.name || '').toLowerCase().includes(q.toLowerCase())) : docs;
-  if (filtered.length === 0) return '<div class="docs-empty">Aucun résultat pour cette recherche.</div>';
+  // La recherche ne filtre QUE les feuilles d'émargement (PDF), les Excel sont toujours visibles
+  const xlsDocs = docs.filter(d => d.type === 'xls');
+  const pdfDocs = q
+    ? docs.filter(d => d.type === 'pdf' && (d.adresse || d.name || '').toLowerCase().includes(q.toLowerCase()))
+    : docs.filter(d => d.type === 'pdf');
 
-  const xlsDocs = filtered.filter(d => d.type === 'xls');
-  const pdfDocs = filtered.filter(d => d.type === 'pdf');
+  if (xlsDocs.length === 0 && pdfDocs.length === 0 && !q) return '<div class="docs-empty">Aucun document pour cette campagne.</div>';
+  if (xlsDocs.length === 0 && pdfDocs.length === 0 && q) return '<div class="docs-empty" style="padding:20px 0;">Aucune feuille d\'émargement ne correspond à cette recherche.</div>';
 
   let html = '';
 
