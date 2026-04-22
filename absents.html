@@ -661,23 +661,37 @@ window.handleLogout = async function() {
 
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
-  try {
-    const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
-    if (!snap.empty) {
-      const p = snap.docs[0].data();
-      const name = document.getElementById("sideClientName");
-      const id = document.getElementById("sideClientId");
-      const avatar = document.getElementById("sideAvatar");
-      const fname = document.getElementById("sideFooterName");
-      const frole = document.getElementById("sideFooterRole");
-      if (name) name.textContent = p.client || "Client";
-      if (id) id.textContent = p.identifiant || "";
-      if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
-      if (fname) fname.textContent = p.client || user.email;
-      if (frole) frole.textContent = p.role === "admin" ? "Administrateur" : "Client";
-      
-    }
-  } catch(e) { console.error(e); }
+  
+  // Admin reconnu directement par email
+  if (user.email === "belledonne.multiservices@gmail.com") {
+    const name = document.getElementById("sideClientName");
+    const id = document.getElementById("sideClientId");
+    const avatar = document.getElementById("sideAvatar");
+    const fname = document.getElementById("sideFooterName");
+    const frole = document.getElementById("sideFooterRole");
+    if (name) name.textContent = "Belledonne Multiservices";
+    if (id) id.textContent = "belledonne-admin";
+    if (avatar) avatar.textContent = "BM";
+    if (fname) fname.textContent = "Belledonne Multiservices";
+    if (frole) frole.textContent = "Administrateur";
+  } else {
+    try {
+      const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+      if (!snap.empty) {
+        const p = snap.docs[0].data();
+        const name = document.getElementById("sideClientName");
+        const id = document.getElementById("sideClientId");
+        const avatar = document.getElementById("sideAvatar");
+        const fname = document.getElementById("sideFooterName");
+        const frole = document.getElementById("sideFooterRole");
+        if (name) name.textContent = p.client || "Client";
+        if (id) id.textContent = p.identifiant || "";
+        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
+        if (fname) fname.textContent = p.client || user.email;
+        if (frole) frole.textContent = "Client";
+      }
+    } catch(e) { console.error(e); }
+  }
   if (user.email === "belledonne.multiservices@gmail.com") {
     var adminNav = document.getElementById("adminNav");
     if (adminNav) adminNav.style.display = "block";
