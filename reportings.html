@@ -478,7 +478,11 @@ document.getElementById('filterClient').addEventListener('change', filterCampagn
 
 // MODAL CAMPAGNE
 const modalCampagne = document.getElementById('modalCampagne');
-document.getElementById('btnNewCampagne').addEventListener('click', () => modalCampagne.classList.add('open'));
+document.getElementById('btnNewCampagne').addEventListener('click', () => {
+  modalCampagne.classList.add('open');
+  // Recharger les clients à chaque ouverture (au cas où pas encore chargés)
+  if (window._reloadClients) window._reloadClients();
+});
 document.getElementById('closeCampagne').addEventListener('click', () => modalCampagne.classList.remove('open'));
 document.getElementById('cancelCampagne').addEventListener('click', () => modalCampagne.classList.remove('open'));
 modalCampagne.addEventListener('click', e => { if (e.target === modalCampagne) modalCampagne.classList.remove('open'); });
@@ -742,11 +746,16 @@ async function loadClientsIntoSelect(selectId) {
   if (!sel) return;
   sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
   snap.docs.forEach(d => {
+    const c = d.data().client;
+    if (!c) return;
     const opt = document.createElement("option");
-    opt.value = d.data().client; opt.textContent = d.data().client;
+    opt.value = c; opt.textContent = c;
     sel.appendChild(opt);
   });
 }
+
+// Exposé pour être appelé à l'ouverture du modal
+window._reloadClients = () => loadClientsIntoSelect("inputClient");
 
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
