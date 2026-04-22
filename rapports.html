@@ -84,36 +84,30 @@
   .results-count { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
 
   /* LISTE RAPPORTS */
-  .reports-list { display: flex; flex-direction: column; gap: 10px; }
+  .reports-list { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
 
-  .report-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; display: grid; grid-template-columns: 48px 1fr auto; gap: 16px; align-items: center; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; }
-  .report-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(13,27,42,0.06); border-color: rgba(46,204,143,0.3); }
+  .report-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
+  .report-row:last-child { border-bottom: none; }
+  .report-row:hover { background: var(--bg); }
 
-  .pdf-icon { width: 48px; height: 48px; background: #FDECEA; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .pdf-icon svg { width: 22px; height: 22px; color: var(--red); }
+  .report-icon { width: 36px; height: 36px; background: #FDECEA; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .report-icon svg { width: 18px; height: 18px; color: var(--red); }
 
   .report-info { min-width: 0; }
-  .report-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .report-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .report-meta { display: flex; gap: 16px; flex-wrap: wrap; }
-  .meta-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
-  .meta-chip svg { width: 12px; height: 12px; flex-shrink: 0; }
-  .meta-chip strong { color: var(--text-mid); font-weight: 500; }
+  .report-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .r-bc { display: inline-flex; font-size: 11px; font-weight: 600; color: var(--navy); background: #EBF0F5; padding: 2px 8px; border-radius: 10px; }
+  .r-date { font-size: 11px; color: var(--text-muted); }
+  .r-size { font-size: 11px; color: var(--text-muted); }
 
-  .bc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--navy); background: #EBF0F5; padding: 3px 10px; border-radius: 20px; }
+  .passage-chip { display: inline-flex; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #EBF0F5; color: #1A5F8A; }
+  .nuisible-chip { display: inline-flex; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
 
-  .passage-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
-  .p1 { background: var(--green-pale); color: var(--green-dark); }
-  .p2 { background: #EBF0F5; color: #1A5F8A; }
-  .p3 { background: #FEF5E4; color: #C27D0A; }
-
-  .report-actions { display: flex; gap: 8px; align-items: center; }
-  .btn-dl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--green-dark); background: var(--green-pale); border: none; padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; white-space: nowrap; }
-  .btn-dl:hover { background: #C8F0E1; }
-  .btn-dl svg { width: 13px; height: 13px; }
-  .btn-view { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text-mid); background: var(--bg); border: 1px solid var(--border); padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; white-space: nowrap; }
-  .btn-view:hover { background: #E5EAF0; }
-  .btn-view svg { width: 13px; height: 13px; }
+  .report-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+  .btn-action { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; border: none; white-space: nowrap; text-decoration: none; }
+  .btn-telecharger { color: var(--green-dark); background: var(--green-pale); }
+  .btn-telecharger:hover { background: #C8F0E1; }
 
   /* EMPTY STATE */
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
@@ -503,25 +497,26 @@ function renderRapports(list) {
   const TYPE_COLORS = { punaise:'n-punaise', rongeur:'n-rongeur', blatte:'n-blatte', pigeon:'n-pigeon' };
   container.innerHTML = list.map(r => `
     <div class="report-row" id="row-${r.id}">
-      <div class="report-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div>
+      <div class="report-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+      </div>
       <div class="report-info">
         <div class="report-title">${r.site || r.adresse || '—'}</div>
         <div class="report-meta">
-          ${window._isAdmin && r.client ? `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;white-space:nowrap;">${r.client}</span>` : ''}
+          ${window._isAdmin && r.client ? `<span style="font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;white-space:nowrap;">${r.client}</span>` : ''}
           ${r.bc ? `<span class="r-bc">${r.bc}</span>` : ''}
           ${r.passage ? `<span class="passage-chip">${r.passage}</span>` : ''}
           ${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : ''}
           ${r.date ? `<span class="r-date">${r.date}</span>` : ''}
-          ${r.size ? `<span class="r-size">${r.size}</span>` : ''}
         </div>
       </div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
+      <div class="report-actions">
+        ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
         ${window._isAdmin ? `
-          <button onclick="openEditRapport('${r.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1A2E42;background:#EBF0F5;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;" title="Modifier">
+          <button onclick="openEditRapport('${r.id}')" class="btn-action" style="color:#1A2E42;background:#EBF0F5;">
             <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier
           </button>
-          <button onclick="deleteRapport('${r.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">
+          <button onclick="deleteRapport('${r.id}')" class="btn-action" style="color:#E74C3C;background:#FDECEA;">
             <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.
           </button>` : ''}
       </div>
