@@ -401,14 +401,8 @@ function renderProtocols(list) {
           ${p.version ? `<span class="version-badge">${p.version}</span>` : ''}
         </div>
         <div class="card-actions">
-          <button class="btn-dl primary">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-            Télécharger le PDF
-          </button>
-          <button class="btn-dl secondary">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-            Aperçu
-          </button>
+          ${p.pdfUrl ? `<a href="${p.pdfUrl}" target="_blank" class="btn-dl primary"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger le PDF</a>` : `<span style="font-size:12px;color:var(--text-muted);">Pas de PDF joint</span>`}
+          ${window._isAdmin ? `<button onclick="deleteProtocole('${p.id}')" style="height:34px;padding:0 12px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;display:flex;align-items:center;gap:5px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Supprimer</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -528,28 +522,96 @@ filter();
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
-
+const storage = getStorage(app);
 
 window.handleLogout = async function() {
   await signOut(auth);
   window.location.href = "login.html";
 };
 
+window.deleteProtocole = async function(id) {
+  if (!confirm('Supprimer ce protocole ?')) return;
+  try {
+    await deleteDoc(doc(db, "protocoles", id));
+    showToast('Protocole supprimé !');
+    await loadProtocoles(window._currentClientFilter);
+  } catch(e) { alert('Erreur : ' + e.message); }
+};
+
+async function loadProtocoles(clientFilter) {
+  try {
+    let snap;
+    if (clientFilter) {
+      snap = await getDocs(query(collection(db, "protocoles"), where("client", "==", clientFilter)));
+    } else {
+      snap = await getDocs(collection(db, "protocoles"));
+    }
+    protocoles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    filter();
+  } catch(e) { console.error(e); }
+}
+
+// Remplacer le save par Firebase
+let _saving = false;
+document.getElementById('saveModal').addEventListener('click', async () => {
+  if (_saving) return;
+  const titre = document.getElementById('inTitre').value.trim();
+  let type = document.getElementById('inType').value;
+  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
+  if (!titre || !type || type === '__custom__' || clients.length === 0) { alert('Veuillez renseigner au moins un client, le titre et le type.'); return; }
+  
+  const btnSave = document.getElementById('saveModal');
+  _saving = true; btnSave.disabled = true; btnSave.textContent = 'Enregistrement...';
+
+  try {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput ? fileInput.files[0] : null;
+    
+    for (const client of clients) {
+      let pdfUrl = null;
+      if (file) {
+        const storageRef = ref(storage, `protocoles/${client}/${Date.now()}_${file.name}`);
+        const snap = await uploadBytesResumable(storageRef, file);
+        pdfUrl = await getDownloadURL(snap.ref);
+      }
+      await addDoc(collection(db, "protocoles"), {
+        titre, type, client, pdfUrl,
+        version: document.getElementById('inVersion').value.trim() || null,
+        desc: document.getElementById('inDesc').value.trim(),
+        date: new Date().toISOString().split('T')[0],
+        pages: null, createdAt: new Date().toISOString()
+      });
+    }
+    
+    document.getElementById('modal').classList.remove('open');
+    ['inTitre','inVersion','inDesc'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('inType').value = '';
+    document.getElementById('inClientNew').value = '';
+    document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
+    document.getElementById('typeCustomWrap').style.display = 'none';
+    if (fileInput) fileInput.value = '';
+    const dc = document.getElementById('dropChosen'); if (dc) dc.style.display = 'none';
+    showToast(`Protocole "${titre}" ajouté !`);
+    await loadProtocoles(window._currentClientFilter);
+  } catch(e) { alert('Erreur : ' + e.message); }
+  
+  _saving = false; btnSave.disabled = false; btnSave.textContent = 'Enregistrer';
+});
+
 async function loadClientsIntoSelect() {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
   const box = document.getElementById("clientCheckboxes");
   if (!box) return;
-  // Garder seulement la case "Tous les clients"
   const tous = box.lastElementChild;
   box.innerHTML = "";
   snap.docs.forEach(d => {
-    const c = d.data().client;
-    if (!c) return;
+    const c = d.data().client; if (!c) return;
     const lbl = document.createElement("label");
     lbl.style.cssText = "display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;";
     lbl.innerHTML = `<input type="checkbox" value="${c}" style="accent-color:var(--green);width:15px;height:15px;"> ${c}`;
@@ -558,45 +620,34 @@ async function loadClientsIntoSelect() {
   if (tous) box.appendChild(tous);
 }
 
-
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
-  
-  // Admin reconnu directement par email
   if (user.email === "belledonne.multiservices@gmail.com") {
-    const name = document.getElementById("sideClientName");
-    const id = document.getElementById("sideClientId");
-    const avatar = document.getElementById("sideAvatar");
-    const fname = document.getElementById("sideFooterName");
-    const frole = document.getElementById("sideFooterRole");
-    if (name) name.textContent = "Belledonne Multiservices";
-    if (id) id.textContent = "belledonne-admin";
-    if (avatar) avatar.textContent = "BM";
-    if (fname) fname.textContent = "Belledonne Multiservices";
-    if (frole) frole.textContent = "Administrateur";
+    window._isAdmin = true;
+    const name = document.getElementById("sideClientName"); if (name) name.textContent = "Belledonne Multiservices";
+    const id = document.getElementById("sideClientId"); if (id) id.textContent = "belledonne-admin";
+    const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = "BM";
+    const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = "Belledonne Multiservices";
+    const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Administrateur";
+    var adminNav = document.getElementById("adminNav"); if (adminNav) adminNav.style.display = "block";
+    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
+    loadClientsIntoSelect();
+    window._currentClientFilter = null;
+    await loadProtocoles(null);
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
       if (!snap.empty) {
         const p = snap.docs[0].data();
-        const name = document.getElementById("sideClientName");
-        const id = document.getElementById("sideClientId");
-        const avatar = document.getElementById("sideAvatar");
-        const fname = document.getElementById("sideFooterName");
-        const frole = document.getElementById("sideFooterRole");
-        if (name) name.textContent = p.client || "Client";
-        if (id) id.textContent = p.identifiant || "";
-        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
-        if (fname) fname.textContent = p.client || user.email;
-        if (frole) frole.textContent = "Client";
+        const name = document.getElementById("sideClientName"); if (name) name.textContent = p.client || "Client";
+        const id = document.getElementById("sideClientId"); if (id) id.textContent = p.identifiant || "";
+        const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = (p.client||"CL").substring(0,2).toUpperCase();
+        const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = p.client || user.email;
+        const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Client";
+        window._currentClientFilter = p.client;
+        await loadProtocoles(p.client);
       }
     } catch(e) { console.error(e); }
-  }
-  if (user.email === "belledonne.multiservices@gmail.com") {
-    var adminNav = document.getElementById("adminNav");
-    if (adminNav) adminNav.style.display = "block";
-    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
-    loadClientsIntoSelect();
   }
 });
 </script>

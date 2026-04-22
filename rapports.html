@@ -445,14 +445,12 @@ if (btnOpenModal) btnOpenModal.addEventListener('click', () => modalOverlay.clas
 if (btnCloseModal) btnCloseModal.addEventListener('click', () => modalOverlay.classList.remove('open'));
 if (modalOverlay) modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('open'); });
 
-// Gestion type nuisible personnalisé
 window.handleTypeChange = function() {
   const val = document.getElementById('inputNuisible') ? document.getElementById('inputNuisible').value : '';
   const wrap = document.getElementById('inputNuisibleCustomWrap');
   if (wrap) wrap.style.display = val === '__autre__' ? 'flex' : 'none';
 };
 
-// Drag & drop PDF
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const dropMsg = document.getElementById('dropChosen');
@@ -462,32 +460,13 @@ if (dropZone) {
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--green)'; });
   dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
   dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.style.borderColor = '';
+    e.preventDefault(); dropZone.style.borderColor = '';
     if (e.dataTransfer.files[0] && dropMsg) dropMsg.textContent = e.dataTransfer.files[0].name;
   });
 }
-if (fileInput) {
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files[0] && dropMsg) dropMsg.textContent = fileInput.files[0].name;
-  });
-}
-
-// Enregistrer rapport
-const btnSaveModal = document.getElementById('btnSave');
-if (btnSaveModal) {
-  btnSaveModal.addEventListener('click', () => {
-    const bc = document.getElementById('inputBC') ? document.getElementById('inputBC').value.trim() : '';
-    const site = document.getElementById('inputSite') ? document.getElementById('inputSite').value.trim() : '';
-    if (!bc || !site) { alert('Veuillez renseigner le bon de commande et le site.'); return; }
-    modalOverlay.classList.remove('open');
-    if (dropMsg) dropMsg.textContent = 'Glissez votre PDF ici ou cliquez pour parcourir';
-    if (fileInput) fileInput.value = '';
-    document.getElementById('inputBC').value = '';
-    document.getElementById('inputSite').value = '';
-    showToast('Rapport ajouté avec succès !');
-  });
-}
+if (fileInput) fileInput.addEventListener('change', () => {
+  if (fileInput.files[0] && dropMsg) dropMsg.textContent = fileInput.files[0].name;
+});
 
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -495,20 +474,137 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3500);
 }
+
+function renderRapports(list) {
+  const container = document.getElementById('reportsList');
+  const empty = document.getElementById('emptyState');
+  const count = document.getElementById('resultsCount');
+  if (!container) return;
+  count.textContent = list.length + ' rapport' + (list.length !== 1 ? 's' : '');
+  if (list.length === 0) {
+    container.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  const TYPE_LABELS = { punaise:'Punaises de lit', rongeur:'Rongeurs', blatte:'Blattes / Insectes', pigeon:'Dépigeonnage' };
+  const TYPE_COLORS = { punaise:'n-punaise', rongeur:'n-rongeur', blatte:'n-blatte', pigeon:'n-pigeon' };
+  container.innerHTML = list.map(r => `
+    <div class="report-row" id="row-${r.id}">
+      <div class="report-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div>
+      <div class="report-info">
+        <div class="report-title">${r.site || r.adresse || '—'}</div>
+        <div class="report-meta">
+          ${r.bc ? `<span class="r-bc">${r.bc}</span>` : ''}
+          ${r.passage ? `<span class="passage-chip">${r.passage}</span>` : ''}
+          ${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : ''}
+          ${r.date ? `<span class="r-date">${r.date}</span>` : ''}
+          ${r.size ? `<span class="r-size">${r.size}</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
+        ${window._isAdmin ? `<button onclick="deleteRapport('${r.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+let rapports = [];
+let _currentFilter = null;
+
+function filterRapports() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const p = document.getElementById('filterPassage').value;
+  const n = document.getElementById('filterNuisible') ? document.getElementById('filterNuisible').value : '';
+  const y = document.getElementById('filterYear').value;
+  const list = rapports.filter(r => {
+    const mq = !q || (r.site||'').toLowerCase().includes(q) || (r.bc||'').toLowerCase().includes(q);
+    const mp = !p || r.passage === p;
+    const mn = !n || r.nuisible === n;
+    const my = !y || (r.date||'').startsWith(y);
+    return mq && mp && mn && my;
+  });
+  renderRapports(list);
+}
+
+document.getElementById('searchInput').addEventListener('input', filterRapports);
+document.getElementById('filterPassage').addEventListener('change', filterRapports);
+if (document.getElementById('filterNuisible')) document.getElementById('filterNuisible').addEventListener('change', filterRapports);
+document.getElementById('filterYear').addEventListener('change', filterRapports);
 </script>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
 
-window.handleLogout = async function() {
-  await signOut(auth);
-  window.location.href = "login.html";
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
+
+async function loadRapports(clientFilter) {
+  try {
+    const snap = clientFilter
+      ? await getDocs(query(collection(db, "rapports"), where("client", "==", clientFilter)))
+      : await getDocs(collection(db, "rapports"));
+    rapports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    rapports.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    filterRapports();
+  } catch(e) { console.error(e); }
+}
+
+window.deleteRapport = async function(id) {
+  if (!confirm('Supprimer ce rapport ?')) return;
+  try {
+    await deleteDoc(doc(db, "rapports", id));
+    rapports = rapports.filter(r => r.id !== id);
+    filterRapports();
+    showToast('Rapport supprimé !');
+  } catch(e) { alert('Erreur : ' + e.message); }
 };
+
+let _saving = false;
+const btnSaveModal = document.getElementById('btnSave');
+if (btnSaveModal) {
+  btnSaveModal.addEventListener('click', async () => {
+    if (_saving) return;
+    const bc = document.getElementById('inputBC').value.trim();
+    const site = document.getElementById('inputSite').value.trim();
+    const client = document.getElementById('inputClient').value;
+    if (!bc || !site || !client) { alert('Veuillez renseigner le client, le bon de commande et le site.'); return; }
+
+    _saving = true; btnSaveModal.disabled = true; btnSaveModal.textContent = 'Enregistrement...';
+    try {
+      const file = fileInput ? fileInput.files[0] : null;
+      let pdfUrl = null;
+      if (file) {
+        const storageRef = ref(storage, `rapports/${client}/${Date.now()}_${file.name}`);
+        const snap = await uploadBytesResumable(storageRef, file);
+        pdfUrl = await getDownloadURL(snap.ref);
+      }
+      await addDoc(collection(db, "rapports"), {
+        bc, site, client, pdfUrl,
+        passage: document.getElementById('inputPassage') ? document.getElementById('inputPassage').value : '',
+        nuisible: document.getElementById('inputNuisible') ? document.getElementById('inputNuisible').value : '',
+        date: document.getElementById('inputDate') ? document.getElementById('inputDate').value : new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString()
+      });
+      modalOverlay.classList.remove('open');
+      document.getElementById('inputBC').value = '';
+      document.getElementById('inputSite').value = '';
+      document.getElementById('inputClient').value = '';
+      if (dropMsg) { dropMsg.style.display = 'none'; dropMsg.textContent = ''; }
+      if (fileInput) fileInput.value = '';
+      showToast('Rapport ajouté avec succès !');
+      await loadRapports(_currentFilter);
+    } catch(e) { alert('Erreur : ' + e.message); }
+    _saving = false; btnSaveModal.disabled = false; btnSaveModal.textContent = 'Enregistrer le rapport';
+  });
+}
 
 async function loadClientsIntoSelect() {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
@@ -517,46 +613,37 @@ async function loadClientsIntoSelect() {
   sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
   snap.docs.forEach(d => {
     const opt = document.createElement("option");
-    opt.value = d.data().client;
-    opt.textContent = d.data().client;
+    opt.value = d.data().client; opt.textContent = d.data().client;
     sel.appendChild(opt);
   });
 }
+
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
   if (user.email === "belledonne.multiservices@gmail.com") {
-    const name = document.getElementById("sideClientName");
-    const id = document.getElementById("sideClientId");
-    const avatar = document.getElementById("sideAvatar");
-    const fname = document.getElementById("sideFooterName");
-    const frole = document.getElementById("sideFooterRole");
-    if (name) name.textContent = "Belledonne Multiservices";
-    if (id) id.textContent = "belledonne-admin";
-    if (avatar) avatar.textContent = "BM";
-    if (fname) fname.textContent = "Belledonne Multiservices";
-    if (frole) frole.textContent = "Administrateur";
-    
-    var adminNav = document.getElementById("adminNav");
-    if (adminNav) adminNav.style.display = "block";
+    window._isAdmin = true;
+    const name = document.getElementById("sideClientName"); if (name) name.textContent = "Belledonne Multiservices";
+    const id = document.getElementById("sideClientId"); if (id) id.textContent = "belledonne-admin";
+    const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = "BM";
+    const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = "Belledonne Multiservices";
+    const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Administrateur";
+    var adminNav = document.getElementById("adminNav"); if (adminNav) adminNav.style.display = "block";
     var btn = document.getElementById("btnOpenModal"); if (btn) btn.style.display = "";
     loadClientsIntoSelect();
-  
+    _currentFilter = null;
+    await loadRapports(null);
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
       if (!snap.empty) {
         const p = snap.docs[0].data();
-        const name = document.getElementById("sideClientName");
-        const id = document.getElementById("sideClientId");
-        const avatar = document.getElementById("sideAvatar");
-        const fname = document.getElementById("sideFooterName");
-        const frole = document.getElementById("sideFooterRole");
-        if (name) name.textContent = p.client || "Client";
-        if (id) id.textContent = p.identifiant || "";
-        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
-        if (fname) fname.textContent = p.client || user.email;
-        if (frole) frole.textContent = "Client";
-        
+        const name = document.getElementById("sideClientName"); if (name) name.textContent = p.client || "Client";
+        const id = document.getElementById("sideClientId"); if (id) id.textContent = p.identifiant || "";
+        const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = (p.client||"CL").substring(0,2).toUpperCase();
+        const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = p.client || user.email;
+        const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Client";
+        _currentFilter = p.client;
+        await loadRapports(p.client);
       }
     } catch(e) { console.error(e); }
   }
