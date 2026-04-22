@@ -335,9 +335,6 @@ const TYPE_LABELS = { rodenticide:'Rodenticide', insecticide:'Insecticide', desi
 const TYPE_CSS = { rodenticide:'tb-rodenticide', insecticide:'tb-insecticide', desinfectant:'tb-desinfectant', repulsif:'tb-repulsif', autre:'tb-autre' };
 const CARD_CSS = { rodenticide:'t-rodenticide', insecticide:'t-insecticide', desinfectant:'t-desinfectant', repulsif:'t-repulsif', autre:'t-autre' };
 
-// Initialisé à false dès le départ — sera mis à true par Firebase si admin reconnu
-window._isAdmin = false;
-
 let produits = [];
 
 
@@ -366,16 +363,22 @@ function renderProducts(list) {
   }
   empty.style.display = 'none';
 
-  grid.innerHTML = list.map(p => `
+  grid.innerHTML = list.map(p => {
+    // Gère l'ancien format (client: string) ET le nouveau (clients: array)
+    const clientList = Array.isArray(p.clients) ? p.clients : (p.client ? [p.client] : []);
+    const clientBadges = clientList.map(c =>
+      `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;white-space:nowrap;">${c}</span>`
+    ).join('');
+    return `
     <div class="product-card ${getCardCss(p.type)}">
       <div class="product-header">
         <div class="product-name">${p.nom}</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
-          ${p.client ? `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;">${p.client}</span>` : ''}
           <span class="type-badge ${getTypeCss(p.type)}">${getTypeLabel(p.type)}</span>
           ${window._isAdmin ? `<button onclick="deleteProduit('${p.id}')" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
         </div>
       </div>
+      ${clientList.length > 0 ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">${clientBadges}</div>` : ''}
       <div class="product-usage">${p.usage || '<em style="color:var(--text-muted)">Aucune description</em>'}</div>
       <div class="product-docs">
         ${p.ficheUrl
@@ -385,7 +388,8 @@ function renderProducts(list) {
           ? `<a href="${p.fdsUrl}" target="_blank" class="doc-btn fds"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>FDS</a>`
           : `<span class="doc-missing"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>FDS non disponible</span>`}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function filter() {
@@ -484,7 +488,7 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-// Ne pas appeler filter() ici — les produits sont chargés depuis Firestore après l'auth
+filter();
 </script>
 
 <script type="module">
@@ -515,14 +519,18 @@ window.deleteProduit = async function(id) {
 // Charger les produits depuis Firestore
 async function loadProduits(clientFilter) {
   try {
-    let q;
+    const snap = await getDocs(collection(db, "produits"));
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
     if (clientFilter) {
-      q = query(collection(db, "produits"), where("client", "==", clientFilter));
-    } else {
-      q = query(collection(db, "produits"));
+      // Filtre compatible ancien format (client: string) ET nouveau (clients: array)
+      docs = docs.filter(p => {
+        if (Array.isArray(p.clients)) return p.clients.includes(clientFilter);
+        return p.client === clientFilter;
+      });
     }
-    const snap = await getDocs(q);
-    produits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    produits = docs;
     filter();
   } catch(e) { console.error(e); }
 }
@@ -555,20 +563,20 @@ async function saveProduit() {
     const fileFiche = document.getElementById('fileFiche').files[0];
     const fileFds = document.getElementById('fileFds').files[0];
 
-    for (const client of clients) {
-      const ts = Date.now();
-      const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/${client}/${ts}_fiche_${fileFiche.name}`) : null;
-      const fdsUrl = fileFds ? await uploadFile(fileFds, `produits/${client}/${ts}_fds_${fileFds.name}`) : null;
+    // Un seul upload pour tous les clients (un seul document Firestore)
+    const ts = Date.now();
+    const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/commun/${ts}_fiche_${fileFiche.name}`) : null;
+    const fdsUrl = fileFds ? await uploadFile(fileFds, `produits/commun/${ts}_fds_${fileFds.name}`) : null;
 
-      await addDoc(collection(db, "produits"), {
-        nom, type, client,
-        usage: document.getElementById('inUsage').value.trim(),
-        ficheUrl, fdsUrl,
-        fiche: !!ficheUrl,
-        fds: !!fdsUrl,
-        createdAt: new Date().toISOString()
-      });
-    }
+    await addDoc(collection(db, "produits"), {
+      nom, type,
+      clients,          // tableau ["ERILIA", "ACTIS TMR", ...]
+      usage: document.getElementById('inUsage').value.trim(),
+      ficheUrl, fdsUrl,
+      fiche: !!ficheUrl,
+      fds: !!fdsUrl,
+      createdAt: new Date().toISOString()
+    });
 
     modal.classList.remove('open');
     document.getElementById('inNom').value = '';
