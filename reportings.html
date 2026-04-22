@@ -263,6 +263,7 @@
         <option value="active">En cours</option>
         <option value="closed">Terminée</option>
       </select>
+      <select class="filter-select" id="filterClient" style="display:none;"><option value="">Tous les clients</option></select>
       <span class="results-count" id="resultsCount"></span>
     </div>
 
@@ -365,6 +366,8 @@
 
 <script>
 
+window._isAdmin = false;
+
 const COLORS = ['color-green','color-blue','color-amber','color-purple'];
 
 let campagnes = [];
@@ -425,6 +428,7 @@ function renderCampagnes(list) {
         <div class="campagne-color ${c.color}"></div>
         <div class="campagne-header-info">
           <div class="campagne-name">${c.nom}</div>
+          ${window._isAdmin && c.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;margin-bottom:4px;">${c.client}</span>` : ''}
           <div class="campagne-meta">
             <span class="cmeta"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><strong>${formatDate(c.debut)}</strong> → <strong>${formatDate(c.fin)}</strong></span>
             <span class="cmeta"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg><strong>${c.sites}</strong> site${c.sites > 1 ? 's' : ''}</span>
@@ -464,16 +468,19 @@ function toggleCampagne(id) {
 function filterCampagnes() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const s = document.getElementById('filterStatus').value;
+  const fc = document.getElementById('filterClient') ? document.getElementById('filterClient').value : '';
   const filtered = campagnes.filter(c => {
     const matchQ = !q || c.nom.toLowerCase().includes(q);
     const matchS = !s || c.statut === s;
-    return matchQ && matchS;
+    const matchC = !fc || c.client === fc;
+    return matchQ && matchS && matchC;
   });
   renderCampagnes(filtered);
 }
 
 document.getElementById('searchInput').addEventListener('input', filterCampagnes);
 document.getElementById('filterStatus').addEventListener('change', filterCampagnes);
+document.getElementById('filterClient').addEventListener('change', filterCampagnes);
 
 // MODAL CAMPAGNE
 const modalCampagne = document.getElementById('modalCampagne');
@@ -483,10 +490,8 @@ document.getElementById('cancelCampagne').addEventListener('click', () => modalC
 modalCampagne.addEventListener('click', e => { if (e.target === modalCampagne) modalCampagne.classList.remove('open'); });
 
 let _savingCampagne = false;
-document.getElementById('saveCampagne').addEventListener('click', () => {
+document.getElementById('saveCampagne').addEventListener('click', async () => {
   if (_savingCampagne) return;
-  _savingCampagne = true;
-  setTimeout(() => { _savingCampagne = false; }, 2000);
   const nom = document.getElementById('inputNom').value.trim();
   const debut = document.getElementById('inputDebut').value;
   const fin = document.getElementById('inputFin').value;
@@ -495,18 +500,26 @@ document.getElementById('saveCampagne').addEventListener('click', () => {
   let client = document.getElementById('inputClient').value;
   if (client === '__new__') client = document.getElementById('inputClientNew').value.trim();
   if (!nom || !debut || !client) { alert('Veuillez renseigner au moins le client, le nom et la date de début.'); return; }
-  const newC = { id: Date.now(), nom, debut, fin, sites, statut, client, color: COLORS[colorIndex % COLORS.length], docs: [] };
-  colorIndex++;
-  campagnes.unshift(newC);
-  filterCampagnes();
-  modalCampagne.classList.remove('open');
-  document.getElementById('inputNom').value = '';
-  document.getElementById('inputDebut').value = '';
-  document.getElementById('inputFin').value = '';
-  document.getElementById('inputSites').value = '';
-  document.getElementById('inputClient').value = '';
-  document.getElementById('newClientCampWrap').style.display = 'none';
-  showToast('Campagne "' + nom + '" créée !');
+
+  _savingCampagne = true;
+  const btn = document.getElementById('saveCampagne');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+  try {
+    await window._addCampagne({ nom, debut, fin, sites, statut, client,
+      color: COLORS[colorIndex % COLORS.length], docs: [], createdAt: new Date().toISOString() });
+    colorIndex++;
+    modalCampagne.classList.remove('open');
+    document.getElementById('inputNom').value = '';
+    document.getElementById('inputDebut').value = '';
+    document.getElementById('inputFin').value = '';
+    document.getElementById('inputSites').value = '';
+    document.getElementById('inputClient').value = '';
+    document.getElementById('newClientCampWrap').style.display = 'none';
+    showToast('Campagne "' + nom + '" créée !');
+    await window._loadCampagnes(window._currentClientFilter);
+  } catch(e) { alert('Erreur : ' + e.message); }
+  btn.disabled = false; btn.textContent = 'Créer la campagne';
+  _savingCampagne = false;
 });
 
 // ── PARSING NOM DE FICHIER ──
@@ -539,7 +552,7 @@ function renderDocCards(docs) {
           ${formatDate(d.date)}
         </div>
       </div>
-      <button class="doc-dl"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button>
+      ${d.url ? `<a href="${d.url}" target="_blank" class="doc-dl" title="Télécharger"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></a>` : `<span class="doc-dl" style="opacity:0.3;cursor:default;" title="Pas de fichier"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>`}
     </div>`).join('');
 }
 
@@ -600,7 +613,8 @@ fileInputDoc.addEventListener('change', () => {
     const ext = file.name.split('.').pop().toLowerCase();
     const type = (ext==='xls'||ext==='xlsx') ? 'xls' : 'pdf';
     const { adresse, passage } = parseFilename(file.name);
-    pendingFiles.push({ name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
+    // On stocke le File JS original pour l'upload Firebase
+    pendingFiles.push({ file, name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
   });
   renderPendingFiles();
   fileInputDoc.value = '';
@@ -615,26 +629,30 @@ dropZoneDoc.addEventListener('drop', e => {
     const ext = file.name.split('.').pop().toLowerCase();
     const type = (ext==='xls'||ext==='xlsx') ? 'xls' : 'pdf';
     const { adresse, passage } = parseFilename(file.name);
-    pendingFiles.push({ name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
+    pendingFiles.push({ file, name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
   });
   renderPendingFiles();
 });
 
-document.getElementById('saveDoc').addEventListener('click', () => {
+document.getElementById('saveDoc').addEventListener('click', async () => {
   if (pendingFiles.length === 0) { alert('Veuillez sélectionner au moins un fichier.'); return; }
-  const c = campagnes.find(x => x.id === currentCampagneId);
-  if (!c) return;
-  pendingFiles.forEach(f => c.docs.push({ id: Date.now()+Math.random(), ...f }));
-  const nb = pendingFiles.length;
-  filterCampagnes();
-  setTimeout(() => {
-    const docs = document.getElementById('docs-' + currentCampagneId);
-    const toggle = document.getElementById('toggle-' + currentCampagneId);
-    if (docs) { docs.classList.add('open'); toggle.classList.add('open'); }
-  }, 50);
-  modalDoc.classList.remove('open');
-  pendingFiles = [];
-  showToast(nb + ' document' + (nb>1?'s':'') + ' ajouté' + (nb>1?'s':'') + ' !');
+  const btn = document.getElementById('saveDoc');
+  btn.disabled = true; btn.textContent = 'Envoi en cours...';
+  try {
+    await window._uploadDocs(currentCampagneId, pendingFiles);
+    const nb = pendingFiles.length;
+    modalDoc.classList.remove('open');
+    pendingFiles = [];
+    renderPendingFiles();
+    showToast(nb + ' document' + (nb>1?'s':'') + ' ajouté' + (nb>1?'s':'') + ' !');
+    await window._loadCampagnes(window._currentClientFilter);
+    setTimeout(() => {
+      const docs = document.getElementById('docs-' + currentCampagneId);
+      const toggle = document.getElementById('toggle-' + currentCampagneId);
+      if (docs) { docs.classList.add('open'); if(toggle) toggle.classList.add('open'); }
+    }, 100);
+  } catch(e) { alert('Erreur upload : ' + e.message); }
+  btn.disabled = false; btn.textContent = 'Ajouter les documents';
 });
 
 function showToast(msg) {
@@ -644,27 +662,61 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 3500);
 }
 
-renderCampagnes(campagnes);
+// Chargement déclenché par Firebase
 </script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
 
-window.handleLogout = async function() {
-  await signOut(auth);
-  window.location.href = "login.html";
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
+
+// ── Charger les campagnes depuis Firestore ──
+window._currentClientFilter = null;
+
+window._loadCampagnes = async function(clientFilter) {
+  try {
+    const snap = await getDocs(collection(db, "campagnes"));
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data(), docs: d.data().docs || [] }));
+    if (clientFilter) docs = docs.filter(c => c.client === clientFilter);
+    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    campagnes = docs;
+    if (window._isAdmin) populateClientFilter();
+    filterCampagnes();
+  } catch(e) { console.error(e); }
 };
 
+function populateClientFilter() {
+  const sel = document.getElementById('filterClient');
+  if (!sel) return;
+  sel.style.display = '';
+  const current = sel.value;
+  const allClients = new Set(campagnes.map(c => c.client).filter(Boolean));
+  sel.innerHTML = '<option value="">Tous les clients</option>';
+  [...allClients].sort().forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    if (c === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Créer une campagne dans Firestore ──
+window._addCampagne = async function(data) {
+  await addDoc(collection(db, "campagnes"), data);
+};
+
+// ── Supprimer une campagne ──
 window.deleteCampagne = async function(id, event) {
   event.stopPropagation();
-  if (!confirm('Supprimer cette campagne ?')) return;
+  if (!confirm('Supprimer cette campagne et tous ses documents ?')) return;
   try {
-    const { deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     await deleteDoc(doc(db, "campagnes", String(id)));
     campagnes = campagnes.filter(c => c.id !== id);
     filterCampagnes();
@@ -672,6 +724,26 @@ window.deleteCampagne = async function(id, event) {
   } catch(e) { alert('Erreur : ' + e.message); }
 };
 
+// ── Uploader les documents et les attacher à la campagne ──
+window._uploadDocs = async function(campagneId, files) {
+  const campRef = doc(db, "campagnes", String(campagneId));
+  const newDocs = [];
+  for (const f of files) {
+    // f.file est le File JS original, f contient name/type/adresse/passage/date
+    if (f.file) {
+      const ts = Date.now();
+      const storageRef = ref(storage, `campagnes/${campagneId}/${ts}_${f.file.name}`);
+      const snap = await uploadBytesResumable(storageRef, f.file);
+      const url = await getDownloadURL(snap.ref);
+      newDocs.push({ id: ts + Math.random(), name: f.name, type: f.type, adresse: f.adresse, passage: f.passage, date: f.date, url });
+    } else {
+      newDocs.push({ id: Date.now() + Math.random(), name: f.name, type: f.type, adresse: f.adresse, passage: f.passage, date: f.date, url: null });
+    }
+  }
+  await updateDoc(campRef, { docs: arrayUnion(...newDocs) });
+};
+
+// ── Charger les clients dans le select ──
 async function loadClientsIntoSelect(selectId) {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
   const sel = document.getElementById(selectId);
@@ -679,47 +751,37 @@ async function loadClientsIntoSelect(selectId) {
   sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
   snap.docs.forEach(d => {
     const opt = document.createElement("option");
-    opt.value = d.data().client;
-    opt.textContent = d.data().client;
+    opt.value = d.data().client; opt.textContent = d.data().client;
     sel.appendChild(opt);
   });
 }
+
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
   if (user.email === "belledonne.multiservices@gmail.com") {
     window._isAdmin = true;
-    const name = document.getElementById("sideClientName");
-    const id = document.getElementById("sideClientId");
-    const avatar = document.getElementById("sideAvatar");
-    const fname = document.getElementById("sideFooterName");
-    const frole = document.getElementById("sideFooterRole");
-    if (name) name.textContent = "Belledonne Multiservices";
-    if (id) id.textContent = "belledonne-admin";
-    if (avatar) avatar.textContent = "BM";
-    if (fname) fname.textContent = "Belledonne Multiservices";
-    if (frole) frole.textContent = "Administrateur";
-    
-    var adminNav = document.getElementById("adminNav");
-    if (adminNav) adminNav.style.display = "block";
+    const name = document.getElementById("sideClientName"); if (name) name.textContent = "Belledonne Multiservices";
+    const id = document.getElementById("sideClientId"); if (id) id.textContent = "belledonne-admin";
+    const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = "BM";
+    const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = "Belledonne Multiservices";
+    const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Administrateur";
+    var adminNav = document.getElementById("adminNav"); if (adminNav) adminNav.style.display = "block";
     var btn = document.getElementById("btnNewCampagne"); if (btn) btn.style.display = "";
     loadClientsIntoSelect("inputClient");
-  
+    window._currentClientFilter = null;
+    await window._loadCampagnes(null);
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
       if (!snap.empty) {
         const p = snap.docs[0].data();
-        const name = document.getElementById("sideClientName");
-        const id = document.getElementById("sideClientId");
-        const avatar = document.getElementById("sideAvatar");
-        const fname = document.getElementById("sideFooterName");
-        const frole = document.getElementById("sideFooterRole");
-        if (name) name.textContent = p.client || "Client";
-        if (id) id.textContent = p.identifiant || "";
-        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
-        if (fname) fname.textContent = p.client || user.email;
-        if (frole) frole.textContent = "Client";
-        
+        const name = document.getElementById("sideClientName"); if (name) name.textContent = p.client || "Client";
+        const id = document.getElementById("sideClientId"); if (id) id.textContent = p.identifiant || "";
+        const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = (p.client||"CL").substring(0,2).toUpperCase();
+        const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = p.client || user.email;
+        const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Client";
+        window._currentClientFilter = p.client;
+        await window._loadCampagnes(p.client);
       }
     } catch(e) { console.error(e); }
   }
