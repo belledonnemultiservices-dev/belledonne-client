@@ -483,7 +483,11 @@ window.handleClientSelect = function() {
   document.getElementById('newClientWrap').style.display = document.getElementById('inClient').value === '__new__' ? 'block' : 'none';
 };
 
+let _savingAbsent = false;
 document.getElementById('saveModal').addEventListener('click', () => {
+  if (_savingAbsent) return;
+  _savingAbsent = true;
+  setTimeout(() => { _savingAbsent = false; }, 2000);
   const statut = document.getElementById('inStatut').value;
   const adresse = document.getElementById('inAdresse').value.trim();
   const date = document.getElementById('inDate').value;
@@ -531,13 +535,8 @@ updateKPIs();
 filter();
 
 // ── MODAL ENVOI ──
-const CONTACTS_DB = [
-  { nom:'Marc Renaud', role:'Responsable patrimoine', client:'OPH Isère Habitat', email:'m.renaud@oph-isere.fr', notif:['rapport','garantie'] },
-  { nom:'Sophie Girard', role:'Chargée de secteur', client:'OPH Isère Habitat', email:'s.girard@oph-isere.fr', notif:['rapport','garantie','absent'] },
-  { nom:'Thomas Blanc', role:'Directeur technique', client:'Grenoble Habitat', email:'t.blanc@grenoble-habitat.fr', notif:['rapport'] },
-  { nom:'Nadia Oumari', role:'Responsable hygiène', client:'Actis', email:'n.oumari@actis38.fr', notif:['rapport','garantie','absent'] },
-];
-const CLIENT_PAR_DEFAUT = 'OPH Isère Habitat';
+const CONTACTS_DB = [];
+const CLIENT_PAR_DEFAUT = '';
 
 let currentSendId = null;
 let extraRecipients = [];

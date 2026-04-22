@@ -482,7 +482,11 @@ document.getElementById('closeCampagne').addEventListener('click', () => modalCa
 document.getElementById('cancelCampagne').addEventListener('click', () => modalCampagne.classList.remove('open'));
 modalCampagne.addEventListener('click', e => { if (e.target === modalCampagne) modalCampagne.classList.remove('open'); });
 
+let _savingCampagne = false;
 document.getElementById('saveCampagne').addEventListener('click', () => {
+  if (_savingCampagne) return;
+  _savingCampagne = true;
+  setTimeout(() => { _savingCampagne = false; }, 2000);
   const nom = document.getElementById('inputNom').value.trim();
   const debut = document.getElementById('inputDebut').value;
   const fin = document.getElementById('inputFin').value;
