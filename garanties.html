@@ -273,7 +273,7 @@
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Ajouter un passage garantie</div>
+      <div class="modal-title" id="modalTitle">Ajouter un passage garantie</div>
       <button class="modal-close" id="closeModal">✕</button>
     </div>
     <div class="modal-body">
@@ -510,14 +510,12 @@ let _editGarantieId = null;
 
 function resetModal() {
   _editGarantieId = null;
-  document.getElementById('modalTitle').textContent = 'Ajouter un passage garantie';
-  document.getElementById('saveModal').textContent = 'Enregistrer';
-  ['inAdresse','inBC','inDate'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-  document.getElementById('inNuisible').value = '';
-  document.getElementById('inClient').value = '';
-  document.getElementById('newClientWrap').style.display = 'none';
-  fileInput.value = '';
-  dropChosen.style.display = 'none'; dropChosen.textContent = ''; dropChosen.style.color = '';
+  const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Ajouter un passage garantie';
+  const sm = document.getElementById('saveModal'); if(sm) sm.textContent = 'Enregistrer';
+  ['inAdresse','inBC','inDate','inNuisible','inClient'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  const ncw = document.getElementById('newClientWrap'); if(ncw) ncw.style.display = 'none';
+  if(fileInput) fileInput.value = '';
+  if(dropChosen) { dropChosen.style.display = 'none'; dropChosen.textContent = ''; dropChosen.style.color = ''; }
 }
 
 window.openEditGarantie = function(id) {
