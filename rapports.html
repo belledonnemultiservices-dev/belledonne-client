@@ -463,10 +463,11 @@ const btnCancelModal = document.getElementById('btnCancelModal');
 if (btnCancelModal) btnCancelModal.addEventListener('click', () => modalOverlay.classList.remove('open'));
 if (modalOverlay) modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('open'); });
 
+window._editRapportId = null;
 let _editRapportId = null;
 
 function resetRapportModal() {
-  _editRapportId = null;
+  _editRapportId = null; window._editRapportId = null;
   const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Déposer un rapport PDF';
   const bs = document.getElementById('btnSave'); if(bs) bs.textContent = 'Enregistrer le rapport';
   ['inputBC','inputSite','inputDate'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
@@ -480,7 +481,7 @@ function resetRapportModal() {
 window.openEditRapport = function(id) {
   const r = (window.rapports||rapports).find(x => x.id === id);
   if (!r) return;
-  _editRapportId = id;
+  _editRapportId = id; window._editRapportId = id;
   const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Modifier le rapport';
   const bs = document.getElementById('btnSave'); if(bs) bs.textContent = 'Mettre à jour';
   const ibc=document.getElementById('inputBC'); if(ibc) ibc.value=r.bc||'';
@@ -707,29 +708,44 @@ if (btnSaveModal) {
     _saving = true; btnSaveModal.disabled = true; btnSaveModal.textContent = 'Enregistrement...';
     try {
       const file = fileInput ? fileInput.files[0] : null;
-      let pdfUrl = null;
-      if (file) {
-        const storageRef = ref(storage, `rapports/${client}/${Date.now()}_${file.name}`);
-        const snap = await uploadBytesResumable(storageRef, file);
-        pdfUrl = await getDownloadURL(snap.ref);
-      }
-      await addDoc(collection(db, "rapports"), {
-        bc, site, client, pdfUrl,
+      const ts = Date.now();
+      const editId = window._editRapportId;
+      const data = {
+        bc, site, client,
         passage: document.getElementById('inputPassage') ? document.getElementById('inputPassage').value : '',
         nuisible: document.getElementById('inputNuisible') ? document.getElementById('inputNuisible').value : '',
         date: document.getElementById('inputDate') ? document.getElementById('inputDate').value : new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      });
+      };
+
+      if (editId) {
+        // MODE MISE À JOUR
+        const existing = (window.rapports||[]).find(x => x.id === editId) || {};
+        let pdfUrl = existing.pdfUrl || null;
+        if (file) {
+          const storageRef = ref(storage, `rapports/${client}/${ts}_${file.name}`);
+          const snap = await uploadBytesResumable(storageRef, file);
+          pdfUrl = await getDownloadURL(snap.ref);
+        }
+        const { updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+        await updateDoc(doc(db, "rapports", editId), { ...data, pdfUrl, updatedAt: new Date().toISOString() });
+        showToast('Rapport mis à jour !');
+      } else {
+        // MODE AJOUT
+        let pdfUrl = null;
+        if (file) {
+          const storageRef = ref(storage, `rapports/${client}/${ts}_${file.name}`);
+          const snap = await uploadBytesResumable(storageRef, file);
+          pdfUrl = await getDownloadURL(snap.ref);
+        }
+        await addDoc(collection(db, "rapports"), { ...data, pdfUrl, createdAt: new Date().toISOString() });
+        showToast('Rapport ajouté avec succès !');
+      }
+
       modalOverlay.classList.remove('open');
-      document.getElementById('inputBC').value = '';
-      document.getElementById('inputSite').value = '';
-      document.getElementById('inputClient').value = '';
-      if (dropMsg) { dropMsg.style.display = 'none'; dropMsg.textContent = ''; }
-      if (fileInput) fileInput.value = '';
-      showToast('Rapport ajouté avec succès !');
+      resetRapportModal();
       await loadRapports(_currentFilter);
     } catch(e) { alert('Erreur : ' + e.message); }
-    _saving = false; btnSaveModal.disabled = false; btnSaveModal.textContent = 'Enregistrer le rapport';
+    _saving = false; btnSaveModal.disabled = false; btnSaveModal.textContent = window._editRapportId ? 'Mettre à jour' : 'Enregistrer le rapport';
   });
 }
 
