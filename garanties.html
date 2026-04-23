@@ -176,7 +176,7 @@
     <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
     <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
     <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
-    <a class="nav-item active" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item active" href="window.garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
     <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
     <div class="nav-group-label">Documentation</div>
     <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
@@ -429,7 +429,6 @@ document.addEventListener('keydown', e => {
 });
 
 window.garanties = [];
-let garanties = window.garanties;
 
 
 function formatDate(d) {
@@ -446,9 +445,9 @@ function initiales(nom) {
 
 function updateKPIs(list) {
   const annee = new Date().getFullYear().toString();
-  document.getElementById('kpiTotal').textContent = garanties.length;
-  document.getElementById('kpiAnnee').textContent = garanties.filter(g => g.date.startsWith(annee)).length;
-  document.getElementById('kpiRapports').textContent = garanties.filter(g => g.rapport).length;
+  document.getElementById('kpiTotal').textContent = window.garanties.length;
+  document.getElementById('kpiAnnee').textContent = window.garanties.filter(g => g.date.startsWith(annee)).length;
+  document.getElementById('kpiRapports').textContent = window.garanties.filter(g => g.rapport).length;
 }
 
 function renderTable(list) {
@@ -488,7 +487,7 @@ function filter() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const n = document.getElementById('filterNuisible').value;
   const y = document.getElementById('filterAnnee').value;
-  const filtered = garanties.filter(g => {
+  const filtered = window.garanties.filter(g => {
     const mq = !q || (g.adresse||'').toLowerCase().includes(q) || (g.bc||'').toLowerCase().includes(q);
     const mn = !n || g.nuisible === n;
     const my = !y || g.date.startsWith(y);
@@ -520,7 +519,7 @@ function resetModal() {
 }
 
 window.openEditGarantie = function(id) {
-  const g = garanties.find(x => x.id === id);
+  const g = window.garanties.find(x => x.id === id);
   if (!g) return;
   _editGarantieId = id;
   document.getElementById('modalTitle').textContent = 'Modifier la garantie';
@@ -638,7 +637,7 @@ document.getElementById('saveModal').addEventListener('click', async () => {
   const nuisible = document.getElementById('inNuisible').value;
   let client = document.getElementById('inClient').value;
   if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
-  if (!client || !adresse || !date || !nuisible) { alert('Veuillez remplir les champs obligatoires : client, adresse, date et type d'intervention.'); return; }
+  if (!client || !adresse || !date || !nuisible) { alert('Veuillez remplir les champs obligatoires : client, adresse, date et type.'); return; }
 
   _savingGarantie = true;
   const btn = document.getElementById('saveModal');
@@ -757,7 +756,7 @@ window.confirmSend = function() {
     ...extraRecipients.map(r => r.nom)
   ];
   if (currentSendId !== null) {
-    const g = garanties.find(x => x.id === currentSendId);
+    const g = window.garanties.find(x => x.id === currentSendId);
     if (g) g.notifs = (g.notifs || 0) + 1;
   }
   document.getElementById('sendMainContent').style.display = 'none';
@@ -790,7 +789,7 @@ window._loadGaranties = async function(clientFilter) {
     let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     if (clientFilter) docs = docs.filter(g => g.client === clientFilter);
     docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-    garanties = docs; window.garanties = docs;
+    window.garanties = docs;
     if (window._isAdmin) populateClientFilter();
     updateKPIs();
     filter();
@@ -802,7 +801,7 @@ function populateClientFilter() {
   if (!sel) return;
   sel.style.display = '';
   const current = sel.value;
-  const allClients = new Set(garanties.map(g => g.client).filter(Boolean));
+  const allClients = new Set((window.garanties||[]).map(g => g.client).filter(Boolean));
   sel.innerHTML = '<option value="">Tous les clients</option>';
   [...allClients].sort().forEach(c => {
     const opt = document.createElement('option');
@@ -816,7 +815,7 @@ function populateClientFilter() {
 window._saveGarantie = async function({ adresse, bc, date, nuisible, client, note, file, editId }) {
   const ts = Date.now();
   let rapportUrl = null;
-  if (editId) rapportUrl = (garanties.find(g => g.id === editId) || {}).rapportUrl || null;
+  if (editId) rapportUrl = ((window.garanties||[]).find(g => g.id === editId) || {}).rapportUrl || null;
   if (file) {
     const storageRef = ref(storage, `garanties/${client}/${ts}_${file.name}`);
     const snap = await uploadBytesResumable(storageRef, file);
@@ -835,7 +834,7 @@ window.deleteGarantie = async function(id) {
   if (!confirm('Supprimer cette garantie ?')) return;
   try {
     await deleteDoc(doc(db, "garanties", String(id)));
-    garanties = garanties.filter(g => g.id !== id);
+    window.garanties = (window.garanties||[]).filter(g => g.id !== id);
     updateKPIs(); filter();
     showToast('Garantie supprimée !');
   } catch(e) { alert('Erreur : ' + e.message); }
