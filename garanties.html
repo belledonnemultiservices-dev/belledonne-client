@@ -428,7 +428,8 @@ document.addEventListener('keydown', e => {
   }
 });
 
-let garanties = [];
+window.garanties = [];
+let garanties = window.garanties;
 
 
 function formatDate(d) {
@@ -629,7 +630,6 @@ document.getElementById('dropZone').addEventListener('drop', e => {
 });
 
 let _savingGarantie = false;
-let _savingGarantie = false;
 document.getElementById('saveModal').addEventListener('click', async () => {
   if (_savingGarantie) return;
   const adresse = document.getElementById('inAdresse').value.trim();
@@ -790,7 +790,7 @@ window._loadGaranties = async function(clientFilter) {
     let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     if (clientFilter) docs = docs.filter(g => g.client === clientFilter);
     docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-    garanties = docs;
+    garanties = docs; window.garanties = docs;
     if (window._isAdmin) populateClientFilter();
     updateKPIs();
     filter();
