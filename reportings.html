@@ -671,11 +671,12 @@ const modalDoc = document.getElementById('modalDoc');
 let pendingFiles = [];
 
 window.openAddDoc = function(campagneId, e) {
-  e.stopPropagation();
+  if(e) e.stopPropagation();
   currentCampagneId = campagneId;
-  const c = (window.campagnes || campagnes || []).find(x => x.id === campagneId);
-  if (!c) return;
-  document.getElementById('modalDocTitle').textContent = 'Ajouter des documents — ' + c.nom.substring(0, 36) + (c.nom.length > 36 ? '…' : '');
+  const allCampagnes = window.campagnes || campagnes || [];
+  const c = allCampagnes.find(x => x.id === campagneId || x.id === String(campagneId));
+  const nom = c ? c.nom : campagneId;
+  document.getElementById('modalDocTitle').textContent = 'Ajouter des documents — ' + (nom||'').substring(0, 36);
   pendingFiles = [];
   renderPendingFiles();
   modalDoc.classList.add('open');
@@ -730,7 +731,7 @@ dropZoneDoc.addEventListener('drop', e => {
     const ext = file.name.split('.').pop().toLowerCase();
     const type = (ext==='xls'||ext==='xlsx') ? 'xls' : 'pdf';
     const { adresse, passage } = parseFilename(file.name);
-    pendingFiles.push({ name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
+    pendingFiles.push({ file, name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
   });
   renderPendingFiles();
 });
