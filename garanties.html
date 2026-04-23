@@ -463,22 +463,18 @@ function renderTable(list) {
   body.innerHTML = list.map(g => `
     <div class="table-row">
       <div>
-        <div class="addr-main">${g.adresse.split(',')[0]}</div>
-        <div class="addr-sub">${g.adresse.includes(',') ? g.adresse.split(',').slice(1).join(',').trim() : g.adresse.substring(g.adresse.indexOf(' ', 10))}</div>
-        ${g.note ? `<div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;">${g.note}</div>` : ''}
+        ${window._isAdmin && g.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:1px 7px;border-radius:10px;margin-bottom:3px;">${g.client}</span>` : ""}
+        <div class="addr-main">${(g.adresse||"").split(",")[0]}</div>
+        <div class="addr-sub">${(g.adresse||"").includes(",") ? (g.adresse||"").split(",").slice(1).join(",").trim() : ""}</div>
       </div>
-      ${g.bc ? `<span class="bc-chip">${g.bc}</span>` : `<span style="font-size:12px;color:var(--text-muted);">—</span>`}
+      <span style="font-size:13px;color:var(--text-mid);">${g.bc||"—"}</span>
       <span class="cell-date">${formatDate(g.date)}</span>
       <span class="nuisible-pill ${getTypeColor(g.nuisible)}">${getTypeLabel(g.nuisible)}</span>
-      <div style="display:flex;gap:8px;align-items:center;">
-        ${g.notifs > 0 ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifié${g.notifs > 1 ? ' ×'+g.notifs : ''}</span>` : ''}
-        ${g.rapport
-          ? `<button class="btn-rapport"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</button>`
-          : `<span class="no-rapport">Non joint</span>`}
-        <button onclick="openSendModal('garantie','${g.bc||''}','${g.adresse}','${g.date}',${g.id})" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:var(--green-dark);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">
-          <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier
-        </button>
-        ${window._isAdmin ? `<button onclick="deleteGarantie(${g.id})" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        ${g.rapportUrl ? `<a href="${g.rapportUrl}" target="_blank" class="btn-rapport"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : `<span class="no-rapport">Non joint</span>`}
+        ${window._isAdmin ? `<button onclick="openSendModal(event,'${g.id}')" class="btn-notifier"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>` : ""}
+        ${window._isAdmin ? `<button onclick="openEditGarantie('${g.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1A2E42;background:#EBF0F5;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>` : ""}
+        ${window._isAdmin ? `<button onclick="deleteGarantie('${g.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ""}
       </div>
     </div>`).join('');
 }
@@ -699,7 +695,16 @@ function renderExtraList() {
     </div>`).join('');
 }
 
-window.openSendModal = function(type, bc, adresse, date, id) {
+window.openSendModal = function(evtOrId, id) {
+  // Compatibilité : openSendModal(event, id)
+  const gId = id || evtOrId;
+  const g = (window.garanties||[]).find(x => x.id === gId) || {};
+  const type = 'garantie'; const bc = g.bc||''; const adresse = g.adresse||''; const date = g.date||'';
+  if(evtOrId && evtOrId.stopPropagation) evtOrId.stopPropagation();
+  // suite identique
+  window._openSendModalInner(type, bc, adresse, date, gId);
+};
+window._openSendModalInner = function(type, bc, adresse, date, id) {
   currentSendId = id;
   extraRecipients = [];
   if (document.getElementById('extraList')) document.getElementById('extraList').innerHTML = '';
