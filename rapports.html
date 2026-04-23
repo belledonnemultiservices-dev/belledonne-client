@@ -457,9 +457,45 @@ const modalOverlay = document.getElementById('modalOverlay');
 const btnOpenModal = document.getElementById('btnOpenModal');
 const btnCloseModal = document.getElementById('btnCloseModal');
 
-if (btnOpenModal) btnOpenModal.addEventListener('click', () => modalOverlay.classList.add('open'));
+if (btnOpenModal) btnOpenModal.addEventListener('click', () => { resetRapportModal(); modalOverlay.classList.add('open'); });
 if (btnCloseModal) btnCloseModal.addEventListener('click', () => modalOverlay.classList.remove('open'));
+const btnCancelModal = document.getElementById('btnCancelModal');
+if (btnCancelModal) btnCancelModal.addEventListener('click', () => modalOverlay.classList.remove('open'));
 if (modalOverlay) modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('open'); });
+
+let _editRapportId = null;
+
+function resetRapportModal() {
+  _editRapportId = null;
+  const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Déposer un rapport PDF';
+  const bs = document.getElementById('btnSave'); if(bs) bs.textContent = 'Enregistrer le rapport';
+  ['inputBC','inputSite','inputDate'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const ip=document.getElementById('inputPassage'); if(ip) ip.value='';
+  const in2=document.getElementById('inputNuisible'); if(in2) in2.value='';
+  const ic=document.getElementById('inputClient'); if(ic) ic.value='';
+  if(fileInput) fileInput.value='';
+  if(dropMsg) { dropMsg.style.display='none'; dropMsg.textContent=''; dropMsg.style.color=''; }
+}
+
+window.openEditRapport = function(id) {
+  const r = (window.rapports||rapports).find(x => x.id === id);
+  if (!r) return;
+  _editRapportId = id;
+  const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Modifier le rapport';
+  const bs = document.getElementById('btnSave'); if(bs) bs.textContent = 'Mettre à jour';
+  const ibc=document.getElementById('inputBC'); if(ibc) ibc.value=r.bc||'';
+  const is=document.getElementById('inputSite'); if(is) is.value=r.site||r.adresse||'';
+  const id2=document.getElementById('inputDate'); if(id2) id2.value=r.date||'';
+  const ip=document.getElementById('inputPassage'); if(ip) ip.value=r.passage||'';
+  const in2=document.getElementById('inputNuisible'); if(in2) in2.value=r.nuisible||'';
+  const ic=document.getElementById('inputClient'); if(ic) ic.value=r.client||'';
+  if(fileInput) fileInput.value='';
+  if(dropMsg) {
+    if(r.pdfUrl) { dropMsg.textContent='✓ Fichier existant (remplacer si besoin)'; dropMsg.style.display='block'; }
+    else dropMsg.style.display='none';
+  }
+  modalOverlay.classList.add('open');
+};
 
 window.handleTypeChange = function() {
   const val = document.getElementById('inputNuisible') ? document.getElementById('inputNuisible').value : '';
@@ -590,12 +626,15 @@ function renderRapports(list) {
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
         ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
-        ${window._isAdmin ? `<button onclick="deleteRapport('${r.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
+        ${window._isAdmin ? `
+          <button onclick="openEditRapport('${r.id}')" class="btn-action" style="color:#1A2E42;background:#EBF0F5;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+          <button onclick="deleteRapport('${r.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
       </div>
     </div>`).join('');
 }
 
-let rapports = [];
+window.rapports = [];
+let rapports = window.rapports;
 let _currentFilter = null;
 
 function filterRapports() {
