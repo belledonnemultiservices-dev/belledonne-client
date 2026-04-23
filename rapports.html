@@ -678,6 +678,7 @@ async function loadRapports(clientFilter) {
       : await getDocs(collection(db, "rapports"));
     rapports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     rapports.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    window.rapports = rapports;
     filterRapports();
   } catch(e) { console.error(e); }
 }
@@ -687,6 +688,7 @@ window.deleteRapport = async function(id) {
   try {
     await deleteDoc(doc(db, "rapports", id));
     rapports = rapports.filter(r => r.id !== id);
+    window.rapports = rapports;
     filterRapports();
     showToast('Rapport supprimé !');
   } catch(e) { alert('Erreur : ' + e.message); }
