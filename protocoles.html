@@ -299,15 +299,8 @@
             <button type="button" onclick="addCustomType()" style="height:42px;padding:0 14px;border:none;background:var(--green);color:white;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Ajouter</button>
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Version</label>
-          <input class="form-input" type="text" id="inVersion" placeholder="ex: v1.2" />
-        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Description</label>
-        <textarea class="form-textarea" id="inDesc" placeholder="ex: Procédure complète pour le traitement des punaises de lit en logement social, incluant la préparation, les produits et les consignes post-traitement..."></textarea>
-      </div>
+
       <div class="form-group" style="margin-bottom:0;">
         <label class="form-label">Fichier PDF *</label>
         <div class="drop-zone" id="dropZone">
@@ -486,7 +479,7 @@ function resetModal() {
   _editId = null;
   const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Ajouter un protocole';
   const sm = document.getElementById('saveModal'); if(sm) sm.textContent = 'Enregistrer';
-  ['inTitre','inVersion','inDesc'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const inT=document.getElementById('inTitre'); if(inT) inT.value='';
   document.getElementById('inType').value = '';
   document.getElementById('inClientNew').value = '';
   document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
@@ -502,8 +495,6 @@ window.openEditModal = function(id) {
   const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Modifier le protocole';
   const sm = document.getElementById('saveModal'); if(sm) sm.textContent = 'Mettre à jour';
   document.getElementById('inTitre').value = p.titre || '';
-  document.getElementById('inVersion').value = p.version || '';
-  document.getElementById('inDesc').value = p.desc || '';
   document.getElementById('inType').value = p.type || '';
   document.getElementById('typeCustomWrap').style.display = 'none';
   const clientList = Array.isArray(p.clients) ? p.clients : (p.client ? [p.client] : []);
@@ -545,8 +536,6 @@ document.getElementById('saveModal').addEventListener('click', () => {
   clients.forEach(client => {
     protocoles.unshift({
       id: Date.now() + Math.random(), titre, type, client,
-      version: document.getElementById('inVersion').value.trim() || null,
-      desc: document.getElementById('inDesc').value.trim(),
       date: new Date().toISOString().split('T')[0],
       pages: null
     });
@@ -554,7 +543,7 @@ document.getElementById('saveModal').addEventListener('click', () => {
 
   filter();
   modal.classList.remove('open');
-  ['inTitre','inVersion','inDesc'].forEach(id => document.getElementById(id).value = '');
+  const itv=document.getElementById('inTitre'); if(itv) itv.value='';
   document.getElementById('inType').value = '';
   document.getElementById('inClientNew').value = '';
   document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
@@ -654,8 +643,6 @@ document.getElementById('saveModal').addEventListener('click', async () => {
       const { updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
       await updateDoc(doc(db, "protocoles", _editId), {
         titre, type, clients, pdfUrl,
-        version: document.getElementById('inVersion').value.trim() || null,
-        desc: document.getElementById('inDesc').value.trim(),
         updatedAt: new Date().toISOString()
       });
       showToast(`Protocole "${titre}" mis à jour !`);
@@ -669,8 +656,6 @@ document.getElementById('saveModal').addEventListener('click', async () => {
       }
       await addDoc(collection(db, "protocoles"), {
         titre, type, clients, pdfUrl,
-        version: document.getElementById('inVersion').value.trim() || null,
-        desc: document.getElementById('inDesc').value.trim(),
         date: new Date().toISOString().split('T')[0],
         pages: null, createdAt: new Date().toISOString()
       });
