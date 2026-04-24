@@ -102,7 +102,7 @@
   .s-annulation::before{background:var(--red);}
 
   /* MOTIF */
-  .motif-cell{font-size:11px;color:var(--text-muted);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .motif-cell{font-size:11px;color:var(--text-muted);font-style:italic;white-space:normal;word-break:break-word;max-width:220px;}
   .motif-none{font-size:11px;color:var(--text-muted);}
 
   /* EMPTY */
@@ -118,7 +118,7 @@
   .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
   .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;}
   .modal-close:hover{background:#E5EAF0;}
-  .modal-body{padding:24px 26px;}
+  .modal-body{padding:24px 26px;max-height:65vh;overflow-y:auto;}
   .modal-footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;}
 
   .form-group{margin-bottom:16px;}
@@ -416,6 +416,7 @@ function renderTable(list) {
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         ${e.notifs > 0 ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifié${e.notifs > 1 ? ' ×'+e.notifs : ''}</span>` : ''}
         <span class="statut-pill ${e.statut === 'absent' ? 's-absent' : 's-annulation'}">${e.statut === 'absent' ? 'Absent' : 'Annulation'}</span>
+        ${e.rapportUrl ? `<a href="${e.rapportUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;text-decoration:none;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
         ${window._isAdmin ? `<button onclick="openSendModal('absent','${e.bc||''}','${e.adresse}','${e.date}','${e.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:#1DA870;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>` : ""}
         ${window._isAdmin ? `
           <button onclick="openEditAbsent('${e.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1A2E42;background:#EBF0F5;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
@@ -587,7 +588,7 @@ document.getElementById('saveModal').addEventListener('click', async () => {
   const btn = document.getElementById('saveModal');
   btn.disabled = true; btn.textContent = 'Enregistrement...';
   try {
-    await window._saveAbsent({ adresse, nom, date, bc, statut, motif, client, editId: window._editAbsentId });
+    await window._saveAbsent({ adresse, nom, date, bc, statut, motif, client, editId: window._editAbsentId, file: document.getElementById('fileInputAbsent') ? document.getElementById('fileInputAbsent').files[0] : null });
     modal.classList.remove('open');
     resetAbsentModal();
     await window._loadAbsents(window._currentClientFilter);
@@ -709,10 +710,12 @@ document.getElementById('modalSend').addEventListener('click', e => { if(e.targe
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
 
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
 window._currentClientFilter = null;
@@ -741,8 +744,15 @@ function populateClientFilter() {
 }
 
 // ── Sauvegarder (ajout ou update) ──
-window._saveAbsent = async function({ adresse, nom, date, bc, statut, motif, client, editId }) {
-  const data = { adresse, nom, date, bc, statut, motif, client };
+window._saveAbsent = async function({ adresse, nom, date, bc, statut, motif, client, editId, file }) {
+  let rapportUrl = null;
+  if (editId) rapportUrl = ((window.absents||[]).find(e => e.id === editId)||{}).rapportUrl || null;
+  if (file) {
+    const storageRef = ref(storage, `absents/${client}/${Date.now()}_${file.name}`);
+    const snap = await uploadBytesResumable(storageRef, file);
+    rapportUrl = await getDownloadURL(snap.ref);
+  }
+  const data = { adresse, nom, date, bc, statut, motif, client, rapportUrl };
   if (editId) {
     await updateDoc(doc(db, "absents", editId), { ...data, updatedAt: new Date().toISOString() });
   } else {
