@@ -700,7 +700,7 @@ function renderPendingFiles() {
         <div style="flex:1;min-width:0;">
           <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.adresse || f.name}</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
-            ${f.passage ? `<span style="color:var(--green-dark);font-weight:600;">${f.passage}</span> · ` : '<span>Pas de passage détecté</span> · '}${f.type==='xls'?'Reporting Excel':'Émargement PDF'}
+            ${f.type==='xls' ? 'Reporting Excel' : (f.passage ? `<span style="color:var(--green-dark);font-weight:600;">${f.passage}</span> · Émargement PDF` : 'Émargement PDF')}
           </div>
         </div>
         <button onclick="removePending(${i})" style="width:22px;height:22px;border:none;background:transparent;cursor:pointer;color:var(--text-muted);font-size:18px;line-height:1;border-radius:4px;">×</button>
