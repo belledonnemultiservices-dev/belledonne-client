@@ -323,7 +323,7 @@
         <div class="drop-zone" id="dropZone">
           <input type="file" accept=".xlsx,.xls" id="fileInput" />
           <div class="drop-text">Glissez le rapport Excel ici ou cliquez pour choisir</div>
-          <div class="drop-sub">Fichier Excel uniquement · Max 20 Mo</div>
+          <div class="drop-sub">Fichier PDF uniquement · Max 20 Mo</div>
           <div class="drop-chosen" id="dropChosen"></div>
         </div>
       </div>
@@ -510,44 +510,10 @@ window.handleClientSelect = function() {
   document.getElementById('newClientWrap').style.display = document.getElementById('inClient').value === '__new__' ? 'block' : 'none';
 };
 
-const TYPE_MAP_GAR = {
-  'blattes': 'blatte', 'blatte': 'blatte', 'insecte': 'blatte',
-  'punaise': 'punaise', 'punaises': 'punaise',
-  'rongeur': 'rongeur', 'rongeurs': 'rongeur',
-  'pigeon': 'pigeon',
-};
-function parseExcelAndFill(file) {
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const type=ws['B5']?String(ws['B5'].v).trim():'';
-      const adresse=ws['D5']?String(ws['D5'].v).trim():'';
-      const nom=ws['B6']?String(ws['B6'].v).trim():'';
-      const dateVal=ws['D6']?ws['D6'].v:'';
-      if(adresse){const el=document.getElementById('inAdresse');if(el)el.value=adresse;}
-      if(nom){const el=document.getElementById('inBC');if(el)el.value=nom;}
-      if(dateVal){
-        let ds='';
-        if(dateVal instanceof Date)ds=dateVal.toISOString().split('T')[0];
-        else if(typeof dateVal==='string'){const p=dateVal.split(' ')[0].split('/');if(p.length===3)ds=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;}
-        if(ds){const el=document.getElementById('inDate');if(el)el.value=ds;}
-      }
-      if(type){const k=type.toLowerCase();const m=TYPE_MAP_GAR[k];const s=document.getElementById('inNuisible');if(s&&m)s.value=m;}
-      const dc=document.getElementById('dropChosen');
-      if(dc){dc.textContent='✓ '+file.name+' — champs pré-remplis !';dc.style.display='block';dc.style.color='var(--green-dark)';}
-    } catch(err){console.error(err);}
-  };
-  reader.readAsArrayBuffer(file);
-}
 const fileInput = document.getElementById('fileInput');
 const dropChosen = document.getElementById('dropChosen');
 fileInput.addEventListener('change', () => {
-  const f=fileInput.files[0]; if(!f) return;
-  const ext=f.name.split('.').pop().toLowerCase();
-  if(ext==='xlsx'||ext==='xls') parseExcelAndFill(f);
-  else{dropChosen.textContent='✓ '+f.name;dropChosen.style.display='block';}
+  if (fileInput.files[0]) { dropChosen.textContent = '✓ ' + fileInput.files[0].name; dropChosen.style.display = 'block'; }
 });
 
 let _savingGarantie = false;

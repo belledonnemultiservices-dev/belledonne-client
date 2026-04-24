@@ -523,7 +523,7 @@ filter();
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
@@ -538,10 +538,6 @@ window.handleLogout = async function() {
 window.deleteProtocole = async function(id) {
   if (!confirm('Supprimer ce protocole ?')) return;
   try {
-    const item = (protocoles||[]).find(x => x.id === id) || (typeof p !== 'undefined' ? p : null);
-    if (item && item.pdfUrl) {
-      try { await deleteObject(ref(storage, item.pdfUrl)); } catch(se) { console.warn('Storage:', se); }
-    }
     await deleteDoc(doc(db, "protocoles", id));
     showToast('Protocole supprimé !');
     await loadProtocoles(window._currentClientFilter);

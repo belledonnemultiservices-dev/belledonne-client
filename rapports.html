@@ -85,6 +85,7 @@
 
   /* LISTE RAPPORTS */
   .reports-list { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+
   .report-row { display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
   .report-row:last-child { border-bottom: none; }
   .report-row:hover { background: var(--bg); }
@@ -96,11 +97,11 @@
   .r-bc { display: inline-flex; font-size: 11px; font-weight: 600; color: var(--navy); background: #EBF0F5; padding: 2px 8px; border-radius: 10px; }
   .r-date { font-size: 11px; color: var(--text-muted); }
   .passage-chip { display: inline-flex; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #EBF0F5; color: #1A5F8A; }
-  .nuisible-chip { display: inline-flex; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
   .report-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
   .btn-action { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; border: none; white-space: nowrap; text-decoration: none; }
   .btn-telecharger { color: var(--green-dark); background: var(--green-pale); }
   .btn-telecharger:hover { background: #C8F0E1; }
+
 
   .pdf-icon { width: 48px; height: 48px; background: #FDECEA; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .pdf-icon svg { width: 22px; height: 22px; color: var(--red); }
@@ -469,50 +470,6 @@ const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const dropMsg = document.getElementById('dropChosen');
 
-// Mapping nuisibles Excel → valeurs select
-const NUISIBLE_MAP_RAPPORTS = {
-  'blattes': 'blatte', 'blatte': 'blatte', 'insecte': 'blatte', 'insectes rampants': 'blatte',
-  'punaise': 'punaise', 'punaises': 'punaise', 'punaises de lit': 'punaise',
-  'rongeur': 'rongeur', 'rongeurs': 'rongeur', 'rat': 'rongeur', 'souris': 'rongeur',
-  'pigeon': 'pigeon', 'pigeons': 'pigeon',
-};
-const PASSAGE_MAP_R = { '1': '1er passage', '2': '2ème passage', '3': '3ème passage' };
-
-function parseRapportExcel(file) {
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const bc      = ws['B5'] ? String(ws['B5'].v).trim() : '';
-      const type    = ws['D5'] ? String(ws['D5'].v).trim() : '';
-      const passage = ws['B6'] ? String(ws['B6'].v).trim() : '';
-      const adresse = ws['B7'] ? String(ws['B7'].v).trim() : '';
-      const dateVal = ws['B8'] ? ws['B8'].v : '';
-
-      if (bc)      { const el=document.getElementById('inputBC');   if(el) el.value=bc; }
-      if (adresse) { const el=document.getElementById('inputSite'); if(el) el.value=adresse; }
-
-      if (dateVal) {
-        let ds = '';
-        if (dateVal instanceof Date) ds = dateVal.toISOString().split('T')[0];
-        else if (typeof dateVal === 'string') {
-          const p = dateVal.split(' ')[0].split('/');
-          if (p.length===3) ds = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
-        }
-        if (ds) { const el=document.getElementById('inputDate'); if(el) el.value=ds; }
-      }
-      if (passage) { const m=PASSAGE_MAP_R[passage]; const s=document.getElementById('inputPassage'); if(s&&m) s.value=m; }
-      if (type) {
-        const k=type.toLowerCase(); const m=NUISIBLE_MAP_RAPPORTS[k];
-        const s=document.getElementById('inputNuisible'); if(s) s.value=m||'';
-      }
-      if (dropMsg) { dropMsg.textContent='✓ '+file.name+' — champs pré-remplis !'; dropMsg.style.display='block'; dropMsg.style.color='var(--green-dark)'; }
-    } catch(err) { console.error(err); if(dropMsg){ dropMsg.textContent='✓ '+file.name; dropMsg.style.display='block'; } }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
 if (dropZone) {
   dropZone.addEventListener('click', () => fileInput && fileInput.click());
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--green)'; });
@@ -560,11 +517,9 @@ function renderRapports(list) {
           ${r.size ? `<span class="r-size">${r.size}</span>` : ''}
         </div>
       </div>
-      <div class="report-actions">
+      <div style="display:flex;gap:6px;align-items:center;">
         ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
-        ${window._isAdmin ? `
-          <button onclick="openEditRapport('${r.id}')" class="btn-action" style="color:#1A2E42;background:#EBF0F5;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
-          <button onclick="deleteRapport('${r.id}')" class="btn-action" style="color:#E74C3C;background:#FDECEA;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
+        ${window._isAdmin ? `<button onclick="deleteRapport('${r.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -597,7 +552,7 @@ document.getElementById('filterYear').addEventListener('change', filterRapports)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
@@ -620,10 +575,6 @@ async function loadRapports(clientFilter) {
 window.deleteRapport = async function(id) {
   if (!confirm('Supprimer ce rapport ?')) return;
   try {
-    const item = (window.rapports||[]).find(x => x.id === id) || (typeof r !== 'undefined' ? r : null);
-    if (item && item.pdfUrl) {
-      try { await deleteObject(ref(storage, item.pdfUrl)); } catch(se) { console.warn('Storage:', se); }
-    }
     await deleteDoc(doc(db, "rapports", id));
     rapports = rapports.filter(r => r.id !== id);
     filterRapports();
