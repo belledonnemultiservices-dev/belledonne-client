@@ -263,7 +263,6 @@
         <option value="active">En cours</option>
         <option value="closed">Terminée</option>
       </select>
-      <select class="filter-select" id="filterClient" style="display:none;"><option value="">Tous les clients</option></select>
       <span class="results-count" id="resultsCount"></span>
     </div>
 
@@ -275,7 +274,7 @@
 <div class="modal-overlay" id="modalCampagne">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title" id="modalCampagneTitle">Nouvelle campagne</div>
+      <div class="modal-title">Nouvelle campagne</div>
       <button class="modal-close" id="closeCampagne">✕</button>
     </div>
     <div class="modal-body">
@@ -302,18 +301,12 @@
           <input class="form-input" type="date" id="inputFin" />
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Nombre de sites</label>
-          <input class="form-input" type="number" id="inputSites" placeholder="ex: 8" min="1" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Statut</label>
-          <select class="form-select" id="inputStatut">
-            <option value="active">En cours</option>
-            <option value="closed">Terminée</option>
-          </select>
-        </div>
+      <div class="form-group">
+        <label class="form-label">Statut</label>
+        <select class="form-select" id="inputStatut">
+          <option value="active">En cours</option>
+          <option value="closed">Terminée</option>
+        </select>
       </div>
     </div>
     <div class="modal-footer">
@@ -337,15 +330,16 @@
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label">Fichiers PDF ou Excel *</label>
         <div class="drop-zone" id="dropZoneDoc">
-          <input type="file" id="fileInputDoc" accept=".pdf,.xls,.xlsx" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;" />
+          <input type="file" id="fileInputDoc" accept=".pdf,.xls,.xlsx" multiple />
           <div class="drop-text">Glissez vos fichiers ici ou cliquez pour choisir</div>
           <div class="drop-sub">Sélection multiple possible · PDF et Excel acceptés · Max 20 Mo/fichier</div>
-          <div style="margin-top:10px;">
-            <span style="display:inline-block;font-size:12px;font-weight:500;color:var(--green-dark);background:var(--green-pale);padding:6px 16px;border-radius:6px;border:1px solid rgba(46,204,143,0.3);pointer-events:none;">📂 Choisir des fichiers</span>
-          </div>
         </div>
       </div>
       <div id="pendingList" style="display:none;max-height:280px;overflow-y:auto;"></div>
+      <div style="margin-top:10px;padding:10px 12px;background:var(--green-pale);border-radius:var(--radius-sm);font-size:12px;color:var(--green-dark);display:flex;gap:8px;align-items:flex-start;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;margin-top:1px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        L'adresse et le numéro de passage sont extraits automatiquement du nom du fichier.
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" id="cancelDoc">Annuler</button>
@@ -364,8 +358,6 @@
 </div>
 
 <script>
-
-window._isAdmin = false;
 
 const COLORS = ['color-green','color-blue','color-amber','color-purple'];
 
@@ -415,29 +407,26 @@ function renderCampagnes(list) {
         <div style="padding:12px 24px 0;">
           <div style="position:relative;">
             <svg viewBox="0 0 24 24" fill="currentColor" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-muted);pointer-events:none;"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-            <input type="text" placeholder="Rechercher par adresse..." oninput="filterDocs('${c.id}', this.value)"
+            <input type="text" placeholder="Rechercher par adresse..." oninput="filterDocs(${c.id}, this.value)"
               style="width:100%;height:36px;padding:0 12px 0 34px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;" />
           </div>
         </div>
-        <div id="docsgrid-${c.id}" style="padding-bottom:16px;">${renderDocsSection(c.docs, '', c.id)}</div>`;
+        <div class="docs-grid" id="docsgrid-${c.id}">${renderDocCards(c.docs)}</div>`;
 
     return `
     <div class="campagne-card" data-id="${c.id}">
-      <div class="campagne-header" onclick="toggleCampagne('${c.id}')">
+      <div class="campagne-header" onclick="toggleCampagne(${c.id})">
         <div class="campagne-color ${c.color}"></div>
         <div class="campagne-header-info">
           <div class="campagne-name">${c.nom}</div>
-          ${window._isAdmin && c.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;margin-bottom:4px;">${c.client}</span>` : ""}
           <div class="campagne-meta">
             <span class="cmeta"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><strong>${formatDate(c.debut)}</strong> → <strong>${formatDate(c.fin)}</strong></span>
-
+            <span class="cmeta"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg><strong>${c.sites}</strong> site${c.sites > 1 ? 's' : ''}</span>
             <span class="cmeta"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z"/></svg><strong>${c.docs.length}</strong> document${c.docs.length > 1 ? 's' : ''}</span>
           </div>
         </div>
         <span class="campagne-status ${c.statut === 'active' ? 'cs-active' : 'cs-closed'}">${c.statut === 'active' ? 'En cours' : 'Terminée'}</span>
-        ${window._isAdmin ? `
-          <button onclick="openEditCampagne('${c.id}', event)" style="width:28px;height:28px;border:none;background:#EBF0F5;color:#1A2E42;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Modifier"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
-          <button onclick="deleteCampagne('${c.id}', event)" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
+        ${window._isAdmin ? `<button onclick="deleteCampagne(${c.id}, event)" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
         <button class="campagne-toggle" id="toggle-${c.id}"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></button>
       </div>
       ${c.statut === 'active' ? `
@@ -448,10 +437,10 @@ function renderCampagnes(list) {
       <div class="campagne-docs" id="docs-${c.id}">
         <div class="docs-toolbar">
           <span class="docs-toolbar-title">${nbXls} Excel · ${nbPdf} feuille${nbPdf>1?'s':''} d'émargement</span>
-          ${window._isAdmin ? `<button class="btn-add-doc" onclick="openAddDoc('${c.id}', event)">
+          <button class="btn-add-doc" onclick="openAddDoc(${c.id}, event)">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             Ajouter des documents
-          </button>` : ""}
+          </button>
         </div>
         ${docsHtml}
       </div>
@@ -469,94 +458,48 @@ function toggleCampagne(id) {
 function filterCampagnes() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const s = document.getElementById('filterStatus').value;
-  const fc = document.getElementById('filterClient') ? document.getElementById('filterClient').value : '';
   const filtered = campagnes.filter(c => {
-    const matchQ = !q || (c.nom||'').toLowerCase().includes(q);
+    const matchQ = !q || c.nom.toLowerCase().includes(q);
     const matchS = !s || c.statut === s;
-    const matchC = !fc || c.client === fc;
-    return matchQ && matchS && matchC;
+    return matchQ && matchS;
   });
   renderCampagnes(filtered);
 }
 
 document.getElementById('searchInput').addEventListener('input', filterCampagnes);
 document.getElementById('filterStatus').addEventListener('change', filterCampagnes);
-document.getElementById('filterClient').addEventListener('change', filterCampagnes);
 
 // MODAL CAMPAGNE
 const modalCampagne = document.getElementById('modalCampagne');
-let _editCampagneId = null;
-
-function resetCampagneModal() {
-  _editCampagneId = null;
-  const mt = document.getElementById('modalCampagneTitle'); if(mt) mt.textContent = 'Nouvelle campagne';
-  const bs = document.getElementById('saveCampagne'); if(bs) bs.textContent = 'Créer la campagne';
-  document.getElementById('inputNom').value = '';
-  document.getElementById('inputDebut').value = '';
-  document.getElementById('inputFin').value = '';
-  document.getElementById('inputStatut').value = 'active';
-  document.getElementById('inputClient').value = '';
-  document.getElementById('newClientCampWrap').style.display = 'none';
-}
-
-window.openEditCampagne = function(id, e) {
-  if(e) e.stopPropagation();
-  const c = (window.campagnes||campagnes).find(x => x.id === id);
-  if (!c) return;
-  _editCampagneId = id;
-  const mt = document.getElementById('modalCampagneTitle'); if(mt) mt.textContent = 'Modifier la campagne';
-  const bs = document.getElementById('saveCampagne'); if(bs) bs.textContent = 'Mettre à jour';
-  document.getElementById('inputNom').value = c.nom || '';
-  document.getElementById('inputDebut').value = c.debut || '';
-  document.getElementById('inputFin').value = c.fin || '';
-  document.getElementById('inputStatut').value = c.statut || 'active';
-  if (window._reloadClients) {
-    window._reloadClients().then(() => { document.getElementById('inputClient').value = c.client || ''; });
-  } else { document.getElementById('inputClient').value = c.client || ''; }
-  modalCampagne.classList.add('open');
-};
-
-document.getElementById('btnNewCampagne').addEventListener('click', () => {
-  resetCampagneModal();
-  if (window._reloadClients) window._reloadClients();
-  modalCampagne.classList.add('open');
-});
+document.getElementById('btnNewCampagne').addEventListener('click', () => modalCampagne.classList.add('open'));
 document.getElementById('closeCampagne').addEventListener('click', () => modalCampagne.classList.remove('open'));
 document.getElementById('cancelCampagne').addEventListener('click', () => modalCampagne.classList.remove('open'));
 modalCampagne.addEventListener('click', e => { if (e.target === modalCampagne) modalCampagne.classList.remove('open'); });
 
 let _savingCampagne = false;
-document.getElementById('saveCampagne').addEventListener('click', async () => {
+document.getElementById('saveCampagne').addEventListener('click', () => {
   if (_savingCampagne) return;
   _savingCampagne = true;
   setTimeout(() => { _savingCampagne = false; }, 2000);
   const nom = document.getElementById('inputNom').value.trim();
   const debut = document.getElementById('inputDebut').value;
   const fin = document.getElementById('inputFin').value;
-  const sites = parseInt(document.getElementById('inputSites').value) || 0;
   const statut = document.getElementById('inputStatut').value;
   let client = document.getElementById('inputClient').value;
   if (client === '__new__') client = document.getElementById('inputClientNew').value.trim();
   if (!nom || !debut || !client) { alert('Veuillez renseigner au moins le client, le nom et la date de début.'); return; }
-  const newC = { id: Date.now(), nom, debut, fin, sites, statut, client, color: COLORS[colorIndex % COLORS.length], docs: [] };
+  const newC = { id: Date.now(), nom, debut, fin, statut, client, color: COLORS[colorIndex % COLORS.length], docs: [] };
   colorIndex++;
-  const btn = document.getElementById('saveCampagne');
-  btn.disabled = true; btn.textContent = 'Enregistrement...';
-  try {
-    if (_editCampagneId) {
-      await window._updateCampagne(_editCampagneId, { nom, debut, fin, statut, client });
-      showToast('Campagne "' + nom + '" mise à jour !');
-    } else {
-      await window._addCampagne({ nom, debut, fin, statut, client,
-        color: COLORS[colorIndex % COLORS.length], docs: [], createdAt: new Date().toISOString() });
-      colorIndex++;
-      showToast('Campagne "' + nom + '" créée !');
-    }
-    modalCampagne.classList.remove('open');
-    resetCampagneModal();
-    await window._loadCampagnes(window._currentClientFilter);
-  } catch(e) { alert('Erreur : ' + e.message); }
-  btn.disabled = false; btn.textContent = _editCampagneId ? 'Mettre à jour' : 'Créer la campagne';
+  campagnes.unshift(newC);
+  filterCampagnes();
+  modalCampagne.classList.remove('open');
+  document.getElementById('inputNom').value = '';
+  document.getElementById('inputDebut').value = '';
+  document.getElementById('inputFin').value = '';
+  document.getElementById('inputSites').value = '';
+  document.getElementById('inputClient').value = '';
+  document.getElementById('newClientCampWrap').style.display = 'none';
+  showToast('Campagne "' + nom + '" créée !');
 });
 
 // ── PARSING NOM DE FICHIER ──
@@ -576,8 +519,9 @@ function parseFilename(filename) {
   return { adresse, passage };
 }
 
-function renderDocCard(d, campagneId) {
-  return `
+function renderDocCards(docs) {
+  if (docs.length === 0) return '<div class="docs-empty" style="padding:20px 0;">Aucun résultat pour cette recherche.</div>';
+  return docs.map(d => `
     <div class="doc-card">
       <div class="doc-icon ${d.type}">${docIcon(d.type)}</div>
       <div class="doc-info">
@@ -588,81 +532,17 @@ function renderDocCard(d, campagneId) {
           ${formatDate(d.date)}
         </div>
       </div>
-      <div style="display:flex;gap:4px;align-items:center;">
-        ${d.url ? `<a href="${d.url}" target="_blank" class="doc-dl" title="Télécharger"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></a>` : `<span class="doc-dl" style="opacity:0.3;cursor:default;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></span>`}
-        ${window._isAdmin && campagneId ? `<button onclick="deleteDoc('${campagneId}','${d.id}',event)" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
-      </div>
-    </div>`;
-}
-
-function renderDocsSection(docs, q, campagneId) {
-  const xlsDocs = docs.filter(d => d.type === 'xls');
-  const pdfDocs = q
-    ? docs.filter(d => d.type === 'pdf' && (d.adresse || d.name || '').toLowerCase().includes(q.toLowerCase()))
-    : docs.filter(d => d.type === 'pdf');
-
-  if (xlsDocs.length === 0 && pdfDocs.length === 0 && !q) return '<div class="docs-empty" style="padding:20px 24px;">Aucun document pour cette campagne.</div>';
-  if (xlsDocs.length === 0 && pdfDocs.length === 0 && q) return '<div class="docs-empty" style="padding:20px 24px;">Aucun résultat pour cette recherche.</div>';
-
-  let html = '';
-
-  if (xlsDocs.length > 0) {
-    html += `<div style="padding:16px 24px 0;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#3B6D11;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-        Reporting${xlsDocs.length > 1 ? 's' : ''} Excel
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        ${xlsDocs.map(d => `
-        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--green-pale);border:1px solid rgba(46,204,143,0.2);border-radius:var(--radius-sm);">
-          <div style="width:40px;height:40px;background:#EAF3DE;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${docIcon('xls')}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.adresse || d.name}</div>
-            <div style="font-size:11px;color:var(--green-dark);margin-top:2px;">${formatDate(d.date)}</div>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;">
-            ${d.url ? `<a href="${d.url}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--green-dark);background:#C8F0E1;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;text-decoration:none;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
-            ${window._isAdmin && campagneId ? `<button onclick="deleteDoc('${campagneId}','${d.id}',event)" style="width:32px;height:32px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
-          </div>
-        </div>`).join('')}
-      </div>
-    </div>`;
-  }
-
-  if (pdfDocs.length > 0) {
-    html += `<div style="padding:16px 24px 0;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#993C1D;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M20 2H8L2 8v14h20V2z"/></svg>
-        Feuille${pdfDocs.length > 1 ? 's' : ''} d'émargement (${pdfDocs.length})
-      </div>
-      <div class="docs-grid" style="padding:0;">${pdfDocs.map(d => renderDocCard(d, campagneId)).join('')}</div>
-    </div>`;
-  }
-
-  return html || '<div class="docs-empty" style="padding:20px 24px;">Aucun document.</div>';
+      <button class="doc-dl"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button>
+    </div>`).join('');
 }
 
 window.filterDocs = function(campagneId, q) {
-  const c = (window.campagnes||campagnes).find(x => x.id === campagneId);
+  const c = campagnes.find(x => x.id === campagneId);
   if (!c) return;
-  const container = document.getElementById('docsgrid-' + campagneId);
-  if (!container) return;
-  container.innerHTML = renderDocsSection(c.docs, q, campagneId);
-};
-
-window.deleteDoc = async function(campagneId, docId, e) {
-  e.stopPropagation();
-  if (!confirm('Supprimer ce document ?')) return;
-  try {
-    await window.deleteDoc_camp(campagneId, docId);
-    showToast('Document supprimé !');
-    await window._loadCampagnes(window._currentClientFilter);
-    setTimeout(() => {
-      const docs = document.getElementById('docs-' + campagneId);
-      const toggle = document.getElementById('toggle-' + campagneId);
-      if (docs) { docs.classList.add('open'); if(toggle) toggle.classList.add('open'); }
-    }, 100);
-  } catch(err) { alert('Erreur : ' + err.message); }
+  const grid = document.getElementById('docsgrid-' + campagneId);
+  if (!grid) return;
+  const filtered = q.trim() === '' ? c.docs : c.docs.filter(d => (d.adresse || d.name || '').toLowerCase().includes(q.toLowerCase()));
+  grid.innerHTML = renderDocCards(filtered);
 };
 
 // ── MODAL DOC ──
@@ -670,12 +550,10 @@ const modalDoc = document.getElementById('modalDoc');
 let pendingFiles = [];
 
 window.openAddDoc = function(campagneId, e) {
-  if(e) e.stopPropagation();
+  e.stopPropagation();
   currentCampagneId = campagneId;
-  const allCampagnes = window.campagnes || campagnes || [];
-  const c = allCampagnes.find(x => x.id === campagneId || x.id === String(campagneId));
-  const nom = c ? c.nom : campagneId;
-  document.getElementById('modalDocTitle').textContent = 'Ajouter des documents — ' + (nom||'').substring(0, 36);
+  const c = campagnes.find(x => x.id === campagneId);
+  document.getElementById('modalDocTitle').textContent = 'Ajouter des documents — ' + c.nom.substring(0, 36) + (c.nom.length > 36 ? '…' : '');
   pendingFiles = [];
   renderPendingFiles();
   modalDoc.classList.add('open');
@@ -700,7 +578,7 @@ function renderPendingFiles() {
         <div style="flex:1;min-width:0;">
           <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.adresse || f.name}</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
-            ${f.type==='xls' ? 'Reporting Excel' : (f.passage ? `<span style="color:var(--green-dark);font-weight:600;">${f.passage}</span> · Émargement PDF` : 'Émargement PDF')}
+            ${f.passage ? `<span style="color:var(--green-dark);font-weight:600;">${f.passage}</span> · ` : '<span>Pas de passage détecté</span> · '}${f.type==='xls'?'Reporting Excel':'Émargement PDF'}
           </div>
         </div>
         <button onclick="removePending(${i})" style="width:22px;height:22px;border:none;background:transparent;cursor:pointer;color:var(--text-muted);font-size:18px;line-height:1;border-radius:4px;">×</button>
@@ -715,7 +593,7 @@ fileInputDoc.addEventListener('change', () => {
     const ext = file.name.split('.').pop().toLowerCase();
     const type = (ext==='xls'||ext==='xlsx') ? 'xls' : 'pdf';
     const { adresse, passage } = parseFilename(file.name);
-    pendingFiles.push({ file, name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
+    pendingFiles.push({ name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
   });
   renderPendingFiles();
   fileInputDoc.value = '';
@@ -730,29 +608,26 @@ dropZoneDoc.addEventListener('drop', e => {
     const ext = file.name.split('.').pop().toLowerCase();
     const type = (ext==='xls'||ext==='xlsx') ? 'xls' : 'pdf';
     const { adresse, passage } = parseFilename(file.name);
-    pendingFiles.push({ file, name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
+    pendingFiles.push({ name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
   });
   renderPendingFiles();
 });
 
-document.getElementById('saveDoc').addEventListener('click', async () => {
+document.getElementById('saveDoc').addEventListener('click', () => {
   if (pendingFiles.length === 0) { alert('Veuillez sélectionner au moins un fichier.'); return; }
-  const btn = document.getElementById('saveDoc');
-  btn.disabled = true; btn.textContent = 'Envoi en cours...';
-  try {
-    await window._uploadDocs(currentCampagneId, pendingFiles);
-    const nb = pendingFiles.length;
-    modalDoc.classList.remove('open');
-    pendingFiles = []; renderPendingFiles();
-    showToast(nb + ' document' + (nb>1?'s':'') + ' ajouté' + (nb>1?'s':'') + ' !');
-    await window._loadCampagnes(window._currentClientFilter);
-    setTimeout(() => {
-      const docs = document.getElementById('docs-' + currentCampagneId);
-      const toggle = document.getElementById('toggle-' + currentCampagneId);
-      if (docs) { docs.classList.add('open'); if(toggle) toggle.classList.add('open'); }
-    }, 100);
-  } catch(e) { alert('Erreur upload : ' + e.message); }
-  btn.disabled = false; btn.textContent = 'Ajouter les documents';
+  const c = campagnes.find(x => x.id === currentCampagneId);
+  if (!c) return;
+  pendingFiles.forEach(f => c.docs.push({ id: Date.now()+Math.random(), ...f }));
+  const nb = pendingFiles.length;
+  filterCampagnes();
+  setTimeout(() => {
+    const docs = document.getElementById('docs-' + currentCampagneId);
+    const toggle = document.getElementById('toggle-' + currentCampagneId);
+    if (docs) { docs.classList.add('open'); toggle.classList.add('open'); }
+  }, 50);
+  modalDoc.classList.remove('open');
+  pendingFiles = [];
+  showToast(nb + ' document' + (nb>1?'s':'') + ' ajouté' + (nb>1?'s':'') + ' !');
 });
 
 function showToast(msg) {
@@ -762,121 +637,82 @@ function showToast(msg) {
   setTimeout(() => toast.classList.remove('show'), 3500);
 }
 
-// chargé via Firebase
+renderCampagnes(campagnes);
 </script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
-const storage = getStorage(app);
 
-window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
-window._currentClientFilter = null;
-
-window._loadCampagnes = async function(clientFilter) {
-  try {
-    const snap = await getDocs(collection(db, "campagnes"));
-    let docs = snap.docs.map(d => ({ id: d.id, ...d.data(), docs: d.data().docs || [] }));
-    if (clientFilter) docs = docs.filter(c => c.client === clientFilter);
-    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-    campagnes = docs; window.campagnes = docs;
-    if (window._isAdmin) populateClientFilter();
-    filterCampagnes();
-  } catch(e) { console.error(e); }
-};
-
-function populateClientFilter() {
-  const sel = document.getElementById('filterClient');
-  if (!sel) return; sel.style.display = '';
-  const current = sel.value;
-  const all = new Set(campagnes.map(c => c.client).filter(Boolean));
-  sel.innerHTML = '<option value="">Tous les clients</option>';
-  [...all].sort().forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; if(c===current) o.selected=true; sel.appendChild(o); });
-}
-
-window._addCampagne = async function(data) { await addDoc(collection(db, "campagnes"), data); };
-
-window._updateCampagne = async function(id, data) {
-  await updateDoc(doc(db, "campagnes", String(id)), { ...data, updatedAt: new Date().toISOString() });
-};
-
-window.deleteDoc_camp = async function(campagneId, docId) {
-  const c = (window.campagnes||[]).find(x => x.id === campagneId);
-  if (!c) return;
-  const newDocs = (c.docs||[]).filter(d => String(d.id) !== String(docId));
-  await updateDoc(doc(db, "campagnes", String(campagneId)), { docs: newDocs });
-};
-
-window._updateCampagne = async function(id, data) {
-  await updateDoc(doc(db, "campagnes", String(id)), { ...data, updatedAt: new Date().toISOString() });
+window.handleLogout = async function() {
+  await signOut(auth);
+  window.location.href = "login.html";
 };
 
 window.deleteCampagne = async function(id, event) {
   event.stopPropagation();
   if (!confirm('Supprimer cette campagne ?')) return;
   try {
+    const { deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     await deleteDoc(doc(db, "campagnes", String(id)));
-    campagnes = campagnes.filter(c => c.id !== id); window.campagnes = campagnes;
-    filterCampagnes(); showToast('Campagne supprimée !');
+    campagnes = campagnes.filter(c => c.id !== id);
+    filterCampagnes();
+    showToast('Campagne supprimée !');
   } catch(e) { alert('Erreur : ' + e.message); }
 };
 
-window._uploadDocs = async function(campagneId, files) {
-  const campRef = doc(db, "campagnes", String(campagneId));
-  const newDocs = [];
-  for (const f of files) {
-    if (f.file) {
-      const ts = Date.now();
-      const storageRef = ref(storage, `campagnes/${campagneId}/${ts}_${f.file.name}`);
-      const snap = await uploadBytesResumable(storageRef, f.file);
-      const url = await getDownloadURL(snap.ref);
-      newDocs.push({ id: ts + Math.random(), name: f.name, type: f.type, adresse: f.adresse, passage: f.passage, date: f.date, url });
-    } else {
-      newDocs.push({ id: Date.now()+Math.random(), name: f.name, type: f.type, adresse: f.adresse, passage: f.passage, date: f.date, url: null });
-    }
-  }
-  await updateDoc(campRef, { docs: arrayUnion(...newDocs) });
-};
-
-window._reloadClients = async function() {
+async function loadClientsIntoSelect(selectId) {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
-  const sel = document.getElementById('inputClient');
+  const sel = document.getElementById(selectId);
   if (!sel) return;
   sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
-  snap.docs.forEach(d => { const c=d.data().client; if(!c) return; const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
-};
-
+  snap.docs.forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d.data().client;
+    opt.textContent = d.data().client;
+    sel.appendChild(opt);
+  });
+}
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
   if (user.email === "belledonne.multiservices@gmail.com") {
     window._isAdmin = true;
-    const name=document.getElementById("sideClientName"); if(name) name.textContent="Belledonne Multiservices";
-    const id=document.getElementById("sideClientId"); if(id) id.textContent="belledonne-admin";
-    const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent="BM";
-    const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent="Belledonne Multiservices";
-    const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Administrateur";
-    var adminNav=document.getElementById("adminNav"); if(adminNav) adminNav.style.display="block";
-    var btn=document.getElementById("btnNewCampagne"); if(btn) btn.style.display="";
-    await window._reloadClients();
-    window._currentClientFilter = null;
-    await window._loadCampagnes(null);
+    const name = document.getElementById("sideClientName");
+    const id = document.getElementById("sideClientId");
+    const avatar = document.getElementById("sideAvatar");
+    const fname = document.getElementById("sideFooterName");
+    const frole = document.getElementById("sideFooterRole");
+    if (name) name.textContent = "Belledonne Multiservices";
+    if (id) id.textContent = "belledonne-admin";
+    if (avatar) avatar.textContent = "BM";
+    if (fname) fname.textContent = "Belledonne Multiservices";
+    if (frole) frole.textContent = "Administrateur";
+    
+    var adminNav = document.getElementById("adminNav");
+    if (adminNav) adminNav.style.display = "block";
+    var btn = document.getElementById("btnNewCampagne"); if (btn) btn.style.display = "";
+    loadClientsIntoSelect("inputClient");
+  
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
       if (!snap.empty) {
         const p = snap.docs[0].data();
-        const name=document.getElementById("sideClientName"); if(name) name.textContent=p.client||"Client";
-        const id=document.getElementById("sideClientId"); if(id) id.textContent=p.identifiant||"";
-        const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent=(p.client||"CL").substring(0,2).toUpperCase();
-        const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent=p.client||user.email;
-        const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Client";
-        window._currentClientFilter = p.client;
-        await window._loadCampagnes(p.client);
+        const name = document.getElementById("sideClientName");
+        const id = document.getElementById("sideClientId");
+        const avatar = document.getElementById("sideAvatar");
+        const fname = document.getElementById("sideFooterName");
+        const frole = document.getElementById("sideFooterRole");
+        if (name) name.textContent = p.client || "Client";
+        if (id) id.textContent = p.identifiant || "";
+        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
+        if (fname) fname.textContent = p.client || user.email;
+        if (frole) frole.textContent = "Client";
+        
       }
     } catch(e) { console.error(e); }
   }
