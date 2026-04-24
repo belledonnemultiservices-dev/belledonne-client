@@ -202,6 +202,7 @@
   .n-pigeon { background:#EAF3DE;color:#3B6D11; }
   .n-custom { background:#F1EFE8;color:#5F5E5A; }
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -330,7 +331,7 @@
       <div class="form-group">
         <label class="form-label">Fichier PDF</label>
         <div class="drop-zone" id="dropZone">
-          <input type="file" accept=".pdf" id="fileInput" />
+          <input type="file" accept=".pdf,.xlsx,.xls" id="fileInput" />
           <div class="drop-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg></div>
           <div class="drop-text">Glissez votre PDF ici ou cliquez pour choisir</div>
           <div class="drop-sub">Fichiers PDF uniquement · Max 20 Mo</div>
@@ -467,6 +468,50 @@ window.handleTypeChange = function() {
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const dropMsg = document.getElementById('dropChosen');
+
+// Mapping nuisibles Excel → valeurs select
+const NUISIBLE_MAP_RAPPORTS = {
+  'blattes': 'blatte', 'blatte': 'blatte', 'insecte': 'blatte', 'insectes rampants': 'blatte',
+  'punaise': 'punaise', 'punaises': 'punaise', 'punaises de lit': 'punaise',
+  'rongeur': 'rongeur', 'rongeurs': 'rongeur', 'rat': 'rongeur', 'souris': 'rongeur',
+  'pigeon': 'pigeon', 'pigeons': 'pigeon',
+};
+const PASSAGE_MAP_R = { '1': '1er passage', '2': '2ème passage', '3': '3ème passage' };
+
+function parseRapportExcel(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const bc      = ws['B5'] ? String(ws['B5'].v).trim() : '';
+      const type    = ws['D5'] ? String(ws['D5'].v).trim() : '';
+      const passage = ws['B6'] ? String(ws['B6'].v).trim() : '';
+      const adresse = ws['B7'] ? String(ws['B7'].v).trim() : '';
+      const dateVal = ws['B8'] ? ws['B8'].v : '';
+
+      if (bc)      { const el=document.getElementById('inputBC');   if(el) el.value=bc; }
+      if (adresse) { const el=document.getElementById('inputSite'); if(el) el.value=adresse; }
+
+      if (dateVal) {
+        let ds = '';
+        if (dateVal instanceof Date) ds = dateVal.toISOString().split('T')[0];
+        else if (typeof dateVal === 'string') {
+          const p = dateVal.split(' ')[0].split('/');
+          if (p.length===3) ds = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        }
+        if (ds) { const el=document.getElementById('inputDate'); if(el) el.value=ds; }
+      }
+      if (passage) { const m=PASSAGE_MAP_R[passage]; const s=document.getElementById('inputPassage'); if(s&&m) s.value=m; }
+      if (type) {
+        const k=type.toLowerCase(); const m=NUISIBLE_MAP_RAPPORTS[k];
+        const s=document.getElementById('inputNuisible'); if(s) s.value=m||'';
+      }
+      if (dropMsg) { dropMsg.textContent='✓ '+file.name+' — champs pré-remplis !'; dropMsg.style.display='block'; dropMsg.style.color='var(--green-dark)'; }
+    } catch(err) { console.error(err); if(dropMsg){ dropMsg.textContent='✓ '+file.name; dropMsg.style.display='block'; } }
+  };
+  reader.readAsArrayBuffer(file);
+}
 
 if (dropZone) {
   dropZone.addEventListener('click', () => fileInput && fileInput.click());

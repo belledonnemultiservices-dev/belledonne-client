@@ -113,13 +113,13 @@
   /* MODAL */
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;}
   .modal-overlay.open{display:flex;}
-  .modal{background:var(--surface);border-radius:var(--radius);width:540px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);animation:fadeUp 0.2s ease;}
+  .modal{background:var(--surface);border-radius:var(--radius);width:540px;max-width:95vw;max-height:90vh;box-shadow:0 24px 60px rgba(13,27,42,0.2);animation:fadeUp 0.2s ease;display:flex;flex-direction:column;overflow:hidden;}
   .modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
   .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
   .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;}
   .modal-close:hover{background:#E5EAF0;}
-  .modal-body{padding:24px 26px;}
-  .modal-footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;}
+  .modal-body{padding:24px 26px;overflow-y:auto;flex:1;}
+  .modal-footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);flex-shrink:0;background:var(--surface);}
 
   .form-group{margin-bottom:16px;}
   .form-label{display:block;font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;}
@@ -143,6 +143,7 @@
 
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -317,6 +318,16 @@
         </div>
       </div>
     </div>
+      <div class="form-group" style="margin-top:16px;margin-bottom:0;">
+        <label class="form-label">Rapport Excel (auto-remplissage)</label>
+        <div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center;cursor:pointer;position:relative;">
+          <input type="file" id="fileInputAbsent" accept=".xlsx,.xls" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;" />
+          <div style="font-size:13px;color:var(--text-muted);">Glissez le rapport Excel ici ou cliquez pour choisir</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Les champs seront remplis automatiquement</div>
+          <div id="dropChosenAbsent" style="display:none;margin-top:8px;font-size:12px;font-weight:600;color:var(--green-dark);"></div>
+        </div>
+      </div>
+    </div>
     <div class="modal-footer">
       <button class="btn-cancel" id="cancelModal">Annuler</button>
       <button class="btn-save" id="saveModal">
@@ -474,6 +485,48 @@ document.addEventListener('keydown', e => {
 
 // MODAL
 const modal = document.getElementById('modal');
+const STATUT_MAP_ABS = { 'absent': 'absent', 'absence': 'absent', 'annulation': 'annulation', 'annulé': 'annulation' };
+
+function parseAbsentExcel(file) {
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const bc      = ws['B5'] ? String(ws['B5'].v).trim().replace(/##[^#]+##/g,'').trim() : '';
+      const nom     = ws['B6'] ? String(ws['B6'].v).trim().replace(/##[^#]+##/g,'').trim() : '';
+      const adresse = ws['B7'] ? String(ws['B7'].v).trim().replace(/##[^#]+##/g,'').trim() : '';
+      const dateVal = ws['B8'] ? ws['B8'].v : '';
+      const statut  = ws['D8'] ? String(ws['D8'].v).trim().toLowerCase() : '';
+      const motif   = ws['A11'] ? String(ws['A11'].v).trim().replace(/##[^#]+##/g,'').trim() : '';
+      if (bc && !bc.includes('#'))      { const el=document.getElementById('inBC');      if(el) el.value=bc; }
+      if (nom && !nom.includes('#'))    { const el=document.getElementById('inNom');     if(el) el.value=nom; }
+      if (adresse && !adresse.includes('#')) { const el=document.getElementById('inAdresse'); if(el) el.value=adresse; }
+      if (motif && !motif.includes('#')){ const el=document.getElementById('inMotifSelect'); if(el) el.value=motif; }
+      if (dateVal) {
+        let ds = '';
+        if (dateVal instanceof Date) ds = dateVal.toISOString().split('T')[0];
+        else if (typeof dateVal === 'string' && !dateVal.includes('#')) {
+          const p = dateVal.split(' ')[0].split('/');
+          if (p.length===3) ds = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        }
+        if (ds) { const el=document.getElementById('inDate'); if(el) el.value=ds; }
+      }
+      if (statut && !statut.includes('#')) {
+        const m=STATUT_MAP_ABS[statut]; const s=document.getElementById('inStatut'); if(s&&m) s.value=m;
+      }
+      const dc=document.getElementById('dropChosenAbsent');
+      if(dc){ dc.textContent='✓ '+file.name+' — champs pré-remplis !'; dc.style.display='block'; dc.style.color='var(--green-dark)'; }
+    } catch(err) { console.error('Excel:', err); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+const fileInputAbsent = document.getElementById('fileInputAbsent');
+if (fileInputAbsent) fileInputAbsent.addEventListener('change', () => {
+  if (fileInputAbsent.files[0]) parseAbsentExcel(fileInputAbsent.files[0]);
+});
+
 document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
 document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
