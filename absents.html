@@ -303,20 +303,7 @@
       </div>
       <div class="form-group" style="margin-bottom:0;">
         <label class="form-label">Motif</label>
-        <select class="form-select" id="inMotifSelect" onchange="handleMotifChange()" style="margin-bottom:8px;">
-          <option value="">— Sélectionner un motif —</option>
-          <option value="Pas de réponse à la porte">Pas de réponse à la porte</option>
-          <option value="Locataire hospitalisé">Locataire hospitalisé</option>
-          <option value="Rendez-vous oublié">Rendez-vous oublié</option>
-          <option value="Annulation locataire">Annulation locataire</option>
-          <option value="Annulation bailleur">Annulation bailleur</option>
-          <option value="Problème d'accès">Problème d'accès</option>
-          <option value="__autre__">+ Autre motif...</option>
-        </select>
-        <div id="motifCustomWrap" style="display:none;flex-direction:row;gap:8px;">
-          <input class="form-input" type="text" id="inMotifCustom" placeholder="Saisissez le motif..." style="flex:1;" />
-          <button type="button" onclick="addCustomMotif()" style="height:42px;padding:0 14px;border:none;background:var(--green);color:white;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Ajouter</button>
-        </div>
+        <input class="form-input" type="text" id="inMotifSelect" placeholder="Rempli automatiquement depuis le rapport Excel" />
       </div>
     </div>
       <div class="form-group" style="margin-top:12px;">
@@ -501,7 +488,6 @@ function resetAbsentModal() {
   document.getElementById('inStatut').value = 'absent';
   document.getElementById('inClient').value = '';
   document.getElementById('inMotifSelect').value = '';
-  document.getElementById('motifCustomWrap').style.display = 'none';
   const dc = document.getElementById('dropChosenAbsent'); if(dc){ dc.style.display='none'; dc.textContent=''; }
   const fi = document.getElementById('fileInputAbsent'); if(fi) fi.value='';
 }
@@ -518,7 +504,7 @@ window.openEditAbsent = function(id) {
   document.getElementById('inBC').value = e.bc || '';
   document.getElementById('inStatut').value = e.statut || 'absent';
   document.getElementById('inClient').value = e.client || '';
-  document.getElementById('inMotifSelect').value = e.motif || '';
+  const ms = document.getElementById('inMotifSelect'); if(ms) ms.value = e.motif || '';
   const fi = document.getElementById('fileInputAbsent'); if(fi) fi.value='';
   modal.classList.add('open');
 };
@@ -555,14 +541,7 @@ function parseAbsentExcel(file) {
         const mapped = STATUT_MAP[statut] || null;
         const sel=document.getElementById('inStatut'); if(sel && mapped) sel.value=mapped;
       }
-      if (motif && !motif.includes('#')) {
-        const sel=document.getElementById('inMotifSelect');
-        if (sel) {
-          const opt = [...sel.options].find(o => o.value.toLowerCase() === motif.toLowerCase());
-          if (opt) sel.value = opt.value;
-          else { sel.value='__autre__'; handleMotifChange(); const ci=document.getElementById('inMotifCustom'); if(ci) ci.value=motif; }
-        }
-      }
+      if (motif && !motif.includes('#')) { const mi=document.getElementById('inMotifSelect'); if(mi) mi.value=motif; }
       const dc=document.getElementById('dropChosenAbsent');
       if(dc) { dc.textContent='✓ '+file.name+' — champs pré-remplis !'; dc.style.display='block'; dc.style.color='var(--green-dark)'; }
     } catch(err) {
@@ -600,8 +579,7 @@ document.getElementById('saveModal').addEventListener('click', async () => {
     alert('Veuillez remplir les champs obligatoires : client, statut, adresse et date.');
     return;
   }
-  const motifVal = document.getElementById('inMotifSelect').value;
-  const motif = motifVal === '__autre__' ? document.getElementById('inMotifCustom').value.trim() : motifVal;
+  const motif = document.getElementById('inMotifSelect').value.trim();
   const nom = document.getElementById('inNom').value.trim();
   const bc = document.getElementById('inBC').value.trim();
 
