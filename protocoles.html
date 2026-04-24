@@ -396,10 +396,10 @@ function renderProtocols(list) {
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
             <span class="type-badge ${cfg.badge}">${cfg.label}</span>
             ${window._isAdmin ? `
-              <button onclick="openEditModal('${p.id}')" style="width:26px;height:26px;border:none;background:#EBF0F5;color:#1A2E42;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Modifier">
+              <button onclick="openEditModal('${p.id}')" style="width:26px;height:26px;border:none;background:#EBF0F5;color:#1A2E42;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Modifier">
                 <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
               </button>
-              <button onclick="deleteProtocole('${p.id}')" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer">
+              <button onclick="deleteProtocole('${p.id}')" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Supprimer">
                 <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
               </button>` : ''}
           </div>
@@ -484,24 +484,23 @@ let _editId = null;
 
 function resetModal() {
   _editId = null;
-  document.getElementById('modalTitle').textContent = 'Ajouter un protocole';
-  document.getElementById('saveModal').textContent = 'Enregistrer';
-  ['inTitre','inVersion','inDesc'].forEach(id => document.getElementById(id).value = '');
+  const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Ajouter un protocole';
+  const sm = document.getElementById('saveModal'); if(sm) sm.textContent = 'Enregistrer';
+  ['inTitre','inVersion','inDesc'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('inType').value = '';
   document.getElementById('inClientNew').value = '';
   document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
   document.getElementById('typeCustomWrap').style.display = 'none';
   fileInput.value = '';
-  dropChosen.style.display = 'none';
-  dropChosen.textContent = '';
+  dropChosen.style.display = 'none'; dropChosen.textContent = '';
 }
 
 window.openEditModal = function(id) {
   const p = protocoles.find(x => x.id === id);
   if (!p) return;
   _editId = id;
-  document.getElementById('modalTitle').textContent = 'Modifier le protocole';
-  document.getElementById('saveModal').textContent = 'Mettre à jour';
+  const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Modifier le protocole';
+  const sm = document.getElementById('saveModal'); if(sm) sm.textContent = 'Mettre à jour';
   document.getElementById('inTitre').value = p.titre || '';
   document.getElementById('inVersion').value = p.version || '';
   document.getElementById('inDesc').value = p.desc || '';
@@ -537,7 +536,32 @@ document.getElementById('closeModal').addEventListener('click', () => modal.clas
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
 modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
 
-// Save géré par le module Firebase ci-dessous
+document.getElementById('saveModal').addEventListener('click', () => {
+  const titre = document.getElementById('inTitre').value.trim();
+  let type = document.getElementById('inType').value;
+  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
+  if (!titre || !type || type === '__custom__' || clients.length === 0) { alert('Veuillez renseigner au moins un client, le titre et le type.'); return; }
+
+  clients.forEach(client => {
+    protocoles.unshift({
+      id: Date.now() + Math.random(), titre, type, client,
+      version: document.getElementById('inVersion').value.trim() || null,
+      desc: document.getElementById('inDesc').value.trim(),
+      date: new Date().toISOString().split('T')[0],
+      pages: null
+    });
+  });
+
+  filter();
+  modal.classList.remove('open');
+  ['inTitre','inVersion','inDesc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inType').value = '';
+  document.getElementById('inClientNew').value = '';
+  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
+  document.getElementById('typeCustomWrap').style.display = 'none';
+  fileInput.value = ''; dropChosen.style.display = 'none';
+  showToast(`Protocole "${titre}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
+});
 
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -591,24 +615,17 @@ async function loadProtocoles(clientFilter) {
 
 function populateClientFilter() {
   const sel = document.getElementById('filterClient');
-  if (!sel) return;
-  sel.style.display = '';
+  if (!sel) return; sel.style.display = '';
   const current = sel.value;
-  const allClients = new Set();
+  const all = new Set();
   protocoles.forEach(p => {
     const cl = Array.isArray(p.clients) ? p.clients : (p.client ? [p.client] : []);
-    cl.forEach(c => allClients.add(c));
+    cl.forEach(c => all.add(c));
   });
   sel.innerHTML = '<option value="">Tous les clients</option>';
-  [...allClients].sort().forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c; opt.textContent = c;
-    if (c === current) opt.selected = true;
-    sel.appendChild(opt);
-  });
+  [...all].sort().forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; if(c===current) o.selected=true; sel.appendChild(o); });
 }
 
-// Save Firebase — ajout ET mise à jour
 let _saving = false;
 document.getElementById('saveModal').addEventListener('click', async () => {
   if (_saving) return;
