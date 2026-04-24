@@ -240,7 +240,6 @@
         <option value="repulsif">Répulsif</option>
         <option value="autre">Autre</option>
       </select>
-      <select class="filter-select" id="filterClient" style="display:none;"><option value="">Tous les clients</option></select>
       <span class="results-count" id="resultsCount"></span>
     </div>
 
@@ -256,7 +255,7 @@
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title" id="modalTitle">Ajouter un produit</div>
+      <div class="modal-title">Ajouter un produit</div>
       <button class="modal-close" id="closeModal">✕</button>
     </div>
     <div class="modal-body">
@@ -332,8 +331,6 @@
 
 <script>
 
-window._isAdmin = false;
-
 const TYPE_LABELS = { rodenticide:'Rodenticide', insecticide:'Insecticide', desinfectant:'Désinfectant', repulsif:'Répulsif', autre:'Autre' };
 const TYPE_CSS = { rodenticide:'tb-rodenticide', insecticide:'tb-insecticide', desinfectant:'tb-desinfectant', repulsif:'tb-repulsif', autre:'tb-autre' };
 const CARD_CSS = { rodenticide:'t-rodenticide', insecticide:'t-insecticide', desinfectant:'t-desinfectant', repulsif:'t-repulsif', autre:'t-autre' };
@@ -366,28 +363,16 @@ function renderProducts(list) {
   }
   empty.style.display = 'none';
 
-  grid.innerHTML = list.map(p => {
-    const clientList = Array.isArray(p.clients) ? p.clients : (p.client ? [p.client] : []);
-    // Badges clients visibles uniquement pour l'admin
-    const clientBadges = window._isAdmin
-      ? clientList.map(c => `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;white-space:nowrap;">${c}</span>`).join('')
-      : '';
-    return `
+  grid.innerHTML = list.map(p => `
     <div class="product-card ${getCardCss(p.type)}">
       <div class="product-header">
         <div class="product-name">${p.nom}</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          ${p.client ? `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;">${p.client}</span>` : ''}
           <span class="type-badge ${getTypeCss(p.type)}">${getTypeLabel(p.type)}</span>
-          ${window._isAdmin ? `
-            <button onclick="openEditModal('${p.id}')" style="width:26px;height:26px;border:none;background:#EBF0F5;color:#1A2E42;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Modifier">
-              <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-            </button>
-            <button onclick="deleteProduit('${p.id}')" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer">
-              <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            </button>` : ''}
+          ${window._isAdmin ? `<button onclick="deleteProduit('${p.id}')" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
         </div>
       </div>
-      ${window._isAdmin && clientList.length > 0 ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">${clientBadges}</div>` : ''}
       <div class="product-usage">${p.usage || '<em style="color:var(--text-muted)">Aucune description</em>'}</div>
       <div class="product-docs">
         ${p.ficheUrl
@@ -397,21 +382,17 @@ function renderProducts(list) {
           ? `<a href="${p.fdsUrl}" target="_blank" class="doc-btn fds"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>FDS</a>`
           : `<span class="doc-missing"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>FDS non disponible</span>`}
       </div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 }
 
 function filter() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const t = document.getElementById('filterType').value;
-  const fc = document.getElementById('filterClient') ? document.getElementById('filterClient').value : '';
   let list = produits.filter(p => {
-    const clientList = Array.isArray(p.clients) ? p.clients : (p.client ? [p.client] : []);
     const mq = !q || p.nom.toLowerCase().includes(q) || (p.usage||'').toLowerCase().includes(q);
     const mt = !t || p.type === t;
-    const mc = !fc || clientList.includes(fc);
     const mTab = currentTab === 'tous' || (currentTab === 'fiche' && p.fiche) || (currentTab === 'fds' && p.fds);
-    return mq && mt && mc && mTab;
+    return mq && mt && mTab;
   });
   updateCounts(list);
   renderProducts(list);
@@ -426,7 +407,6 @@ window.switchTab = function(tab) {
 
 document.getElementById('searchInput').addEventListener('input', filter);
 document.getElementById('filterType').addEventListener('change', filter);
-document.getElementById('filterClient').addEventListener('change', filter);
 
 // TYPE PERSONNALISÉ
 window.handleTypeChange = function() {
@@ -474,52 +454,7 @@ document.addEventListener('keydown', e => {
 
 // MODAL
 const modal = document.getElementById('modal');
-let _editId = null;
-
-function resetModal() {
-  _editId = null;
-  document.getElementById('modalTitle').textContent = 'Ajouter un produit';
-  document.getElementById('saveModal').textContent = 'Enregistrer';
-  document.getElementById('inNom').value = '';
-  document.getElementById('inUsage').value = '';
-  document.getElementById('inType').value = '';
-  document.getElementById('inClientNew').value = '';
-  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
-  document.getElementById('typeCustomWrap').style.display = 'none';
-  ['Fiche','Fds'].forEach(n => {
-    document.getElementById('file'+n).value = '';
-    const c = document.getElementById('chosen'+n);
-    if (c) { c.style.display = 'none'; c.textContent = ''; }
-  });
-}
-
-window.openEditModal = function(id) {
-  const p = produits.find(x => x.id === id);
-  if (!p) return;
-  _editId = id;
-  document.getElementById('modalTitle').textContent = 'Modifier le produit';
-  document.getElementById('saveModal').textContent = 'Mettre à jour';
-  document.getElementById('inNom').value = p.nom || '';
-  document.getElementById('inUsage').value = p.usage || '';
-  document.getElementById('inType').value = p.type || '';
-  document.getElementById('typeCustomWrap').style.display = 'none';
-  const clientList = Array.isArray(p.clients) ? p.clients : (p.client ? [p.client] : []);
-  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous)').forEach(cb => {
-    cb.checked = clientList.includes(cb.value);
-  });
-  ['Fiche','Fds'].forEach(n => {
-    document.getElementById('file'+n).value = '';
-    const c = document.getElementById('chosen'+n);
-    const url = n === 'Fiche' ? p.ficheUrl : p.fdsUrl;
-    if (c) {
-      if (url) { c.textContent = '✓ Fichier existant (remplacer si besoin)'; c.style.display = 'block'; }
-      else { c.style.display = 'none'; c.textContent = ''; }
-    }
-  });
-  modal.classList.add('open');
-};
-
-document.getElementById('btnAjouter').addEventListener('click', () => { resetModal(); modal.classList.add('open'); });
+document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
 document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
 modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
@@ -546,14 +481,14 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-// Rendu déclenché par Firebase après auth
+filter();
 </script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
@@ -568,6 +503,14 @@ window.handleLogout = async function() {
 window.deleteProduit = async function(id) {
   if (!confirm('Supprimer ce produit ?')) return;
   try {
+    const item = (produits||[]).find(x => x.id === id) || (typeof p !== 'undefined' ? p : null);
+    if (item && item.ficheUrl) {
+      try { await deleteObject(ref(storage, item.ficheUrl)); } catch(se) { console.warn('Storage:', se); }
+    }
+    const item = (produits||[]).find(x => x.id === id) || (typeof p !== 'undefined' ? p : null);
+    if (item && item.fdsUrl) {
+      try { await deleteObject(ref(storage, item.fdsUrl)); } catch(se) { console.warn('Storage:', se); }
+    }
     await deleteDoc(doc(db, "produits", id));
     showToast('Produit supprimé !');
     await loadProduits(window._currentClientFilter);
@@ -577,37 +520,16 @@ window.deleteProduit = async function(id) {
 // Charger les produits depuis Firestore
 async function loadProduits(clientFilter) {
   try {
-    const snap = await getDocs(collection(db, "produits"));
-    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let q;
     if (clientFilter) {
-      docs = docs.filter(p => {
-        if (Array.isArray(p.clients)) return p.clients.includes(clientFilter);
-        return p.client === clientFilter;
-      });
+      q = query(collection(db, "produits"), where("client", "==", clientFilter));
+    } else {
+      q = query(collection(db, "produits"));
     }
-    produits = docs;
-    if (window._isAdmin) populateClientFilter();
+    const snap = await getDocs(q);
+    produits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     filter();
   } catch(e) { console.error(e); }
-}
-
-function populateClientFilter() {
-  const sel = document.getElementById('filterClient');
-  if (!sel) return;
-  sel.style.display = '';
-  const current = sel.value;
-  const allClients = new Set();
-  produits.forEach(p => {
-    const cl = Array.isArray(p.clients) ? p.clients : (p.client ? [p.client] : []);
-    cl.forEach(c => allClients.add(c));
-  });
-  sel.innerHTML = '<option value="">Tous les clients</option>';
-  [...allClients].sort().forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c; opt.textContent = c;
-    if (c === current) opt.selected = true;
-    sel.appendChild(opt);
-  });
 }
 
 // Upload un fichier dans Storage et retourner l'URL
@@ -636,39 +558,37 @@ async function saveProduit() {
 
   try {
     const fileFiche = document.getElementById('fileFiche').files[0];
-    const fileFds   = document.getElementById('fileFds').files[0];
-    const ts = Date.now();
+    const fileFds = document.getElementById('fileFds').files[0];
 
-    if (_editId) {
-      // MODE MISE À JOUR
-      const existing = produits.find(x => x.id === _editId) || {};
-      const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/commun/${ts}_fiche_${fileFiche.name}`) : (existing.ficheUrl || null);
-      const fdsUrl   = fileFds   ? await uploadFile(fileFds,   `produits/commun/${ts}_fds_${fileFds.name}`)   : (existing.fdsUrl   || null);
-      const { updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-      await updateDoc(doc(db, "produits", _editId), {
-        nom, type, clients,
-        usage: document.getElementById('inUsage').value.trim(),
-        ficheUrl, fdsUrl,
-        fiche: !!ficheUrl, fds: !!fdsUrl,
-        updatedAt: new Date().toISOString()
-      });
-      showToast(`Produit "${nom}" mis à jour !`);
-    } else {
-      // MODE AJOUT — un seul document pour tous les clients
-      const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/commun/${ts}_fiche_${fileFiche.name}`) : null;
-      const fdsUrl   = fileFds   ? await uploadFile(fileFds,   `produits/commun/${ts}_fds_${fileFds.name}`)   : null;
+    for (const client of clients) {
+      const ts = Date.now();
+      const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/${client}/${ts}_fiche_${fileFiche.name}`) : null;
+      const fdsUrl = fileFds ? await uploadFile(fileFds, `produits/${client}/${ts}_fds_${fileFds.name}`) : null;
+
       await addDoc(collection(db, "produits"), {
-        nom, type, clients,
+        nom, type, client,
         usage: document.getElementById('inUsage').value.trim(),
         ficheUrl, fdsUrl,
-        fiche: !!ficheUrl, fds: !!fdsUrl,
+        fiche: !!ficheUrl,
+        fds: !!fdsUrl,
         createdAt: new Date().toISOString()
       });
-      showToast(`Produit "${nom}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
     }
 
     modal.classList.remove('open');
-    resetModal();
+    document.getElementById('inNom').value = '';
+    document.getElementById('inUsage').value = '';
+    document.getElementById('inType').value = '';
+    document.getElementById('inClientNew').value = '';
+    document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
+    document.getElementById('typeCustomWrap').style.display = 'none';
+    ['Fiche','Fds'].forEach(n => {
+      document.getElementById('file'+n).value = '';
+      const c = document.getElementById('chosen'+n);
+      if (c) { c.style.display = 'none'; c.textContent = ''; }
+    });
+
+    showToast(`Produit "${nom}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
     await loadProduits(window._currentClientFilter);
   } catch(e) {
     console.error(e);
@@ -676,10 +596,11 @@ async function saveProduit() {
   }
 
   btnSave.disabled = false;
-  btnSave.textContent = _editId ? 'Mettre à jour' : 'Enregistrer';
+  btnSave.textContent = 'Enregistrer';
   _saving = false;
 }
 
+// Remplacer le listener save
 document.getElementById('saveModal').addEventListener('click', saveProduit);
 
 async function loadClientsIntoSelect() {

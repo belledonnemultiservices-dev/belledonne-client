@@ -154,7 +154,6 @@
   .n-pigeon{background:#EAF3DE;color:#3B6D11;}
   .n-custom{background:#F1EFE8;color:#5F5E5A;}
 </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -176,7 +175,7 @@
     <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
     <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
     <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
-    <a class="nav-item active" href="window.garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item active" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
     <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
     <div class="nav-group-label">Documentation</div>
     <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
@@ -259,7 +258,7 @@
     <div class="table-wrap">
       <div class="table-head">
         <span>Adresse</span>
-        <span>Nom locataire</span>
+        <span>Bon de commande</span>
         <span>Date intervention</span>
         <span>Type d'intervention</span>
         <span>Rapport</span>
@@ -273,7 +272,7 @@
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title" id="modalTitle">Ajouter un passage garantie</div>
+      <div class="modal-title">Ajouter un passage garantie</div>
       <button class="modal-close" id="closeModal">✕</button>
     </div>
     <div class="modal-body">
@@ -292,8 +291,8 @@
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Nom du locataire</label>
-          <input class="form-input" type="text" id="inBC" placeholder="ex: Jean Dupont" />
+          <label class="form-label">Bon de commande initial</label>
+          <input class="form-input" type="text" id="inBC" placeholder="ex: BC-2025-0142" />
         </div>
         <div class="form-group">
           <label class="form-label">Date d'intervention *</label>
@@ -317,14 +316,16 @@
           </div>
         </div>
       </div>
-
+      <div class="form-group">
+        <label class="form-label">Note / Observations</label>
+        <textarea class="form-textarea" id="inNote" placeholder="ex: Retraitement partiel chambre principale, présence résiduelle détectée..."></textarea>
+      </div>
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Rapport d'intervention Excel</label>
+        <label class="form-label">Rapport d'intervention PDF</label>
         <div class="drop-zone" id="dropZone">
-          <input type="file" accept=".xlsx,.xls" id="fileInput" />
-          <div class="drop-icon" style="margin-bottom:6px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:28px;height:28px;color:#3B6D11;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg></div>
-          <div class="drop-text">Glissez le rapport Excel ici ou cliquez pour choisir</div>
-          <div class="drop-sub">Fichiers .xlsx / .xls · Les champs seront remplis automatiquement</div>
+          <input type="file" accept=".pdf" id="fileInput" />
+          <div class="drop-text">Glissez le rapport PDF ici ou cliquez pour choisir</div>
+          <div class="drop-sub">Fichier PDF uniquement · Max 20 Mo</div>
           <div class="drop-chosen" id="dropChosen"></div>
         </div>
       </div>
@@ -428,7 +429,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
-window.garanties = [];
+let garanties = [];
 
 
 function formatDate(d) {
@@ -445,9 +446,9 @@ function initiales(nom) {
 
 function updateKPIs(list) {
   const annee = new Date().getFullYear().toString();
-  document.getElementById('kpiTotal').textContent = window.garanties.length;
-  document.getElementById('kpiAnnee').textContent = window.garanties.filter(g => g.date.startsWith(annee)).length;
-  document.getElementById('kpiRapports').textContent = window.garanties.filter(g => g.rapport).length;
+  document.getElementById('kpiTotal').textContent = garanties.length;
+  document.getElementById('kpiAnnee').textContent = garanties.filter(g => g.date.startsWith(annee)).length;
+  document.getElementById('kpiRapports').textContent = garanties.filter(g => g.rapport).length;
 }
 
 function renderTable(list) {
@@ -463,18 +464,22 @@ function renderTable(list) {
   body.innerHTML = list.map(g => `
     <div class="table-row">
       <div>
-        ${window._isAdmin && g.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:1px 7px;border-radius:10px;margin-bottom:3px;">${g.client}</span>` : ""}
-        <div class="addr-main">${(g.adresse||"").split(",")[0]}</div>
-        <div class="addr-sub">${(g.adresse||"").includes(",") ? (g.adresse||"").split(",").slice(1).join(",").trim() : ""}</div>
+        <div class="addr-main">${g.adresse.split(',')[0]}</div>
+        <div class="addr-sub">${g.adresse.includes(',') ? g.adresse.split(',').slice(1).join(',').trim() : g.adresse.substring(g.adresse.indexOf(' ', 10))}</div>
+        ${g.note ? `<div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;">${g.note}</div>` : ''}
       </div>
-      <span style="font-size:13px;color:var(--text-mid);">${g.bc||"—"}</span>
+      ${g.bc ? `<span class="bc-chip">${g.bc}</span>` : `<span style="font-size:12px;color:var(--text-muted);">—</span>`}
       <span class="cell-date">${formatDate(g.date)}</span>
       <span class="nuisible-pill ${getTypeColor(g.nuisible)}">${getTypeLabel(g.nuisible)}</span>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        ${g.rapportUrl ? `<a href="${g.rapportUrl}" target="_blank" class="btn-rapport"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : `<span class="no-rapport">Non joint</span>`}
-        ${window._isAdmin ? `<button onclick="openSendModal(event,'${g.id}')" class="btn-notifier"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>` : ""}
-        ${window._isAdmin ? `<button onclick="openEditGarantie('${g.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1A2E42;background:#EBF0F5;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>` : ""}
-        ${window._isAdmin ? `<button onclick="deleteGarantie('${g.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ""}
+      <div style="display:flex;gap:8px;align-items:center;">
+        ${g.notifs > 0 ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifié${g.notifs > 1 ? ' ×'+g.notifs : ''}</span>` : ''}
+        ${g.rapport
+          ? `<button class="btn-rapport"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</button>`
+          : `<span class="no-rapport">Non joint</span>`}
+        <button onclick="openSendModal('garantie','${g.bc||''}','${g.adresse}','${g.date}',${g.id})" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:var(--green-dark);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier
+        </button>
+        ${window._isAdmin ? `<button onclick="deleteGarantie(${g.id})" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -483,8 +488,8 @@ function filter() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const n = document.getElementById('filterNuisible').value;
   const y = document.getElementById('filterAnnee').value;
-  const filtered = window.garanties.filter(g => {
-    const mq = !q || (g.adresse||'').toLowerCase().includes(q) || (g.bc||'').toLowerCase().includes(q);
+  const filtered = garanties.filter(g => {
+    const mq = !q || g.adresse.toLowerCase().includes(q) || g.bc.toLowerCase().includes(q);
     const mn = !n || g.nuisible === n;
     const my = !y || g.date.startsWith(y);
     return mq && mn && my;
@@ -496,42 +501,9 @@ document.getElementById('searchInput').addEventListener('input', filter);
 document.getElementById('filterNuisible').addEventListener('change', filter);
 document.getElementById('filterAnnee').addEventListener('change', filter);
 
-const fileInput = document.getElementById('fileInput');
-const dropChosen = document.getElementById('dropChosen');
-
 // MODAL
 const modal = document.getElementById('modal');
-
-let _editGarantieId = null;
-
-function resetModal() {
-  _editGarantieId = null;
-  const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Ajouter un passage garantie';
-  const sm = document.getElementById('saveModal'); if(sm) sm.textContent = 'Enregistrer';
-  ['inAdresse','inBC','inDate','inNuisible','inClient'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-  const ncw = document.getElementById('newClientWrap'); if(ncw) ncw.style.display = 'none';
-  if(fileInput) fileInput.value = '';
-  if(dropChosen) { dropChosen.style.display = 'none'; dropChosen.textContent = ''; dropChosen.style.color = ''; }
-}
-
-window.openEditGarantie = function(id) {
-  const g = window.garanties.find(x => x.id === id);
-  if (!g) return;
-  _editGarantieId = id;
-  document.getElementById('modalTitle').textContent = 'Modifier la garantie';
-  document.getElementById('saveModal').textContent = 'Mettre à jour';
-  document.getElementById('inAdresse').value = g.adresse || '';
-  document.getElementById('inBC').value = g.bc || '';
-  document.getElementById('inDate').value = g.date || '';
-  document.getElementById('inNuisible').value = g.nuisible || '';
-  document.getElementById('inClient').value = g.client || '';
-  fileInput.value = '';
-  if (g.rapportUrl) { dropChosen.textContent = '✓ Fichier existant (remplacer si besoin)'; dropChosen.style.display = 'block'; }
-  else { dropChosen.style.display = 'none'; }
-  modal.classList.add('open');
-};
-
-document.getElementById('btnAjouter').addEventListener('click', () => { resetModal(); modal.classList.add('open'); });
+document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
 document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
 modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
@@ -540,118 +512,39 @@ window.handleClientSelect = function() {
   document.getElementById('newClientWrap').style.display = document.getElementById('inClient').value === '__new__' ? 'block' : 'none';
 };
 
-
-// Mapping des types d'intervention Excel → valeurs du select
-const TYPE_MAP = {
-  'blattes': 'blatte', 'blatte': 'blatte', 'insecte': 'blatte', 'insectes': 'blatte',
-  'punaise': 'punaise', 'punaises': 'punaise',
-  'rongeur': 'rongeur', 'rongeurs': 'rongeur', 'rat': 'rongeur', 'souris': 'rongeur',
-  'pigeon': 'pigeon', 'pigeons': 'pigeon', 'dépigeonage': 'pigeon', 'depigeonnage': 'pigeon',
-};
-
-function parseExcelAndFill(file) {
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-
-      // Lecture des cellules selon la structure fixe du rapport Belledonne
-      const type    = ws['B5'] ? ws['B5'].v : '';   // Type d'intervention
-      const adresse = ws['D5'] ? ws['D5'].v : '';   // Adresse
-      const nom     = ws['B6'] ? ws['B6'].v : '';   // Nom locataire
-      const dateVal = ws['D6'] ? ws['D6'].v : '';   // Date / Heure
-
-      // Remplir Adresse
-      if (adresse) document.getElementById('inAdresse').value = adresse;
-
-      // Remplir Nom locataire
-      if (nom) document.getElementById('inBC').value = nom;
-
-      // Remplir Date (format Excel → YYYY-MM-DD)
-      if (dateVal) {
-        let dateStr = '';
-        if (dateVal instanceof Date) {
-          dateStr = dateVal.toISOString().split('T')[0];
-        } else if (typeof dateVal === 'string') {
-          // Format "22/04/2026 19:39" ou "22/04/2026"
-          const parts = dateVal.split(' ')[0].split('/');
-          if (parts.length === 3) dateStr = `${parts[2]}-${parts[1]}-${parts[0]}`;
-        }
-        if (dateStr) document.getElementById('inDate').value = dateStr;
-      }
-
-      // Remplir Type d'intervention
-      if (type) {
-        const typeKey = type.toString().toLowerCase().trim();
-        const mapped = TYPE_MAP[typeKey] || null;
-        const sel = document.getElementById('inNuisible');
-        if (mapped) {
-          sel.value = mapped;
-        } else {
-          // Type personnalisé — essayer de sélectionner __autre__ et pré-remplir
-          sel.value = '__autre__';
-          handleTypeChange && handleTypeChange();
-          const custom = document.getElementById('inNuisibleCustom');
-          if (custom) custom.value = type;
-        }
-      }
-
-      dropChosen.textContent = '✓ ' + file.name + ' — champs pré-remplis !';
-      dropChosen.style.display = 'block';
-      dropChosen.style.color = 'var(--green-dark)';
-    } catch(err) {
-      console.error('Erreur lecture Excel:', err);
-      dropChosen.textContent = '✓ ' + file.name + ' (lecture auto échouée)';
-      dropChosen.style.display = 'block';
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
+const fileInput = document.getElementById('fileInput');
+const dropChosen = document.getElementById('dropChosen');
 fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) parseExcelAndFill(fileInput.files[0]);
-});
-
-// Drag & drop avec parsing
-document.getElementById('dropZone').addEventListener('drop', e => {
-  e.preventDefault();
-  const file = e.dataTransfer.files[0];
-  if (file) {
-    const dt = new DataTransfer(); dt.items.add(file);
-    fileInput.files = dt.files;
-    parseExcelAndFill(file);
-  }
+  if (fileInput.files[0]) { dropChosen.textContent = '✓ ' + fileInput.files[0].name; dropChosen.style.display = 'block'; }
 });
 
 let _savingGarantie = false;
-document.getElementById('saveModal').addEventListener('click', async () => {
+document.getElementById('saveModal').addEventListener('click', () => {
   if (_savingGarantie) return;
+  _savingGarantie = true;
+  setTimeout(() => { _savingGarantie = false; }, 2000);
   const adresse = document.getElementById('inAdresse').value.trim();
   const bc = document.getElementById('inBC').value.trim();
   const date = document.getElementById('inDate').value;
   const nuisible = document.getElementById('inNuisible').value;
   let client = document.getElementById('inClient').value;
   if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
-  if (!client || !adresse || !date || !nuisible) { alert('Veuillez remplir les champs obligatoires : client, adresse, date et type.'); return; }
-
-  _savingGarantie = true;
-  const btn = document.getElementById('saveModal');
-  btn.disabled = true; btn.textContent = 'Enregistrement...';
-  try {
-    const currentEditId = _editGarantieId;
-    await window._saveGarantie({
-      adresse, bc, date, nuisible, client, note: '',
-      file: fileInput.files[0] || null,
-      editId: currentEditId
-    });
-    modal.classList.remove('open');
-    resetModal();
-    await window._loadGaranties(window._currentClientFilter);
-    showToast(currentEditId ? 'Garantie mise à jour !' : 'Passage garantie ajouté — ' + adresse.substring(0,40));
-  } catch(e) { alert('Erreur : ' + e.message); }
-  btn.disabled = false; btn.textContent = _editGarantieId ? 'Mettre à jour' : 'Enregistrer';
-  _savingGarantie = false;
+  if (!client || !adresse || !date || !nuisible) { alert('Veuillez remplir les champs obligatoires : client, adresse, date et type d\'intervention.'); return; }
+  garanties.unshift({
+    id: Date.now(),
+    adresse, bc, date, nuisible, client,
+    tech: '—',
+    note: document.getElementById('inNote').value.trim(),
+    rapport: !!fileInput.files[0],
+    notifs: 0
+  });
+  filter();
+  updateKPIs();
+  modal.classList.remove('open');
+  ['inAdresse','inBC','inDate','inNote'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inNuisible').value = '';
+  fileInput.value = ''; dropChosen.style.display = 'none';
+  showToast('Passage garantie ajouté — ' + adresse.substring(0,40));
 });
 
 function showToast(msg) {
@@ -661,6 +554,8 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
+updateKPIs();
+filter();
 
 // ── MODAL ENVOI ──
 const CONTACTS_DB = [];
@@ -695,16 +590,7 @@ function renderExtraList() {
     </div>`).join('');
 }
 
-window.openSendModal = function(evtOrId, id) {
-  // Compatibilité : openSendModal(event, id)
-  const gId = id || evtOrId;
-  const g = (window.garanties||[]).find(x => x.id === gId) || {};
-  const type = 'garantie'; const bc = g.bc||''; const adresse = g.adresse||''; const date = g.date||'';
-  if(evtOrId && evtOrId.stopPropagation) evtOrId.stopPropagation();
-  // suite identique
-  window._openSendModalInner(type, bc, adresse, date, gId);
-};
-window._openSendModalInner = function(type, bc, adresse, date, id) {
+window.openSendModal = function(type, bc, adresse, date, id) {
   currentSendId = id;
   extraRecipients = [];
   if (document.getElementById('extraList')) document.getElementById('extraList').innerHTML = '';
@@ -761,7 +647,7 @@ window.confirmSend = function() {
     ...extraRecipients.map(r => r.nom)
   ];
   if (currentSendId !== null) {
-    const g = window.garanties.find(x => x.id === currentSendId);
+    const g = garanties.find(x => x.id === currentSendId);
     if (g) g.notifs = (g.notifs || 0) + 1;
   }
   document.getElementById('sendMainContent').style.display = 'none';
@@ -776,117 +662,84 @@ document.getElementById('modalSend').addEventListener('click', e => { if(e.targe
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
-const storage = getStorage(app);
 
-window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
-window._currentClientFilter = null;
 
-// ── Charger les garanties depuis Firestore ──
-window._loadGaranties = async function(clientFilter) {
-  try {
-    const snap = await getDocs(collection(db, "garanties"));
-    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (clientFilter) docs = docs.filter(g => g.client === clientFilter);
-    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-    window.garanties = docs;
-    if (window._isAdmin) populateClientFilter();
-    updateKPIs();
-    filter();
-  } catch(e) { console.error(e); }
-};
-
-function populateClientFilter() {
-  const sel = document.getElementById('filterClient');
-  if (!sel) return;
-  sel.style.display = '';
-  const current = sel.value;
-  const allClients = new Set((window.garanties||[]).map(g => g.client).filter(Boolean));
-  sel.innerHTML = '<option value="">Tous les clients</option>';
-  [...allClients].sort().forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c; opt.textContent = c;
-    if (c === current) opt.selected = true;
-    sel.appendChild(opt);
-  });
-}
-
-// ── Sauvegarder (ajout ou mise à jour) ──
-window._saveGarantie = async function({ adresse, bc, date, nuisible, client, note, file, editId }) {
-  const ts = Date.now();
-  let rapportUrl = null;
-  if (editId) rapportUrl = ((window.garanties||[]).find(g => g.id === editId) || {}).rapportUrl || null;
-  if (file) {
-    const storageRef = ref(storage, `garanties/${client}/${ts}_${file.name}`);
-    const snap = await uploadBytesResumable(storageRef, file);
-    rapportUrl = await getDownloadURL(snap.ref);
-  }
-  const data = { adresse, bc, date, nuisible, client, note: note||'', rapportUrl, rapport: !!rapportUrl };
-  if (editId) {
-    await updateDoc(doc(db, "garanties", editId), { ...data, updatedAt: new Date().toISOString() });
-  } else {
-    await addDoc(collection(db, "garanties"), { ...data, notifs: 0, createdAt: new Date().toISOString() });
-  }
-};
-
-// ── Supprimer ──
-window.deleteGarantie = async function(id) {
-  if (!confirm('Supprimer cette garantie ?')) return;
-  try {
-    await deleteDoc(doc(db, "garanties", String(id)));
-    window.garanties = (window.garanties||[]).filter(g => g.id !== id);
-    updateKPIs(); filter();
-    showToast('Garantie supprimée !');
-  } catch(e) { alert('Erreur : ' + e.message); }
-};
-
-// ── Charger les clients dans le select ──
 async function loadClientsIntoSelect(selectId) {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
   const sel = document.getElementById(selectId);
   if (!sel) return;
   sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
   snap.docs.forEach(d => {
-    const c = d.data().client; if (!c) return;
     const opt = document.createElement("option");
-    opt.value = c; opt.textContent = c;
+    opt.value = d.data().client;
+    opt.textContent = d.data().client;
     sel.appendChild(opt);
   });
 }
+window.handleLogout = async function() {
+  await signOut(auth);
+  window.location.href = "login.html";
+};
+
+window.deleteGarantie = async function(id) {
+  if (!confirm('Supprimer cette garantie ?')) return;
+  try {
+    const item = (window.garanties||[]).find(x => x.id === id) || (typeof g !== 'undefined' ? g : null);
+    if (item && item.rapportUrl) {
+      try { await deleteObject(ref(storage, item.rapportUrl)); } catch(se) { console.warn('Storage:', se); }
+    }
+    const { deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    await deleteDoc(doc(db, "garanties", String(id)));
+    garanties = garanties.filter(g => g.id !== id);
+    filter();
+    showToast('Garantie supprimée !');
+  } catch(e) { alert('Erreur : ' + e.message); }
+};
 
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
+  
+  // Admin reconnu directement par email
   if (user.email === "belledonne.multiservices@gmail.com") {
     window._isAdmin = true;
-    const name = document.getElementById("sideClientName"); if (name) name.textContent = "Belledonne Multiservices";
-    const id = document.getElementById("sideClientId"); if (id) id.textContent = "belledonne-admin";
-    const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = "BM";
-    const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = "Belledonne Multiservices";
-    const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Administrateur";
-    var adminNav = document.getElementById("adminNav"); if (adminNav) adminNav.style.display = "block";
-    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
-    loadClientsIntoSelect("inClient");
-    window._currentClientFilter = null;
-    await window._loadGaranties(null);
+    const name = document.getElementById("sideClientName");
+    const id = document.getElementById("sideClientId");
+    const avatar = document.getElementById("sideAvatar");
+    const fname = document.getElementById("sideFooterName");
+    const frole = document.getElementById("sideFooterRole");
+    if (name) name.textContent = "Belledonne Multiservices";
+    if (id) id.textContent = "belledonne-admin";
+    if (avatar) avatar.textContent = "BM";
+    if (fname) fname.textContent = "Belledonne Multiservices";
+    if (frole) frole.textContent = "Administrateur";
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
       if (!snap.empty) {
         const p = snap.docs[0].data();
-        const name = document.getElementById("sideClientName"); if (name) name.textContent = p.client || "Client";
-        const id = document.getElementById("sideClientId"); if (id) id.textContent = p.identifiant || "";
-        const avatar = document.getElementById("sideAvatar"); if (avatar) avatar.textContent = (p.client||"CL").substring(0,2).toUpperCase();
-        const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = p.client || user.email;
-        const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Client";
-        window._currentClientFilter = p.client;
-        await window._loadGaranties(p.client);
+        const name = document.getElementById("sideClientName");
+        const id = document.getElementById("sideClientId");
+        const avatar = document.getElementById("sideAvatar");
+        const fname = document.getElementById("sideFooterName");
+        const frole = document.getElementById("sideFooterRole");
+        if (name) name.textContent = p.client || "Client";
+        if (id) id.textContent = p.identifiant || "";
+        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
+        if (fname) fname.textContent = p.client || user.email;
+        if (frole) frole.textContent = "Client";
       }
     } catch(e) { console.error(e); }
+  }
+  if (user.email === "belledonne.multiservices@gmail.com") {
+    var adminNav = document.getElementById("adminNav");
+    if (adminNav) adminNav.style.display = "block";
+    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
+    loadClientsIntoSelect("inClient");
   }
 });
 </script>
