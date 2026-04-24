@@ -526,30 +526,7 @@ document.getElementById('closeModal').addEventListener('click', () => modal.clas
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
 modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
 
-document.getElementById('saveModal').addEventListener('click', () => {
-  const titre = document.getElementById('inTitre').value.trim();
-  let type = document.getElementById('inType').value;
-  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
-  if (!titre || !type || type === '__custom__' || clients.length === 0) { alert('Veuillez renseigner au moins un client, le titre et le type.'); return; }
-
-  clients.forEach(client => {
-    protocoles.unshift({
-      id: Date.now() + Math.random(), titre, type, client,
-      date: new Date().toISOString().split('T')[0],
-      pages: null
-    });
-  });
-
-  filter();
-  modal.classList.remove('open');
-  const itv=document.getElementById('inTitre'); if(itv) itv.value='';
-  document.getElementById('inType').value = '';
-  document.getElementById('inClientNew').value = '';
-  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
-  document.getElementById('typeCustomWrap').style.display = 'none';
-  fileInput.value = ''; dropChosen.style.display = 'none';
-  showToast(`Protocole "${titre}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
-});
+// Save géré par le module Firebase
 
 function showToast(msg) {
   const t = document.getElementById('toast');
