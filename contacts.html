@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contacts & Notifications — Belledonne Multiservices</title>
+<title>Contacts — Belledonne Multiservices</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -23,9 +23,9 @@
   .logo-icon svg{width:18px;height:18px;}
   .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
   .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
-  .sidebar-brand{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:8px;}
-  .admin-badge{font-size:10px;font-weight:700;background:var(--amber);color:#fff;padding:2px 8px;border-radius:10px;letter-spacing:0.04em;}
-  .sidebar-brand-label{font-size:12px;color:rgba(255,255,255,0.6);}
+  .sidebar-brand{margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;}
+  .sidebar-brand svg{width:14px;height:14px;color:#F5A623;flex-shrink:0;}
+  .sidebar-brand span{font-size:11px;font-weight:600;color:#F5A623;text-transform:uppercase;letter-spacing:0.06em;}
   .sidebar-nav{padding:20px 12px;flex:1;}
   .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
   .nav-group-label:first-child{margin-top:0;}
@@ -44,67 +44,58 @@
   .breadcrumb span:last-child{color:var(--text);font-weight:500;}
   .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
   .content{padding:32px;flex:1;}
-  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
+  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;gap:16px;}
   .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
   .page-sub{font-size:14px;color:var(--text-muted);}
   .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
   .btn-primary:hover{background:var(--navy-mid);}
   .btn-primary svg{width:16px;height:16px;}
-  .tabs{display:flex;gap:4px;margin-bottom:28px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px;width:fit-content;}
-  .tab{padding:8px 20px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-muted);transition:all 0.15s;border:none;background:transparent;font-family:'DM Sans',sans-serif;}
-  .tab.active{background:var(--navy);color:#fff;}
-  .contacts-toolbar{display:flex;gap:12px;margin-bottom:20px;align-items:center;}
-  .search-wrap{flex:1;position:relative;max-width:360px;}
+
+  /* TOOLBAR */
+  .toolbar{display:flex;gap:12px;margin-bottom:24px;align-items:center;flex-wrap:wrap;}
+  .search-wrap{flex:1;position:relative;max-width:340px;min-width:200px;}
   .search-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
   .search-input{width:100%;height:42px;padding:0 14px 0 40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
   .search-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
   .search-input::placeholder{color:var(--text-muted);}
   .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
-  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .table-head{display:grid;grid-template-columns:2fr 1.5fr 1.5fr 1.2fr 1fr 0.8fr;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
-  .table-row{display:grid;grid-template-columns:2fr 1.5fr 1.5fr 1.2fr 1fr 0.8fr;gap:8px;padding:13px 22px;border-top:1px solid var(--border);align-items:center;transition:background 0.1s;}
-  .table-row:hover{background:var(--bg);}
-  .contact-name{font-size:13px;font-weight:500;color:var(--text);}
-  .contact-role{font-size:11px;color:var(--text-muted);margin-top:1px;}
-  .contact-email{font-size:12px;color:var(--text-mid);}
-  .contact-tel{font-size:12px;color:var(--text-mid);}
-  .client-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#EBF0F5;color:var(--navy);}
-  .btn-icon{width:30px;height:30px;border:1px solid var(--border);background:transparent;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.1s;flex-shrink:0;}
-  .btn-icon:hover{background:var(--bg);}
-  .btn-icon svg{width:14px;height:14px;color:var(--text-mid);}
-  .btn-icon.send{background:var(--green-pale);border-color:rgba(46,204,143,0.3);}
-  .btn-icon.send:hover{background:#C8F0E1;}
-  .btn-icon.send svg{color:var(--green-dark);}
-  .btn-icon.del:hover{background:#FDECEA;}
-  .btn-icon.del:hover svg{color:var(--red);}
-  .row-actions{display:flex;gap:6px;align-items:center;}
-  .empty-state{text-align:center;padding:48px 20px;color:var(--text-muted);}
+
+  /* CARDS GRID */
+  .contacts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+  .contact-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;gap:14px;transition:box-shadow 0.15s;}
+  .contact-card:hover{box-shadow:0 4px 16px rgba(13,27,42,0.08);}
+  .card-top{display:flex;align-items:center;gap:14px;}
+  .card-avatar{width:48px;height:48px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#fff;flex-shrink:0;}
+  .card-info{flex:1;min-width:0;}
+  .card-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .card-role{font-size:12px;color:var(--text-muted);margin-top:2px;}
+  .card-client-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#EBF0F5;color:var(--navy);margin-top:4px;}
+  .card-contacts{display:flex;flex-direction:column;gap:7px;}
+  .card-contact-row{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-mid);}
+  .card-contact-row svg{width:14px;height:14px;flex-shrink:0;color:var(--text-muted);}
+  .card-contact-row a{color:var(--text-mid);text-decoration:none;}
+  .card-contact-row a:hover{color:var(--green-dark);text-decoration:underline;}
+  .card-actions{display:flex;gap:8px;padding-top:8px;border-top:1px solid var(--border);}
+  .btn-action{flex:1;height:34px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;border:none;transition:all 0.15s;}
+  .btn-action svg{width:13px;height:13px;}
+  .btn-action.email{background:var(--green-pale);color:var(--green-dark);}
+  .btn-action.email:hover{background:#C8F0E1;}
+  .btn-action.tel{background:#EBF0F5;color:var(--navy-mid);}
+  .btn-action.tel:hover{background:#DDE4EC;}
+  .btn-action.edit{background:#EBF0F5;color:var(--navy-mid);}
+  .btn-action.edit:hover{background:#DDE4EC;}
+  .btn-action.del{background:#FDECEA;color:var(--red);}
+  .btn-action.del:hover{background:#F9D5D3;}
+
+  /* EMPTY STATE */
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+  .empty-state svg{width:48px;height:48px;margin-bottom:12px;opacity:0.3;}
   .empty-state p{font-size:14px;}
-  .templates-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
-  .template-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .template-top{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
-  .template-icon{width:38px;height:38px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .ti-rapport{background:var(--green-pale);}
-  .ti-garantie{background:#EEEDFE;}
-  .ti-absent{background:#FEF5E4;}
-  .template-icon svg{width:18px;height:18px;}
-  .ti-rapport svg{color:var(--green-dark);}
-  .ti-garantie svg{color:var(--purple);}
-  .ti-absent svg{color:var(--amber);}
-  .template-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);flex:1;}
-  .btn-edit-tpl{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--text-mid);background:var(--bg);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
-  .btn-edit-tpl:hover{background:#E5EAF0;}
-  .btn-edit-tpl svg{width:12px;height:12px;}
-  .template-body{padding:16px 20px;}
-  .template-subject{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;}
-  .template-subject-val{font-size:13px;font-weight:500;color:var(--text);margin-bottom:12px;}
-  .template-msg{font-size:12px;color:var(--text-mid);line-height:1.6;background:var(--bg);border-radius:var(--radius-sm);padding:12px 14px;white-space:pre-line;}
-  .template-vars{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center;}
-  .var-chip{font-size:10px;font-weight:600;background:#EBF0F5;color:var(--navy);padding:2px 8px;border-radius:10px;}
+
+  /* MODAL */
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;}
   .modal-overlay.open{display:flex;}
   .modal{background:var(--surface);border-radius:var(--radius);width:520px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);animation:fadeUp 0.2s ease;}
-  .modal-lg{width:620px;}
   .modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
   .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
   .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;}
@@ -117,34 +108,21 @@
   .form-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
   .form-select{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;cursor:pointer;}
   .form-select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
-  .form-textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;resize:vertical;min-height:140px;line-height:1.6;transition:border-color 0.15s;}
-  .form-textarea:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
   .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  .form-hint{font-size:11px;color:var(--text-muted);margin-top:5px;}
   .btn-cancel{height:40px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
   .btn-cancel:hover{background:var(--bg);}
   .btn-save{height:40px;padding:0 22px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;}
   .btn-save:hover{background:var(--navy-mid);}
-  .btn-green{height:40px;padding:0 22px;border:none;background:var(--green);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:8px;}
-  .btn-green:hover{background:var(--green-dark);color:#fff;}
-  .send-context{background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:20px;border-left:3px solid var(--green);}
-  .send-context-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:4px;}
-  .send-context-val{font-size:13px;font-weight:500;color:var(--text);}
-  .contacts-checkboxes{display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;margin-bottom:4px;}
-  .contact-check{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:background 0.1s,border-color 0.1s;}
-  .contact-check:hover{background:var(--bg);}
-  .contact-check.selected{border-color:var(--green);background:var(--green-pale);}
-  .contact-check input[type="checkbox"]{width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0;}
-  .contact-check-name{font-size:13px;font-weight:500;color:var(--text);}
-  .contact-check-email{font-size:11px;color:var(--text-muted);}
-  .message-preview{background:var(--bg);border-radius:var(--radius-sm);padding:14px 16px;font-size:12px;color:var(--text-mid);line-height:1.7;white-space:pre-line;border:1px solid var(--border);margin-top:8px;max-height:150px;overflow-y:auto;}
-  .send-success{display:none;text-align:center;padding:20px 0;}
-  .send-success svg{width:48px;height:48px;color:var(--green);margin-bottom:10px;}
-  .send-success-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;}
-  .send-success-sub{font-size:13px;color:var(--text-muted);}
+  .btn-save:disabled{opacity:0.5;cursor:not-allowed;}
+
+  /* TOAST */
   .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);z-index:300;transform:translateY(80px);opacity:0;transition:transform 0.3s ease,opacity 0.3s ease;}
   .toast.show{transform:translateY(0);opacity:1;}
   .toast svg{width:16px;height:16px;color:var(--green);flex-shrink:0;}
+
+  /* SECTION TITRE CLIENT (vue client) */
+  .client-section-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--navy);margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--green-pale);}
+
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
 </style>
 </head>
@@ -156,9 +134,9 @@
       <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
     </div>
   </div>
-  <div class="sidebar-brand" style="margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
-    <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:#F5A623;flex-shrink:0;"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-    <span style="font-size:11px;font-weight:600;color:#F5A623;text-transform:uppercase;letter-spacing:0.06em;">Espace Admin</span>
+  <div class="sidebar-brand" id="sidebarBrand" style="display:none;">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+    <span id="sidebarBrandLabel">Espace Admin</span>
   </div>
   <nav class="sidebar-nav">
     <div class="nav-group-label">Principal</div>
@@ -170,15 +148,14 @@
     <div class="nav-group-label">Documentation</div>
     <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
     <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
-    <div class="nav-group-label">Compte</div>
-        <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
-    <a class="nav-item" href="admin.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
-    <a class="nav-item active" style="color:var(--navy);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+    <div class="nav-group-label" id="navAdminLabel" style="display:none;color:rgba(245,166,35,0.6);">Administration</div>
+    <a class="nav-item" href="admin.html" id="navAdmin" style="display:none;color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+    <a class="nav-item active" id="navContacts" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts Belledonne</span></a>
   </nav>
   <div class="sidebar-footer">
     <div class="footer-user">
-      <div class="f-avatar">BM</div>
-      <div><div class="footer-name">Belledonne Multiservices</div><div class="footer-role">Administrateur</div></div>
+      <div class="f-avatar" id="footerAvatar">BM</div>
+      <div><div class="footer-name" id="footerName">Belledonne Multiservices</div><div class="footer-role" id="footerRole">Administrateur</div></div>
     </div>
     <button onclick="handleLogout()" style="width:100%;margin-top:8px;padding:8px 12px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(231,76,60,0.15)';this.style.color='#E74C3C'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.5)'">
       <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
@@ -189,41 +166,37 @@
 
 <div class="main">
   <header class="topbar">
-    <div class="breadcrumb"><span>Admin</span><span>›</span><span>Contacts & Notifications</span></div>
-    <div class="date-chip">Jeudi 9 avril 2025</div>
+    <div class="breadcrumb"><span id="bcParent">Admin</span><span>›</span><span>Contacts Belledonne</span></div>
+    <div class="date-chip" id="dateChip"></div>
   </header>
   <div class="content">
     <div class="page-header">
       <div>
-        <div class="page-title">Contacts & Notifications</div>
-        <div class="page-sub">Carnet de contacts par client et modèles d'emails</div>
+        <div class="page-title">Contacts Belledonne</div>
+        <div class="page-sub" id="pageSub">Gérez les interlocuteurs Belledonne par client</div>
       </div>
-      <button class="btn-primary" id="btnAddContact">
+      <button class="btn-primary btn-admin-only" id="btnAjouter" onclick="openAddModal()">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         Ajouter un contact
       </button>
     </div>
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab('contacts')">Carnet de contacts</button>
-      <button class="tab" onclick="switchTab('templates')">Modèles d'emails</button>
-    </div>
-    <div id="sectionContacts">
-      <div class="contacts-toolbar">
-        <div class="search-wrap">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-          <input class="search-input" type="text" id="searchContacts" placeholder="Rechercher un contact..." />
-        </div>
-        <select class="filter-select" id="filterClient"><option value="">Tous les clients</option></select>
+
+    <!-- Toolbar admin -->
+    <div class="toolbar btn-admin-only" id="adminToolbar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input class="search-input" type="text" id="searchInput" placeholder="Rechercher un contact..." oninput="renderCards()">
       </div>
-      <div class="table-wrap">
-        <div class="table-head">
-          <span>Nom / Rôle</span><span>Client</span><span>Email</span><span>Téléphone</span><span>Notifié pour</span><span>Actions</span>
-        </div>
-        <div id="contactsBody"></div>
-      </div>
+      <select class="filter-select" id="filterClient" onchange="renderCards()">
+        <option value="">Tous les clients</option>
+      </select>
     </div>
-    <div id="sectionTemplates" style="display:none;">
-      <div class="templates-grid" id="templatesGrid"></div>
+
+    <!-- Grille de cartes -->
+    <div id="contactsGrid" class="contacts-grid"></div>
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      <p>Aucun contact trouvé.</p>
     </div>
   </div>
 </div>
@@ -232,371 +205,216 @@
 <div class="modal-overlay" id="modalContact">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title" id="modalContactTitle">Ajouter un contact</div>
-      <button class="modal-close" onclick="closeModal('modalContact')">✕</button>
+      <div class="modal-title" id="modalTitle">Ajouter un contact</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Nom complet *</label><input class="form-input" type="text" id="cNom" placeholder="ex: Marc Renaud" /></div>
-        <div class="form-group"><label class="form-label">Rôle / Fonction</label><input class="form-input" type="text" id="cRole" placeholder="ex: Chargé de secteur" /></div>
+        <div class="form-group">
+          <label class="form-label">Prénom *</label>
+          <input class="form-input" type="text" id="fPrenom" placeholder="ex: Marc">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nom *</label>
+          <input class="form-input" type="text" id="fNom" placeholder="ex: Renaud">
+        </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Client *</label>
-        <select class="form-select" id="cClient">
-          <option value="">— Sélectionner —</option>
+        <label class="form-label">Rôle / Poste</label>
+        <input class="form-input" type="text" id="fRole" placeholder="ex: Chargé de secteur">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Client associé *</label>
+        <select class="form-select" id="fClient">
+          <option value="">— Sélectionner un client —</option>
         </select>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Email *</label><input class="form-input" type="email" id="cEmail" placeholder="ex: m.renaud@oph-isere.fr" /></div>
-        <div class="form-group"><label class="form-label">Téléphone</label><input class="form-input" type="tel" id="cTel" placeholder="ex: 04 76 12 34 56" /></div>
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Notifier pour</label>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-mid);"><input type="checkbox" id="cNotifRapport" checked style="width:16px;height:16px;accent-color:var(--green);" />Nouveaux rapports d'intervention</label>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-mid);"><input type="checkbox" id="cNotifGarantie" checked style="width:16px;height:16px;accent-color:var(--green);" />Passages garantie effectués</label>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-mid);"><input type="checkbox" id="cNotifAbsent" style="width:16px;height:16px;accent-color:var(--green);" />Absents / Annulations</label>
+        <div class="form-group">
+          <label class="form-label">Email *</label>
+          <input class="form-input" type="email" id="fEmail" placeholder="ex: m.renaud@client.fr">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Téléphone</label>
+          <input class="form-input" type="tel" id="fTelephone" placeholder="ex: 04 76 12 34 56">
         </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeModal('modalContact')">Annuler</button>
-      <button class="btn-save" id="saveContact"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistrer</button>
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-save" id="btnSave" onclick="saveContact()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Enregistrer
+      </button>
     </div>
   </div>
 </div>
 
-<!-- MODAL ENVOI -->
-<div class="modal-overlay" id="modalSend">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <div class="modal-title">Envoyer une notification email</div>
-      <button class="modal-close" onclick="closeModal('modalSend')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="send-context" id="sendContextBlock">
-        <div class="send-context-label">Document concerné</div>
-        <div class="send-context-val" id="sendContextVal">—</div>
-      </div>
-      <div class="form-group" id="sendContactsGroup">
-        <label class="form-label">Destinataires *</label>
-        <div class="contacts-checkboxes" id="sendContactsList"></div>
-      </div>
-      <div class="form-group" id="sendTemplateGroup">
-        <label class="form-label">Modèle de message</label>
-        <select class="form-select" id="sendTemplate" onchange="updatePreview()" style="margin-bottom:10px;">
-          <option value="rapport">Nouveau rapport d'intervention</option>
-          <option value="garantie">Passage garantie effectué</option>
-          <option value="absent">Absent / Annulation</option>
-        </select>
-        <div class="message-preview" id="messagePreview"></div>
-        <div class="form-hint">Le message sera personnalisé automatiquement avec les données du document.</div>
-      </div>
-      <div class="send-success" id="sendSuccess">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-        <div class="send-success-title">Email(s) envoyé(s) avec succès !</div>
-        <div class="send-success-sub" id="sendSuccessSub"></div>
-      </div>
-    </div>
-    <div class="modal-footer" id="sendFooter">
-      <button class="btn-cancel" onclick="closeModal('modalSend')">Annuler</button>
-      <button class="btn-green" id="btnConfirmSend"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer l'email</button>
-    </div>
-  </div>
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+  <span id="toastMsg"></span>
 </div>
 
-<!-- MODAL MODÈLE -->
-<div class="modal-overlay" id="modalTemplate">
-  <div class="modal modal-lg">
-    <div class="modal-header">
-      <div class="modal-title" id="tplModalTitle">Modifier le modèle</div>
-      <button class="modal-close" onclick="closeModal('modalTemplate')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label">Objet de l'email *</label><input class="form-input" type="text" id="tplSubject" /></div>
-      <div class="form-group" style="margin-bottom:8px;"><label class="form-label">Corps du message *</label><textarea class="form-textarea" id="tplBody"></textarea></div>
-      <div class="form-hint">Variables disponibles :
-        <span style="display:inline-flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
-          <span class="var-chip">{{contact}}</span><span class="var-chip">{{client}}</span><span class="var-chip">{{bc}}</span><span class="var-chip">{{adresse}}</span><span class="var-chip">{{date}}</span><span class="var-chip">{{lien}}</span>
-        </span>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeModal('modalTemplate')">Annuler</button>
-      <button class="btn-save" id="saveTpl"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistrer</button>
-    </div>
-  </div>
-</div>
-
-<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span id="toastMsg"></span></div>
-
+<!-- Script sync (données + rendu) -->
 <script>
 let contacts = [];
+let clientsList = [];
+window._editContactId = null;
+window._isAdmin = false;
+window._currentClientFilter = null;
 
+function getInitials(prenom, nom) {
+  return ((prenom||'')[0]||'') + ((nom||'')[0]||'');
+}
 
-let templates = {
-  rapport:{ id:'rapport', name:'Nouveau rapport d\'intervention', icon:'ti-rapport',
-    subject:'[Belledonne Multiservices] Rapport d\'intervention disponible — {{bc}}',
-    body:`Bonjour {{contact}},
+// Couleurs avatar par initiale
+const AVATAR_COLORS = ['#0D1B2A','#1DA870','#7F77DD','#F5A623','#E74C3C','#2980B9','#8E44AD','#16A085'];
+function avatarColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
 
-Nous vous informons qu'un nouveau rapport d'intervention est disponible sur votre espace client.
+function renderCards() {
+  const grid = document.getElementById('contactsGrid');
+  const empty = document.getElementById('emptyState');
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const cl = document.getElementById('filterClient')?.value || '';
 
-📋 Bon de commande : {{bc}}
-📍 Adresse : {{adresse}}
-📅 Date d'intervention : {{date}}
-
-Consultez et téléchargez ce rapport ici :
-👉 {{lien}}
-
-Cordialement,
-L'équipe Belledonne Multiservices — 06 95 67 26 03`},
-  garantie:{ id:'garantie', name:'Passage garantie effectué', icon:'ti-garantie',
-    subject:'[Belledonne Multiservices] Passage garantie effectué — {{adresse}}',
-    body:`Bonjour {{contact}},
-
-Suite à votre demande, nous confirmons qu'un passage en garantie a été effectué. Le rapport est disponible sur votre espace client.
-
-📍 Adresse : {{adresse}}
-📅 Date d'intervention : {{date}}
-🔗 Bon de commande d'origine : {{bc}}
-
-Accéder au rapport :
-👉 {{lien}}
-
-Cordialement,
-L'équipe Belledonne Multiservices — 06 95 67 26 03`},
-  absent:{ id:'absent', name:'Absent / Annulation', icon:'ti-absent',
-    subject:'[Belledonne Multiservices] Passage non effectué — {{adresse}}',
-    body:`Bonjour {{contact}},
-
-Notre technicien s'est présenté au logement ci-dessous mais n'a pas pu effectuer l'intervention.
-
-📍 Adresse : {{adresse}}
-📅 Date prévue : {{date}}
-📋 Bon de commande : {{bc}}
-
-Merci de nous contacter pour convenir d'un nouveau rendez-vous.
-
-Cordialement,
-L'équipe Belledonne Multiservices — 06 95 67 26 03`}
-};
-
-let editContactId = null;
-let editTplId = null;
-let activeSendClientFilter = null;
-
-window.switchTab = function(tab) {
-  document.getElementById('sectionContacts').style.display = tab==='contacts'?'block':'none';
-  document.getElementById('sectionTemplates').style.display = tab==='templates'?'block':'none';
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&tab==='contacts')||(i===1&&tab==='templates')));
-  if(tab==='templates') renderTemplates();
-};
-
-function notifLabels(n){ const m={rapport:'Rapports',garantie:'Garanties',absent:'Absents'}; return n.map(x=>m[x]||x).join(', ')||'—'; }
-
-function renderContacts(){
-  const q=document.getElementById('searchContacts').value.toLowerCase();
-  const cl=document.getElementById('filterClient').value;
-  const body=document.getElementById('contactsBody');
-  const list=contacts.filter(c=>{
-    const mq=!q||c.nom.toLowerCase().includes(q)||c.email.toLowerCase().includes(q)||(c.role||'').toLowerCase().includes(q);
-    const mc=!cl||c.client===cl;
-    return mq&&mc;
+  let list = contacts.filter(c => {
+    const fullName = ((c.prenom||'') + ' ' + (c.nom||'')).toLowerCase();
+    const mq = !q || fullName.includes(q) || (c.email||'').toLowerCase().includes(q) || (c.role||'').toLowerCase().includes(q);
+    const mc = !cl || c.client === cl;
+    return mq && mc;
   });
-  if(list.length===0){body.innerHTML='<div class="empty-state"><p>Aucun contact trouvé.</p></div>';return;}
-  body.innerHTML=list.map(c=>`
-    <div class="table-row">
-      <div><div class="contact-name">${c.nom}</div><div class="contact-role">${c.role||'—'}</div></div>
-      <div><span class="client-pill">${c.client}</span></div>
-      <div class="contact-email">${c.email}</div>
-      <div class="contact-tel">${c.tel||'—'}</div>
-      <div style="font-size:11px;color:var(--text-muted);">${notifLabels(c.notif)}</div>
-      <div class="row-actions">
-        <button class="btn-icon send" title="Envoyer une notification" onclick="openSendModal(${c.id})"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
-        <button class="btn-icon" title="Modifier" onclick="openEditContact(${c.id})"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
-        <button class="btn-icon del" title="Supprimer" onclick="deleteContact(${c.id})"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
-      </div>
-    </div>`).join('');
-}
 
-function refreshClientFilter(){
-  const clients=[...new Set(contacts.map(c=>c.client))].sort();
-  const sel=document.getElementById('filterClient');
-  const cur=sel.value;
-  sel.innerHTML='<option value="">Tous les clients</option>'+clients.map(c=>`<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
-}
-
-document.getElementById('searchContacts').addEventListener('input',renderContacts);
-document.getElementById('filterClient').addEventListener('change',renderContacts);
-
-document.getElementById('btnAddContact').addEventListener('click',()=>{
-  editContactId=null;
-  document.getElementById('modalContactTitle').textContent='Ajouter un contact';
-  ['cNom','cRole','cEmail','cTel','cClientNew'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('cClient').value='';
-  document.getElementById('cNotifRapport').checked=true;
-  document.getElementById('cNotifGarantie').checked=true;
-  document.getElementById('cNotifAbsent').checked=false;
-  document.getElementById('newClientWrap').style.display='none';
-  document.getElementById('modalContact').classList.add('open');
-});
-
-window.handleClientChange=function(){
-  document.getElementById('newClientWrap').style.display=document.getElementById('cClient').value==='__new__'?'block':'none';
-};
-
-window.openEditContact=function(id){
-  editContactId=id;
-  const c=contacts.find(x=>x.id===id);
-  document.getElementById('modalContactTitle').textContent='Modifier le contact';
-  document.getElementById('cNom').value=c.nom;
-  document.getElementById('cRole').value=c.role||'';
-  document.getElementById('cEmail').value=c.email;
-  document.getElementById('cTel').value=c.tel||'';
-  const sel=document.getElementById('cClient');
-  if(!Array.from(sel.options).some(o=>o.value===c.client)){const opt=document.createElement('option');opt.value=c.client;opt.textContent=c.client;sel.insertBefore(opt,sel.querySelector('option[value="__new__"]'));}
-  sel.value=c.client;
-  document.getElementById('newClientWrap').style.display='none';
-  document.getElementById('cNotifRapport').checked=c.notif.includes('rapport');
-  document.getElementById('cNotifGarantie').checked=c.notif.includes('garantie');
-  document.getElementById('cNotifAbsent').checked=c.notif.includes('absent');
-  document.getElementById('modalContact').classList.add('open');
-};
-
-window.deleteContact=function(id){
-  if(!confirm('Supprimer ce contact ?'))return;
-  contacts=contacts.filter(c=>c.id!==id);
-  renderContacts();refreshClientFilter();
-  showToast('Contact supprimé.');
-};
-
-document.getElementById('saveContact').addEventListener('click',()=>{
-  const nom=document.getElementById('cNom').value.trim();
-  const email=document.getElementById('cEmail').value.trim();
-  let client=document.getElementById('cClient').value;
-  if(client==='__new__') client=document.getElementById('cClientNew').value.trim();
-  if(!nom||!email||!client){alert('Veuillez renseigner nom, email et client.');return;}
-  const notif=[];
-  if(document.getElementById('cNotifRapport').checked)notif.push('rapport');
-  if(document.getElementById('cNotifGarantie').checked)notif.push('garantie');
-  if(document.getElementById('cNotifAbsent').checked)notif.push('absent');
-  if(editContactId){
-    Object.assign(contacts.find(x=>x.id===editContactId),{nom,role:document.getElementById('cRole').value.trim(),client,email,tel:document.getElementById('cTel').value.trim(),notif});
-  } else {
-    contacts.push({id:Date.now(),nom,role:document.getElementById('cRole').value.trim(),client,email,tel:document.getElementById('cTel').value.trim(),notif});
-    const sel=document.getElementById('cClient');
-    if(!Array.from(sel.options).some(o=>o.value===client)){const opt=document.createElement('option');opt.value=client;opt.textContent=client;sel.insertBefore(opt,sel.querySelector('option[value="__new__"]'));}
+  if (!window._isAdmin && window._currentClientFilter) {
+    list = contacts.filter(c => c.client === window._currentClientFilter);
   }
-  closeModal('modalContact');renderContacts();refreshClientFilter();
-  showToast((editContactId?'Contact modifié':'Contact ajouté')+' — '+nom);
-});
 
-// ── ENVOI ──
-window.openSendModal=function(contactId){
-  const c=contacts.find(x=>x.id===contactId);
-  activeSendClientFilter=c.client;
-  const ctx={type:'rapport',bc:'BC-2025-0142',adresse:'8 bis Avenue Marie Reynoard 38100 Grenoble',date:'02/04/2025'};
-  document.getElementById('sendContextVal').textContent=`${ctx.bc} — ${ctx.adresse} — ${ctx.date}`;
-  const clientContacts=contacts.filter(x=>x.client===c.client);
-  document.getElementById('sendContactsList').innerHTML=clientContacts.map(x=>`
-    <label class="contact-check${x.id===contactId?' selected':''}">
-      <input type="checkbox" value="${x.id}" ${x.id===contactId?'checked':''} onchange="this.closest('.contact-check').classList.toggle('selected',this.checked)" />
-      <div><div class="contact-check-name">${x.nom}${x.role?` <span style="font-weight:400;color:var(--text-muted)">· ${x.role}</span>`:''}</div><div class="contact-check-email">${x.email}</div></div>
-    </label>`).join('');
-  document.getElementById('sendTemplate').value=ctx.type;
-  document.getElementById('sendSuccess').style.display='none';
-  document.getElementById('sendContactsGroup').style.display='block';
-  document.getElementById('sendTemplateGroup').style.display='block';
-  document.getElementById('sendContextBlock').style.display='block';
-  document.getElementById('sendFooter').innerHTML=`<button class="btn-cancel" onclick="closeModal('modalSend')">Annuler</button><button class="btn-green" id="btnConfirmSend"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer l'email</button>`;
-  document.getElementById('btnConfirmSend').addEventListener('click',confirmSend);
-  updatePreview(c,ctx);
-  document.getElementById('modalSend').classList.add('open');
-};
+  if (list.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
 
-window.updatePreview=function(c,ctx){
-  const tplKey=document.getElementById('sendTemplate').value;
-  const tpl=templates[tplKey];
-  if(!tpl)return;
-  const contact=c||contacts[0];
-  const context=ctx||{bc:'BC-2025-0142',adresse:'[Adresse]',date:'[Date]'};
-  const body=tpl.body
-    .replace(/{{contact}}/g,contact?contact.nom.split(' ')[0]:'Madame, Monsieur')
-    .replace(/{{client}}/g,contact?contact.client:'[Client]')
-    .replace(/{{bc}}/g,context.bc||'[BC]')
-    .replace(/{{adresse}}/g,context.adresse||'[Adresse]')
-    .replace(/{{date}}/g,context.date||'[Date]')
-    .replace(/{{lien}}/g,'https://clients-belledonne-multiservices.com');
-  document.getElementById('messagePreview').textContent=body;
-};
-
-function confirmSend(){
-  const checked=document.querySelectorAll('#sendContactsList input[type="checkbox"]:checked');
-  if(checked.length===0){alert('Sélectionnez au moins un destinataire.');return;}
-  const names=Array.from(checked).map(cb=>{const c=contacts.find(x=>x.id===parseInt(cb.value));return c?c.nom:'';}).filter(Boolean);
-  document.getElementById('sendSuccess').style.display='block';
-  document.getElementById('sendSuccessSub').textContent='Email envoyé à : '+names.join(', ');
-  document.getElementById('sendContactsGroup').style.display='none';
-  document.getElementById('sendTemplateGroup').style.display='none';
-  document.getElementById('sendContextBlock').style.display='none';
-  document.getElementById('sendFooter').innerHTML=`<button class="btn-save" onclick="closeModal('modalSend')">Fermer</button>`;
-  showToast('Email envoyé à '+names.length+' destinataire'+(names.length>1?'s':'')+' !');
-}
-
-// ── MODÈLES ──
-function renderTemplates(){
-  document.getElementById('templatesGrid').innerHTML=Object.values(templates).map(t=>`
-    <div class="template-card">
-      <div class="template-top">
-        <div class="template-icon ${t.icon}">
-          ${t.id==='rapport'?'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>':t.id==='garantie'?'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>':'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>'}
+  // Admin : grouper par client si pas de filtre
+  if (window._isAdmin && !cl && !q) {
+    const byClient = {};
+    list.forEach(c => { if (!byClient[c.client]) byClient[c.client] = []; byClient[c.client].push(c); });
+    grid.innerHTML = Object.keys(byClient).sort().map(client => `
+      <div style="grid-column:1/-1;">
+        <div class="client-section-title">
+          <span style="background:#EBF0F5;color:var(--navy);padding:3px 12px;border-radius:20px;font-size:13px;">${client}</span>
         </div>
-        <div class="template-name">${t.name}</div>
-        <button class="btn-edit-tpl" onclick="openEditTemplate('${t.id}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg> Modifier</button>
-      </div>
-      <div class="template-body">
-        <div class="template-subject">Objet</div>
-        <div class="template-subject-val">${t.subject}</div>
-        <div class="template-msg">${t.body.substring(0,180)}${t.body.length>180?'…':''}</div>
-        <div class="template-vars"><span style="font-size:11px;color:var(--text-muted);">Variables :</span><span class="var-chip">{{contact}}</span><span class="var-chip">{{bc}}</span><span class="var-chip">{{adresse}}</span><span class="var-chip">{{date}}</span><span class="var-chip">{{lien}}</span></div>
-      </div>
-    </div>`).join('');
+        <div class="contacts-grid" style="margin-bottom:8px;">${byClient[client].map(c => cardHtml(c)).join('')}</div>
+      </div>`).join('');
+  } else {
+    grid.innerHTML = list.map(c => cardHtml(c)).join('');
+  }
 }
 
-window.openEditTemplate=function(id){
-  editTplId=id;
-  const t=templates[id];
-  document.getElementById('tplModalTitle').textContent='Modifier — '+t.name;
-  document.getElementById('tplSubject').value=t.subject;
-  document.getElementById('tplBody').value=t.body;
-  document.getElementById('modalTemplate').classList.add('open');
+function cardHtml(c) {
+  const initials = getInitials(c.prenom, c.nom).toUpperCase() || '?';
+  const color = avatarColor(c.prenom + c.nom);
+  const fullName = [c.prenom, c.nom].filter(Boolean).join(' ');
+
+  const emailBtn = c.email
+    ? `<a href="mailto:${c.email}" class="btn-action email"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Email</a>`
+    : '';
+  const telBtn = c.telephone
+    ? `<a href="tel:${c.telephone}" class="btn-action tel"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>${c.telephone}</a>`
+    : '';
+
+  const adminBtns = window._isAdmin ? `
+    <button class="btn-action edit" onclick="openEditModal('${c.id}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+    <button class="btn-action del" onclick="deleteContact('${c.id}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Suppr.</button>` : '';
+
+  return `
+    <div class="contact-card">
+      <div class="card-top">
+        <div class="card-avatar" style="background:${color};">${initials}</div>
+        <div class="card-info">
+          <div class="card-name">${fullName}</div>
+          ${c.role ? `<div class="card-role">${c.role}</div>` : ''}
+          ${window._isAdmin ? `<div class="card-client-pill">${c.client}</div>` : ''}
+        </div>
+      </div>
+      <div class="card-contacts">
+        ${c.email ? `<div class="card-contact-row"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><a href="mailto:${c.email}">${c.email}</a></div>` : ''}
+        ${c.telephone ? `<div class="card-contact-row"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg><a href="tel:${c.telephone}">${c.telephone}</a></div>` : ''}
+      </div>
+      <div class="card-actions">
+        ${emailBtn}${telBtn}${adminBtns}
+      </div>
+    </div>`;
+}
+
+function openAddModal() {
+  window._editContactId = null;
+  document.getElementById('modalTitle').textContent = 'Ajouter un contact';
+  document.getElementById('fPrenom').value = '';
+  document.getElementById('fNom').value = '';
+  document.getElementById('fRole').value = '';
+  document.getElementById('fEmail').value = '';
+  document.getElementById('fTelephone').value = '';
+  document.getElementById('fClient').value = '';
+  document.getElementById('modalContact').classList.add('open');
+}
+
+window.openEditModal = function(id) {
+  const c = contacts.find(x => x.id === id);
+  if (!c) return;
+  window._editContactId = id;
+  document.getElementById('modalTitle').textContent = 'Modifier le contact';
+  document.getElementById('fPrenom').value = c.prenom || '';
+  document.getElementById('fNom').value = c.nom || '';
+  document.getElementById('fRole').value = c.role || '';
+  document.getElementById('fEmail').value = c.email || '';
+  document.getElementById('fTelephone').value = c.telephone || '';
+  document.getElementById('fClient').value = c.client || '';
+  document.getElementById('modalContact').classList.add('open');
 };
 
-document.getElementById('saveTpl').addEventListener('click',()=>{
-  const subject=document.getElementById('tplSubject').value.trim();
-  const body=document.getElementById('tplBody').value.trim();
-  if(!subject||!body){alert('Veuillez remplir l\'objet et le corps du message.');return;}
-  templates[editTplId].subject=subject;
-  templates[editTplId].body=body;
-  closeModal('modalTemplate');renderTemplates();
-  showToast('Modèle mis à jour !');
+function closeModal() {
+  document.getElementById('modalContact').classList.remove('open');
+}
+
+document.getElementById('modalContact').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalContact')) closeModal();
 });
 
-window.closeModal=function(id){document.getElementById(id).classList.remove('open');};
-document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+function showToast(msg, error = false) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.style.background = error ? 'var(--red)' : 'var(--navy)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
 
-function showToast(msg){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
-
-refreshClientFilter();
-renderContacts();
+function updateDateChip() {
+  const now = new Date();
+  document.getElementById('dateChip').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+updateDateChip();
 </script>
 
+<!-- Script module Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
+const app = initializeApp({
+  apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
+  authDomain:"belledonne-client.firebaseapp.com",
+  projectId:"belledonne-client",
+  storageBucket:"belledonne-client.firebasestorage.app",
+  messagingSenderId:"737384028313",
+  appId:"1:737384028313:web:700aee1467ac27d0c58008"
+});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 
@@ -605,26 +423,157 @@ window.handleLogout = async function() {
   window.location.href = "login.html";
 };
 
-async function loadClientsIntoSelects() {
-  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
-  const clients = snap.docs.map(d => d.data().client).filter(Boolean);
-  const sel = document.getElementById("cClient");
-  if (sel) {
-    sel.innerHTML = '<option value="">— Sélectionner —</option>';
-    clients.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c; opt.textContent = c;
-      sel.appendChild(opt);
-    });
+// ── CHARGER CONTACTS ──────────────────────────────────────────────
+async function loadContacts() {
+  try {
+    let snap;
+    if (window._isAdmin) {
+      snap = await getDocs(query(collection(db, "contacts"), orderBy("createdAt", "desc")));
+    } else {
+      snap = await getDocs(query(
+        collection(db, "contacts"),
+        where("client", "==", window._currentClientFilter),
+        orderBy("createdAt", "desc")
+      ));
+    }
+    window.contacts = contacts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (window._isAdmin) populateFilterClient();
+    renderCards();
+  } catch(e) {
+    console.error("loadContacts:", e);
+    showToast("Erreur de chargement : " + e.message, true);
   }
 }
 
-onAuthStateChanged(auth, function(user) {
+function populateFilterClient() {
+  const sel = document.getElementById('filterClient');
+  if (!sel) return;
+  const current = sel.value;
+  const all = [...new Set(contacts.map(c => c.client).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Tous les clients</option>';
+  all.forEach(cl => {
+    const o = document.createElement('option');
+    o.value = cl; o.textContent = cl;
+    if (cl === current) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+// ── CHARGER CLIENTS DANS LE SELECT MODAL ─────────────────────────
+async function loadClientsSelect() {
+  try {
+    const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+    const cls = [...new Set(snap.docs.map(d => d.data().client).filter(Boolean))].sort();
+    window.clientsList = cls;
+    const sel = document.getElementById('fClient');
+    sel.innerHTML = '<option value="">— Sélectionner un client —</option>';
+    cls.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      sel.appendChild(o);
+    });
+  } catch(e) { console.error("loadClientsSelect:", e); }
+}
+
+// ── SAVE (add ou update) ──────────────────────────────────────────
+window.saveContact = async function() {
+  const prenom = document.getElementById('fPrenom').value.trim();
+  const nom = document.getElementById('fNom').value.trim();
+  const role = document.getElementById('fRole').value.trim();
+  const client = document.getElementById('fClient').value;
+  const email = document.getElementById('fEmail').value.trim();
+  const telephone = document.getElementById('fTelephone').value.trim();
+
+  if (!prenom || !nom || !client || !email) {
+    alert('Veuillez renseigner prénom, nom, client et email.');
+    return;
+  }
+
+  const btnSave = document.getElementById('btnSave');
+  btnSave.disabled = true;
+  btnSave.textContent = 'Enregistrement…';
+
+  const data = { prenom, nom, role, client, email, telephone };
+
+  try {
+    if (window._editContactId) {
+      await updateDoc(doc(db, "contacts", window._editContactId), data);
+      showToast(`Contact modifié — ${prenom} ${nom}`);
+    } else {
+      data.createdAt = new Date().toISOString();
+      await addDoc(collection(db, "contacts"), data);
+      showToast(`Contact ajouté — ${prenom} ${nom}`);
+    }
+    closeModal();
+    await loadContacts();
+  } catch(e) {
+    console.error("saveContact:", e);
+    showToast("Erreur : " + e.message, true);
+  } finally {
+    btnSave.disabled = false;
+    btnSave.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistrer';
+  }
+};
+
+// ── DELETE ────────────────────────────────────────────────────────
+window.deleteContact = async function(id) {
+  if (!confirm('Supprimer ce contact ?')) return;
+  try {
+    await deleteDoc(doc(db, "contacts", id));
+    showToast('Contact supprimé.');
+    await loadContacts();
+  } catch(e) {
+    console.error("deleteContact:", e);
+    showToast("Erreur : " + e.message, true);
+  }
+};
+
+// ── AUTH ──────────────────────────────────────────────────────────
+onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
-  if (user.email !== "belledonne.multiservices@gmail.com") {
-    window.location.href = "dashboard.html";
+
+  // Détecter admin
+  if (user.email === "belledonne.multiservices@gmail.com") {
+    window._isAdmin = true;
+    document.getElementById('sidebarBrand').style.display = 'flex';
+    document.getElementById('sidebarBrandLabel').textContent = 'Espace Admin';
+    document.getElementById('navAdminLabel').style.display = '';
+    document.getElementById('navAdmin').style.display = '';
+    document.getElementById('footerRole').textContent = 'Administrateur';
+    document.getElementById('footerAvatar').textContent = 'BM';
+    document.getElementById('footerName').textContent = 'Belledonne Multiservices';
+    document.getElementById('bcParent').textContent = 'Admin';
+    await loadClientsSelect();
+    await loadContacts();
   } else {
-    loadClientsIntoSelects();
+    // Récupérer le profil client
+    try {
+      const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+      if (!snap.empty) {
+        const profile = snap.docs[0].data();
+        window._currentClientFilter = profile.client;
+        // Masquer les éléments admin
+        document.querySelectorAll('.btn-admin-only').forEach(el => el.style.display = 'none');
+        document.getElementById('adminToolbar').style.display = 'none';
+        document.getElementById('sidebarBrand').style.display = 'flex';
+        document.getElementById('sidebarBrand').style.background = 'rgba(46,204,143,0.1)';
+        document.getElementById('sidebarBrand').style.borderColor = 'rgba(46,204,143,0.3)';
+        document.getElementById('sidebarBrand').querySelector('svg').style.color = 'var(--green)';
+        document.getElementById('sidebarBrandLabel').textContent = profile.client || 'Espace Client';
+        document.getElementById('sidebarBrandLabel').style.color = 'var(--green)';
+        document.getElementById('footerRole').textContent = 'Client';
+        document.getElementById('footerName').textContent = profile.client || user.email;
+        document.getElementById('footerAvatar').textContent = (profile.client||'C')[0].toUpperCase();
+        document.getElementById('bcParent').textContent = profile.client || 'Client';
+        document.getElementById('pageSub').textContent = 'Vos interlocuteurs Belledonne Multiservices';
+        await loadContacts();
+      } else {
+        window.location.href = "login.html";
+      }
+    } catch(e) {
+      console.error("Auth profile:", e);
+      window.location.href = "login.html";
+    }
   }
 });
 </script>
