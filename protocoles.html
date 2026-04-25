@@ -235,7 +235,8 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         <input class="search-input" type="text" id="searchInput" placeholder="Rechercher un protocole..." />
       </div>
-      <select class="filter-select" id="filterType">
+      <select class="filter-select" id="filterClient" style="display:none;"><option value="">Tous les clients</option></select>
+        <select class="filter-select" id="filterType">
         <option value="">Tous les types</option>
         <option value="punaise">Punaises de lit</option>
         <option value="rongeur">Rongeurs</option>
@@ -298,15 +299,8 @@
             <button type="button" onclick="addCustomType()" style="height:42px;padding:0 14px;border:none;background:var(--green);color:white;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Ajouter</button>
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Version</label>
-          <input class="form-input" type="text" id="inVersion" placeholder="ex: v1.2" />
-        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Description</label>
-        <textarea class="form-textarea" id="inDesc" placeholder="ex: Procédure complète pour le traitement des punaises de lit en logement social, incluant la préparation, les produits et les consignes post-traitement..."></textarea>
-      </div>
+
       <div class="form-group" style="margin-bottom:0;">
         <label class="form-label">Fichier PDF *</label>
         <div class="drop-zone" id="dropZone">
@@ -357,7 +351,9 @@ function iconSvg(type) {
   return icons[type] || icons['autre'];
 }
 
-let protocoles = [];
+window._isAdmin = false;
+window.protocoles = [];
+let protocoles = window.protocoles;
 
 
 function formatDate(d) {
@@ -402,7 +398,9 @@ function renderProtocols(list) {
         </div>
         <div class="card-actions">
           ${p.pdfUrl ? `<a href="${p.pdfUrl}" target="_blank" class="btn-dl primary"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger le PDF</a>` : `<span style="font-size:12px;color:var(--text-muted);">Pas de PDF joint</span>`}
-          ${window._isAdmin ? `<button onclick="deleteProtocole('${p.id}')" style="height:34px;padding:0 12px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;display:flex;align-items:center;gap:5px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Supprimer</button>` : ''}
+          ${window._isAdmin ? `
+            <button onclick="openEditProtocole('${p.id}')" style="height:34px;padding:0 12px;border:none;background:#EBF0F5;color:#1A2E42;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;display:flex;align-items:center;gap:5px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+            <button onclick="deleteProtocole('${p.id}')" style="height:34px;padding:0 12px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;display:flex;align-items:center;gap:5px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Supprimer</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -410,18 +408,22 @@ function renderProtocols(list) {
 }
 
 function filter() {
+  if (window.protocoles) protocoles = window.protocoles;
   const q = document.getElementById('searchInput').value.toLowerCase();
   const t = document.getElementById('filterType').value;
+  const fc = document.getElementById('filterClient') ? document.getElementById('filterClient').value : '';
   const list = protocoles.filter(p => {
-    const mq = !q || p.titre.toLowerCase().includes(q) || (p.desc||'').toLowerCase().includes(q);
+    const mq = !q || p.titre.toLowerCase().includes(q);
     const mt = !t || p.type === t;
-    return mq && mt;
+    const mc = !fc || p.client === fc;
+    return mq && mt && mc;
   });
   renderProtocols(list);
 }
 
 document.getElementById('searchInput').addEventListener('input', filter);
 document.getElementById('filterType').addEventListener('change', filter);
+document.getElementById('filterClient').addEventListener('change', filter);
 
 // TYPE PERSONNALISÉ
 window.handleTypeChange = function() {
@@ -478,37 +480,46 @@ window.addClientCheckbox = function() {
   document.getElementById('inClientNew').value = '';
 };
 
-document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
+
+window._editProtocoleId = null;
+
+function resetProtocoleModal() {
+  window._editProtocoleId = null;
+  const mt=document.getElementById('modalTitle'); if(mt) mt.textContent='Ajouter un protocole';
+  const sm=document.getElementById('saveModal'); if(sm) sm.textContent='Enregistrer';
+  const it=document.getElementById('inTitre'); if(it) it.value='';
+  const ity=document.getElementById('inType'); if(ity) ity.value='';
+  document.getElementById('typeCustomWrap').style.display = 'none';
+  document.getElementById('inClientNew').value = '';
+  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
+  const fi=document.getElementById('fileInput'); if(fi) fi.value='';
+  const dc=document.getElementById('dropChosen'); if(dc){ dc.style.display='none'; dc.textContent=''; }
+}
+window.resetProtocoleModal = resetProtocoleModal;
+
+window.openEditProtocole = function(id) {
+  const p = (window.protocoles||protocoles||[]).find(x => x.id === id);
+  if (!p) return;
+  window._editProtocoleId = id;
+  const mt=document.getElementById('modalTitle'); if(mt) mt.textContent='Modifier le protocole';
+  const sm=document.getElementById('saveModal'); if(sm) sm.textContent='Mettre à jour';
+  const it=document.getElementById('inTitre'); if(it) it.value=p.titre||'';
+  const ity=document.getElementById('inType'); if(ity) ity.value=p.type||'';
+  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous)').forEach(cb => {
+    cb.checked = cb.value === p.client;
+  });
+  const fi=document.getElementById('fileInput'); if(fi) fi.value='';
+  const dc=document.getElementById('dropChosen');
+  if(dc){ if(p.pdfUrl){ dc.textContent='✓ Fichier existant'; dc.style.display='block'; } else dc.style.display='none'; }
+  modal.classList.add('open');
+};
+
+document.getElementById('btnAjouter').addEventListener('click', () => { resetProtocoleModal(); modal.classList.add('open'); });
 document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
 modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
 
-document.getElementById('saveModal').addEventListener('click', () => {
-  const titre = document.getElementById('inTitre').value.trim();
-  let type = document.getElementById('inType').value;
-  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
-  if (!titre || !type || type === '__custom__' || clients.length === 0) { alert('Veuillez renseigner au moins un client, le titre et le type.'); return; }
-
-  clients.forEach(client => {
-    protocoles.unshift({
-      id: Date.now() + Math.random(), titre, type, client,
-      version: document.getElementById('inVersion').value.trim() || null,
-      desc: document.getElementById('inDesc').value.trim(),
-      date: new Date().toISOString().split('T')[0],
-      pages: null
-    });
-  });
-
-  filter();
-  modal.classList.remove('open');
-  ['inTitre','inVersion','inDesc'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('inType').value = '';
-  document.getElementById('inClientNew').value = '';
-  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
-  document.getElementById('typeCustomWrap').style.display = 'none';
-  fileInput.value = ''; dropChosen.style.display = 'none';
-  showToast(`Protocole "${titre}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
-});
+// Save géré par le module Firebase
 
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -516,14 +527,167 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3500);
 }
-
-filter();
 </script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
+
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
+window._currentClientFilter = null;
+
+// ── Charger ──
+async function loadProtocoles(clientFilter) {
+  try {
+    const snap = await getDocs(collection(db, "protocoles"));
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (clientFilter) docs = docs.filter(p => p.client === clientFilter);
+    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    protocoles = docs; window.protocoles = docs;
+    if (window._isAdmin) populateFilterClient();
+    filter();
+  } catch(e) { console.error(e); }
+}
+
+function populateFilterClient() {
+  const sel = document.getElementById('filterClient');
+  if (!sel) return; sel.style.display = '';
+  const current = sel.value;
+  const all = new Set((window.protocoles||[]).map(p => p.client).filter(Boolean));
+  sel.innerHTML = '<option value="">Tous les clients</option>';
+  [...all].sort().forEach(cl => { const o=document.createElement('option'); o.value=cl; o.textContent=cl; if(cl===current) o.selected=true; sel.appendChild(o); });
+}
+
+// ── Supprimer ──
+window.deleteProtocole = async function(id) {
+  if (!confirm('Supprimer ce protocole ?')) return;
+  try {
+    const p = (window.protocoles||protocoles||[]).find(x => x.id === id);
+    if (p && p.pdfUrl) {
+      try { await deleteObject(ref(storage, p.pdfUrl)); } catch(se) { console.warn('Storage:', se); }
+    }
+    await deleteDoc(doc(db, "protocoles", id));
+    showToast('Protocole supprimé !');
+    await loadProtocoles(window._currentClientFilter);
+  } catch(e) { alert('Erreur : ' + e.message); }
+};
+
+// ── Sauvegarder (ajout ou update) ──
+let _saving = false;
+document.getElementById('saveModal').addEventListener('click', async () => {
+  if (_saving) return;
+  const titre = document.getElementById('inTitre').value.trim();
+  let type = document.getElementById('inType').value;
+  if (type === '__custom__') {
+    const custom = document.getElementById('inTypeCustom');
+    if (custom) type = custom.value.trim();
+  }
+  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
+  if (!titre || !type || clients.length === 0) { alert('Veuillez renseigner au moins un client, le titre et le type.'); return; }
+
+  const btnSave = document.getElementById('saveModal');
+  _saving = true; btnSave.disabled = true; btnSave.textContent = 'Enregistrement...';
+
+  try {
+    const fileEl = document.getElementById('fileInput');
+    const file = fileEl ? fileEl.files[0] : null;
+    const editId = window._editProtocoleId;
+    const ts = Date.now();
+
+    if (editId) {
+      // MODE MISE À JOUR
+      const existing = (window.protocoles||protocoles||[]).find(x => x.id === editId) || {};
+      let pdfUrl = existing.pdfUrl || null;
+      const client = clients[0] || existing.client;
+      if (file) {
+        if (pdfUrl) { try { await deleteObject(ref(storage, pdfUrl)); } catch(se){} }
+        const storageRef = ref(storage, `protocoles/${client}/${ts}_${file.name}`);
+        const snap = await uploadBytesResumable(storageRef, file);
+        pdfUrl = await getDownloadURL(snap.ref);
+      }
+      await updateDoc(doc(db, "protocoles", editId), { titre, type, client, pdfUrl, updatedAt: new Date().toISOString() });
+      showToast(`Protocole "${titre}" mis à jour !`);
+    } else {
+      // MODE AJOUT — une carte par client
+      for (const client of clients) {
+        let pdfUrl = null;
+        if (file) {
+          const storageRef = ref(storage, `protocoles/${client}/${ts}_${file.name}`);
+          const snap = await uploadBytesResumable(storageRef, file);
+          pdfUrl = await getDownloadURL(snap.ref);
+        }
+        await addDoc(collection(db, "protocoles"), {
+          titre, type, client, pdfUrl,
+          date: new Date().toISOString().split('T')[0],
+          createdAt: new Date().toISOString()
+        });
+      }
+      showToast(`Protocole "${titre}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
+    }
+
+    document.getElementById('modal').classList.remove('open');
+    resetProtocoleModal();
+    await loadProtocoles(window._currentClientFilter);
+  } catch(e) { alert('Erreur : ' + e.message); }
+
+  _saving = false; btnSave.disabled = false; btnSave.textContent = window._editProtocoleId ? 'Mettre à jour' : 'Enregistrer';
+});
+
+async function loadClientsIntoSelect() {
+  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+  const box = document.getElementById("clientCheckboxes");
+  if (!box) return;
+  const tous = box.lastElementChild;
+  box.innerHTML = "";
+  snap.docs.forEach(d => {
+    const cl = d.data().client; if (!cl) return;
+    const lbl = document.createElement("label");
+    lbl.style.cssText = "display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;";
+    lbl.innerHTML = `<input type="checkbox" value="${cl}" style="accent-color:var(--green);width:15px;height:15px;"> ${cl}`;
+    box.appendChild(lbl);
+  });
+  if (tous) box.appendChild(tous);
+}
+
+onAuthStateChanged(auth, async function(user) {
+  if (!user) { window.location.href = "login.html"; return; }
+  if (user.email === "belledonne.multiservices@gmail.com") {
+    window._isAdmin = true;
+    const name=document.getElementById("sideClientName"); if(name) name.textContent="Belledonne Multiservices";
+    const id=document.getElementById("sideClientId"); if(id) id.textContent="belledonne-admin";
+    const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent="BM";
+    const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent="Belledonne Multiservices";
+    const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Administrateur";
+    var adminNav=document.getElementById("adminNav"); if(adminNav) adminNav.style.display="block";
+    var btn=document.getElementById("btnAjouter"); if(btn) btn.style.display="";
+    loadClientsIntoSelect();
+    window._currentClientFilter = null;
+    await loadProtocoles(null);
+  } else {
+    try {
+      const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+      if (!snap.empty) {
+        const p = snap.docs[0].data();
+        const name=document.getElementById("sideClientName"); if(name) name.textContent=p.client||"Client";
+        const id=document.getElementById("sideClientId"); if(id) id.textContent=p.identifiant||"";
+        const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent=(p.client||"CL").substring(0,2).toUpperCase();
+        const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent=p.client||user.email;
+        const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Client";
+        window._currentClientFilter = p.client;
+        await loadProtocoles(p.client);
+      }
+    } catch(e) { console.error(e); }
+  }
+});
+</script>
+</body>
+</html>
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
@@ -559,51 +723,6 @@ async function loadProtocoles(clientFilter) {
 
 // Remplacer le save par Firebase
 let _saving = false;
-document.getElementById('saveModal').addEventListener('click', async () => {
-  if (_saving) return;
-  const titre = document.getElementById('inTitre').value.trim();
-  let type = document.getElementById('inType').value;
-  const clients = Array.from(document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous):checked')).map(c => c.value);
-  if (!titre || !type || type === '__custom__' || clients.length === 0) { alert('Veuillez renseigner au moins un client, le titre et le type.'); return; }
-  
-  const btnSave = document.getElementById('saveModal');
-  _saving = true; btnSave.disabled = true; btnSave.textContent = 'Enregistrement...';
-
-  try {
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput ? fileInput.files[0] : null;
-    
-    for (const client of clients) {
-      let pdfUrl = null;
-      if (file) {
-        const storageRef = ref(storage, `protocoles/${client}/${Date.now()}_${file.name}`);
-        const snap = await uploadBytesResumable(storageRef, file);
-        pdfUrl = await getDownloadURL(snap.ref);
-      }
-      await addDoc(collection(db, "protocoles"), {
-        titre, type, client, pdfUrl,
-        version: document.getElementById('inVersion').value.trim() || null,
-        desc: document.getElementById('inDesc').value.trim(),
-        date: new Date().toISOString().split('T')[0],
-        pages: null, createdAt: new Date().toISOString()
-      });
-    }
-    
-    document.getElementById('modal').classList.remove('open');
-    ['inTitre','inVersion','inDesc'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('inType').value = '';
-    document.getElementById('inClientNew').value = '';
-    document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
-    document.getElementById('typeCustomWrap').style.display = 'none';
-    if (fileInput) fileInput.value = '';
-    const dc = document.getElementById('dropChosen'); if (dc) dc.style.display = 'none';
-    showToast(`Protocole "${titre}" ajouté !`);
-    await loadProtocoles(window._currentClientFilter);
-  } catch(e) { alert('Erreur : ' + e.message); }
-  
-  _saving = false; btnSave.disabled = false; btnSave.textContent = 'Enregistrer';
-});
-
 async function loadClientsIntoSelect() {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
   const box = document.getElementById("clientCheckboxes");
