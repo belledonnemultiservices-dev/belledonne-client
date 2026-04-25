@@ -48,8 +48,8 @@
   .hero{background:var(--navy);border-radius:var(--radius);padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;}
   .hero::before{content:'';position:absolute;top:-40px;right:-40px;width:220px;height:220px;border-radius:50%;background:rgba(46,204,143,0.07);}
   .hero-greeting{font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:6px;}
-  .hero-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fff;margin-bottom:6px;}
-  .hero-title span{color:var(--green);}
+  .hero-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:#fff;margin-bottom:6px;}
+  .hero-title span{color:#fff;}
   .hero-sub{font-size:13px;color:rgba(255,255,255,0.4);}
   .hero-right{display:flex;gap:12px;flex-shrink:0;z-index:1;}
   .hero-stat{background:rgba(255,255,255,0.07);border-radius:var(--radius-sm);padding:14px 20px;text-align:center;min-width:90px;}
@@ -99,11 +99,12 @@
   .ni-badge{font-size:11px;font-weight:600;background:rgba(46,204,143,0.15);color:var(--green);padding:4px 12px;border-radius:20px;flex-shrink:0;}
 
   /* GRILLES */
-  .grid-main{display:grid;grid-template-columns:1fr 340px;gap:20px;margin-bottom:20px;}
-  .grid-bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}
+  .grid-main{display:grid;grid-template-columns:1fr 340px;gap:20px;margin-bottom:20px;align-items:start;}
+  .grid-bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:start;}
 
   /* CARD */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;animation:fadeUp 0.4s ease both;animation-delay:0.25s;}
+  .card-scroll{overflow-y:auto;max-height:320px;}
   .card-header{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
   .card-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:600;color:var(--text);}
   .card-link{font-size:12px;color:var(--green-dark);font-weight:500;text-decoration:none;cursor:pointer;}
@@ -271,17 +272,11 @@
     <div class="grid-main">
       <div class="card">
         <div class="card-header"><div class="card-title">Derniers rapports d'intervention</div><a class="card-link" href="rapports.html">Voir tous →</a></div>
-        <div id="recentRapports"><div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
+        <div id="recentRapports" class="card-scroll"><div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:20px;">
-        <div class="card">
-          <div class="card-header"><div class="card-title">Campagnes en cours</div><a class="card-link" href="reportings.html">Voir →</a></div>
-          <div id="recentCampagnes"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
-        </div>
-        <div class="card" id="cardContactsBelledonne">
-          <div class="card-header"><div class="card-title">Nous contacter</div></div>
-          <div id="contactsBelledonne"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
-        </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Campagnes en cours</div><a class="card-link" href="reportings.html">Voir →</a></div>
+        <div id="recentCampagnes"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
       </div>
     </div>
 
@@ -289,16 +284,22 @@
     <div class="grid-bottom">
       <div class="card">
         <div class="card-header"><div class="card-title">Garanties récentes</div><a class="card-link" href="garanties.html">Voir →</a></div>
-        <div id="recentGaranties"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
+        <div id="recentGaranties" class="card-scroll"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
       </div>
       <div class="card">
         <div class="card-header"><div class="card-title">Absents / Annulations récents</div><a class="card-link" href="absents.html">Voir →</a></div>
-        <div id="recentAbsents"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
+        <div id="recentAbsents" class="card-scroll"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
       </div>
       <div class="card" id="cardContactsClients">
         <div class="card-header"><div class="card-title" id="gridBottomTitle">Activité par client</div><a class="card-link" id="gridBottomLink" href="contacts.html" style="display:none;">Voir →</a></div>
-        <div id="activiteClients"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
+        <div id="activiteClients" class="card-scroll"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
       </div>
+    </div>
+
+    <!-- NOUS CONTACTER — visible côté client uniquement -->
+    <div class="card" id="cardNousContacter" style="display:none;margin-top:20px;">
+      <div class="card-header"><div class="card-title">Nous contacter</div></div>
+      <div id="contactsBelledonne"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
     </div>
 
   </div>
@@ -459,6 +460,9 @@ async function loadClientDashboard(clientFilter) {
 
   const tel = config.telephone || '';
   const email = config.email || '';
+  // Afficher la card "Nous contacter" côté client
+  const cardNC = document.getElementById('cardNousContacter');
+  if (cardNC) cardNC.style.display = '';
   document.getElementById('contactsBelledonne').innerHTML = `
     <div style="padding:16px;">
       ${tel ? `<a href="tel:${tel}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);text-decoration:none;margin-bottom:8px;border:1px solid var(--border);">
