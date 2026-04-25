@@ -295,8 +295,8 @@
         <div class="card-header"><div class="card-title">Absents / Annulations récents</div><a class="card-link" href="absents.html">Voir →</a></div>
         <div id="recentAbsents"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
       </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Activité par client</div></div>
+      <div class="card" id="cardContactsClients">
+        <div class="card-header"><div class="card-title" id="gridBottomTitle">Activité par client</div><a class="card-link" id="gridBottomLink" href="contacts.html" style="display:none;">Voir →</a></div>
         <div id="activiteClients"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
       </div>
     </div>
@@ -342,12 +342,13 @@ async function loadClientDashboard(clientFilter) {
   const annee = new Date().getFullYear().toString();
 
   // Charger données filtrées par client en parallèle
-  const [snapR, snapG, snapA, snapC, snapConfig] = await Promise.all([
+  const [snapR, snapG, snapA, snapC, snapConfig, snapContacts] = await Promise.all([
     getDocs(collection(db, "rapports")),
     getDocs(collection(db, "garanties")),
     getDocs(collection(db, "absents")),
     getDocs(collection(db, "campagnes")),
     getDocs(collection(db, "config")),
+    getDocs(query(collection(db, "contacts"), where("client", "==", clientFilter))),
   ]);
 
   const rapports  = snapR.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.client===clientFilter);
@@ -356,6 +357,7 @@ async function loadClientDashboard(clientFilter) {
   const campagnes = snapC.docs.map(d=>({id:d.id,...d.data()})).filter(c=>c.client===clientFilter);
   const configDoc = snapConfig.docs.find(d=>d.id==='belledonne');
   const config    = configDoc ? configDoc.data() : {};
+  const contacts  = snapContacts.docs.map(d=>({id:d.id,...d.data()}));
 
   // ── KPIs ──
   document.getElementById('kpiRapports').textContent = rapports.filter(r=>(r.date||'').startsWith(mois)).length;
@@ -407,6 +409,28 @@ async function loadClientDashboard(clientFilter) {
 
   // ── Contacts Belledonne (coordonnées fixes) ──
 
+  // ── Contacts par client dans la 3e card bottom ──
+  const titleEl = document.getElementById('gridBottomTitle');
+  const linkEl = document.getElementById('gridBottomLink');
+  if (titleEl) { titleEl.textContent = 'Contacts Belledonne'; }
+  if (linkEl) { linkEl.style.display = ''; }
+  document.getElementById('activiteClients').innerHTML = contacts.length === 0
+    ? '<div style="text-align:center;padding:24px 16px;color:var(--text-muted);font-size:13px;">Aucun contact renseigné pour votre compte.</div>'
+    : contacts.map(ct => {
+        const initials = ((ct.prenom||'')[0]||(ct.nom||'')[0]||'?').toUpperCase();
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--border);">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--green);flex-shrink:0;">${initials}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ct.prenom||''} ${ct.nom||''}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${ct.role||''}</div>
+          </div>
+          <div style="display:flex;gap:5px;">
+            ${ct.email?`<a href="mailto:${ct.email}" title="${ct.email}" style="width:26px;height:26px;background:#EBF0F5;border-radius:6px;display:flex;align-items:center;justify-content:center;text-decoration:none;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;color:var(--navy);"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></a>`:''}
+            ${ct.telephone?`<a href="tel:${ct.telephone}" title="${ct.telephone}" style="width:26px;height:26px;background:var(--green-pale);border-radius:6px;display:flex;align-items:center;justify-content:center;text-decoration:none;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;color:var(--green-dark);"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></a>`:''}
+          </div>
+        </div>`;
+      }).join('');
+
   // ── Garanties récentes ──
   const last4G = [...garanties].sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'')).slice(0,4);
   document.getElementById('recentGaranties').innerHTML = last4G.length===0
@@ -436,31 +460,16 @@ async function loadClientDashboard(clientFilter) {
   const tel = config.telephone || '';
   const email = config.email || '';
   document.getElementById('contactsBelledonne').innerHTML = `
-    <div style="padding:20px;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-        <div style="width:44px;height:44px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg viewBox="0 0 24 24" fill="white" style="width:20px;height:20px;"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-        </div>
-        <div>
-          <div style="font-size:14px;font-weight:700;color:var(--text);">Belledonne Multiservices</div>
-          <div style="font-size:11px;color:var(--text-muted);">Lutte anti-nuisibles</div>
-        </div>
-      </div>
-      ${tel ? `<a href="tel:${tel}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg);border-radius:var(--radius-sm);text-decoration:none;margin-bottom:10px;border:1px solid var(--border);transition:background 0.1s;" onmouseover="this.style.background='#E8F9F2'" onmouseout="this.style.background='var(--bg)'">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;color:var(--green-dark);flex-shrink:0;"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
-        <div>
-          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">Téléphone</div>
-          <div style="font-size:14px;font-weight:600;color:var(--text);">${tel}</div>
-        </div>
+    <div style="padding:16px;">
+      ${tel ? `<a href="tel:${tel}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);text-decoration:none;margin-bottom:8px;border:1px solid var(--border);">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;color:var(--green-dark);flex-shrink:0;"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+        <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">Téléphone</div><div style="font-size:13px;font-weight:600;color:var(--text);">${tel}</div></div>
       </a>` : ''}
-      ${email ? `<a href="mailto:${email}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg);border-radius:var(--radius-sm);text-decoration:none;border:1px solid var(--border);transition:background 0.1s;" onmouseover="this.style.background='#EBF0F5'" onmouseout="this.style.background='var(--bg)'">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;color:var(--navy);flex-shrink:0;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-        <div>
-          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">Email</div>
-          <div style="font-size:14px;font-weight:600;color:var(--text);">${email}</div>
-        </div>
+      ${email ? `<a href="mailto:${email}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);text-decoration:none;border:1px solid var(--border);">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;color:var(--navy);flex-shrink:0;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">Email</div><div style="font-size:13px;font-weight:600;color:var(--text);">${email}</div></div>
       </a>` : ''}
-      ${!tel && !email ? '<div style="text-align:center;color:var(--text-muted);font-size:13px;">Coordonnées non renseignées.</div>' : ''}
+      ${!tel && !email ? '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:10px 0;">Coordonnées non renseignées.</div>' : ''}
     </div>`;
 }
 
