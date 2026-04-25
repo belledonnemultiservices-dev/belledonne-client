@@ -300,8 +300,6 @@
       </select>
       <select class="filter-select" id="filterYear">
         <option value="">Toutes les années</option>
-        <option value="2025">2025</option>
-        <option value="2024">2024</option>
       </select>
       <span class="results-count" id="resultsCount">6 rapports</span>
     </div>
@@ -330,12 +328,12 @@
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Fichier PDF</label>
+        <label class="form-label">Fichier Excel</label>
         <div class="drop-zone" id="dropZone">
           <input type="file" accept=".pdf,.xlsx,.xls" id="fileInput" />
           <div class="drop-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg></div>
-          <div class="drop-text">Glissez votre PDF ici ou cliquez pour choisir</div>
-          <div class="drop-sub">Fichiers PDF uniquement · Max 20 Mo</div>
+          <div class="drop-text">Glissez votre rapport Excel ici ou cliquez pour choisir</div>
+          <div class="drop-sub">Fichiers .xlsx / .xls · Max 20 Mo</div>
           <div class="drop-chosen" id="dropChosen"></div>
         </div>
       </div>
@@ -456,8 +454,45 @@ const modalOverlay = document.getElementById('modalOverlay');
 const btnOpenModal = document.getElementById('btnOpenModal');
 const btnCloseModal = document.getElementById('btnCloseModal');
 
+
+window._editRapportId = null;
+
+function resetRapportModal() {
+  window._editRapportId = null;
+  const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Déposer un rapport PDF';
+  const bs = document.getElementById('btnSave'); if(bs) bs.textContent = 'Enregistrer le rapport';
+  ['inputBC','inputSite','inputDate'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const ip=document.getElementById('inputPassage'); if(ip) ip.value='';
+  const in2=document.getElementById('inputNuisible'); if(in2) in2.value='';
+  const ic=document.getElementById('inputClient'); if(ic) ic.value='';
+  if(fileInput) fileInput.value='';
+  if(dropMsg) { dropMsg.style.display='none'; dropMsg.textContent=''; dropMsg.style.color=''; }
+}
+
+window.openEditRapport = function(id) {
+  const r = (window.rapports||rapports||[]).find(x => x.id === id);
+  if (!r) return;
+  window._editRapportId = id;
+  const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Modifier le rapport';
+  const bs = document.getElementById('btnSave'); if(bs) bs.textContent = 'Mettre à jour';
+  const ibc=document.getElementById('inputBC'); if(ibc) ibc.value=r.bc||'';
+  const is=document.getElementById('inputSite'); if(is) is.value=r.site||r.adresse||'';
+  const id2=document.getElementById('inputDate'); if(id2) id2.value=r.date||'';
+  const ip=document.getElementById('inputPassage'); if(ip) ip.value=r.passage||'';
+  const in2=document.getElementById('inputNuisible'); if(in2) in2.value=r.nuisible||'';
+  const ic=document.getElementById('inputClient'); if(ic) ic.value=r.client||'';
+  if(fileInput) fileInput.value='';
+  if(dropMsg) {
+    if(r.pdfUrl) { dropMsg.textContent='✓ Fichier existant (remplacer si besoin)'; dropMsg.style.display='block'; }
+    else dropMsg.style.display='none';
+  }
+  modalOverlay.classList.add('open');
+};
+
 if (btnOpenModal) btnOpenModal.addEventListener('click', () => modalOverlay.classList.add('open'));
 if (btnCloseModal) btnCloseModal.addEventListener('click', () => modalOverlay.classList.remove('open'));
+const btnCancelModal = document.getElementById('btnCancelModal');
+if (btnCancelModal) btnCancelModal.addEventListener('click', () => modalOverlay.classList.remove('open'));
 if (modalOverlay) modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) modalOverlay.classList.remove('open'); });
 
 window.handleTypeChange = function() {
@@ -470,17 +505,65 @@ const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const dropMsg = document.getElementById('dropChosen');
 
+// Parser Excel rapports
+const NUISIBLE_MAP_R = {
+  'blattes': 'blatte', 'blatte': 'blatte', 'insecte': 'blatte', 'insectes rampants': 'blatte',
+  'punaise': 'punaise', 'punaises': 'punaise', 'punaises de lit': 'punaise',
+  'rongeur': 'rongeur', 'rongeurs': 'rongeur', 'rat': 'rongeur', 'souris': 'rongeur',
+  'pigeon': 'pigeon', 'pigeons': 'pigeon',
+};
+const PASSAGE_MAP_R = { '1': '1er passage', '2': '2ème passage', '3': '3ème passage' };
+
+function parseRapportExcel(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const bc      = ws['B5'] ? String(ws['B5'].v).trim() : '';
+      const type    = ws['D5'] ? String(ws['D5'].v).trim() : '';
+      const passage = ws['B6'] ? String(ws['B6'].v).trim() : '';
+      const adresse = ws['B7'] ? String(ws['B7'].v).trim() : '';
+      const dateVal = ws['B8'] ? ws['B8'].v : '';
+      if (bc)      { const el=document.getElementById('inputBC');   if(el) el.value=bc; }
+      if (adresse) { const el=document.getElementById('inputSite'); if(el) el.value=adresse; }
+      if (dateVal) {
+        let ds = '';
+        if (dateVal instanceof Date) ds = dateVal.toISOString().split('T')[0];
+        else if (typeof dateVal === 'string') {
+          const p = dateVal.split(' ')[0].split('/');
+          if (p.length===3) ds = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        }
+        if (ds) { const el=document.getElementById('inputDate'); if(el) el.value=ds; }
+      }
+      if (passage) { const m=PASSAGE_MAP_R[passage.trim()]; const s=document.getElementById('inputPassage'); if(s&&m) s.value=m; }
+      if (type) { const k=type.toLowerCase(); const m=NUISIBLE_MAP_R[k]; const s=document.getElementById('inputNuisible'); if(s&&m) s.value=m; }
+      if (dropMsg) { dropMsg.textContent='✓ '+file.name+' — champs pré-remplis !'; dropMsg.style.display='block'; dropMsg.style.color='var(--green-dark)'; }
+    } catch(err) { console.error(err); if(dropMsg){ dropMsg.textContent='✓ '+file.name; dropMsg.style.display='block'; } }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 if (dropZone) {
-  dropZone.addEventListener('click', () => fileInput && fileInput.click());
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--green)'; });
   dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
   dropZone.addEventListener('drop', e => {
     e.preventDefault(); dropZone.style.borderColor = '';
-    if (e.dataTransfer.files[0] && dropMsg) dropMsg.textContent = e.dataTransfer.files[0].name;
+    const f = e.dataTransfer.files[0];
+    if (f && fileInput) {
+      const dt = new DataTransfer(); dt.items.add(f);
+      fileInput.files = dt.files;
+      const ext = f.name.split('.').pop().toLowerCase();
+      if (ext==='xlsx'||ext==='xls') parseRapportExcel(f);
+      else if(dropMsg){ dropMsg.textContent='✓ '+f.name; dropMsg.style.display='block'; }
+    }
   });
 }
 if (fileInput) fileInput.addEventListener('change', () => {
-  if (fileInput.files[0] && dropMsg) dropMsg.textContent = fileInput.files[0].name;
+  const f = fileInput.files[0]; if(!f) return;
+  const ext = f.name.split('.').pop().toLowerCase();
+  if (ext==='xlsx'||ext==='xls') parseRapportExcel(f);
+  else if(dropMsg){ dropMsg.textContent='✓ '+f.name; dropMsg.style.display='block'; }
 });
 
 function showToast(msg) {
@@ -519,7 +602,10 @@ function renderRapports(list) {
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
         ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
-        ${window._isAdmin ? `<button onclick="deleteRapport('${r.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
+        ${window._isAdmin ? `
+          <button onclick="openSendModal('rapport','${r.bc||''}','${r.site||''}','${r.date}','${r.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:#1DA870;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>
+          <button onclick="openEditRapport('${r.id}')" class="btn-action" style="color:#1A2E42;background:#EBF0F5;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+          <button onclick="deleteRapport('${r.id}')" class="btn-action" style="color:#E74C3C;background:#FDECEA;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -542,6 +628,18 @@ function filterRapports() {
   renderRapports(list);
 }
 
+// Générer les années dynamiquement
+(function() {
+  const sel = document.getElementById('filterYear');
+  if (!sel) return;
+  const now = new Date().getFullYear();
+  for (let y = now + 1; y >= now; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    sel.appendChild(o);
+  }
+})();
+
 document.getElementById('searchInput').addEventListener('input', filterRapports);
 document.getElementById('filterPassage').addEventListener('change', filterRapports);
 if (document.getElementById('filterNuisible')) document.getElementById('filterNuisible').addEventListener('change', filterRapports);
@@ -551,8 +649,8 @@ document.getElementById('filterYear').addEventListener('change', filterRapports)
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
@@ -567,6 +665,7 @@ async function loadRapports(clientFilter) {
       ? await getDocs(query(collection(db, "rapports"), where("client", "==", clientFilter)))
       : await getDocs(collection(db, "rapports"));
     rapports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    window.rapports = rapports;
     rapports.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     filterRapports();
   } catch(e) { console.error(e); }
@@ -575,6 +674,10 @@ async function loadRapports(clientFilter) {
 window.deleteRapport = async function(id) {
   if (!confirm('Supprimer ce rapport ?')) return;
   try {
+    const r = (window.rapports||rapports||[]).find(x => x.id === id);
+    if (r && r.pdfUrl) {
+      try { await deleteObject(ref(storage, r.pdfUrl)); } catch(se) { console.warn('Storage:', se); }
+    }
     await deleteDoc(doc(db, "rapports", id));
     rapports = rapports.filter(r => r.id !== id);
     filterRapports();
@@ -595,29 +698,49 @@ if (btnSaveModal) {
     _saving = true; btnSaveModal.disabled = true; btnSaveModal.textContent = 'Enregistrement...';
     try {
       const file = fileInput ? fileInput.files[0] : null;
-      let pdfUrl = null;
-      if (file) {
-        const storageRef = ref(storage, `rapports/${client}/${Date.now()}_${file.name}`);
-        const snap = await uploadBytesResumable(storageRef, file);
-        pdfUrl = await getDownloadURL(snap.ref);
-      }
-      await addDoc(collection(db, "rapports"), {
-        bc, site, client, pdfUrl,
+      const editId = window._editRapportId;
+      const data = {
+        bc, site, client,
         passage: document.getElementById('inputPassage') ? document.getElementById('inputPassage').value : '',
         nuisible: document.getElementById('inputNuisible') ? document.getElementById('inputNuisible').value : '',
         date: document.getElementById('inputDate') ? document.getElementById('inputDate').value : new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
-      });
+      };
+
+      if (editId) {
+        // MODE MISE À JOUR
+        const existing = (window.rapports||rapports||[]).find(x => x.id === editId) || {};
+        let pdfUrl = existing.pdfUrl || null;
+        if (file) {
+          const storageRef = ref(storage, `rapports/${client}/${Date.now()}_${file.name}`);
+          const snap = await uploadBytesResumable(storageRef, file);
+          pdfUrl = await getDownloadURL(snap.ref);
+        }
+        await updateDoc(doc(db, "rapports", editId), { ...data, pdfUrl, updatedAt: new Date().toISOString() });
+        showToast('Rapport mis à jour !');
+      } else {
+        // MODE AJOUT
+        let pdfUrl = null;
+        if (file) {
+          const storageRef = ref(storage, `rapports/${client}/${Date.now()}_${file.name}`);
+          const snap = await uploadBytesResumable(storageRef, file);
+          pdfUrl = await getDownloadURL(snap.ref);
+        }
+        await addDoc(collection(db, "rapports"), { ...data, pdfUrl, createdAt: new Date().toISOString() });
+        showToast('Rapport ajouté avec succès !');
+      }
+
       modalOverlay.classList.remove('open');
-      document.getElementById('inputBC').value = '';
-      document.getElementById('inputSite').value = '';
-      document.getElementById('inputClient').value = '';
-      if (dropMsg) { dropMsg.style.display = 'none'; dropMsg.textContent = ''; }
-      if (fileInput) fileInput.value = '';
-      showToast('Rapport ajouté avec succès !');
+      if (typeof resetRapportModal === 'function') resetRapportModal();
+      else {
+        document.getElementById('inputBC').value = '';
+        document.getElementById('inputSite').value = '';
+        document.getElementById('inputClient').value = '';
+        if (dropMsg) { dropMsg.style.display = 'none'; dropMsg.textContent = ''; }
+        if (fileInput) fileInput.value = '';
+      }
       await loadRapports(_currentFilter);
     } catch(e) { alert('Erreur : ' + e.message); }
-    _saving = false; btnSaveModal.disabled = false; btnSaveModal.textContent = 'Enregistrer le rapport';
+    _saving = false; btnSaveModal.disabled = false; btnSaveModal.textContent = window._editRapportId ? 'Mettre à jour' : 'Enregistrer le rapport';
   });
 }
 
