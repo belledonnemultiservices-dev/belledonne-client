@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contacts — Belledonne Multiservices</title>
+<title>Contacts Belledonne — Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
+    --navy:#0D1B2A;--navy-mid:#1A2E42;
     --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
-    --amber:#F5A623;--red:#E74C3C;--purple:#7F77DD;
+    --amber:#F5A623;--red:#E74C3C;
     --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
     --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
     --sidebar-w:240px;--radius:14px;--radius-sm:8px;
@@ -34,7 +34,7 @@
   .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
   .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.8;}
   .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
-  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;}
   .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--navy);flex-shrink:0;}
   .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
   .footer-role{font-size:10px;color:var(--green);}
@@ -43,87 +43,43 @@
   .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
   .breadcrumb span:last-child{color:var(--text);font-weight:500;}
   .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
-  .content{padding:32px;flex:1;}
-  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;gap:16px;}
-  .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
-  .page-sub{font-size:14px;color:var(--text-muted);}
-  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
-  .btn-primary:hover{background:var(--navy-mid);}
-  .btn-primary svg{width:16px;height:16px;}
+  .content{padding:32px;flex:1;display:flex;flex-direction:column;align-items:center;}
 
-  /* TOOLBAR */
-  .toolbar{display:flex;gap:12px;margin-bottom:24px;align-items:center;flex-wrap:wrap;}
-  .search-wrap{flex:1;position:relative;max-width:340px;min-width:200px;}
-  .search-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
-  .search-input{width:100%;height:42px;padding:0 14px 0 40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
-  .search-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
-  .search-input::placeholder{color:var(--text-muted);}
-  .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
-
-  /* CARDS GRID */
-  .contacts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
-  .contact-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;display:flex;flex-direction:column;gap:14px;transition:box-shadow 0.15s;}
-  .contact-card:hover{box-shadow:0 4px 16px rgba(13,27,42,0.08);}
-  .card-top{display:flex;align-items:center;gap:14px;}
-  .card-avatar{width:48px;height:48px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#fff;flex-shrink:0;}
-  .card-info{flex:1;min-width:0;}
-  .card-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .card-role{font-size:12px;color:var(--text-muted);margin-top:2px;}
-  .card-client-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#EBF0F5;color:var(--navy);margin-top:4px;}
-  .card-contacts{display:flex;flex-direction:column;gap:7px;}
-  .card-contact-row{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-mid);}
-  .card-contact-row svg{width:14px;height:14px;flex-shrink:0;color:var(--text-muted);}
-  .card-contact-row a{color:var(--text-mid);text-decoration:none;}
-  .card-contact-row a:hover{color:var(--green-dark);text-decoration:underline;}
-  .card-actions{display:flex;gap:8px;padding-top:8px;border-top:1px solid var(--border);}
-  .btn-action{flex:1;height:34px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;border:none;transition:all 0.15s;}
-  .btn-action svg{width:13px;height:13px;}
-  .btn-action.email{background:var(--green-pale);color:var(--green-dark);}
-  .btn-action.email:hover{background:#C8F0E1;}
-  .btn-action.tel{background:#EBF0F5;color:var(--navy-mid);}
-  .btn-action.tel:hover{background:#DDE4EC;}
-  .btn-action.edit{background:#EBF0F5;color:var(--navy-mid);}
-  .btn-action.edit:hover{background:#DDE4EC;}
-  .btn-action.del{background:#FDECEA;color:var(--red);}
-  .btn-action.del:hover{background:#F9D5D3;}
-
-  /* EMPTY STATE */
-  .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
-  .empty-state svg{width:48px;height:48px;margin-bottom:12px;opacity:0.3;}
-  .empty-state p{font-size:14px;}
-
-  /* MODAL */
-  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;}
-  .modal-overlay.open{display:flex;}
-  .modal{background:var(--surface);border-radius:var(--radius);width:520px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);animation:fadeUp 0.2s ease;}
-  .modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-  .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
-  .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;}
-  .modal-close:hover{background:#E5EAF0;}
-  .modal-body{padding:24px 26px;}
-  .modal-footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;}
-  .form-group{margin-bottom:16px;}
-  .form-label{display:block;font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;}
-  .form-input{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .config-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:520px;overflow:hidden;box-shadow:0 4px 20px rgba(13,27,42,0.06);animation:fadeUp 0.3s ease;}
+  .config-card-header{padding:24px 28px 20px;border-bottom:1px solid var(--border);}
+  .config-card-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px;}
+  .config-card-sub{font-size:13px;color:var(--text-muted);line-height:1.5;}
+  .config-card-body{padding:28px;}
+  .form-group{margin-bottom:20px;}
+  .form-label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-mid);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;}
+  .form-label svg{width:14px;height:14px;}
+  .form-input{width:100%;height:48px;padding:0 16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);outline:none;transition:border-color 0.15s,box-shadow 0.15s;}
   .form-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
-  .form-select{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;cursor:pointer;}
-  .form-select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
-  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  .btn-cancel{height:40px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
-  .btn-cancel:hover{background:var(--bg);}
-  .btn-save{height:40px;padding:0 22px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .form-input::placeholder{color:var(--text-muted);}
+  .form-hint{font-size:11px;color:var(--text-muted);margin-top:6px;}
+  .config-card-footer{padding:0 28px 28px;display:flex;gap:12px;align-items:center;}
+  .btn-save{height:44px;padding:0 28px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background 0.15s;}
   .btn-save:hover{background:var(--navy-mid);}
   .btn-save:disabled{opacity:0.5;cursor:not-allowed;}
+  .save-ok{font-size:13px;color:var(--green-dark);display:none;align-items:center;gap:6px;font-weight:500;}
+  .save-ok svg{width:15px;height:15px;}
 
-  /* TOAST */
-  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);z-index:300;transform:translateY(80px);opacity:0;transition:transform 0.3s ease,opacity 0.3s ease;}
+  .preview-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:520px;margin-top:20px;overflow:hidden;animation:fadeUp 0.4s ease 0.1s both;}
+  .preview-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .preview-title{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;}
+  .preview-badge{font-size:10px;background:#EBF0F5;color:var(--navy);padding:2px 8px;border-radius:10px;font-weight:600;}
+  .preview-body{padding:20px;}
+  .preview-row{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:var(--radius-sm);background:var(--bg);border:1px solid var(--border);margin-bottom:10px;}
+  .preview-row:last-child{margin-bottom:0;}
+  .preview-row svg{width:20px;height:20px;flex-shrink:0;}
+  .preview-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:2px;}
+  .preview-val{font-size:15px;font-weight:600;color:var(--text);}
+
+  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);z-index:300;transform:translateY(80px);opacity:0;transition:transform 0.3s,opacity 0.3s;}
   .toast.show{transform:translateY(0);opacity:1;}
-  .toast svg{width:16px;height:16px;color:var(--green);flex-shrink:0;}
+  .toast svg{width:16px;height:16px;color:var(--green);}
 
-  /* SECTION TITRE CLIENT (vue client) */
-  .client-section-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--navy);margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--green-pale);}
-
-  @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 </style>
 </head>
 <body>
@@ -134,9 +90,9 @@
       <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
     </div>
   </div>
-  <div class="sidebar-brand" id="sidebarBrand" style="display:none;">
+  <div class="sidebar-brand">
     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-    <span id="sidebarBrandLabel">Espace Admin</span>
+    <span>Espace Admin</span>
   </div>
   <nav class="sidebar-nav">
     <div class="nav-group-label">Principal</div>
@@ -148,14 +104,14 @@
     <div class="nav-group-label">Documentation</div>
     <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
     <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
-    <div class="nav-group-label" id="navAdminLabel" style="display:none;color:rgba(245,166,35,0.6);">Administration</div>
-    <a class="nav-item" href="admin.html" id="navAdmin" style="display:none;color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
-    <a class="nav-item active" id="navContacts" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts Belledonne</span></a>
+    <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+    <a class="nav-item" href="admin.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+    <a class="nav-item active" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts Belledonne</span></a>
   </nav>
   <div class="sidebar-footer">
     <div class="footer-user">
-      <div class="f-avatar" id="footerAvatar">BM</div>
-      <div><div class="footer-name" id="footerName">Belledonne Multiservices</div><div class="footer-role" id="footerRole">Administrateur</div></div>
+      <div class="f-avatar">BM</div>
+      <div><div class="footer-name">Belledonne Multiservices</div><div class="footer-role">Administrateur</div></div>
     </div>
     <button onclick="handleLogout()" style="width:100%;margin-top:8px;padding:8px 12px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(231,76,60,0.15)';this.style.color='#E74C3C'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.5)'">
       <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
@@ -166,87 +122,73 @@
 
 <div class="main">
   <header class="topbar">
-    <div class="breadcrumb"><span id="bcParent">Admin</span><span>›</span><span>Contacts Belledonne</span></div>
+    <div class="breadcrumb"><span>Admin</span><span>›</span><span>Contacts Belledonne</span></div>
     <div class="date-chip" id="dateChip"></div>
   </header>
   <div class="content">
-    <div class="page-header">
-      <div>
-        <div class="page-title">Contacts Belledonne</div>
-        <div class="page-sub" id="pageSub">Gérez les interlocuteurs Belledonne par client</div>
+
+    <div class="config-card">
+      <div class="config-card-header">
+        <div class="config-card-title">Coordonnées Belledonne Multiservices</div>
+        <div class="config-card-sub">Ces informations apparaissent dans l'espace client de chaque client — dans le tableau de bord et l'onglet "Nous contacter".</div>
       </div>
-      <button class="btn-primary btn-admin-only" id="btnAjouter" onclick="openAddModal()">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        Ajouter un contact
-      </button>
+      <div class="config-card-body">
+        <div class="form-group">
+          <label class="form-label">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="color:var(--green-dark);"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+            Numéro de téléphone
+          </label>
+          <input class="form-input" type="tel" id="inputTel" placeholder="ex: 06 95 67 26 03" oninput="updatePreview()">
+          <div class="form-hint">Affiché comme lien cliquable — le client peut appeler directement depuis l'espace web.</div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="color:var(--navy);"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+            Adresse email
+          </label>
+          <input class="form-input" type="email" id="inputEmail" placeholder="ex: belledonne.multiservices@gmail.com" oninput="updatePreview()">
+          <div class="form-hint">Affiché comme lien mailto: — ouvre directement la messagerie du client.</div>
+        </div>
+      </div>
+      <div class="config-card-footer">
+        <button class="btn-save" id="btnSave" onclick="saveConfig()">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+          Enregistrer
+        </button>
+        <div class="save-ok" id="saveOk">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          Enregistré avec succès !
+        </div>
+      </div>
     </div>
 
-    <!-- Toolbar admin -->
-    <div class="toolbar btn-admin-only" id="adminToolbar">
-      <div class="search-wrap">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        <input class="search-input" type="text" id="searchInput" placeholder="Rechercher un contact..." oninput="renderCards()">
+    <!-- APERÇU CLIENT -->
+    <div class="preview-card">
+      <div class="preview-header">
+        <div class="preview-title">Aperçu côté client</div>
+        <div class="preview-badge">Tel que vu dans le dashboard</div>
       </div>
-      <select class="filter-select" id="filterClient" onchange="renderCards()">
-        <option value="">Tous les clients</option>
-      </select>
+      <div class="preview-body">
+        <div id="previewTel" class="preview-row" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="color:var(--green-dark);"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+          <div>
+            <div class="preview-lbl">Téléphone</div>
+            <div class="preview-val" id="previewTelVal">—</div>
+          </div>
+        </div>
+        <div id="previewEmail" class="preview-row" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="color:var(--navy);"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          <div>
+            <div class="preview-lbl">Email</div>
+            <div class="preview-val" id="previewEmailVal">—</div>
+          </div>
+        </div>
+        <div id="previewEmpty" style="text-align:center;color:var(--text-muted);font-size:13px;padding:16px 0;">
+          Renseignez les champs ci-dessus pour voir l'aperçu.
+        </div>
+      </div>
     </div>
 
-    <!-- Grille de cartes -->
-    <div id="contactsGrid" class="contacts-grid"></div>
-    <div id="emptyState" class="empty-state" style="display:none;">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-      <p>Aucun contact trouvé.</p>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL CONTACT -->
-<div class="modal-overlay" id="modalContact">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="modalTitle">Ajouter un contact</div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Prénom *</label>
-          <input class="form-input" type="text" id="fPrenom" placeholder="ex: Marc">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Nom *</label>
-          <input class="form-input" type="text" id="fNom" placeholder="ex: Renaud">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Rôle / Poste</label>
-        <input class="form-input" type="text" id="fRole" placeholder="ex: Chargé de secteur">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Client associé *</label>
-        <select class="form-select" id="fClient">
-          <option value="">— Sélectionner un client —</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Email *</label>
-          <input class="form-input" type="email" id="fEmail" placeholder="ex: m.renaud@client.fr">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Téléphone</label>
-          <input class="form-input" type="tel" id="fTelephone" placeholder="ex: 04 76 12 34 56">
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
-      <button class="btn-save" id="btnSave" onclick="saveContact()">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-        Enregistrer
-      </button>
-    </div>
   </div>
 </div>
 
@@ -255,156 +197,31 @@
   <span id="toastMsg"></span>
 </div>
 
-<!-- Script sync (données + rendu) -->
 <script>
-let contacts = [];
-let clientsList = [];
-window._editContactId = null;
-window._isAdmin = false;
-window._currentClientFilter = null;
-
-function getInitials(prenom, nom) {
-  return ((prenom||'')[0]||'') + ((nom||'')[0]||'');
+function updatePreview() {
+  const tel = document.getElementById('inputTel').value.trim();
+  const email = document.getElementById('inputEmail').value.trim();
+  document.getElementById('previewEmpty').style.display = (tel || email) ? 'none' : 'block';
+  const rowTel = document.getElementById('previewTel');
+  rowTel.style.display = tel ? 'flex' : 'none';
+  if (tel) document.getElementById('previewTelVal').textContent = tel;
+  const rowEmail = document.getElementById('previewEmail');
+  rowEmail.style.display = email ? 'flex' : 'none';
+  if (email) document.getElementById('previewEmailVal').textContent = email;
 }
-
-// Couleurs avatar par initiale
-const AVATAR_COLORS = ['#0D1B2A','#1DA870','#7F77DD','#F5A623','#E74C3C','#2980B9','#8E44AD','#16A085'];
-function avatarColor(name) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
-}
-
-function renderCards() {
-  const grid = document.getElementById('contactsGrid');
-  const empty = document.getElementById('emptyState');
-  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
-  const cl = document.getElementById('filterClient')?.value || '';
-
-  let list = contacts.filter(c => {
-    const fullName = ((c.prenom||'') + ' ' + (c.nom||'')).toLowerCase();
-    const mq = !q || fullName.includes(q) || (c.email||'').toLowerCase().includes(q) || (c.role||'').toLowerCase().includes(q);
-    const mc = !cl || c.client === cl;
-    return mq && mc;
-  });
-
-  if (!window._isAdmin && window._currentClientFilter) {
-    list = contacts.filter(c => c.client === window._currentClientFilter);
-  }
-
-  if (list.length === 0) {
-    grid.innerHTML = '';
-    empty.style.display = 'block';
-    return;
-  }
-  empty.style.display = 'none';
-
-  // Admin : grouper par client si pas de filtre
-  if (window._isAdmin && !cl && !q) {
-    const byClient = {};
-    list.forEach(c => { if (!byClient[c.client]) byClient[c.client] = []; byClient[c.client].push(c); });
-    grid.innerHTML = Object.keys(byClient).sort().map(client => `
-      <div style="grid-column:1/-1;">
-        <div class="client-section-title">
-          <span style="background:#EBF0F5;color:var(--navy);padding:3px 12px;border-radius:20px;font-size:13px;">${client}</span>
-        </div>
-        <div class="contacts-grid" style="margin-bottom:8px;">${byClient[client].map(c => cardHtml(c)).join('')}</div>
-      </div>`).join('');
-  } else {
-    grid.innerHTML = list.map(c => cardHtml(c)).join('');
-  }
-}
-
-function cardHtml(c) {
-  const initials = getInitials(c.prenom, c.nom).toUpperCase() || '?';
-  const color = avatarColor(c.prenom + c.nom);
-  const fullName = [c.prenom, c.nom].filter(Boolean).join(' ');
-
-  const emailBtn = c.email
-    ? `<a href="mailto:${c.email}" class="btn-action email"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Email</a>`
-    : '';
-  const telBtn = c.telephone
-    ? `<a href="tel:${c.telephone}" class="btn-action tel"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>${c.telephone}</a>`
-    : '';
-
-  const adminBtns = window._isAdmin ? `
-    <button class="btn-action edit" onclick="openEditModal('${c.id}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
-    <button class="btn-action del" onclick="deleteContact('${c.id}')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Suppr.</button>` : '';
-
-  return `
-    <div class="contact-card">
-      <div class="card-top">
-        <div class="card-avatar" style="background:${color};">${initials}</div>
-        <div class="card-info">
-          <div class="card-name">${fullName}</div>
-          ${c.role ? `<div class="card-role">${c.role}</div>` : ''}
-          ${window._isAdmin ? `<div class="card-client-pill">${c.client}</div>` : ''}
-        </div>
-      </div>
-      <div class="card-contacts">
-        ${c.email ? `<div class="card-contact-row"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><a href="mailto:${c.email}">${c.email}</a></div>` : ''}
-        ${c.telephone ? `<div class="card-contact-row"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg><a href="tel:${c.telephone}">${c.telephone}</a></div>` : ''}
-      </div>
-      <div class="card-actions">
-        ${emailBtn}${telBtn}${adminBtns}
-      </div>
-    </div>`;
-}
-
-function openAddModal() {
-  window._editContactId = null;
-  document.getElementById('modalTitle').textContent = 'Ajouter un contact';
-  document.getElementById('fPrenom').value = '';
-  document.getElementById('fNom').value = '';
-  document.getElementById('fRole').value = '';
-  document.getElementById('fEmail').value = '';
-  document.getElementById('fTelephone').value = '';
-  document.getElementById('fClient').value = '';
-  document.getElementById('modalContact').classList.add('open');
-}
-
-window.openEditModal = function(id) {
-  const c = contacts.find(x => x.id === id);
-  if (!c) return;
-  window._editContactId = id;
-  document.getElementById('modalTitle').textContent = 'Modifier le contact';
-  document.getElementById('fPrenom').value = c.prenom || '';
-  document.getElementById('fNom').value = c.nom || '';
-  document.getElementById('fRole').value = c.role || '';
-  document.getElementById('fEmail').value = c.email || '';
-  document.getElementById('fTelephone').value = c.telephone || '';
-  document.getElementById('fClient').value = c.client || '';
-  document.getElementById('modalContact').classList.add('open');
-};
-
-function closeModal() {
-  document.getElementById('modalContact').classList.remove('open');
-}
-
-document.getElementById('modalContact').addEventListener('click', e => {
-  if (e.target === document.getElementById('modalContact')) closeModal();
-});
-
-function showToast(msg, error = false) {
+function showToast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toastMsg').textContent = msg;
-  t.style.background = error ? 'var(--red)' : 'var(--navy)';
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3500);
+  setTimeout(() => t.classList.remove('show'), 3000);
 }
-
-function updateDateChip() {
-  const now = new Date();
-  document.getElementById('dateChip').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
-updateDateChip();
+document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
 </script>
 
-<!-- Script module Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy }
+import { getFirestore, collection, getDocs, doc, setDoc }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({
@@ -418,163 +235,45 @@ const app = initializeApp({
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 
-window.handleLogout = async function() {
-  await signOut(auth);
-  window.location.href = "login.html";
-};
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
 
-// ── CHARGER CONTACTS ──────────────────────────────────────────────
-async function loadContacts() {
+async function loadConfig() {
   try {
-    let snap;
-    if (window._isAdmin) {
-      snap = await getDocs(query(collection(db, "contacts"), orderBy("createdAt", "desc")));
-    } else {
-      snap = await getDocs(query(
-        collection(db, "contacts"),
-        where("client", "==", window._currentClientFilter),
-        orderBy("createdAt", "desc")
-      ));
+    const snap = await getDocs(collection(db, "config"));
+    const d = snap.docs.find(x => x.id === 'belledonne');
+    if (d) {
+      const data = d.data();
+      if (data.telephone) document.getElementById('inputTel').value = data.telephone;
+      if (data.email) document.getElementById('inputEmail').value = data.email;
+      updatePreview();
     }
-    window.contacts = contacts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (window._isAdmin) populateFilterClient();
-    renderCards();
-  } catch(e) {
-    console.error("loadContacts:", e);
-    showToast("Erreur de chargement : " + e.message, true);
-  }
+  } catch(e) { console.error(e); }
 }
 
-function populateFilterClient() {
-  const sel = document.getElementById('filterClient');
-  if (!sel) return;
-  const current = sel.value;
-  const all = [...new Set(contacts.map(c => c.client).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">Tous les clients</option>';
-  all.forEach(cl => {
-    const o = document.createElement('option');
-    o.value = cl; o.textContent = cl;
-    if (cl === current) o.selected = true;
-    sel.appendChild(o);
-  });
-}
+window.saveConfig = async function() {
+  const telephone = document.getElementById('inputTel').value.trim();
+  const email = document.getElementById('inputEmail').value.trim();
+  if (!telephone && !email) { alert('Renseignez au moins un téléphone ou un email.'); return; }
 
-// ── CHARGER CLIENTS DANS LE SELECT MODAL ─────────────────────────
-async function loadClientsSelect() {
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true;
   try {
-    const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
-    const cls = [...new Set(snap.docs.map(d => d.data().client).filter(Boolean))].sort();
-    window.clientsList = cls;
-    const sel = document.getElementById('fClient');
-    sel.innerHTML = '<option value="">— Sélectionner un client —</option>';
-    cls.forEach(c => {
-      const o = document.createElement('option');
-      o.value = c; o.textContent = c;
-      sel.appendChild(o);
-    });
-  } catch(e) { console.error("loadClientsSelect:", e); }
-}
-
-// ── SAVE (add ou update) ──────────────────────────────────────────
-window.saveContact = async function() {
-  const prenom = document.getElementById('fPrenom').value.trim();
-  const nom = document.getElementById('fNom').value.trim();
-  const role = document.getElementById('fRole').value.trim();
-  const client = document.getElementById('fClient').value;
-  const email = document.getElementById('fEmail').value.trim();
-  const telephone = document.getElementById('fTelephone').value.trim();
-
-  if (!prenom || !nom || !client || !email) {
-    alert('Veuillez renseigner prénom, nom, client et email.');
-    return;
-  }
-
-  const btnSave = document.getElementById('btnSave');
-  btnSave.disabled = true;
-  btnSave.textContent = 'Enregistrement…';
-
-  const data = { prenom, nom, role, client, email, telephone };
-
-  try {
-    if (window._editContactId) {
-      await updateDoc(doc(db, "contacts", window._editContactId), data);
-      showToast(`Contact modifié — ${prenom} ${nom}`);
-    } else {
-      data.createdAt = new Date().toISOString();
-      await addDoc(collection(db, "contacts"), data);
-      showToast(`Contact ajouté — ${prenom} ${nom}`);
-    }
-    closeModal();
-    await loadContacts();
+    await setDoc(doc(db, "config", "belledonne"), { telephone, email, updatedAt: new Date().toISOString() });
+    const ok = document.getElementById('saveOk');
+    ok.style.display = 'flex';
+    setTimeout(() => { ok.style.display = 'none'; }, 3000);
+    showToast('Coordonnées enregistrées !');
   } catch(e) {
-    console.error("saveContact:", e);
-    showToast("Erreur : " + e.message, true);
+    showToast('Erreur : ' + e.message);
   } finally {
-    btnSave.disabled = false;
-    btnSave.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistrer';
+    btn.disabled = false;
   }
 };
 
-// ── DELETE ────────────────────────────────────────────────────────
-window.deleteContact = async function(id) {
-  if (!confirm('Supprimer ce contact ?')) return;
-  try {
-    await deleteDoc(doc(db, "contacts", id));
-    showToast('Contact supprimé.');
-    await loadContacts();
-  } catch(e) {
-    console.error("deleteContact:", e);
-    showToast("Erreur : " + e.message, true);
-  }
-};
-
-// ── AUTH ──────────────────────────────────────────────────────────
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
-
-  // Détecter admin
-  if (user.email === "belledonne.multiservices@gmail.com") {
-    window._isAdmin = true;
-    document.getElementById('sidebarBrand').style.display = 'flex';
-    document.getElementById('sidebarBrandLabel').textContent = 'Espace Admin';
-    document.getElementById('navAdminLabel').style.display = '';
-    document.getElementById('navAdmin').style.display = '';
-    document.getElementById('footerRole').textContent = 'Administrateur';
-    document.getElementById('footerAvatar').textContent = 'BM';
-    document.getElementById('footerName').textContent = 'Belledonne Multiservices';
-    document.getElementById('bcParent').textContent = 'Admin';
-    await loadClientsSelect();
-    await loadContacts();
-  } else {
-    // Récupérer le profil client
-    try {
-      const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
-      if (!snap.empty) {
-        const profile = snap.docs[0].data();
-        window._currentClientFilter = profile.client;
-        // Masquer les éléments admin
-        document.querySelectorAll('.btn-admin-only').forEach(el => el.style.display = 'none');
-        document.getElementById('adminToolbar').style.display = 'none';
-        document.getElementById('sidebarBrand').style.display = 'flex';
-        document.getElementById('sidebarBrand').style.background = 'rgba(46,204,143,0.1)';
-        document.getElementById('sidebarBrand').style.borderColor = 'rgba(46,204,143,0.3)';
-        document.getElementById('sidebarBrand').querySelector('svg').style.color = 'var(--green)';
-        document.getElementById('sidebarBrandLabel').textContent = profile.client || 'Espace Client';
-        document.getElementById('sidebarBrandLabel').style.color = 'var(--green)';
-        document.getElementById('footerRole').textContent = 'Client';
-        document.getElementById('footerName').textContent = profile.client || user.email;
-        document.getElementById('footerAvatar').textContent = (profile.client||'C')[0].toUpperCase();
-        document.getElementById('bcParent').textContent = profile.client || 'Client';
-        document.getElementById('pageSub').textContent = 'Vos interlocuteurs Belledonne Multiservices';
-        await loadContacts();
-      } else {
-        window.location.href = "login.html";
-      }
-    } catch(e) {
-      console.error("Auth profile:", e);
-      window.location.href = "login.html";
-    }
-  }
+  if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
+  await loadConfig();
 });
 </script>
 </body>
