@@ -258,11 +258,7 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         <input class="search-input" type="text" id="searchInput" placeholder="Rechercher une campagne..." />
       </div>
-      <select class="filter-select" id="filterStatus">
-        <option value="">Tous les statuts</option>
-        <option value="active">En cours</option>
-        <option value="closed">Terminée</option>
-      </select>
+      <select class="filter-select" id="filterYear"><option value="">Toutes les années</option></select>
       <span class="results-count" id="resultsCount"></span>
     </div>
 
@@ -301,18 +297,12 @@
           <input class="form-input" type="date" id="inputFin" />
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Nombre de sites</label>
-          <input class="form-input" type="number" id="inputSites" placeholder="ex: 8" min="1" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Statut</label>
-          <select class="form-select" id="inputStatut">
-            <option value="active">En cours</option>
-            <option value="closed">Terminée</option>
-          </select>
-        </div>
+      <div class="form-group">
+        <label class="form-label">Statut</label>
+        <select class="form-select" id="inputStatut">
+          <option value="active">En cours</option>
+          <option value="closed">Terminée</option>
+        </select>
       </div>
     </div>
     <div class="modal-footer">
@@ -342,10 +332,7 @@
         </div>
       </div>
       <div id="pendingList" style="display:none;max-height:280px;overflow-y:auto;"></div>
-      <div style="margin-top:10px;padding:10px 12px;background:var(--green-pale);border-radius:var(--radius-sm);font-size:12px;color:var(--green-dark);display:flex;gap:8px;align-items:flex-start;">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;margin-top:1px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-        L'adresse et le numéro de passage sont extraits automatiquement du nom du fichier.
-      </div>
+      
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" id="cancelDoc">Annuler</button>
@@ -364,6 +351,9 @@
 </div>
 
 <script>
+
+window._isAdmin = false;
+window._currentClientFilter = null;
 
 const COLORS = ['color-green','color-blue','color-amber','color-purple'];
 
@@ -413,7 +403,7 @@ function renderCampagnes(list) {
         <div style="padding:12px 24px 0;">
           <div style="position:relative;">
             <svg viewBox="0 0 24 24" fill="currentColor" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-muted);pointer-events:none;"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-            <input type="text" placeholder="Rechercher par adresse..." oninput="filterDocs(${c.id}, this.value)"
+            <input type="text" placeholder="Rechercher par adresse..." oninput="filterDocs('${c.id}', this.value)"
               style="width:100%;height:36px;padding:0 12px 0 34px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;" />
           </div>
         </div>
@@ -421,7 +411,7 @@ function renderCampagnes(list) {
 
     return `
     <div class="campagne-card" data-id="${c.id}">
-      <div class="campagne-header" onclick="toggleCampagne(${c.id})">
+      <div class="campagne-header" onclick="toggleCampagne('${c.id}')">
         <div class="campagne-color ${c.color}"></div>
         <div class="campagne-header-info">
           <div class="campagne-name">${c.nom}</div>
@@ -445,10 +435,10 @@ function renderCampagnes(list) {
       <div class="campagne-docs" id="docs-${c.id}">
         <div class="docs-toolbar">
           <span class="docs-toolbar-title">${nbXls} Excel · ${nbPdf} feuille${nbPdf>1?'s':''} d'émargement</span>
-          <button class="btn-add-doc" onclick="openAddDoc(${c.id}, event)">
+          ${window._isAdmin ? `<button class="btn-add-doc" onclick="openAddDoc('${c.id}', event)">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
             Ajouter des documents
-          </button>
+          </button>` : ''}
         </div>
         ${docsHtml}
       </div>
@@ -464,18 +454,31 @@ function toggleCampagne(id) {
 }
 
 function filterCampagnes() {
+  if (window.campagnes) campagnes = window.campagnes;
   const q = document.getElementById('searchInput').value.toLowerCase();
-  const s = document.getElementById('filterStatus').value;
+  const y = document.getElementById('filterYear').value;
   const filtered = campagnes.filter(c => {
     const matchQ = !q || c.nom.toLowerCase().includes(q);
-    const matchS = !s || c.statut === s;
-    return matchQ && matchS;
+    const matchY = !y || (c.debut||'').startsWith(y);
+    return matchQ && matchY;
   });
   renderCampagnes(filtered);
 }
 
+// Générer les années dynamiquement
+(function() {
+  const sel = document.getElementById('filterYear');
+  if (!sel) return;
+  const now = new Date().getFullYear();
+  for (let y = now + 1; y >= now; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    sel.appendChild(o);
+  }
+})();
+
 document.getElementById('searchInput').addEventListener('input', filterCampagnes);
-document.getElementById('filterStatus').addEventListener('change', filterCampagnes);
+document.getElementById('filterYear').addEventListener('change', filterCampagnes);
 
 // MODAL CAMPAGNE
 const modalCampagne = document.getElementById('modalCampagne');
@@ -485,30 +488,42 @@ document.getElementById('cancelCampagne').addEventListener('click', () => modalC
 modalCampagne.addEventListener('click', e => { if (e.target === modalCampagne) modalCampagne.classList.remove('open'); });
 
 let _savingCampagne = false;
-document.getElementById('saveCampagne').addEventListener('click', () => {
+let _editCampagneId = null;
+document.getElementById('saveCampagne').addEventListener('click', async () => {
   if (_savingCampagne) return;
-  _savingCampagne = true;
-  setTimeout(() => { _savingCampagne = false; }, 2000);
   const nom = document.getElementById('inputNom').value.trim();
   const debut = document.getElementById('inputDebut').value;
   const fin = document.getElementById('inputFin').value;
-  const sites = parseInt(document.getElementById('inputSites').value) || 0;
   const statut = document.getElementById('inputStatut').value;
   let client = document.getElementById('inputClient').value;
   if (client === '__new__') client = document.getElementById('inputClientNew').value.trim();
   if (!nom || !debut || !client) { alert('Veuillez renseigner au moins le client, le nom et la date de début.'); return; }
-  const newC = { id: Date.now(), nom, debut, fin, sites, statut, client, color: COLORS[colorIndex % COLORS.length], docs: [] };
-  colorIndex++;
-  campagnes.unshift(newC);
-  filterCampagnes();
-  modalCampagne.classList.remove('open');
-  document.getElementById('inputNom').value = '';
-  document.getElementById('inputDebut').value = '';
-  document.getElementById('inputFin').value = '';
-  document.getElementById('inputSites').value = '';
-  document.getElementById('inputClient').value = '';
-  document.getElementById('newClientCampWrap').style.display = 'none';
-  showToast('Campagne "' + nom + '" créée !');
+
+  _savingCampagne = true;
+  const btn = document.getElementById('saveCampagne');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+  try {
+    const editId = window._editCampagneId || _editCampagneId;
+    if (editId) {
+      await window._updateCampagne(editId, { nom, debut, fin, statut, client });
+      showToast('Campagne "' + nom + '" mise à jour !');
+    } else {
+      await window._addCampagne({ nom, debut, fin, statut, client, color: COLORS[colorIndex % COLORS.length], docs: [], createdAt: new Date().toISOString() });
+      colorIndex++;
+      showToast('Campagne "' + nom + '" créée !');
+    }
+    modalCampagne.classList.remove('open');
+    _editCampagneId = null; window._editCampagneId = null;
+    document.getElementById('inputNom').value = '';
+    document.getElementById('inputDebut').value = '';
+    document.getElementById('inputFin').value = '';
+    document.getElementById('inputClient').value = '';
+    document.getElementById('newClientCampWrap').style.display = 'none';
+    const mt = document.getElementById('modalCampagneTitle'); if(mt) mt.textContent = 'Nouvelle campagne';
+    await window._loadCampagnes(window._currentClientFilter);
+  } catch(e) { alert('Erreur : ' + e.message); }
+  btn.disabled = false; btn.textContent = 'Créer la campagne';
+  _savingCampagne = false;
 });
 
 // ── PARSING NOM DE FICHIER ──
@@ -604,10 +619,11 @@ const modalDoc = document.getElementById('modalDoc');
 let pendingFiles = [];
 
 window.openAddDoc = function(campagneId, e) {
-  e.stopPropagation();
+  if(e) e.stopPropagation();
   currentCampagneId = campagneId;
-  const c = campagnes.find(x => x.id === campagneId);
-  document.getElementById('modalDocTitle').textContent = 'Ajouter des documents — ' + c.nom.substring(0, 36) + (c.nom.length > 36 ? '…' : '');
+  const c = (window.campagnes || campagnes || []).find(x => x.id === campagneId);
+  const nom = c ? c.nom : '';
+  document.getElementById('modalDocTitle').textContent = 'Ajouter des documents' + (nom ? ' — ' + nom.substring(0, 36) : '');
   pendingFiles = [];
   renderPendingFiles();
   modalDoc.classList.add('open');
@@ -647,7 +663,7 @@ fileInputDoc.addEventListener('change', () => {
     const ext = file.name.split('.').pop().toLowerCase();
     const type = (ext==='xls'||ext==='xlsx') ? 'xls' : 'pdf';
     const { adresse, passage } = parseFilename(file.name);
-    pendingFiles.push({ name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
+    pendingFiles.push({ file, name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
   });
   renderPendingFiles();
   fileInputDoc.value = '';
@@ -662,26 +678,29 @@ dropZoneDoc.addEventListener('drop', e => {
     const ext = file.name.split('.').pop().toLowerCase();
     const type = (ext==='xls'||ext==='xlsx') ? 'xls' : 'pdf';
     const { adresse, passage } = parseFilename(file.name);
-    pendingFiles.push({ name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
+    pendingFiles.push({ file, name: file.name, type, adresse, passage, date: new Date().toISOString().split('T')[0] });
   });
   renderPendingFiles();
 });
 
-document.getElementById('saveDoc').addEventListener('click', () => {
+document.getElementById('saveDoc').addEventListener('click', async () => {
   if (pendingFiles.length === 0) { alert('Veuillez sélectionner au moins un fichier.'); return; }
-  const c = campagnes.find(x => x.id === currentCampagneId);
-  if (!c) return;
-  pendingFiles.forEach(f => c.docs.push({ id: Date.now()+Math.random(), ...f }));
-  const nb = pendingFiles.length;
-  filterCampagnes();
-  setTimeout(() => {
-    const docs = document.getElementById('docs-' + currentCampagneId);
-    const toggle = document.getElementById('toggle-' + currentCampagneId);
-    if (docs) { docs.classList.add('open'); toggle.classList.add('open'); }
-  }, 50);
-  modalDoc.classList.remove('open');
-  pendingFiles = [];
-  showToast(nb + ' document' + (nb>1?'s':'') + ' ajouté' + (nb>1?'s':'') + ' !');
+  const btn = document.getElementById('saveDoc');
+  btn.disabled = true; btn.textContent = 'Envoi en cours...';
+  try {
+    await window._uploadDocs(currentCampagneId, pendingFiles);
+    const nb = pendingFiles.length;
+    modalDoc.classList.remove('open');
+    pendingFiles = []; renderPendingFiles();
+    showToast(nb + ' document' + (nb>1?'s':'') + ' ajouté' + (nb>1?'s':'') + ' !');
+    await window._loadCampagnes(window._currentClientFilter);
+    setTimeout(() => {
+      const docs = document.getElementById('docs-' + currentCampagneId);
+      const toggle = document.getElementById('toggle-' + currentCampagneId);
+      if (docs) { docs.classList.add('open'); if(toggle) toggle.classList.add('open'); }
+    }, 100);
+  } catch(e) { alert('Erreur upload : ' + e.message); }
+  btn.disabled = false; btn.textContent = 'Ajouter les documents';
 });
 
 function showToast(msg) {
@@ -696,11 +715,13 @@ renderCampagnes(campagnes);
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
 
 window.handleLogout = async function() {
   await signOut(auth);
@@ -709,14 +730,89 @@ window.handleLogout = async function() {
 
 window.deleteCampagne = async function(id, event) {
   event.stopPropagation();
-  if (!confirm('Supprimer cette campagne ?')) return;
+  if (!confirm('Supprimer cette campagne et tous ses documents ?')) return;
   try {
-    const { deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    // Supprimer tous les fichiers Storage de la campagne
+    const camp = (window.campagnes||[]).find(x => x.id === id);
+    if (camp && camp.docs) {
+      for (const d of camp.docs) {
+        if (d.url) {
+          try { await deleteObject(ref(storage, d.url)); } catch(se) { console.warn('Storage:', se); }
+        }
+      }
+    }
     await deleteDoc(doc(db, "campagnes", String(id)));
-    campagnes = campagnes.filter(c => c.id !== id);
+    campagnes = campagnes.filter(c => c.id !== id); window.campagnes = campagnes;
     filterCampagnes();
     showToast('Campagne supprimée !');
   } catch(e) { alert('Erreur : ' + e.message); }
+};
+
+// ── Charger les campagnes ──
+window._loadCampagnes = async function(clientFilter) {
+  try {
+    const snap = await getDocs(collection(db, "campagnes"));
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data(), docs: d.data().docs || [] }));
+    if (clientFilter) docs = docs.filter(c => c.client === clientFilter);
+    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    campagnes = docs; window.campagnes = docs;
+    filterCampagnes();
+  } catch(e) { console.error(e); }
+};
+
+window._addCampagne = async function(data) { await addDoc(collection(db, "campagnes"), data); };
+
+window._updateCampagne = async function(id, data) {
+  await updateDoc(doc(db, "campagnes", String(id)), { ...data, updatedAt: new Date().toISOString() });
+};
+
+// ── Upload documents dans une campagne ──
+window._uploadDocs = async function(campagneId, files) {
+  const campRef = doc(db, "campagnes", String(campagneId));
+  const newDocs = [];
+  for (const f of files) {
+    if (f.file) {
+      const ts = Date.now();
+      const storageRef = ref(storage, `campagnes/${campagneId}/${ts}_${f.file.name}`);
+      const snap = await uploadBytesResumable(storageRef, f.file);
+      const url = await getDownloadURL(snap.ref);
+      newDocs.push({ id: String(ts + Math.random()), name: f.name, type: f.type, adresse: f.adresse, passage: f.passage, date: f.date, url });
+    } else {
+      newDocs.push({ id: String(Date.now()+Math.random()), name: f.name, type: f.type, adresse: f.adresse, passage: f.passage, date: f.date, url: null });
+    }
+  }
+  const existing = (window.campagnes||[]).find(x => x.id === campagneId);
+  const currentDocs = existing ? (existing.docs||[]) : [];
+  await updateDoc(campRef, { docs: [...currentDocs, ...newDocs] });
+};
+
+// ── Supprimer un document d'une campagne ──
+window.deleteDoc_camp = async function(campagneId, docId) {
+  const camp = (window.campagnes||[]).find(x => x.id === campagneId);
+  if (!camp) return;
+  const docToDelete = (camp.docs||[]).find(d => String(d.id) === String(docId));
+  if (docToDelete && docToDelete.url) {
+    try { await deleteObject(ref(storage, docToDelete.url)); } catch(se) { console.warn('Storage:', se); }
+  }
+  const newDocs = (camp.docs||[]).filter(d => String(d.id) !== String(docId));
+  await updateDoc(doc(db, "campagnes", String(campagneId)), { docs: newDocs });
+};
+
+// ── openEditCampagne ──
+window.openEditCampagne = function(id, e) {
+  if(e) e.stopPropagation();
+  const allC = window.campagnes || campagnes || [];
+  const camp = allC.find(x => x.id === id);
+  if (!camp) { console.warn('Campagne non trouvée:', id); return; }
+  _editCampagneId = id; window._editCampagneId = id;
+  const mt = document.getElementById('modalCampagneTitle'); if(mt) mt.textContent = 'Modifier la campagne';
+  const bs = document.getElementById('saveCampagne'); if(bs) bs.textContent = 'Mettre à jour';
+  document.getElementById('inputNom').value = camp.nom || '';
+  document.getElementById('inputDebut').value = camp.debut || '';
+  document.getElementById('inputFin').value = camp.fin || '';
+  document.getElementById('inputStatut').value = camp.statut || 'active';
+  document.getElementById('inputClient').value = camp.client || '';
+  modalCampagne.classList.add('open');
 };
 
 async function loadClientsIntoSelect(selectId) {
@@ -725,48 +821,40 @@ async function loadClientsIntoSelect(selectId) {
   if (!sel) return;
   sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
   snap.docs.forEach(d => {
+    const cl = d.data().client; if(!cl) return;
     const opt = document.createElement("option");
-    opt.value = d.data().client;
-    opt.textContent = d.data().client;
+    opt.value = cl; opt.textContent = cl;
     sel.appendChild(opt);
   });
 }
+
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
   if (user.email === "belledonne.multiservices@gmail.com") {
     window._isAdmin = true;
-    const name = document.getElementById("sideClientName");
-    const id = document.getElementById("sideClientId");
-    const avatar = document.getElementById("sideAvatar");
-    const fname = document.getElementById("sideFooterName");
-    const frole = document.getElementById("sideFooterRole");
-    if (name) name.textContent = "Belledonne Multiservices";
-    if (id) id.textContent = "belledonne-admin";
-    if (avatar) avatar.textContent = "BM";
-    if (fname) fname.textContent = "Belledonne Multiservices";
-    if (frole) frole.textContent = "Administrateur";
-    
-    var adminNav = document.getElementById("adminNav");
-    if (adminNav) adminNav.style.display = "block";
-    var btn = document.getElementById("btnNewCampagne"); if (btn) btn.style.display = "";
+    window._currentClientFilter = null;
+    const name=document.getElementById("sideClientName"); if(name) name.textContent="Belledonne Multiservices";
+    const id=document.getElementById("sideClientId"); if(id) id.textContent="belledonne-admin";
+    const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent="BM";
+    const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent="Belledonne Multiservices";
+    const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Administrateur";
+    var adminNav=document.getElementById("adminNav"); if(adminNav) adminNav.style.display="block";
+    var btn=document.getElementById("btnNewCampagne"); if(btn) btn.style.display="";
     loadClientsIntoSelect("inputClient");
-  
+    window._currentClientFilter = null;
+    await window._loadCampagnes(null);
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
       if (!snap.empty) {
         const p = snap.docs[0].data();
-        const name = document.getElementById("sideClientName");
-        const id = document.getElementById("sideClientId");
-        const avatar = document.getElementById("sideAvatar");
-        const fname = document.getElementById("sideFooterName");
-        const frole = document.getElementById("sideFooterRole");
-        if (name) name.textContent = p.client || "Client";
-        if (id) id.textContent = p.identifiant || "";
-        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
-        if (fname) fname.textContent = p.client || user.email;
-        if (frole) frole.textContent = "Client";
-        
+        const name=document.getElementById("sideClientName"); if(name) name.textContent=p.client||"Client";
+        const id=document.getElementById("sideClientId"); if(id) id.textContent=p.identifiant||"";
+        const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent=(p.client||"CL").substring(0,2).toUpperCase();
+        const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent=p.client||user.email;
+        const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Client";
+        window._currentClientFilter = p.client;
+        await window._loadCampagnes(p.client);
       }
     } catch(e) { console.error(e); }
   }
