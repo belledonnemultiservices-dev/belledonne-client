@@ -63,6 +63,8 @@
   .kpi.navy::before{background:var(--navy);}
   .kpi-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px;}
   .kpi-lbl{font-size:12px;color:var(--text-muted);}
+  .kpi-period-btn{font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text-mid);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+  .kpi-period-btn.active{background:var(--green);color:#fff;border-color:var(--green);}
 
   /* BOUTON */
   .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
@@ -102,7 +104,7 @@
   .s-annulation::before{background:var(--red);}
 
   /* MOTIF */
-  .motif-cell{font-size:11px;color:var(--text-muted);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .motif-cell{font-size:11px;color:var(--text-muted);font-style:italic;white-space:normal;word-break:break-word;max-width:220px;}
   .motif-none{font-size:11px;color:var(--text-muted);}
 
   /* EMPTY */
@@ -211,16 +213,21 @@
     <div class="kpi-row">
       <div class="kpi red">
         <div class="kpi-val" id="kpiTotal">0</div>
-        <div class="kpi-lbl">Total entrées</div>
+        <div class="kpi-lbl" id="kpiLbl">Cette semaine</div>
       </div>
       <div class="kpi amber">
         <div class="kpi-val" id="kpiAbsents">0</div>
-        <div class="kpi-lbl">Absents</div>
+        <div class="kpi-lbl">Cette année</div>
       </div>
       <div class="kpi navy">
         <div class="kpi-val" id="kpiAnnulations">0</div>
-        <div class="kpi-lbl">Annulations</div>
+        <div class="kpi-lbl">Ce mois</div>
       </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <button onclick="setKpiPeriod('semaine')" id="btnSemaine" class="kpi-period-btn active">Cette semaine</button>
+      <button onclick="setKpiPeriod('mois')" id="btnMois" class="kpi-period-btn">Ce mois</button>
+      <button onclick="setKpiPeriod('annee')" id="btnAnnee" class="kpi-period-btn">Cette année</button>
     </div>
 
     <!-- SEARCH -->
@@ -229,16 +236,8 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         <input class="search-input" type="text" id="searchInput" placeholder="Rechercher par adresse, nom, bon de commande..." />
       </div>
-      <select class="filter-select" id="filterStatut">
-        <option value="">Absent & Annulation</option>
-        <option value="absent">Absent uniquement</option>
-        <option value="annulation">Annulation uniquement</option>
-      </select>
-      <select class="filter-select" id="filterAnnee">
-        <option value="">Toutes les années</option>
-        <option value="2025">2025</option>
-        <option value="2024">2024</option>
-      </select>
+      <select class="filter-select" id="filterAnnee"><option value="">Toutes les années</option></select>
+      <select class="filter-select" id="filterClient" style="display:none;"><option value="">Tous les clients</option></select>
       <span class="results-count" id="resultsCount"></span>
     </div>
 
@@ -304,8 +303,7 @@
         <label class="form-label">Motif</label>
         <input class="form-input" type="text" id="inMotifSelect" placeholder="Rempli automatiquement depuis le rapport Excel" />
       </div>
-    </div>
-      <div class="form-group" style="margin-top:16px;margin-bottom:0;">
+      <div class="form-group" style="margin-top:16px;margin-bottom:0;padding:0 2px;">
         <label class="form-label">Rapport Excel (auto-remplissage)</label>
         <div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center;cursor:pointer;position:relative;">
           <input type="file" id="fileInputAbsent" accept=".xlsx,.xls" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;" />
@@ -375,7 +373,9 @@
 
 <script>
 
-let entries = [];
+window._isAdmin = false;
+window.absents = [];
+let entries = window.absents;
 
 
 function formatDate(d) {
@@ -385,10 +385,31 @@ function formatDate(d) {
   return `${parseInt(day)} ${mois[parseInt(m)-1]} ${y}`;
 }
 
+let _kpiPeriod = 'semaine';
+function setKpiPeriod(period) {
+  _kpiPeriod = period;
+  document.querySelectorAll('.kpi-period-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn' + period.charAt(0).toUpperCase() + period.slice(1)).classList.add('active');
+  updateKPIs();
+}
+
 function updateKPIs() {
-  document.getElementById('kpiTotal').textContent = entries.length;
-  document.getElementById('kpiAbsents').textContent = entries.filter(e => e.statut === 'absent').length;
-  document.getElementById('kpiAnnulations').textContent = entries.filter(e => e.statut === 'annulation').length;
+  const now = new Date();
+  const annee = now.getFullYear().toString();
+  const mois = annee + '-' + String(now.getMonth()+1).padStart(2,'0');
+  const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const monday = new Date(now); monday.setDate(now.getDate() - dow);
+  const mondayStr = monday.toISOString().split('T')[0];
+  const all = window.absents || entries || [];
+  let periodeCount = 0;
+  if (_kpiPeriod === 'semaine') periodeCount = all.filter(e => (e.date||'') >= mondayStr).length;
+  else if (_kpiPeriod === 'mois') periodeCount = all.filter(e => (e.date||'').startsWith(mois)).length;
+  else periodeCount = all.filter(e => (e.date||'').startsWith(annee)).length;
+  const lbl = _kpiPeriod === 'semaine' ? 'Cette semaine' : _kpiPeriod === 'mois' ? 'Ce mois' : 'Cette année';
+  document.getElementById('kpiTotal').textContent = periodeCount;
+  document.getElementById('kpiLbl').textContent = lbl;
+  document.getElementById('kpiAbsents').textContent = all.filter(e => (e.date||'').startsWith(annee)).length;
+  document.getElementById('kpiAnnulations').textContent = all.filter(e => (e.date||'').startsWith(mois)).length;
 }
 
 function renderTable(list) {
@@ -414,30 +435,46 @@ function renderTable(list) {
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         ${e.notifs > 0 ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifié${e.notifs > 1 ? ' ×'+e.notifs : ''}</span>` : ''}
         <span class="statut-pill ${e.statut === 'absent' ? 's-absent' : 's-annulation'}">${e.statut === 'absent' ? 'Absent' : 'Annulation'}</span>
-        <button onclick="openSendModal('absent','${e.bc||''}','${e.adresse}','${e.date}',${e.id})" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:#1DA870;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">
+        ${window._isAdmin ? `<button onclick="openSendModal('absent','${e.bc||''}','${e.adresse}','${e.date}','${e.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:#1DA870;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier
-        </button>
-        ${window._isAdmin ? `<button onclick="deleteAbsent(${e.id})" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
+        </button>` : ''}
+        ${e.rapportUrl ? `<a href="${e.rapportUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 10px;border-radius:6px;text-decoration:none;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
+        ${window._isAdmin ? `
+          <button onclick="openEditAbsent('${e.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1A2E42;background:#EBF0F5;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+          <button onclick="deleteAbsent('${e.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
       </div>
     </div>`).join('');
 }
 
 function filter() {
+  if (window.absents) entries = window.absents;
   const q = document.getElementById('searchInput').value.toLowerCase();
-  const s = document.getElementById('filterStatut').value;
   const y = document.getElementById('filterAnnee').value;
+  const fc = document.getElementById('filterClient') ? document.getElementById('filterClient').value : '';
   const filtered = entries.filter(e => {
-    const mq = !q || e.adresse.toLowerCase().includes(q) || (e.nom||'').toLowerCase().includes(q) || (e.bc||'').toLowerCase().includes(q) || (e.motif||'').toLowerCase().includes(q);
-    const ms = !s || e.statut === s;
-    const my = !y || e.date.startsWith(y);
-    return mq && ms && my;
+    const mq = !q || (e.adresse||'').toLowerCase().includes(q) || (e.nom||'').toLowerCase().includes(q) || (e.bc||'').toLowerCase().includes(q);
+    const my = !y || (e.date||'').startsWith(y);
+    const mc = !fc || e.client === fc;
+    return mq && my && mc;
   });
   renderTable(filtered);
 }
 
+// Générer les années dynamiquement
+(function() {
+  const sel = document.getElementById('filterAnnee');
+  if (!sel) return;
+  const now = new Date().getFullYear();
+  for (let y = now + 1; y >= now; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    sel.appendChild(o);
+  }
+})();
+
 document.getElementById('searchInput').addEventListener('input', filter);
-document.getElementById('filterStatut').addEventListener('change', filter);
 document.getElementById('filterAnnee').addEventListener('change', filter);
+document.getElementById('filterClient').addEventListener('change', filter);
 
 // MOTIF DYNAMIQUE
 window.handleMotifChange = function() {
@@ -472,7 +509,80 @@ document.addEventListener('keydown', e => {
 
 // MODAL
 const modal = document.getElementById('modal');
-document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
+const STATUT_MAP_ABS = { 'absent': 'absent', 'absence': 'absent', 'annulation': 'annulation', 'annulé': 'annulation' };
+
+function parseAbsentExcel(file) {
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const bc      = ws['B5'] ? String(ws['B5'].v).trim().replace(/##[^#]+##/g,'').trim() : '';
+      const nom     = ws['B6'] ? String(ws['B6'].v).trim().replace(/##[^#]+##/g,'').trim() : '';
+      const adresse = ws['B7'] ? String(ws['B7'].v).trim().replace(/##[^#]+##/g,'').trim() : '';
+      const dateVal = ws['B8'] ? ws['B8'].v : '';
+      const statut  = ws['D8'] ? String(ws['D8'].v).trim().toLowerCase() : '';
+      const motif   = ws['A11'] ? String(ws['A11'].v).trim().replace(/##[^#]+##/g,'').trim() : '';
+      if (bc && !bc.includes('#'))      { const el=document.getElementById('inBC');         if(el) el.value=bc; }
+      if (nom && !nom.includes('#'))    { const el=document.getElementById('inNom');        if(el) el.value=nom; }
+      if (adresse && !adresse.includes('#')) { const el=document.getElementById('inAdresse'); if(el) el.value=adresse; }
+      if (motif && !motif.includes('#')){ const el=document.getElementById('inMotifSelect'); if(el) el.value=motif; }
+      if (dateVal) {
+        let ds = '';
+        if (dateVal instanceof Date) ds = dateVal.toISOString().split('T')[0];
+        else if (typeof dateVal === 'string' && !dateVal.includes('#')) {
+          const p = dateVal.split(' ')[0].split('/');
+          if (p.length===3) ds = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        }
+        if (ds) { const el=document.getElementById('inDate'); if(el) el.value=ds; }
+      }
+      if (statut && !statut.includes('#')) {
+        const m=STATUT_MAP_ABS[statut]; const s=document.getElementById('inStatut'); if(s&&m) s.value=m;
+      }
+      const dc=document.getElementById('dropChosenAbsent');
+      if(dc){ dc.textContent='✓ '+file.name+' — champs pré-remplis !'; dc.style.display='block'; dc.style.color='var(--green-dark)'; }
+    } catch(err) { console.error(err); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+const fileInputAbsent = document.getElementById('fileInputAbsent');
+if (fileInputAbsent) fileInputAbsent.addEventListener('change', () => {
+  if (fileInputAbsent.files[0]) parseAbsentExcel(fileInputAbsent.files[0]);
+});
+
+// ── resetModal + openEditAbsent ──
+window._editAbsentId = null;
+
+function resetAbsentModal() {
+  window._editAbsentId = null;
+  const mt=document.getElementById('modalTitle'); if(mt) mt.textContent='Ajouter une entrée';
+  const sm=document.getElementById('saveModal'); if(sm) sm.textContent='Enregistrer';
+  ['inAdresse','inNom','inDate','inBC','inMotifSelect'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('inStatut').value = 'absent';
+  document.getElementById('inClient').value = '';
+  document.getElementById('newClientWrap').style.display = 'none';
+  const dc=document.getElementById('dropChosenAbsent'); if(dc){ dc.style.display='none'; dc.textContent=''; dc.style.color=''; }
+  if(fileInputAbsent) fileInputAbsent.value='';
+}
+
+window.openEditAbsent = function(id) {
+  const e = (window.absents||entries||[]).find(x => x.id === id);
+  if (!e) return;
+  window._editAbsentId = id;
+  const mt=document.getElementById('modalTitle'); if(mt) mt.textContent="Modifier l'entrée";
+  const sm=document.getElementById('saveModal'); if(sm) sm.textContent='Mettre à jour';
+  document.getElementById('inAdresse').value = e.adresse||'';
+  document.getElementById('inNom').value = e.nom||'';
+  document.getElementById('inDate').value = e.date||'';
+  document.getElementById('inBC').value = e.bc||'';
+  document.getElementById('inStatut').value = e.statut||'absent';
+  document.getElementById('inClient').value = e.client||'';
+  document.getElementById('inMotifSelect').value = e.motif||'';
+  modal.classList.add('open');
+};
+
+document.getElementById('btnAjouter').addEventListener('click', () => { resetAbsentModal(); modal.classList.add('open'); });
 document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
 modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
@@ -482,43 +592,31 @@ window.handleClientSelect = function() {
 };
 
 let _savingAbsent = false;
-document.getElementById('saveModal').addEventListener('click', () => {
+document.getElementById('saveModal').addEventListener('click', async () => {
   if (_savingAbsent) return;
-  _savingAbsent = true;
-  setTimeout(() => { _savingAbsent = false; }, 2000);
   const statut = document.getElementById('inStatut').value;
   const adresse = document.getElementById('inAdresse').value.trim();
   const date = document.getElementById('inDate').value;
   let client = document.getElementById('inClient').value;
   if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
-  if (!client || !statut || !adresse || !date) {
-    alert('Veuillez remplir les champs obligatoires : client, statut, adresse et date.');
-    return;
-  }
+  if (!client || !statut || !adresse || !date) { alert('Veuillez remplir les champs obligatoires : client, statut, adresse et date.'); return; }
   const motif = document.getElementById('inMotifSelect').value.trim();
+  const nom = document.getElementById('inNom').value.trim();
+  const bc = document.getElementById('inBC').value.trim();
 
-  entries.unshift({
-    id: Date.now(),
-    statut, adresse, date, client,
-    nom: document.getElementById('inNom').value.trim(),
-    bc: document.getElementById('inBC').value.trim(),
-    motif, notifs: 0
-  });
-
-  filter();
-  updateKPIs();
-  modal.classList.remove('open');
-
-  ['inAdresse','inNom','inDate','inBC'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('inStatut').value = '';
-  document.getElementById('inClient').value = '';
-  document.getElementById('inClientNew').value = '';
-  document.getElementById('newClientWrap').style.display = 'none';
-  document.getElementById('inMotifSelect').value = '';
-  document.getElementById('motifCustomWrap').style.display = 'none';
-
-  const label = statut === 'absent' ? 'Absent' : 'Annulation';
-  showToast(label + ' enregistré — ' + adresse.substring(0, 40));
+  _savingAbsent = true;
+  const btn = document.getElementById('saveModal');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+  try {
+    const file = fileInputAbsent ? fileInputAbsent.files[0] : null;
+    await window._saveAbsent({ adresse, nom, date, bc, statut, motif, client, file, editId: window._editAbsentId });
+    modal.classList.remove('open');
+    resetAbsentModal();
+    await window._loadAbsents(window._currentClientFilter);
+    showToast(window._editAbsentId ? 'Entrée mise à jour !' : (statut==='absent'?'Absent':'Annulation') + ' enregistré — ' + adresse.substring(0,40));
+  } catch(e) { alert('Erreur : ' + e.message); }
+  btn.disabled = false; btn.textContent = window._editAbsentId ? 'Mettre à jour' : 'Enregistrer';
+  _savingAbsent = false;
 });
 
 function showToast(msg) {
@@ -632,80 +730,115 @@ document.getElementById('modalSend').addEventListener('click', e => { if(e.targe
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
 
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
+window._currentClientFilter = null;
+
+// ── Charger les absents ──
+window._loadAbsents = async function(clientFilter) {
+  try {
+    const snap = await getDocs(collection(db, "absents"));
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (clientFilter) docs = docs.filter(e => e.client === clientFilter);
+    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    window.absents = docs;
+    if (window._isAdmin) populateClientFilter();
+    updateKPIs();
+    filter();
+  } catch(e) { console.error(e); }
+};
+
+function populateClientFilter() {
+  const sel = document.getElementById('filterClient');
+  if (!sel) return; sel.style.display = '';
+  const current = sel.value;
+  const all = new Set((window.absents||[]).map(e => e.client).filter(Boolean));
+  sel.innerHTML = '<option value="">Tous les clients</option>';
+  [...all].sort().forEach(cl => { const o=document.createElement('option'); o.value=cl; o.textContent=cl; if(cl===current) o.selected=true; sel.appendChild(o); });
+}
+
+// ── Sauvegarder ──
+window._saveAbsent = async function({ adresse, nom, date, bc, statut, motif, client, file, editId }) {
+  let rapportUrl = null;
+  if (editId) {
+    const existing = (window.absents||[]).find(e => e.id === editId) || {};
+    rapportUrl = existing.rapportUrl || null;
+    if (file && rapportUrl) {
+      try { await deleteObject(ref(storage, rapportUrl)); } catch(se) { console.warn('Storage old:', se); }
+      rapportUrl = null;
+    }
+  }
+  if (file) {
+    const storageRef = ref(storage, `absents/${client}/${Date.now()}_${file.name}`);
+    const snap = await uploadBytesResumable(storageRef, file);
+    rapportUrl = await getDownloadURL(snap.ref);
+  }
+  const data = { adresse, nom, date, bc, statut, motif, client, rapportUrl };
+  if (editId) {
+    await updateDoc(doc(db, "absents", editId), { ...data, updatedAt: new Date().toISOString() });
+  } else {
+    await addDoc(collection(db, "absents"), { ...data, notifs: 0, createdAt: new Date().toISOString() });
+  }
+};
+
+// ── Supprimer ──
+window.deleteAbsent = async function(id) {
+  if (!confirm('Supprimer cet absent/annulation ?')) return;
+  try {
+    const e = (window.absents||[]).find(x => x.id === id);
+    if (e && e.rapportUrl) {
+      try { await deleteObject(ref(storage, e.rapportUrl)); } catch(se) { console.warn('Storage:', se); }
+    }
+    await deleteDoc(doc(db, "absents", String(id)));
+    window.absents = (window.absents||[]).filter(e => e.id !== id);
+    updateKPIs(); filter();
+    showToast('Entrée supprimée !');
+  } catch(e) { alert('Erreur : ' + e.message); }
+};
 
 async function loadClientsIntoSelect(selectId) {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
   const sel = document.getElementById(selectId);
   if (!sel) return;
   sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
-  snap.docs.forEach(d => {
-    const opt = document.createElement("option");
-    opt.value = d.data().client;
-    opt.textContent = d.data().client;
-    sel.appendChild(opt);
-  });
+  snap.docs.forEach(d => { const cl=d.data().client; if(!cl) return; const o=document.createElement('option'); o.value=cl; o.textContent=cl; sel.appendChild(o); });
 }
-window.handleLogout = async function() {
-  await signOut(auth);
-  window.location.href = "login.html";
-};
-
-window.deleteAbsent = async function(id) {
-  if (!confirm('Supprimer cet absent/annulation ?')) return;
-  try {
-    const { deleteDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    await deleteDoc(doc(db, "absents", String(id)));
-    entries = entries.filter(e => e.id !== id);
-    filter();
-    showToast('Entrée supprimée !');
-  } catch(e) { alert('Erreur : ' + e.message); }
-};
 
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
-  
-  // Admin reconnu directement par email
   if (user.email === "belledonne.multiservices@gmail.com") {
     window._isAdmin = true;
-    const name = document.getElementById("sideClientName");
-    const id = document.getElementById("sideClientId");
-    const avatar = document.getElementById("sideAvatar");
-    const fname = document.getElementById("sideFooterName");
-    const frole = document.getElementById("sideFooterRole");
-    if (name) name.textContent = "Belledonne Multiservices";
-    if (id) id.textContent = "belledonne-admin";
-    if (avatar) avatar.textContent = "BM";
-    if (fname) fname.textContent = "Belledonne Multiservices";
-    if (frole) frole.textContent = "Administrateur";
+    const name=document.getElementById("sideClientName"); if(name) name.textContent="Belledonne Multiservices";
+    const id=document.getElementById("sideClientId"); if(id) id.textContent="belledonne-admin";
+    const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent="BM";
+    const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent="Belledonne Multiservices";
+    const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Administrateur";
+    var adminNav=document.getElementById("adminNav"); if(adminNav) adminNav.style.display="block";
+    var btn=document.getElementById("btnAjouter"); if(btn) btn.style.display="";
+    loadClientsIntoSelect("inClient");
+    window._currentClientFilter = null;
+    await window._loadAbsents(null);
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
       if (!snap.empty) {
         const p = snap.docs[0].data();
-        const name = document.getElementById("sideClientName");
-        const id = document.getElementById("sideClientId");
-        const avatar = document.getElementById("sideAvatar");
-        const fname = document.getElementById("sideFooterName");
-        const frole = document.getElementById("sideFooterRole");
-        if (name) name.textContent = p.client || "Client";
-        if (id) id.textContent = p.identifiant || "";
-        if (avatar) avatar.textContent = (p.client || "CL").substring(0,2).toUpperCase();
-        if (fname) fname.textContent = p.client || user.email;
-        if (frole) frole.textContent = "Client";
+        const name=document.getElementById("sideClientName"); if(name) name.textContent=p.client||"Client";
+        const id=document.getElementById("sideClientId"); if(id) id.textContent=p.identifiant||"";
+        const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent=(p.client||"CL").substring(0,2).toUpperCase();
+        const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent=p.client||user.email;
+        const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Client";
+        window._currentClientFilter = p.client;
+        await window._loadAbsents(p.client);
       }
     } catch(e) { console.error(e); }
-  }
-  if (user.email === "belledonne.multiservices@gmail.com") {
-    var adminNav = document.getElementById("adminNav");
-    if (adminNav) adminNav.style.display = "block";
-    var btn = document.getElementById("btnAjouter"); if (btn) btn.style.display = "";
-    loadClientsIntoSelect("inClient");
   }
 });
 </script>
