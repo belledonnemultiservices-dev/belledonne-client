@@ -63,8 +63,9 @@
   .kpi.navy::before{background:var(--navy);}
   .kpi-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px;}
   .kpi-lbl{font-size:12px;color:var(--text-muted);}
-  .kpi-period-btn{font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text-mid);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
-  .kpi-period-btn.active{background:var(--green);color:#fff;border-color:var(--green);}
+  .kpi-clickable{transition:transform 0.12s,box-shadow 0.12s;}
+  .kpi-clickable:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(13,27,42,0.1);}
+  .active-kpi{outline:3px solid var(--green);outline-offset:2px;}
 
   /* BOUTON */
   .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
@@ -210,24 +211,23 @@
     </div>
 
     <!-- KPIs -->
-    <div class="kpi-row">
-      <div class="kpi red">
-        <div class="kpi-val" id="kpiTotal">0</div>
-        <div class="kpi-lbl" id="kpiLbl">Cette semaine</div>
+    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr);">
+      <div class="kpi red kpi-clickable active-kpi" id="kpiSemaine" onclick="setKpiPeriod('semaine')" style="cursor:pointer;">
+        <div class="kpi-val" id="kpiValSemaine">0</div>
+        <div class="kpi-lbl">Cette semaine</div>
       </div>
-      <div class="kpi amber">
-        <div class="kpi-val" id="kpiAbsents">0</div>
-        <div class="kpi-lbl">Cette année</div>
+      <div class="kpi amber kpi-clickable" id="kpiSemPrev" onclick="setKpiPeriod('semaine_prev')" style="cursor:pointer;">
+        <div class="kpi-val" id="kpiValSemPrev">0</div>
+        <div class="kpi-lbl">Semaine dernière</div>
       </div>
-      <div class="kpi navy">
-        <div class="kpi-val" id="kpiAnnulations">0</div>
+      <div class="kpi navy kpi-clickable" id="kpiMois" onclick="setKpiPeriod('mois')" style="cursor:pointer;">
+        <div class="kpi-val" id="kpiValMois">0</div>
         <div class="kpi-lbl">Ce mois</div>
       </div>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:20px;">
-      <button onclick="setKpiPeriod('semaine')" id="btnSemaine" class="kpi-period-btn active">Cette semaine</button>
-      <button onclick="setKpiPeriod('mois')" id="btnMois" class="kpi-period-btn">Ce mois</button>
-      <button onclick="setKpiPeriod('annee')" id="btnAnnee" class="kpi-period-btn">Cette année</button>
+      <div class="kpi navy kpi-clickable" id="kpiMoisPrev" onclick="setKpiPeriod('mois_prev')" style="cursor:pointer;">
+        <div class="kpi-val" id="kpiValMoisPrev">0</div>
+        <div class="kpi-lbl">Mois dernier</div>
+      </div>
     </div>
 
     <!-- SEARCH -->
@@ -386,30 +386,53 @@ function formatDate(d) {
 }
 
 let _kpiPeriod = 'semaine';
-function setKpiPeriod(period) {
-  _kpiPeriod = period;
-  document.querySelectorAll('.kpi-period-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('btn' + period.charAt(0).toUpperCase() + period.slice(1)).classList.add('active');
-  updateKPIs();
+
+function getDateRange(period) {
+  const now = new Date();
+  const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const monday = new Date(now); monday.setDate(now.getDate() - dow);
+  const mondayStr = monday.toISOString().split('T')[0];
+  const prevMonday = new Date(monday); prevMonday.setDate(monday.getDate() - 7);
+  const prevMondayStr = prevMonday.toISOString().split('T')[0];
+  const lastMondayStr = mondayStr; // fin sem dernière
+
+  const annee = now.getFullYear().toString();
+  const mois = annee + '-' + String(now.getMonth()+1).padStart(2,'0');
+  const prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMoisStr = prevM.getFullYear() + '-' + String(prevM.getMonth()+1).padStart(2,'0');
+
+  if (period === 'semaine') return d => (d||'') >= mondayStr;
+  if (period === 'semaine_prev') return d => (d||'') >= prevMondayStr && (d||'') < mondayStr;
+  if (period === 'mois') return d => (d||'').startsWith(mois);
+  if (period === 'mois_prev') return d => (d||'').startsWith(prevMoisStr);
+  return () => true;
 }
 
-function updateKPIs() {
+function setKpiPeriod(period) {
+  _kpiPeriod = period;
+  document.querySelectorAll('.kpi-clickable').forEach(k => k.classList.remove('active-kpi'));
+  const map = {semaine:'kpiSemaine', semaine_prev:'kpiSemPrev', mois:'kpiMois', mois_prev:'kpiMoisPrev'};
+  const el = document.getElementById(map[period]); if(el) el.classList.add('active-kpi');
+  filter();
+}
+
+function updateKPIs(list) {
+  const all = window.absents || entries || [];
   const now = new Date();
   const annee = now.getFullYear().toString();
   const mois = annee + '-' + String(now.getMonth()+1).padStart(2,'0');
   const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
   const monday = new Date(now); monday.setDate(now.getDate() - dow);
   const mondayStr = monday.toISOString().split('T')[0];
-  const all = window.absents || entries || [];
-  let periodeCount = 0;
-  if (_kpiPeriod === 'semaine') periodeCount = all.filter(e => (e.date||'') >= mondayStr).length;
-  else if (_kpiPeriod === 'mois') periodeCount = all.filter(e => (e.date||'').startsWith(mois)).length;
-  else periodeCount = all.filter(e => (e.date||'').startsWith(annee)).length;
-  const lbl = _kpiPeriod === 'semaine' ? 'Cette semaine' : _kpiPeriod === 'mois' ? 'Ce mois' : 'Cette année';
-  document.getElementById('kpiTotal').textContent = periodeCount;
-  document.getElementById('kpiLbl').textContent = lbl;
-  document.getElementById('kpiAbsents').textContent = all.filter(e => (e.date||'').startsWith(annee)).length;
-  document.getElementById('kpiAnnulations').textContent = all.filter(e => (e.date||'').startsWith(mois)).length;
+  const prevMonday = new Date(monday); prevMonday.setDate(monday.getDate() - 7);
+  const prevMondayStr = prevMonday.toISOString().split('T')[0];
+  const prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMoisStr = prevM.getFullYear() + '-' + String(prevM.getMonth()+1).padStart(2,'0');
+
+  document.getElementById('kpiValSemaine').textContent = all.filter(x => (x.date||'') >= mondayStr).length;
+  document.getElementById('kpiValSemPrev').textContent = all.filter(x => (x.date||'') >= prevMondayStr && (x.date||'') < mondayStr).length;
+  document.getElementById('kpiValMois').textContent = all.filter(x => (x.date||'').startsWith(mois)).length;
+  document.getElementById('kpiValMoisPrev').textContent = all.filter(x => (x.date||'').startsWith(prevMoisStr)).length;
 }
 
 function renderTable(list) {
@@ -455,7 +478,7 @@ function filter() {
     const mq = !q || (e.adresse||'').toLowerCase().includes(q) || (e.nom||'').toLowerCase().includes(q) || (e.bc||'').toLowerCase().includes(q);
     const my = !y || (e.date||'').startsWith(y);
     const mc = !fc || e.client === fc;
-    return mq && my && mc;
+    return mq && my && mc && kpiRange(e.date);
   });
   renderTable(filtered);
 }
