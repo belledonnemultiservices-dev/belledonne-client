@@ -334,125 +334,74 @@ async function loadClientDashboard(clientFilter) {
   const mois = getMoisStr();
   const annee = new Date().getFullYear().toString();
 
-  // Charger données filtrées par client en parallèle
-  const [snapR, snapG, snapA, snapC, snapConfig, snapContacts] = await Promise.all([
+  const [snapR, snapG, snapA, snapConfig] = await Promise.all([
     getDocs(collection(db, "rapports")),
     getDocs(collection(db, "garanties")),
     getDocs(collection(db, "absents")),
-    getDocs(collection(db, "campagnes")),
     getDocs(collection(db, "config")),
-    getDocs(query(collection(db, "contacts"), where("client", "==", clientFilter))),
   ]);
 
   const rapports  = snapR.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.client===clientFilter);
   const garanties = snapG.docs.map(d=>({id:d.id,...d.data()})).filter(g=>g.client===clientFilter);
   const absents   = snapA.docs.map(d=>({id:d.id,...d.data()})).filter(a=>a.client===clientFilter);
-  const campagnes = snapC.docs.map(d=>({id:d.id,...d.data()})).filter(c=>c.client===clientFilter);
   const configDoc = snapConfig.docs.find(d=>d.id==='belledonne');
   const config    = configDoc ? configDoc.data() : {};
-  const contacts  = snapContacts.docs.map(d=>({id:d.id,...d.data()}));
 
   // ── KPIs ──
   document.getElementById('kpiRapports').textContent = rapports.filter(r=>(r.date||'').startsWith(mois)).length;
   document.getElementById('kpiRapportsSub').outerHTML = `<span class="kpi-trend trend-neutral">${rapports.filter(r=>(r.date||'').startsWith(annee)).length} cette année</span>`;
-
-  document.getElementById('kpiGaranties').textContent = garanties.filter(g=>(g.date||'').startsWith(annee)).length;
-  document.getElementById('kpiGarantiesSub').outerHTML = `<span class="kpi-trend trend-neutral">Cette année</span>`;
-
+  document.getElementById('kpiGaranties').textContent = garanties.filter(g=>(g.date||'').startsWith(mois)).length;
+  document.getElementById('kpiGarantiesSub').outerHTML = `<span class="kpi-trend trend-neutral">${garanties.filter(g=>(g.date||'').startsWith(annee)).length} cette année</span>`;
   document.getElementById('kpiAbsents').textContent = absents.filter(a=>(a.date||'').startsWith(mois)).length;
   document.getElementById('kpiAbsentsSub').outerHTML = `<span class="kpi-trend trend-neutral">${absents.filter(a=>(a.date||'').startsWith(annee)).length} cette année</span>`;
+  document.getElementById('kpiCampagnes').textContent = '—';
+  document.getElementById('kpiCampagnesSub').outerHTML = `<span class="kpi-trend trend-neutral">Non affiché</span>`;
 
-  const campEnCours = campagnes.filter(c=>c.statut==='active').length;
-  document.getElementById('kpiCampagnes').textContent = campEnCours;
-  document.getElementById('kpiCampagnesSub').outerHTML = `<span class="kpi-trend trend-neutral">${campagnes.length} au total</span>`;
-
-  // ── Derniers rapports ──
-  const last5R = [...rapports].sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'')).slice(0,5);
-  document.getElementById('recentRapports').innerHTML = last5R.length===0
+  // ── 3 derniers rapports ──
+  const last3R = [...rapports].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
+  document.getElementById('recentRapports').innerHTML = last3R.length===0
     ? '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px;">Aucun rapport.</div>'
-    : last5R.map(r=>`
+    : last3R.map(r=>`
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text);">${r.site||r.adresse||'—'}</div>
           <div style="font-size:11px;color:var(--text-muted);">${r.bc||''} · ${r.nuisible||''} · ${r.passage||''}</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${formatDate(r.date)}</span>
-          ${r.pdfUrl?`<a href="${r.pdfUrl}" target="_blank" style="font-size:11px;color:var(--green-dark);font-weight:500;">↓ PDF</a>`:''}
+        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+          <span style="font-size:11px;color:var(--text-muted);">${formatDate(r.date)}</span>
+          ${r.pdfUrl?`<a href="${r.pdfUrl}" target="_blank" style="font-size:11px;color:var(--green-dark);font-weight:600;">↓ PDF</a>`:''}
         </div>
       </div>`).join('');
 
-  // ── Campagnes en cours ──
-  const campActives = campagnes.filter(c=>c.statut==='active');
-  document.getElementById('recentCampagnes').innerHTML = campActives.length===0
-    ? '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucune campagne en cours.</div>'
-    : campActives.map(c=>{
-        const debut = new Date(c.debut); const fin = c.fin ? new Date(c.fin) : null;
-        const now = new Date();
-        let pct = 0;
-        if (fin) { const total=fin-debut; const done=now-debut; pct=Math.min(100,Math.max(0,Math.round(done/total*100))); }
-        return `<div style="padding:10px 16px;border-bottom:1px solid var(--border);">
-          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-            <div style="font-size:13px;font-weight:600;color:var(--text);">${c.nom||'—'}</div>
-            <span style="font-size:11px;color:var(--text-muted);">${(c.docs||[]).length} doc${(c.docs||[]).length>1?'s':''}</span>
-          </div>
-          ${fin?`<div style="background:#EBF0F5;border-radius:10px;height:6px;"><div style="background:var(--green);border-radius:10px;height:6px;width:${pct}%;"></div></div><div style="font-size:10px;color:var(--text-muted);margin-top:3px;">${formatDate(c.debut)} → ${formatDate(c.fin)}</div>`:''}
-        </div>`;
-      }).join('');
-
-  // ── Contacts Belledonne (coordonnées fixes) ──
-
-  // ── Contacts par client dans la 3e card bottom ──
-  const titleEl = document.getElementById('gridBottomTitle');
-  const linkEl = document.getElementById('gridBottomLink');
-  if (titleEl) { titleEl.textContent = 'Contacts Belledonne'; }
-  if (linkEl) { linkEl.style.display = ''; }
-  document.getElementById('activiteClients').innerHTML = contacts.length === 0
-    ? '<div style="text-align:center;padding:24px 16px;color:var(--text-muted);font-size:13px;">Aucun contact renseigné pour votre compte.</div>'
-    : contacts.map(ct => {
-        const initials = ((ct.prenom||'')[0]||(ct.nom||'')[0]||'?').toUpperCase();
-        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--border);">
-          <div style="width:32px;height:32px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--green);flex-shrink:0;">${initials}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ct.prenom||''} ${ct.nom||''}</div>
-            <div style="font-size:11px;color:var(--text-muted);">${ct.role||''}</div>
-          </div>
-          <div style="display:flex;gap:5px;">
-            ${ct.email?`<a href="mailto:${ct.email}" title="${ct.email}" style="width:26px;height:26px;background:#EBF0F5;border-radius:6px;display:flex;align-items:center;justify-content:center;text-decoration:none;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;color:var(--navy);"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></a>`:''}
-            ${ct.telephone?`<a href="tel:${ct.telephone}" title="${ct.telephone}" style="width:26px;height:26px;background:var(--green-pale);border-radius:6px;display:flex;align-items:center;justify-content:center;text-decoration:none;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;color:var(--green-dark);"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></a>`:''}
-          </div>
-        </div>`;
-      }).join('');
-
-  // ── Garanties récentes ──
-  const last4G = [...garanties].sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'')).slice(0,4);
-  document.getElementById('recentGaranties').innerHTML = last4G.length===0
+  // ── 3 dernières garanties ──
+  const last3G = [...garanties].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
+  document.getElementById('recentGaranties').innerHTML = last3G.length===0
     ? '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucune garantie.</div>'
-    : last4G.map(g=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);">
+    : last3G.map(g=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text);">${(g.adresse||'—').split(',')[0]}</div>
           <div style="font-size:11px;color:var(--text-muted);">${g.bc||''} · ${g.nuisible||''}</div>
         </div>
-        <span style="font-size:11px;color:var(--text-muted);">${formatDate(g.date)}</span>
+        <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${formatDate(g.date)}</span>
       </div>`).join('');
 
-  // ── Absents récents ──
-  const last4A = [...absents].sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'')).slice(0,4);
-  document.getElementById('recentAbsents').innerHTML = last4A.length===0
+  // ── 3 derniers absents ──
+  const last3A = [...absents].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
+  document.getElementById('recentAbsents').innerHTML = last3A.length===0
     ? '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucun absent.</div>'
-    : last4A.map(a=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);">
+    : last3A.map(a=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text);">${(a.adresse||'—').split(',')[0]}</div>
           <div style="font-size:11px;color:var(--text-muted);">${a.nom||''} · <span style="font-weight:600;color:${a.statut==='absent'?'#E74C3C':'#F39C12'}">${a.statut||''}</span></div>
         </div>
-        <span style="font-size:11px;color:var(--text-muted);">${formatDate(a.date)}</span>
+        <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${formatDate(a.date)}</span>
       </div>`).join('');
 
+  // ── Nous contacter ──
   const tel = config.telephone || '';
   const email = config.email || '';
-  // Afficher la card "Nous contacter" côté client
   const cardNC = document.getElementById('cardNousContacter');
   if (cardNC) cardNC.style.display = '';
   document.getElementById('contactsBelledonne').innerHTML = `
