@@ -274,9 +274,15 @@
         <div class="card-header"><div class="card-title">Derniers rapports d'intervention</div><a class="card-link" href="rapports.html">Voir tous →</a></div>
         <div id="recentRapports" class="card-scroll"><div style="text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
       </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Campagnes en cours</div><a class="card-link" href="reportings.html">Voir →</a></div>
-        <div id="recentCampagnes"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Campagnes en cours</div><a class="card-link" href="reportings.html">Voir →</a></div>
+          <div id="recentCampagnes"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
+        </div>
+        <div class="card" id="cardNousContacter" style="display:none;">
+          <div class="card-header"><div class="card-title">Nous contacter</div></div>
+          <div id="contactsBelledonne"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
+        </div>
       </div>
     </div>
 
@@ -294,12 +300,6 @@
         <div class="card-header"><div class="card-title" id="gridBottomTitle">Activité par client</div><a class="card-link" id="gridBottomLink" href="contacts.html" style="display:none;">Voir →</a></div>
         <div id="activiteClients" class="card-scroll"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
       </div>
-    </div>
-
-    <!-- NOUS CONTACTER — visible côté client uniquement -->
-    <div class="card" id="cardNousContacter" style="display:none;margin-top:20px;">
-      <div class="card-header"><div class="card-title">Nous contacter</div></div>
-      <div id="contactsBelledonne"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
     </div>
 
   </div>
