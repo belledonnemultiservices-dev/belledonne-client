@@ -232,6 +232,7 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         <input class="search-input" type="text" id="searchInput" placeholder="Rechercher un produit..." />
       </div>
+      <select class="filter-select" id="filterClient" style="display:none;"><option value="">Tous les clients</option></select>
       <select class="filter-select" id="filterType">
         <option value="">Tous les types</option>
         <option value="rodenticide">Rodenticide</option>
@@ -292,10 +293,7 @@
           <button type="button" onclick="addCustomType()" style="height:42px;padding:0 14px;border:none;background:var(--green);color:white;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Ajouter</button>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Usage / Description</label>
-        <textarea class="form-textarea" id="inUsage" placeholder="ex: Rodenticide anticoagulant, utilisé pour les interventions dératisation en espaces communs..."></textarea>
-      </div>
+
       <div class="form-group" style="margin-bottom:0;">
         <label class="form-label">Documents PDF</label>
         <div class="upload-row">
@@ -368,12 +366,14 @@ function renderProducts(list) {
       <div class="product-header">
         <div class="product-name">${p.nom}</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
-          ${p.client ? `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;">${p.client}</span>` : ''}
+          ${window._isAdmin && p.client ? `<span style="font-size:10px;font-weight:600;background:#EBF0F5;color:#1A2E42;padding:2px 8px;border-radius:10px;">${p.client}</span>` : ''}
           <span class="type-badge ${getTypeCss(p.type)}">${getTypeLabel(p.type)}</span>
-          ${window._isAdmin ? `<button onclick="deleteProduit('${p.id}')" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
+          ${window._isAdmin ? `
+            <button onclick="openEditProduit('${p.id}')" style="width:26px;height:26px;border:none;background:#EBF0F5;color:#1A2E42;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Modifier"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+            <button onclick="deleteProduit('${p.id}')" style="width:26px;height:26px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>` : ''}
         </div>
       </div>
-      <div class="product-usage">${p.usage || '<em style="color:var(--text-muted)">Aucune description</em>'}</div>
+
       <div class="product-docs">
         ${p.ficheUrl
           ? `<a href="${p.ficheUrl}" target="_blank" class="doc-btn fiche"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Fiche produit</a>`
@@ -386,13 +386,16 @@ function renderProducts(list) {
 }
 
 function filter() {
+  if (window.produits) produits = window.produits;
   const q = document.getElementById('searchInput').value.toLowerCase();
   const t = document.getElementById('filterType').value;
+  const fc = document.getElementById('filterClient') ? document.getElementById('filterClient').value : '';
   let list = produits.filter(p => {
-    const mq = !q || p.nom.toLowerCase().includes(q) || (p.usage||'').toLowerCase().includes(q);
+    const mq = !q || p.nom.toLowerCase().includes(q);
     const mt = !t || p.type === t;
+    const mc = !fc || p.client === fc;
     const mTab = currentTab === 'tous' || (currentTab === 'fiche' && p.fiche) || (currentTab === 'fds' && p.fds);
-    return mq && mt && mTab;
+    return mq && mt && mc && mTab;
   });
   updateCounts(list);
   renderProducts(list);
@@ -407,6 +410,7 @@ window.switchTab = function(tab) {
 
 document.getElementById('searchInput').addEventListener('input', filter);
 document.getElementById('filterType').addEventListener('change', filter);
+document.getElementById('filterClient').addEventListener('change', filter);
 
 // TYPE PERSONNALISÉ
 window.handleTypeChange = function() {
@@ -454,7 +458,45 @@ document.addEventListener('keydown', e => {
 
 // MODAL
 const modal = document.getElementById('modal');
-document.getElementById('btnAjouter').addEventListener('click', () => modal.classList.add('open'));
+window._editProduitId = null;
+
+function resetProduitModal() {
+  window._editProduitId = null;
+  const mt=document.getElementById('modalTitle'); if(mt) mt.textContent='Ajouter un produit';
+  const sm=document.getElementById('saveModal'); if(sm) sm.textContent='Enregistrer';
+  document.getElementById('inNom').value = '';
+  document.getElementById('inType').value = '';
+  document.getElementById('inClientNew').value = '';
+  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
+  document.getElementById('typeCustomWrap').style.display = 'none';
+  ['Fiche','Fds'].forEach(n => {
+    document.getElementById('file'+n).value = '';
+    const ch=document.getElementById('chosen'+n); if(ch){ ch.style.display='none'; ch.textContent=''; }
+  });
+}
+window.resetProduitModal = resetProduitModal;
+
+window.openEditProduit = function(id) {
+  const p = (window.produits||produits||[]).find(x => x.id === id);
+  if (!p) return;
+  window._editProduitId = id;
+  const mt=document.getElementById('modalTitle'); if(mt) mt.textContent='Modifier le produit';
+  const sm=document.getElementById('saveModal'); if(sm) sm.textContent='Mettre à jour';
+  document.getElementById('inNom').value = p.nom||'';
+  document.getElementById('inType').value = p.type||'';
+  document.querySelectorAll('#clientCheckboxes input[type="checkbox"]:not(#checkTous)').forEach(cb => {
+    cb.checked = cb.value === p.client;
+  });
+  ['Fiche','Fds'].forEach(n => {
+    document.getElementById('file'+n).value = '';
+    const url = n==='Fiche' ? p.ficheUrl : p.fdsUrl;
+    const ch=document.getElementById('chosen'+n);
+    if(ch){ if(url){ ch.textContent='✓ Fichier existant'; ch.style.display='block'; } else ch.style.display='none'; }
+  });
+  modal.classList.add('open');
+};
+
+document.getElementById('btnAjouter').addEventListener('click', () => { resetProduitModal(); modal.classList.add('open'); });
 document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
 document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
 modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
@@ -488,7 +530,7 @@ filter();
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
@@ -503,6 +545,12 @@ window.handleLogout = async function() {
 window.deleteProduit = async function(id) {
   if (!confirm('Supprimer ce produit ?')) return;
   try {
+    const p = (window.produits||produits||[]).find(x => x.id === id);
+    for (const urlField of ['ficheUrl','fdsUrl']) {
+      if (p && p[urlField]) {
+        try { await deleteObject(ref(storage, p[urlField])); } catch(se) { console.warn('Storage:', se); }
+      }
+    }
     await deleteDoc(doc(db, "produits", id));
     showToast('Produit supprimé !');
     await loadProduits(window._currentClientFilter);
@@ -512,16 +560,23 @@ window.deleteProduit = async function(id) {
 // Charger les produits depuis Firestore
 async function loadProduits(clientFilter) {
   try {
-    let q;
-    if (clientFilter) {
-      q = query(collection(db, "produits"), where("client", "==", clientFilter));
-    } else {
-      q = query(collection(db, "produits"));
-    }
-    const snap = await getDocs(q);
-    produits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const snap = await getDocs(collection(db, "produits"));
+    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (clientFilter) docs = docs.filter(p => p.client === clientFilter);
+    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    produits = docs; window.produits = docs;
+    if (window._isAdmin) populateFilterClient();
     filter();
   } catch(e) { console.error(e); }
+}
+
+function populateFilterClient() {
+  const sel = document.getElementById('filterClient');
+  if (!sel) return; sel.style.display = '';
+  const current = sel.value;
+  const all = new Set((window.produits||[]).map(p => p.client).filter(Boolean));
+  sel.innerHTML = '<option value="">Tous les clients</option>';
+  [...all].sort().forEach(cl => { const o=document.createElement('option'); o.value=cl; o.textContent=cl; if(cl===current) o.selected=true; sel.appendChild(o); });
 }
 
 // Upload un fichier dans Storage et retourner l'URL
@@ -551,36 +606,42 @@ async function saveProduit() {
   try {
     const fileFiche = document.getElementById('fileFiche').files[0];
     const fileFds = document.getElementById('fileFds').files[0];
+    const editId = window._editProduitId;
+    const ts = Date.now();
 
-    for (const client of clients) {
-      const ts = Date.now();
-      const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/${client}/${ts}_fiche_${fileFiche.name}`) : null;
-      const fdsUrl = fileFds ? await uploadFile(fileFds, `produits/${client}/${ts}_fds_${fileFds.name}`) : null;
-
-      await addDoc(collection(db, "produits"), {
-        nom, type, client,
-        usage: document.getElementById('inUsage').value.trim(),
-        ficheUrl, fdsUrl,
-        fiche: !!ficheUrl,
-        fds: !!fdsUrl,
-        createdAt: new Date().toISOString()
-      });
+    if (editId) {
+      // MODE MISE À JOUR
+      const existing = (window.produits||produits||[]).find(x => x.id === editId) || {};
+      let ficheUrl = existing.ficheUrl || null;
+      let fdsUrl = existing.fdsUrl || null;
+      const client = clients[0] || existing.client || 'commun';
+      if (fileFiche) {
+        if (ficheUrl) { try { await deleteObject(ref(storage, ficheUrl)); } catch(se){} }
+        ficheUrl = await uploadFile(fileFiche, `produits/${client}/${ts}_fiche_${fileFiche.name}`);
+      }
+      if (fileFds) {
+        if (fdsUrl) { try { await deleteObject(ref(storage, fdsUrl)); } catch(se){} }
+        fdsUrl = await uploadFile(fileFds, `produits/${client}/${ts}_fds_${fileFds.name}`);
+      }
+      const { updateDoc: ud, doc: d2 } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+      await ud(d2(db, "produits", editId), { nom, type, client: clients[0]||existing.client, ficheUrl, fdsUrl, fiche:!!ficheUrl, fds:!!fdsUrl, updatedAt: new Date().toISOString() });
+      showToast(`Produit "${nom}" mis à jour !`);
+    } else {
+      // MODE AJOUT — une carte par client
+      for (const client of clients) {
+        const ficheUrl = fileFiche ? await uploadFile(fileFiche, `produits/${client}/${ts}_fiche_${fileFiche.name}`) : null;
+        const fdsUrl = fileFds ? await uploadFile(fileFds, `produits/${client}/${ts}_fds_${fileFds.name}`) : null;
+        await addDoc(collection(db, "produits"), {
+          nom, type, client, ficheUrl, fdsUrl,
+          fiche: !!ficheUrl, fds: !!fdsUrl,
+          createdAt: new Date().toISOString()
+        });
+      }
+      showToast(`Produit "${nom}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
     }
 
     modal.classList.remove('open');
-    document.getElementById('inNom').value = '';
-    document.getElementById('inUsage').value = '';
-    document.getElementById('inType').value = '';
-    document.getElementById('inClientNew').value = '';
-    document.querySelectorAll('#clientCheckboxes input[type="checkbox"]').forEach(c => c.checked = false);
-    document.getElementById('typeCustomWrap').style.display = 'none';
-    ['Fiche','Fds'].forEach(n => {
-      document.getElementById('file'+n).value = '';
-      const c = document.getElementById('chosen'+n);
-      if (c) { c.style.display = 'none'; c.textContent = ''; }
-    });
-
-    showToast(`Produit "${nom}" ajouté pour ${clients.length} client${clients.length>1?'s':''} !`);
+    resetProduitModal();
     await loadProduits(window._currentClientFilter);
   } catch(e) {
     console.error(e);
@@ -591,7 +652,6 @@ async function saveProduit() {
   btnSave.textContent = 'Enregistrer';
   _saving = false;
 }
-
 // Remplacer le listener save
 document.getElementById('saveModal').addEventListener('click', saveProduit);
 
