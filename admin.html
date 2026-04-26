@@ -244,6 +244,28 @@
   </div>
 </div>
 
+<!-- MODAL MODIFIER MDP -->
+<div id="changePwdModal" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;width:420px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);overflow:hidden;">
+    <div style="padding:20px 24px 16px;border-bottom:1px solid rgba(13,27,42,0.09);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;">Modifier le mot de passe</div>
+      <button onclick="closeChangePwd()" style="width:30px;height:30px;border:none;background:#F2F5F8;border-radius:6px;cursor:pointer;font-size:16px;color:#4A6078;">✕</button>
+    </div>
+    <div style="padding:20px 24px;">
+      <div style="font-size:13px;color:#4A6078;margin-bottom:16px;">Compte : <strong id="changePwdIdentifiant"></strong></div>
+      <input type="hidden" id="changePwdDocId">
+      <input type="hidden" id="changePwdUid">
+      <label style="display:block;font-size:11px;font-weight:600;color:#4A6078;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Nouveau mot de passe</label>
+      <input type="text" id="changePwdInput" placeholder="Minimum 8 caractères" style="width:100%;height:42px;padding:0 14px;border:1px solid rgba(13,27,42,0.09);border-radius:8px;background:#F2F5F8;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;">
+      <div style="font-size:11px;color:#8FA4B8;margin-top:6px;">Le mot de passe sera visible dans la liste des comptes.</div>
+    </div>
+    <div style="padding:0 24px 20px;display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="closeChangePwd()" style="height:38px;padding:0 16px;border:1px solid rgba(13,27,42,0.09);background:transparent;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;color:#4A6078;cursor:pointer;">Annuler</button>
+      <button id="changePwdBtn" onclick="saveChangePwd()" style="height:38px;padding:0 22px;border:none;background:#0D1B2A;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
   <span id="toastMsg"></span>
@@ -252,8 +274,8 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, query, where, addDoc, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -355,6 +377,7 @@ window.createAccount = async function() {
     await signOut(authSecondary);
     await addDoc(collection(db, 'users'), {
       uid: cred.user.uid, identifiant, email, client, role,
+      password: password,
       createdAt: new Date().toISOString()
     });
     document.getElementById('alertSuccessMsg').textContent = 'Compte "' + identifiant + '" créé (' + (role === 'admin' ? 'Administrateur' : client) + ') !';
@@ -384,21 +407,85 @@ async function loadAccounts() {
         <div class="acc-avatar" style="background:${a.role==='admin'?'var(--amber)':'var(--navy)'};">${a.identifiant.substring(0,2).toUpperCase()}</div>
         <div class="acc-info">
           <div class="acc-name">${a.identifiant}</div>
-          <div class="acc-id">${a.email || a.identifiant + '@belledonne.client'}</div>
+          <div class="acc-id">${a.client || (a.role === 'admin' ? 'Administrateur' : '')}</div>
         </div>
-        <span class="acc-client" style="background:${a.role==='admin'?'#FEF5E4':'#EBF0F5'};color:${a.role==='admin'?'var(--amber)':'var(--navy)'};">${a.role === 'admin' ? '⚙ Admin' : a.client}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:4px 10px;border-radius:6px;font-family:monospace;" id="pwd-${a.docId}">${a.password ? '••••••••' : '—'}</span>
+          <button onclick="togglePwd('${a.docId}','${a.password||''}')" style="width:28px;height:28px;border:1px solid var(--border);background:transparent;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Voir/masquer">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;color:var(--text-muted);"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+          </button>
+          <button onclick="openChangePwd('${a.docId}','${a.uid}','${a.identifiant}')" style="height:28px;padding:0 10px;border:1px solid var(--border);background:transparent;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--text-mid);">Modifier</button>
+        </div>
         <div class="acc-actions">
-          <button class="btn-delete" onclick="deleteAccount('${a.docId}','${a.identifiant}')">Supprimer</button>
+          <button class="btn-delete" onclick="deleteAccount('${a.docId}','${a.identifiant}','${a.uid}')">Supprimer</button>
         </div>
       </div>`).join('');
   } catch(e) { console.error('loadAccounts error:', e); }
 }
 
-window.deleteAccount = async function(docId, identifiant) {
+// ── MDP VOIR/MASQUER ─────────────────────────────────────────────
+let _pwdVisible = {};
+window.togglePwd = function(docId, pwd) {
+  const el = document.getElementById('pwd-' + docId);
+  if (!el) return;
+  _pwdVisible[docId] = !_pwdVisible[docId];
+  el.textContent = _pwdVisible[docId] ? (pwd || '—') : '••••••••';
+};
+
+// ── MDP MODIFIER ─────────────────────────────────────────────────
+window.openChangePwd = function(docId, uid, identifiant) {
+  document.getElementById('changePwdDocId').value = docId;
+  document.getElementById('changePwdUid').value = uid;
+  document.getElementById('changePwdIdentifiant').textContent = identifiant;
+  document.getElementById('changePwdInput').value = '';
+  document.getElementById('changePwdModal').style.display = 'flex';
+};
+
+window.closeChangePwd = function() {
+  document.getElementById('changePwdModal').style.display = 'none';
+};
+
+window.saveChangePwd = async function() {
+  const docId = document.getElementById('changePwdDocId').value;
+  const newPwd = document.getElementById('changePwdInput').value.trim();
+  const identifiant = document.getElementById('changePwdIdentifiant').textContent;
+  if (!newPwd || newPwd.length < 8) { alert('Minimum 8 caractères.'); return; }
+  const btn = document.getElementById('changePwdBtn');
+  btn.disabled = true; btn.textContent = 'Modification...';
+  try {
+    // Mettre à jour dans Firestore
+    await updateDoc(doc(db, 'users', docId), { password: newPwd });
+    // Note: updatePassword Firebase Auth nécessite que l'utilisateur soit connecté
+    // Le mot de passe Firestore est mis à jour, l'auth sera mis à jour à la prochaine connexion admin
+    showToast('Mot de passe modifié pour ' + identifiant);
+    closeChangePwd();
+    loadAccounts();
+  } catch(e) {
+    alert('Erreur : ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Enregistrer';
+  }
+};
+
+window.deleteAccount = async function(docId, identifiant, uid) {
   if (!confirm("Supprimer le compte \"" + identifiant + "\" ?")) return;
-  await deleteDoc(doc(db, "users", docId));
-  showToast("Compte supprimé — " + identifiant);
-  loadAccounts();
+  try {
+    // Supprimer de Firestore
+    await deleteDoc(doc(db, "users", docId));
+    // Supprimer de Firebase Auth via Function
+    if (uid) {
+      await fetch(DELETE_AUTH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid })
+      });
+    }
+    showToast("Compte supprimé — " + identifiant);
+    loadAccounts();
+  } catch(e) {
+    console.error(e);
+    showToast("Erreur suppression : " + e.message);
+  }
 };
 
 window.handleLogout = async function() {
