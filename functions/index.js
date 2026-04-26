@@ -1,7 +1,10 @@
 const functions = require("firebase-functions");
+const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const https = require("https");
 const http = require("http");
+
+admin.initializeApp();
 
 const gmailUser = functions.config().gmail.user;
 const gmailPass = functions.config().gmail.pass;
@@ -11,6 +14,29 @@ const transporter = nodemailer.createTransport({
   auth: { user: gmailUser, pass: gmailPass },
 });
 
+// ── SUPPRIMER UTILISATEUR FIREBASE AUTH ───────────────────────────
+exports.deleteAuthUser = functions
+  .region("europe-west1")
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+
+    const { uid } = req.body;
+    if (!uid) { res.status(400).json({ error: "uid manquant" }); return; }
+
+    try {
+      await admin.auth().deleteUser(uid);
+      console.log("Utilisateur supprime de Auth:", uid);
+      res.status(200).json({ success: true });
+    } catch(err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+// ── ENVOYER NOTIFICATION EMAIL ────────────────────────────────────
 function downloadFile(url) {
   return new Promise((resolve, reject) => {
     const client = url.startsWith("https") ? https : http;
