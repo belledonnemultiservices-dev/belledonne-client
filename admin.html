@@ -423,7 +423,9 @@ async function loadAccounts() {
   } catch(e) { console.error('loadAccounts error:', e); }
 }
 
+
 // ── MDP VOIR/MASQUER ─────────────────────────────────────────────
+window.DELETE_AUTH_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteAuthUser";
 let _pwdVisible = {};
 window.togglePwd = function(docId, pwd) {
   const el = document.getElementById('pwd-' + docId);
@@ -474,7 +476,7 @@ window.deleteAccount = async function(docId, identifiant, uid) {
     await deleteDoc(doc(db, "users", docId));
     // Supprimer de Firebase Auth via Function
     if (uid) {
-      await fetch(DELETE_AUTH_URL, {
+      await fetch(window.DELETE_AUTH_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uid })
