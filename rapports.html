@@ -203,8 +203,7 @@
   .n-pigeon { background:#EAF3DE;color:#3B6D11; }
   .n-custom { background:#F1EFE8;color:#5F5E5A; }
 </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">  document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -450,6 +449,7 @@
 </div>
 
 <script>
+  document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 // Gestion modal upload
 const modalOverlay = document.getElementById('modalOverlay');
 const btnOpenModal = document.getElementById('btnOpenModal');

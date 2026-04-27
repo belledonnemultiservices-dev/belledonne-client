@@ -155,8 +155,7 @@
   .n-pigeon{background:#EAF3DE;color:#3B6D11;}
   .n-custom{background:#F1EFE8;color:#5F5E5A;}
 </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">  document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -394,6 +393,7 @@
 </div>
 
 <script>
+  document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 const TYPE_LABELS = { punaise:'Punaises de lit', rongeur:'Rongeurs', blatte:'Blattes / Insectes', pigeon:'Dépigeonnage' };
 const TYPE_COLORS = { punaise:'n-punaise', rongeur:'n-rongeur', blatte:'n-blatte', pigeon:'n-pigeon' };
