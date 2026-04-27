@@ -237,7 +237,7 @@
     <div class="breadcrumb">
       <span>Espace client</span><span>›</span><span>Reportings campagnes</span>
     </div>
-    <div class="date-chip">Jeudi 9 avril 2025</div>
+    <div class="date-chip" id="dateChip"></div>
   </header>
 
   <div class="content">
@@ -351,6 +351,8 @@
 </div>
 
 <script>
+document.getElementById('dateChip').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
 
 window._isAdmin = false;
 window._currentClientFilter = null;
@@ -520,7 +522,7 @@ document.getElementById('saveCampagne').addEventListener('click', async () => {
     document.getElementById('inputClient').value = '';
     document.getElementById('newClientCampWrap').style.display = 'none';
     const mt = document.getElementById('modalCampagneTitle'); if(mt) mt.textContent = 'Nouvelle campagne';
-    await window._loadCampagnes();
+    await window._loadCampagnes(window._currentClientFilter);
   } catch(e) { alert('Erreur : ' + e.message); }
   btn.disabled = false; btn.textContent = 'Créer la campagne';
   _savingCampagne = false;
@@ -605,7 +607,7 @@ window.deleteDoc = async function(campagneId, docId, e) {
   try {
     await window.deleteDoc_camp(campagneId, docId);
     showToast('Document supprimé !');
-    await window._loadCampagnes();
+    await window._loadCampagnes(window._currentClientFilter);
     setTimeout(() => {
       const docs = document.getElementById('docs-' + campagneId);
       const toggle = document.getElementById('toggle-' + campagneId);
@@ -693,7 +695,7 @@ document.getElementById('saveDoc').addEventListener('click', async () => {
     modalDoc.classList.remove('open');
     pendingFiles = []; renderPendingFiles();
     showToast(nb + ' document' + (nb>1?'s':'') + ' ajouté' + (nb>1?'s':'') + ' !');
-    await window._loadCampagnes();
+    await window._loadCampagnes(window._currentClientFilter);
     setTimeout(() => {
       const docs = document.getElementById('docs-' + currentCampagneId);
       const toggle = document.getElementById('toggle-' + currentCampagneId);

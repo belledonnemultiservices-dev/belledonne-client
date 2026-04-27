@@ -231,6 +231,7 @@
     <div class="breadcrumb"><span>Espace client</span><span>›</span><span>Tableau de bord</span></div>
     <div class="topbar-right">
       <div class="date-chip" id="dateChip"></div>
+      <button class="notif-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg><span class="notif-dot"></span></button>
     </div>
   </header>
   <div class="content">
@@ -296,7 +297,7 @@
   </div>
 </div>
 <script type="module">
-document.getElementById("dateChip").textContent = new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+document.getElementById('dateChip').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -507,7 +508,7 @@ async function loadDashboard() {
   absents.forEach(a => { if(a.client && clientMap[a.client]) clientMap[a.client].absents++; });
 
   const clientList = Object.entries(clientMap).sort((a,b) => (b[1].rapports+b[1].garanties+b[1].absents) - (a[1].rapports+a[1].garanties+a[1].absents));
-  const acEl = document.getElementById('activiteClients'); if(acEl) acEl.innerHTML = clientList.length === 0
+  document.getElementById('activiteClients').innerHTML = clientList.length === 0
     ? '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucune donnée.</div>'
     : clientList.map(([client, data]) => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);">
