@@ -203,7 +203,8 @@
   .n-pigeon { background:#EAF3DE;color:#3B6D11; }
   .n-custom { background:#F1EFE8;color:#5F5E5A; }
 </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">  document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+</script>
 </head>
 <body>
 
@@ -262,7 +263,7 @@
       <span>Rapports d'intervention</span>
     </div>
     <div class="topbar-right">
-      <div class="date-chip">Jeudi 9 avril 2025</div>
+      <div class="date-chip" id="dateChip"></div>
     </div>
   </header>
 

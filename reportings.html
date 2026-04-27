@@ -237,7 +237,7 @@
     <div class="breadcrumb">
       <span>Espace client</span><span>›</span><span>Reportings campagnes</span>
     </div>
-    <div class="date-chip">Jeudi 9 avril 2025</div>
+    <div class="date-chip" id="dateChip"></div>
   </header>
 
   <div class="content">
@@ -711,6 +711,7 @@ function showToast(msg) {
 }
 
 renderCampagnes(campagnes);
+  document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 </script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
