@@ -204,7 +204,7 @@
 <div class="main">
   <header class="topbar">
     <div class="breadcrumb"><span>Espace client</span><span>›</span><span>Garanties</span></div>
-    <div class="date-chip" id="dateChip"></div>
+    <div class="date-chip">Jeudi 9 avril 2025</div>
   </header>
 
   <div class="content">
@@ -393,7 +393,6 @@
 </div>
 
 <script>
-  document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 const TYPE_LABELS = { punaise:'Punaises de lit', rongeur:'Rongeurs', blatte:'Blattes / Insectes', pigeon:'Dépigeonnage' };
 const TYPE_COLORS = { punaise:'n-punaise', rongeur:'n-rongeur', blatte:'n-blatte', pigeon:'n-pigeon' };
@@ -639,7 +638,7 @@ document.getElementById('saveModal').addEventListener('click', async () => {
     await window._saveGarantie({ adresse, bc, date, nuisible, client, file: fileInput ? fileInput.files[0] : null, editId: window._editGarantieId });
     modal.classList.remove('open');
     resetModal();
-    await window._loadGaranties(window._currentClientFilter);
+    await window._loadGaranties();
     showToast(window._editGarantieId ? 'Garantie mise à jour !' : 'Passage garantie ajouté — ' + adresse.substring(0,40));
   } catch(e) { alert('Erreur : ' + e.message); }
   btn.disabled = false; btn.textContent = window._editGarantieId ? 'Mettre à jour' : 'Enregistrer';

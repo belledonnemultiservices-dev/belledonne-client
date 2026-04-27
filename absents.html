@@ -193,7 +193,7 @@
 <div class="main">
   <header class="topbar">
     <div class="breadcrumb"><span>Espace client</span><span>›</span><span>Absents / Annulations</span></div>
-    <div class="date-chip" id="dateChip"></div>
+    <div class="date-chip">Jeudi 9 avril 2025</div>
   </header>
 
   <div class="content">
@@ -381,7 +381,6 @@
 </div>
 
 <script>
-  document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 window._isAdmin = false;
 window.absents = [];
@@ -617,7 +616,7 @@ document.getElementById('saveModal').addEventListener('click', async () => {
     await window._saveAbsent({ adresse, nom, date, bc, statut, motif, client, file, editId: window._editAbsentId });
     modal.classList.remove('open');
     resetAbsentModal();
-    await window._loadAbsents(window._currentClientFilter);
+    await window._loadAbsents();
     showToast(window._editAbsentId ? 'Entrée mise à jour !' : (statut==='absent'?'Absent':'Annulation') + ' enregistré — ' + adresse.substring(0,40));
   } catch(e) { alert('Erreur : ' + e.message); }
   btn.disabled = false; btn.textContent = window._editAbsentId ? 'Mettre à jour' : 'Enregistrer';
