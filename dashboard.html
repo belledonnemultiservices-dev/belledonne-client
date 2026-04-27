@@ -507,7 +507,7 @@ async function loadDashboard() {
   absents.forEach(a => { if(a.client && clientMap[a.client]) clientMap[a.client].absents++; });
 
   const clientList = Object.entries(clientMap).sort((a,b) => (b[1].rapports+b[1].garanties+b[1].absents) - (a[1].rapports+a[1].garanties+a[1].absents));
-  document.getElementById('activiteClients').innerHTML = clientList.length === 0
+  const acEl = document.getElementById('activiteClients'); if(acEl) acEl.innerHTML = clientList.length === 0
     ? '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucune donnée.</div>'
     : clientList.map(([client, data]) => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);">
