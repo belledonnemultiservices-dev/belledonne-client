@@ -125,6 +125,26 @@
   .send-ok-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;}
   .send-ok-sub{font-size:12px;color:var(--text-muted);margin-top:4px;}
 
+  /* TEMPLATES */
+  .tpl-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:20px;overflow:hidden;max-width:800px;}
+  .tpl-header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+  .tpl-icon{width:36px;height:36px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .tpl-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--text);}
+  .tpl-sub{font-size:12px;color:var(--text-muted);margin-top:2px;}
+  .tpl-body{padding:20px 24px;}
+  .tpl-vars{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .tpl-var{font-size:11px;font-weight:600;background:#EBF0F5;color:var(--navy);padding:3px 10px;border-radius:20px;font-family:monospace;cursor:pointer;transition:background 0.1s;}
+  .tpl-var:hover{background:#DDE4EC;}
+  .tpl-input{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;margin-bottom:12px;}
+  .tpl-input:focus{border-color:var(--green);background:#fff;}
+  .tpl-textarea{width:100%;min-height:130px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;resize:vertical;line-height:1.6;}
+  .tpl-textarea:focus{border-color:var(--green);background:#fff;}
+  .tpl-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+  .btn-save-tpl{height:38px;padding:0 20px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;display:flex;align-items:center;gap:7px;}
+  .btn-save-tpl:hover{background:var(--navy-mid);}
+  .tpl-saved{font-size:12px;color:var(--green-dark);font-weight:500;display:none;align-items:center;gap:5px;}
+  .tpl-group-label{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+
   /* TOAST */
   .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 18px;border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(13,27,42,0.2);z-index:300;transform:translateY(80px);opacity:0;transition:transform 0.3s,opacity 0.3s;}
   .toast.show{transform:translateY(0);opacity:1;}
@@ -187,6 +207,7 @@
     <div class="tabs">
       <button class="tab active" onclick="switchTab('coordonnees')">Nos coordonnées</button>
       <button class="tab" onclick="switchTab('contacts')">Contacts clients</button>
+      <button class="tab" onclick="switchTab('templates')">Templates email</button>
     </div>
 
     <!-- ONGLET 1 : Coordonnées Belledonne -->
@@ -244,6 +265,119 @@
     </div>
   </div>
 </div>
+
+    <!-- ONGLET 3 : Templates email -->
+    <div id="sectionTemplates" style="display:none;">
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">6 templates — un simple et un multiple par type. Cliquez sur une variable pour l inserer au curseur.</div>
+
+      <div class="tpl-group-label"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:var(--green-dark);"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>Rapports d intervention</div>
+
+      <div class="tpl-section">
+        <div class="tpl-header"><div class="tpl-icon" style="background:#E8F9F2;"><span style="font-size:13px;font-weight:700;color:var(--green-dark);">1</span></div><div><div class="tpl-title">Rapport — ligne unique</div><div class="tpl-sub">1 rapport selectionne</div></div></div>
+        <div class="tpl-body">
+          <div class="tpl-vars">
+            <span class="tpl-var" onclick="insertVar('tplRapportSimpleBody','{{bc}}')">{{bc}}</span>
+            <span class="tpl-var" onclick="insertVar('tplRapportSimpleBody','{{site}}')">{{site}}</span>
+            <span class="tpl-var" onclick="insertVar('tplRapportSimpleBody','{{nuisible}}')">{{nuisible}}</span>
+            <span class="tpl-var" onclick="insertVar('tplRapportSimpleBody','{{passage}}')">{{passage}}</span>
+            <span class="tpl-var" onclick="insertVar('tplRapportSimpleBody','{{date}}')">{{date}}</span>
+            <span class="tpl-var" onclick="insertVar('tplRapportSimpleBody','{{lien}}')">{{lien}}</span>
+          </div>
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
+          <input class="tpl-input" type="text" id="tplRapportSimpleSubject" placeholder="ex: Rapport disponible - BC {{bc}}">
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
+          <textarea class="tpl-textarea" id="tplRapportSimpleBody"></textarea>
+        </div>
+        <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('rapportSimple')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedRapportSimple"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
+      </div>
+
+      <div class="tpl-section">
+        <div class="tpl-header"><div class="tpl-icon" style="background:#E8F9F2;"><span style="font-size:13px;font-weight:700;color:var(--green-dark);">N</span></div><div><div class="tpl-title">Rapport — selection multiple</div><div class="tpl-sub">{{liste}} genere la liste automatiquement</div></div></div>
+        <div class="tpl-body">
+          <div class="tpl-vars">
+            <span class="tpl-var" onclick="insertVar('tplRapportMultiBody','{{liste}}')">{{liste}}</span>
+            <span class="tpl-var" onclick="insertVar('tplRapportMultiBody','{{lien}}')">{{lien}}</span>
+          </div>
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
+          <input class="tpl-input" type="text" id="tplRapportMultiSubject" placeholder="ex: Vos rapports sont disponibles">
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
+          <textarea class="tpl-textarea" id="tplRapportMultiBody"></textarea>
+        </div>
+        <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('rapportMulti')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedRapportMulti"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
+      </div>
+
+      <div class="tpl-group-label" style="margin-top:24px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:#F5A623;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>Absents / Annulations</div>
+
+      <div class="tpl-section">
+        <div class="tpl-header"><div class="tpl-icon" style="background:#FEF3E2;"><span style="font-size:13px;font-weight:700;color:#F5A623;">1</span></div><div><div class="tpl-title">Absent — ligne unique</div><div class="tpl-sub">1 absent selectionne</div></div></div>
+        <div class="tpl-body">
+          <div class="tpl-vars">
+            <span class="tpl-var" onclick="insertVar('tplAbsentSimpleBody','{{bc}}')">{{bc}}</span>
+            <span class="tpl-var" onclick="insertVar('tplAbsentSimpleBody','{{nom}}')">{{nom}}</span>
+            <span class="tpl-var" onclick="insertVar('tplAbsentSimpleBody','{{adresse}}')">{{adresse}}</span>
+            <span class="tpl-var" onclick="insertVar('tplAbsentSimpleBody','{{date}}')">{{date}}</span>
+            <span class="tpl-var" onclick="insertVar('tplAbsentSimpleBody','{{statut}}')">{{statut}}</span>
+            <span class="tpl-var" onclick="insertVar('tplAbsentSimpleBody','{{motif}}')">{{motif}}</span>
+            <span class="tpl-var" onclick="insertVar('tplAbsentSimpleBody','{{lien}}')">{{lien}}</span>
+          </div>
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
+          <input class="tpl-input" type="text" id="tplAbsentSimpleSubject" placeholder="ex: Passage non effectue - BC {{bc}}">
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
+          <textarea class="tpl-textarea" id="tplAbsentSimpleBody"></textarea>
+        </div>
+        <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('absentSimple')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedAbsentSimple"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
+      </div>
+
+      <div class="tpl-section">
+        <div class="tpl-header"><div class="tpl-icon" style="background:#FEF3E2;"><span style="font-size:13px;font-weight:700;color:#F5A623;">N</span></div><div><div class="tpl-title">Absent — selection multiple</div><div class="tpl-sub">{{liste}} genere la liste automatiquement</div></div></div>
+        <div class="tpl-body">
+          <div class="tpl-vars">
+            <span class="tpl-var" onclick="insertVar('tplAbsentMultiBody','{{liste}}')">{{liste}}</span>
+            <span class="tpl-var" onclick="insertVar('tplAbsentMultiBody','{{lien}}')">{{lien}}</span>
+          </div>
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
+          <input class="tpl-input" type="text" id="tplAbsentMultiSubject" placeholder="ex: Passages non effectues - recapitulatif">
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
+          <textarea class="tpl-textarea" id="tplAbsentMultiBody"></textarea>
+        </div>
+        <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('absentMulti')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedAbsentMulti"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
+      </div>
+
+      <div class="tpl-group-label" style="margin-top:24px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:#7F77DD;"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Garanties</div>
+
+      <div class="tpl-section">
+        <div class="tpl-header"><div class="tpl-icon" style="background:#EEF0FD;"><span style="font-size:13px;font-weight:700;color:#7F77DD;">1</span></div><div><div class="tpl-title">Garantie — ligne unique</div><div class="tpl-sub">1 garantie selectionnee</div></div></div>
+        <div class="tpl-body">
+          <div class="tpl-vars">
+            <span class="tpl-var" onclick="insertVar('tplGarantieSimpleBody','{{nom}}')">{{nom}}</span>
+            <span class="tpl-var" onclick="insertVar('tplGarantieSimpleBody','{{adresse}}')">{{adresse}}</span>
+            <span class="tpl-var" onclick="insertVar('tplGarantieSimpleBody','{{nuisible}}')">{{nuisible}}</span>
+            <span class="tpl-var" onclick="insertVar('tplGarantieSimpleBody','{{date}}')">{{date}}</span>
+            <span class="tpl-var" onclick="insertVar('tplGarantieSimpleBody','{{lien}}')">{{lien}}</span>
+          </div>
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
+          <input class="tpl-input" type="text" id="tplGarantieSimpleSubject" placeholder="ex: Passage garantie effectue - {{nom}}">
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
+          <textarea class="tpl-textarea" id="tplGarantieSimpleBody"></textarea>
+        </div>
+        <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('garantieSimple')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedGarantieSimple"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
+      </div>
+
+      <div class="tpl-section">
+        <div class="tpl-header"><div class="tpl-icon" style="background:#EEF0FD;"><span style="font-size:13px;font-weight:700;color:#7F77DD;">N</span></div><div><div class="tpl-title">Garantie — selection multiple</div><div class="tpl-sub">{{liste}} genere la liste automatiquement</div></div></div>
+        <div class="tpl-body">
+          <div class="tpl-vars">
+            <span class="tpl-var" onclick="insertVar('tplGarantieMultiBody','{{liste}}')">{{liste}}</span>
+            <span class="tpl-var" onclick="insertVar('tplGarantieMultiBody','{{lien}}')">{{lien}}</span>
+          </div>
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
+          <input class="tpl-input" type="text" id="tplGarantieMultiSubject" placeholder="ex: Passages garantie effectues - recapitulatif">
+          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
+          <textarea class="tpl-textarea" id="tplGarantieMultiBody"></textarea>
+        </div>
+        <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('garantieMulti')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedGarantieMulti"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
+      </div>
+    </div>
 
 <!-- MODAL CONTACT -->
 <div class="modal-overlay" id="modalContact">
@@ -344,7 +478,19 @@ const TEMPLATES = {
 window.switchTab = function(tab) {
   document.getElementById('sectionCoordonnees').style.display = tab === 'coordonnees' ? 'block' : 'none';
   document.getElementById('sectionContacts').style.display = tab === 'contacts' ? 'block' : 'none';
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='coordonnees')||(i===1&&tab==='contacts')));
+  document.getElementById('sectionTemplates').style.display = tab === 'templates' ? 'block' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active',
+    (i===0&&tab==='coordonnees')||(i===1&&tab==='contacts')||(i===2&&tab==='templates')));
+};
+
+window.insertVar = function(id, varText) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+  el.value = el.value.substring(0, start) + varText + el.value.substring(end);
+  el.selectionStart = el.selectionEnd = start + varText.length;
+  el.focus();
 };
 
 function updateCoordPreview() {} // placeholder
@@ -476,6 +622,25 @@ const db = getFirestore(app, "belledonne-client");
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
 
 // ── COORDONNÉES ───────────────────────────────────────────────────
+window.saveTemplate = async function(type) {
+  const cap = type.charAt(0).toUpperCase() + type.slice(1);
+  const subjectEl = document.getElementById('tpl' + cap + 'Subject');
+  const bodyEl = document.getElementById('tpl' + cap + 'Body');
+  const subject = subjectEl ? subjectEl.value.trim() : '';
+  const body = bodyEl ? bodyEl.value.trim() : '';
+  if (!subject || !body) { alert('Renseignez l objet et le corps.'); return; }
+  const savedEl = document.getElementById('saved' + cap);
+  try {
+    const snap = await getDocs(collection(db, "config"));
+    const existing = snap.docs.find(x => x.id === 'templates');
+    const currentData = existing ? existing.data() : {};
+    currentData[type] = { subject, body, updatedAt: new Date().toISOString() };
+    await setDoc(doc(db, "config", "templates"), currentData);
+    if (savedEl) { savedEl.style.display = 'flex'; setTimeout(() => { savedEl.style.display = 'none'; }, 3000); }
+    window.showToast('Template enregistre !');
+  } catch(e) { window.showToast('Erreur : ' + e.message); }
+};
+
 async function loadConfig() {
   try {
     const snap = await getDocs(collection(db, "config"));
@@ -484,6 +649,20 @@ async function loadConfig() {
       const data = d.data();
       if (data.telephone) document.getElementById('inputTel').value = data.telephone;
       if (data.email) document.getElementById('inputEmail').value = data.email;
+    }
+    // Templates
+    const t = snap.docs.find(x => x.id === 'templates');
+    if (t) {
+      const tpl = t.data();
+      ['rapportSimple','rapportMulti','absentSimple','absentMulti','garantieSimple','garantieMulti'].forEach(k => {
+        if (tpl[k]) {
+          const cap = k.charAt(0).toUpperCase() + k.slice(1);
+          const subEl = document.getElementById('tpl' + cap + 'Subject');
+          const bodyEl = document.getElementById('tpl' + cap + 'Body');
+          if (subEl && tpl[k].subject) subEl.value = tpl[k].subject;
+          if (bodyEl && tpl[k].body) bodyEl.value = tpl[k].body;
+        }
+      });
     }
   } catch(e) { console.error(e); }
 }
