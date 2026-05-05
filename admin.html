@@ -299,7 +299,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function loadClientsIntoSelect() {
-  const snap = await db.collection('users').where('role','==','client').get();
+  const snap = await getDocs(query(collection(db, 'users'), where('role','==','client')));
   const sel = document.getElementById('inClient');
   if (!sel) return;
   const existing = [...snap.docs.map(d => d.data().client)].filter(Boolean);
