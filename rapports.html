@@ -443,6 +443,43 @@
 </div>
 
 <!-- TOAST -->
+<!-- BARRE SELECTION -->
+<div class="selection-bar" id="selectionBar">
+  <span class="sel-count" id="selCount">0 selectionne</span>
+  <span class="sel-clear" onclick="clearSelection()">Tout deselectionner</span>
+  <button class="btn-notif-sel" onclick="openNotifModal()">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    Notifier la selection
+  </button>
+</div>
+<div class="modal-notif-overlay" id="modalNotif">
+  <div class="modal-notif">
+    <div class="mn-header"><div class="mn-title" id="mnTitle">Notifier</div><button class="mn-close" onclick="closeNotifModal()">x</button></div>
+    <div class="mn-body">
+      <div id="mnMainContent">
+        <div class="mn-section-label">Selection</div>
+        <div class="mn-recap" id="mnRecap">-</div>
+        <div class="mn-section-label">Destinataires</div>
+        <div class="mn-contacts" id="mnContacts"><div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><div class="mn-section-label" style="margin-bottom:0;">Message</div></div>
+        <textarea class="mn-msg" id="mnMsg"></textarea>
+        <div class="mn-section-label" style="margin-top:12px;">Objet</div>
+        <input type="text" id="mnSubject" style="width:100%;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;margin-top:4px;">
+      </div>
+      <div class="mn-success" id="mnSuccess">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:40px;height:40px;color:var(--green);margin-bottom:8px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px;">Envoye !</div>
+        <div style="font-size:13px;color:var(--text-muted);" id="mnSuccessMsg"></div>
+      </div>
+    </div>
+    <div class="mn-footer" id="mnFooter">
+      <button class="mn-btn-cancel" onclick="closeNotifModal()">Annuler</button>
+      <button class="mn-btn-send" id="mnBtnSend" onclick="sendNotification()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer
+      </button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
   <span id="toastMsg">Rapport ajouté avec succès !</span>
@@ -757,6 +794,68 @@ async function loadClientsIntoSelect() {
     sel.appendChild(opt);
   });
 }
+
+
+window._loadNotifData = async function(client, isMulti, selectedItems) {
+  try {
+    const snapC = await getDocs(query(collection(db,"contacts"),where("client","==",client)));
+    const contacts = snapC.docs.map(d=>({id:d.id,...d.data()}));
+    if(contacts.length===0) {
+      document.getElementById('mnContacts').innerHTML='<div style="font-size:13px;color:var(--text-muted);padding:12px;">Aucun contact pour ce client. <a href="contacts.html" style="color:var(--green-dark);">Ajouter</a></div>';
+    } else {
+      document.getElementById('mnContacts').innerHTML=contacts.map(c=>`
+        <label class="mn-contact-item">
+          <input type="checkbox" id="mnchk-${c.id}" value="${c.email}" checked>
+          <div><div class="mn-contact-name">${c.prenom||''} ${c.nom||''}</div><div class="mn-contact-email">${c.email||'-'}</div></div>
+        </label>`).join('');
+    }
+    const snapT = await getDocs(collection(db,"config"));
+    const tplDoc = snapT.docs.find(d=>d.id==='templates');
+    const tpl = tplDoc?tplDoc.data():{};
+    const key = isMulti?'rapportMulti':'rapportSimple';
+    const tplData = tpl[key]||{};
+    if(isMulti) {
+      const liste = selectedItems.map(r=>'- BC ' + (r.bc||'-') + ' - ' + (r.site||'-') + ' - ' + (r.date||'-')).join('\n');
+      const body=(tplData.body||'Bonjour,\nVos rapports suivants sont disponibles :\n{{liste}}\nConsultez-les ici : {{lien}}\nCordialement,\nBelledonne Multiservices').replace(/{{liste}}/g,liste).replace(/{{lien}}/g,LIEN_ESPACE);
+      document.getElementById('mnMsg').value=body;
+      document.getElementById('mnSubject').value=tplData.subject||'Vos rapports sont disponibles';
+    } else {
+      const r=selectedItems[0];
+      const body=(tplData.body||'Bonjour,\nVotre rapport (BC {{bc}}) est disponible.\nConsultez-le ici : {{lien}}\nCordialement,\nBelledonne Multiservices').replace(/{{bc}}/g,r.bc||'-').replace(/{{site}}/g,r.site||'-').replace(/{{date}}/g,r.date||'-').replace(/{{nuisible}}/g,r.nuisible||'-').replace(/{{passage}}/g,r.passage||'-').replace(/{{lien}}/g,LIEN_ESPACE);
+      document.getElementById('mnMsg').value=body;
+      const subj=(tplData.subject||'Rapport disponible - BC {{bc}}').replace(/{{bc}}/g,r.bc||'-');
+      document.getElementById('mnSubject').value=subj;
+    }
+    window._notifSelectedItems=selectedItems;
+  } catch(e) {
+    console.error(e);
+    document.getElementById('mnContacts').innerHTML='<div style="color:red;padding:12px;">Erreur: '+e.message+'</div>';
+  }
+};
+
+window._doSendNotification = async function() {
+  const btn=document.getElementById('mnBtnSend');
+  const subject=document.getElementById('mnSubject').value.trim();
+  const body=document.getElementById('mnMsg').value.trim();
+  if(!subject||!body){alert('Objet et message requis.');return;}
+  const checkboxes=document.querySelectorAll('#mnContacts input[type=checkbox]:checked');
+  const recipients=Array.from(checkboxes).map(c=>c.value).filter(Boolean);
+  if(recipients.length===0){alert('Selectionnez au moins un destinataire.');return;}
+  const sel=window._notifSelectedItems||[];
+  const attachments=sel.filter(r=>r.pdfUrl).map(r=>({url:r.pdfUrl,filename:'rapports_'+(r.bc||r.id||'fichier').replace(/[^a-zA-Z0-9]/g,'_')+'.xlsx'}));
+  btn.disabled=true;btn.textContent='Envoi...';
+  let sent=0;let errors=0;
+  for(const to of recipients) {
+    try {
+      const resp=await fetch(FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,subject,body,attachments})});
+      if(resp.ok) sent++; else errors++;
+    } catch(e){errors++;}
+  }
+  document.getElementById('mnSuccess').style.display='block';
+  document.getElementById('mnMainContent').style.display='none';
+  document.getElementById('mnSuccessMsg').textContent=sent+' email(s) envoye(s)'+(errors>0?', '+errors+' erreur(s).':'.');
+  document.getElementById('mnFooter').innerHTML='<button class="mn-btn-cancel" onclick="closeNotifModal();clearSelection()">Fermer</button>';
+};
 
 onAuthStateChanged(auth, async function(user) {
   if (!user) { window.location.href = "login.html"; return; }
