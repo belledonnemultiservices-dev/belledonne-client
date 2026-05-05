@@ -282,9 +282,21 @@
             <span class="tpl-var" onclick="insertVar('tplRapportSimpleBody','{{lien}}')">{{lien}}</span>
           </div>
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
-          <input class="tpl-input" type="text" id="tplRapportSimpleSubject" placeholder="ex: Rapport disponible - BC {{bc}}">
+          <input class="tpl-input" type="text" id="tplRapportSimpleSubject" value="Rapport d'intervention disponible - BC {{bc}}" placeholder="ex: Rapport disponible - BC {{bc}}">
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
-          <textarea class="tpl-textarea" id="tplRapportSimpleBody"></textarea>
+          <textarea class="tpl-textarea" id="tplRapportSimpleBody">Bonjour,
+
+Votre rapport d'intervention concernant le bon de commande {{bc}} est disponible sur votre espace client.
+
+Site : {{site}}
+Nuisible : {{nuisible}}
+Passage : {{passage}}
+Date : {{date}}
+
+Consultez-le ici : https://clients-belledonne-multiservices.com
+
+Cordialement,
+Belledonne Multiservices</textarea>
         </div>
         <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('rapportSimple')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedRapportSimple"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
       </div>
@@ -297,9 +309,18 @@
             <span class="tpl-var" onclick="insertVar('tplRapportMultiBody','{{lien}}')">{{lien}}</span>
           </div>
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
-          <input class="tpl-input" type="text" id="tplRapportMultiSubject" placeholder="ex: Vos rapports sont disponibles">
+          <input class="tpl-input" type="text" id="tplRapportMultiSubject" value="Vos rapports d'intervention sont disponibles" placeholder="ex: Vos rapports sont disponibles">
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
-          <textarea class="tpl-textarea" id="tplRapportMultiBody"></textarea>
+          <textarea class="tpl-textarea" id="tplRapportMultiBody">Bonjour,
+
+Vos rapports d'intervention suivants sont disponibles sur votre espace client :
+
+{{liste}}
+
+Consultez-les ici : https://clients-belledonne-multiservices.com
+
+Cordialement,
+Belledonne Multiservices</textarea>
         </div>
         <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('rapportMulti')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedRapportMulti"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
       </div>
@@ -319,9 +340,21 @@
             <span class="tpl-var" onclick="insertVar('tplAbsentSimpleBody','{{lien}}')">{{lien}}</span>
           </div>
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
-          <input class="tpl-input" type="text" id="tplAbsentSimpleSubject" placeholder="ex: Passage non effectue - BC {{bc}}">
+          <input class="tpl-input" type="text" id="tplAbsentSimpleSubject" value="Passage non effectue - BC {{bc}}" placeholder="ex: Passage non effectue - BC {{bc}}">
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
-          <textarea class="tpl-textarea" id="tplAbsentSimpleBody"></textarea>
+          <textarea class="tpl-textarea" id="tplAbsentSimpleBody">Bonjour,
+
+Notre technicien s'est presente au {{adresse}} le {{date}} (BC {{bc}}) mais n'a pas pu effectuer l'intervention.
+
+Statut : {{statut}}
+Motif : {{motif}}
+
+Merci de nous contacter pour convenir d'un nouveau rendez-vous.
+
+Consultez votre espace client : https://clients-belledonne-multiservices.com
+
+Cordialement,
+Belledonne Multiservices</textarea>
         </div>
         <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('absentSimple')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedAbsentSimple"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
       </div>
@@ -334,9 +367,20 @@
             <span class="tpl-var" onclick="insertVar('tplAbsentMultiBody','{{lien}}')">{{lien}}</span>
           </div>
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
-          <input class="tpl-input" type="text" id="tplAbsentMultiSubject" placeholder="ex: Passages non effectues - recapitulatif">
+          <input class="tpl-input" type="text" id="tplAbsentMultiSubject" value="Passages non effectues - recapitulatif" placeholder="ex: Passages non effectues - recapitulatif">
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
-          <textarea class="tpl-textarea" id="tplAbsentMultiBody"></textarea>
+          <textarea class="tpl-textarea" id="tplAbsentMultiBody">Bonjour,
+
+Les passages suivants n'ont pas pu etre effectues :
+
+{{liste}}
+
+Merci de nous contacter pour convenir de nouveaux rendez-vous.
+
+Consultez votre espace client : https://clients-belledonne-multiservices.com
+
+Cordialement,
+Belledonne Multiservices</textarea>
         </div>
         <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('absentMulti')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedAbsentMulti"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
       </div>
@@ -354,9 +398,18 @@
             <span class="tpl-var" onclick="insertVar('tplGarantieSimpleBody','{{lien}}')">{{lien}}</span>
           </div>
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
-          <input class="tpl-input" type="text" id="tplGarantieSimpleSubject" placeholder="ex: Passage garantie effectue - {{nom}}">
+          <input class="tpl-input" type="text" id="tplGarantieSimpleSubject" value="Passage garantie effectue - {{nom}}" placeholder="ex: Passage garantie effectue - {{nom}}">
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
-          <textarea class="tpl-textarea" id="tplGarantieSimpleBody"></textarea>
+          <textarea class="tpl-textarea" id="tplGarantieSimpleBody">Bonjour,
+
+Un passage garantie a ete effectue au {{adresse}} le {{date}}.
+
+Nuisible : {{nuisible}}
+
+Le rapport est disponible sur votre espace client : https://clients-belledonne-multiservices.com
+
+Cordialement,
+Belledonne Multiservices</textarea>
         </div>
         <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('garantieSimple')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedGarantieSimple"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
       </div>
@@ -369,9 +422,18 @@
             <span class="tpl-var" onclick="insertVar('tplGarantieMultiBody','{{lien}}')">{{lien}}</span>
           </div>
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
-          <input class="tpl-input" type="text" id="tplGarantieMultiSubject" placeholder="ex: Passages garantie effectues - recapitulatif">
+          <input class="tpl-input" type="text" id="tplGarantieMultiSubject" value="Passages garantie effectues - recapitulatif" placeholder="ex: Passages garantie effectues - recapitulatif">
           <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
-          <textarea class="tpl-textarea" id="tplGarantieMultiBody"></textarea>
+          <textarea class="tpl-textarea" id="tplGarantieMultiBody">Bonjour,
+
+Les passages garantie suivants ont ete effectues :
+
+{{liste}}
+
+Les rapports sont disponibles sur votre espace client : https://clients-belledonne-multiservices.com
+
+Cordialement,
+Belledonne Multiservices</textarea>
         </div>
         <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('garantieMulti')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedGarantieMulti"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
       </div>
