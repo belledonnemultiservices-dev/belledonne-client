@@ -73,6 +73,8 @@
   .suivi-table tbody tr.row-termine{background:#BFDBFE !important;}
   .suivi-table tbody tr.row-termine:hover{background:#93C5FD !important;}
   .tech-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+  .notif-badge-bailleur{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+  .notif-badge-locataire{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#FEF3CD;color:#996600;padding:2px 8px;border-radius:20px;white-space:nowrap;}
   #passagesContainer > div { padding:8px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border); }
   .chip-statut-progress{background:#FEF3CD;color:#996600;}
   .chip-statut-done{background:#E8F9F2;color:#1DA870;}
@@ -773,8 +775,11 @@ window.renderTable = function renderTable(list) {
       <td>${passagesDropdown(item.passages||[])}</td>
       <td>${statutChip(item.statut)}</td>
       <td style="text-align:right;white-space:nowrap;">
-        ${(item.passages||[]).filter(Boolean).length ? `<button onclick="openNotifFromRow('${item.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1DA870;background:#E8F9F2;border:1px solid #A7E8CC;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifier</button>` : ''}
-        <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>
+        <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;flex-wrap:wrap;">
+          ${item.notifBailleur ? `<span class="notif-badge-bailleur" title="Bailleur notifié le ${new Date(item.notifBailleur).toLocaleDateString('fr-FR')}">🏢 ${new Date(item.notifBailleur).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>` : ''}
+          ${item.notifLocataire ? `<span class="notif-badge-locataire" title="Locataire notifié le ${new Date(item.notifLocataire).toLocaleDateString('fr-FR')}">🏠 ${new Date(item.notifLocataire).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>` : ''}
+          ${(item.passages||[]).filter(Boolean).length ? `<button onclick="openNotifFromRow('${item.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1DA870;background:#E8F9F2;border:1px solid #A7E8CC;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifier</button>` : ''}
+          <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>
         <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
       </td>
     </tr>`).join('');
@@ -868,10 +873,9 @@ function removePhone(n) {
 
 // ── NOTIFICATION SUIVI RDV ──
 window.openNotifFromRow = function(id) {
-  // Pre-fill form state from the intervention then open notif modal
+  window._nsCurrentItemId = id;
   const item = (window.interventions||[]).find(i => i.id === id);
   if (!item) return;
-  // Temporarily store current item for notification
   window._notifRowItem = item;
   openNotifFromItem(item);
 };
@@ -926,6 +930,7 @@ Belledonne Multiservices
 };
 
 window.openNotifSuivi = async function() {
+  window._nsCurrentItemId = editId;
   const client = document.getElementById('fClient')?.value;
   if (!client) { alert('Sélectionnez un client.'); return; }
 
@@ -991,6 +996,32 @@ window.closeNotifSuivi = function() {
   document.getElementById('modalNotifSuivi').classList.remove('open');
 };
 
+function updateNotifBadge(itemId, field, ts) {
+  const row = document.getElementById('row-' + itemId);
+  if (!row) return;
+  const actionsCell = row.querySelector('td:last-child');
+  if (!actionsCell) return;
+  const badgeId = 'badge-' + field + '-' + itemId;
+  let badge = document.getElementById(badgeId);
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.id = badgeId;
+    actionsCell.insertBefore(badge, actionsCell.firstChild);
+    actionsCell.insertBefore(document.createTextNode(' '), actionsCell.firstChild);
+  }
+  const d = new Date(ts);
+  const label = d.toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit'});
+  if (field === 'notifBailleur') {
+    badge.className = 'notif-badge-bailleur';
+    badge.innerHTML = '🏢 ' + label;
+    badge.title = 'Bailleur notifié le ' + d.toLocaleDateString('fr-FR');
+  } else {
+    badge.className = 'notif-badge-locataire';
+    badge.innerHTML = '🏠 ' + label;
+    badge.title = 'Locataire notifié le ' + d.toLocaleDateString('fr-FR');
+  }
+}
+
 function populateLocataireTab(nom, email, passagesStr, adresse, bc, pl, nature) {
   window._nsLocataireEmail = email;
   const tplLoc = window._suiviRdvLocataireTemplate || {};
@@ -1039,6 +1070,19 @@ window.sendNotifSuivi = async function() {
       document.getElementById('nsSuccessMsg').textContent = 'Email envoyé à ' + to;
       document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Fermer</button>';
       showToast('Email envoyé !');
+      // Update badge in row and Firestore
+      const itemId = window._nsCurrentItemId;
+      if (itemId) {
+        const field = isLoc ? 'notifLocataire' : 'notifBailleur';
+        const ts = new Date().toISOString();
+        // Update local data
+        const idx = interventions.findIndex(i => i.id === itemId);
+        if (idx !== -1) { interventions[idx][field] = ts; window.interventions = interventions; }
+        // Update Firestore via module
+        if (window._updateSuiviNotif) window._updateSuiviNotif(itemId, field, ts);
+        // Update badge in DOM immediately
+        updateNotifBadge(itemId, field, ts);
+      }
     } else { throw new Error('Erreur serveur'); }
   } catch(e) {
     alert('Erreur lors de l\'envoi : ' + e.message);
@@ -1153,6 +1197,15 @@ onAuthStateChanged(auth, async (user) => {
   window.interventions = interventions;
   if(window.renderTable) window.renderTable(interventions);
 });
+
+// ── UPDATE NOTIF FIELDS IN FIRESTORE ──
+window._updateSuiviNotif = async function(id, field, ts) {
+  try {
+    const update = {};
+    update[field] = ts;
+    await updateDoc(doc(db, 'suivi', id), update);
+  } catch(e) { console.warn('notif update:', e); }
+};
 
 // ── CONTACTS POUR NOTIF SUIVI ──
 window._loadContactsForSuivi = async function(client, selEl) {
