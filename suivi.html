@@ -77,6 +77,26 @@
   .notif-badge-locataire{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#FEF3CD;color:#996600;padding:2px 8px;border-radius:20px;white-space:nowrap;}
   .notif-badge-sms{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#EDE9FE;color:#6D28D9;padding:2px 8px;border-radius:20px;white-space:nowrap;}
   #passagesContainer > div { padding:8px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border); }
+  .notif-row { background:#F8FAFC; border-top:none !important; }
+  .notif-row td { padding:10px 16px !important; }
+  .notif-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .notif-section { display:flex; align-items:center; gap:6px; }
+  .notif-label { font-size:11px; font-weight:600; color:var(--text-muted); white-space:nowrap; }
+  .notif-history { position:relative; display:inline-block; }
+  .notif-history-btn { display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;cursor:pointer;border:none;white-space:nowrap; }
+  .notif-history-btn.bailleur { background:#E8F9F2;color:#1DA870; }
+  .notif-history-btn.locataire { background:#FEF3CD;color:#996600; }
+  .notif-history-btn.sms { background:#EDE9FE;color:#6D28D9; }
+  .notif-dropdown { display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,0.1);min-width:180px;z-index:100;padding:6px 0; }
+  .notif-history:hover .notif-dropdown, .notif-history.open .notif-dropdown { display:block; }
+  .notif-dropdown-item { padding:6px 14px;font-size:12px;color:var(--text-mid);white-space:nowrap; }
+  .notif-dropdown-item:first-child { font-weight:600;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:2px; }
+  .notif-none { font-size:11px;color:var(--text-muted);font-style:italic; }
+  .btn-notif-open { display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#fff;background:var(--navy);border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap; }
+  .btn-rappel { display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#6D28D9;background:#EDE9FE;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap; }
+  .btn-toggle-notif { display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:var(--text-muted);background:transparent;border:1px solid var(--border);padding:3px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s; }
+  .btn-toggle-notif:hover { background:var(--bg);color:var(--text); }
+  .btn-toggle-notif.active { background:var(--navy);color:#fff;border-color:var(--navy); }
   .chip-statut-progress{background:#FEF3CD;color:#996600;}
   .chip-statut-done{background:#E8F9F2;color:#1DA870;}
   .chip-statut-cancel{background:#FDECEA;color:#E74C3C;}
@@ -695,6 +715,26 @@ async function deleteIntervention(id) {
 }
 
 // ── RENDER ──
+// Normalize notif field to array (rétrocompat)
+function toNotifArray(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  return [val]; // old string format
+}
+function fmtNotifDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+}
+function notifHistoryHtml(field, arr, icon, cls) {
+  if (!arr.length) return '<span class="notif-none">' + icon + ' Jamais</span>';
+  const last = arr[arr.length-1];
+  const d = new Date(last);
+  const label = icon + ' x' + arr.length + ' &nbsp;▾';
+  const items = arr.slice().reverse().map((ts,i) =>
+    '<div class="notif-dropdown-item">' + (i===0?'Dernier : ':'') + fmtNotifDate(ts) + '</div>'
+  ).join('');
+  return '<div class="notif-history"><button class="notif-history-btn ' + cls + '" onclick="event.stopPropagation();this.parentElement.classList.toggle(\'open\')">' + label + '</button><div class="notif-dropdown">' + items + '</div></div>';
+}
 function fmtPassage(val) {
   if (!val) return '—';
   const [debut, fin] = val.includes('|') ? val.split('|') : [val, ''];
@@ -755,91 +795,44 @@ window.renderTable = function renderTable(list) {
     body.innerHTML = `<tr><td colspan="9"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention trouvée.</p></div></td></tr>`;
     return;
   }
-  body.innerHTML = list.map(item => `
-    <tr class="${item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':''}">
+  body.innerHTML = list.map(item => {
+    const nb = toNotifArray(item.notifBailleur);
+    const nl = toNotifArray(item.notifLocataire);
+    const ns = toNotifArray(item.notifSms);
+    const hasPsg = (item.passages||[]).filter(Boolean).length > 0;
+    const totalNotifs = nb.length + nl.length + ns.length;
+    return `
+    <tr id="row-${item.id}" class="${item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':''}">
       <td class="client-cell">${item.client||'—'}</td>
-      <td>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          ${item.pl ? `<span style="font-family:monospace;font-size:12px;font-weight:600;">${item.pl}</span>` : ''}
-          ${pdfBtn(item.plUrl,'PDF')}
-        </div>
-      </td>
-      <td>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          ${item.bc ? `<span style="font-family:monospace;font-size:12px;font-weight:600;">${item.bc}</span>` : ''}
-          ${pdfBtn(item.bcUrl,'PDF')}
-        </div>
-      </td>
+      <td><div style="display:flex;flex-direction:column;gap:4px;">${item.pl?`<span style="font-family:monospace;font-size:12px;font-weight:600;">${item.pl}</span>`:''} ${pdfBtn(item.plUrl,'PDF')}</div></td>
+      <td><div style="display:flex;flex-direction:column;gap:4px;">${item.bc?`<span style="font-family:monospace;font-size:12px;font-weight:600;">${item.bc}</span>`:''} ${pdfBtn(item.bcUrl,'PDF')}</div></td>
       <td style="font-size:13px;">${item.nature||'—'}</td>
       <td style="min-width:200px;font-size:13px;">${item.adresse||'—'}</td>
-      <td>${item.assigne ? assigneBadge(item.assigne) : '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td>${item.assigne?assigneBadge(item.assigne):'<span style="color:var(--text-muted)">—</span>'}</td>
       <td>${passagesDropdown(item.passages||[])}</td>
       <td>${statutChip(item.statut)}</td>
       <td style="text-align:right;white-space:nowrap;">
-        <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;flex-wrap:wrap;">
-          ${item.notifBailleur ? `<span class="notif-badge-bailleur" title="Bailleur notifié le ${new Date(item.notifBailleur).toLocaleDateString('fr-FR')}">🏢 ${new Date(item.notifBailleur).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>` : ''}
-          ${item.notifLocataire ? `<span class="notif-badge-locataire" title="Locataire notifié le ${new Date(item.notifLocataire).toLocaleDateString('fr-FR')}">🏠 ${new Date(item.notifLocataire).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>` : ''}
-          ${item.notifSms ? `<span class="notif-badge-sms" title="SMS envoyé le ${new Date(item.notifSms).toLocaleDateString('fr-FR')}">💬 ${new Date(item.notifSms).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>` : ''}
-          ${(item.passages||[]).filter(Boolean).length ? `<button onclick="openNotifFromRow('${item.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1DA870;background:#E8F9F2;border:1px solid #A7E8CC;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifier</button>` : ''}
+        <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;">
+          <button class="btn-toggle-notif" onclick="toggleNotifRow('${item.id}')">🔔${totalNotifs>0?' ('+totalNotifs+')':''}</button>
           <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>
-        <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
+          <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
+        </div>
       </td>
-    </tr>`).join('');
-}
-
-// ── FILTER ──
-function filterTable() {
-  const q = document.getElementById('searchInput').value.toLowerCase();
-  const statut = document.getElementById('filterStatut').value;
-  const filtered = interventions.filter(i => {
-    const mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,i.assigne].some(v => (v||'').toLowerCase().includes(q));
-    const ms = !statut || i.statut === statut;
-    return mq && ms;
-  });
-  renderTable(filtered);
-}
-
-// ── TECHNICIENS (non-module) ──
-async function addTechnicien() {
-  const nom = document.getElementById('newTechNom').value.trim();
-  const color = document.getElementById('newTechColor').value;
-  if (!nom) return;
-  await window._addTech(nom, color);
-  document.getElementById('newTechNom').value = '';
-  await window._loadTechniciens();
-  renderTechList();
-  showToast('Technicien ajouté !');
-}
-async function deleteTechnicien(id) {
-  await window._deleteTech(id);
-  await window._loadTechniciens();
-  renderTechList();
-}
-function renderTechList() {
-  const list = document.getElementById('techList');
-  // Read from select options (already updated)
-  const sel = document.getElementById('fAssigne');
-  const techs = Array.from(sel.options).slice(1); // skip default
-  if (!techs.length) {
-    list.innerHTML = '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:16px;">Aucun technicien enregistré.</div>';
-    return;
-  }
-  // We need ids — use techniciens from module scope via window
-  const techData = window._techniciens || [];
-  if (!techData.length) {
-    list.innerHTML = '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:16px;">Aucun technicien enregistré.</div>';
-    return;
-  }
-  list.innerHTML = techData.map(t => {
-    const bg = t.color || '#8FA4B8';
-    const fg = isLightColor(bg) ? '#0D1B2A' : '#fff';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${bg};flex-shrink:0;"></span>
-        <span class="tech-badge" style="background:${bg};color:${fg};">${t.nom}</span>
-      </div>
-      ${t.id ? `<button onclick="deleteTechnicien('${t.id}')" style="border:none;background:#FDECEA;color:#E74C3C;padding:4px 10px;border-radius:6px;font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;">Supprimer</button>` : ''}
-    </div>`;
+    </tr>
+    <tr id="notif-row-${item.id}" class="notif-row" style="display:none;">
+      <td colspan="9">
+        <div class="notif-bar">
+          <div class="notif-section">
+            ${hasPsg?`<button class="btn-notif-open" onclick="openNotifFromRow('${item.id}')">✉ Notifier</button>`:'<span class="notif-none">Ajoutez des passages pour notifier</span>'}
+          </div>
+          <div style="width:1px;height:24px;background:var(--border);margin:0 4px;"></div>
+          <div class="notif-section"><span class="notif-label">🏢 Bailleur</span>${notifHistoryHtml('bailleur',nb,'🏢','bailleur')}</div>
+          <div class="notif-section"><span class="notif-label">🏠 Locataire</span>${notifHistoryHtml('locataire',nl,'🏠','locataire')}</div>
+          <div class="notif-section"><span class="notif-label">💬 SMS</span>${notifHistoryHtml('sms',ns,'💬','sms')}</div>
+          ${hasPsg?`<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms('${item.id}')">💬 Rappel SMS</button></div>`:''}
+        </div>
+      </td>
+    </tr>`;
   }).join('');
 }
 
@@ -1003,6 +996,61 @@ window.closeNotifSuivi = function() {
   document.getElementById('modalNotifSuivi').classList.remove('open');
 };
 
+function updateNotifRow(itemId) {
+  const item = interventions.find(i => i.id === itemId);
+  if (!item) return;
+  const nb = toNotifArray(item.notifBailleur);
+  const nl = toNotifArray(item.notifLocataire);
+  const ns = toNotifArray(item.notifSms);
+  const totalNotifs = nb.length + nl.length + ns.length;
+  const btn = document.querySelector('#row-' + itemId + ' .btn-toggle-notif');
+  if (btn) btn.textContent = '🔔' + (totalNotifs > 0 ? ' (' + totalNotifs + ')' : '');
+  const notifRow = document.getElementById('notif-row-' + itemId);
+  if (notifRow) {
+    const bar = notifRow.querySelector('.notif-bar');
+    if (bar) {
+      const sects = bar.querySelectorAll('.notif-section');
+      if (sects[1]) sects[1].innerHTML = '<span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur',nb,'🏢','bailleur');
+      if (sects[2]) sects[2].innerHTML = '<span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire',nl,'🏠','locataire');
+      if (sects[3]) sects[3].innerHTML = '<span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms',ns,'💬','sms');
+    }
+  }
+}
+
+function toggleNotifRow(id) {
+  const row = document.getElementById('notif-row-' + id);
+  const btn = document.querySelector('#row-' + id + ' .btn-toggle-notif');
+  if (!row) return;
+  const isOpen = row.style.display !== 'none';
+  row.style.display = isOpen ? 'none' : 'table-row';
+  if (btn) btn.classList.toggle('active', !isOpen);
+}
+
+window.openRappelSms = async function(id) {
+  window._nsCurrentItemId = id;
+  const item = (window.interventions||[]).find(i => i.id === id);
+  if (!item) return;
+  const passages = (item.passages||[]).filter(Boolean);
+  const passLignes = passages.map((p,i) => {
+    const [debut] = p.includes('|') ? p.split('|') : [p];
+    return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
+  }).join(' | ');
+  const phones = Array.isArray(item.coordonnees) ? item.coordonnees : (item.coordonnees ? [item.coordonnees] : []);
+  populateSmsPanel(phones, passLignes, item.adresse||'', item.bc||'', item.nature||'');
+  // Override with rappel message
+  const rappelMsg = 'Rappel Belledonne : votre intervention est prevue ' + passLignes + ' - ' + (item.adresse||'').substring(0,30) + '. Contact : 06 95 67 26 03.';
+  const bodyEl = document.getElementById('nsSmsBody');
+  if (bodyEl) { bodyEl.value = rappelMsg; updateSmsCount(); }
+  switchNotifTab('sms');
+  const sel = document.getElementById('nsSel');
+  sel.innerHTML = '<option value="">—</option>';
+  document.getElementById('nsSubject').value = '';
+  document.getElementById('nsBody').value = '';
+  document.getElementById('nsSuccess').style.display = 'none';
+  document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button><button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
+  document.getElementById('modalNotifSuivi').classList.add('open');
+};
+
 function updateNotifBadge(itemId, field, ts) {
   const row = document.getElementById('row-' + itemId);
   if (!row) return;
@@ -1059,8 +1107,16 @@ async function sendSmsNotif() {
         const ts = new Date().toISOString();
         const idx = interventions.findIndex(i => i.id === itemId);
         if (idx !== -1) { interventions[idx].notifSms = ts; window.interventions = interventions; }
-        if (window._updateSuiviNotif) window._updateSuiviNotif(itemId, 'notifSms', ts);
-        updateNotifBadge(itemId, 'notifSms', ts);
+        if (window._updateSuiviNotifArray) window._updateSuiviNotifArray(itemId, 'notifSms', ts);
+        // Push to local array
+        const idxS = interventions.findIndex(i => i.id === itemId);
+        if (idxS !== -1) {
+          const arrS = toNotifArray(interventions[idxS].notifSms);
+          arrS.push(ts);
+          interventions[idxS].notifSms = arrS;
+          window.interventions = interventions;
+        }
+        updateNotifRow(itemId);
       }
     } else if (data.ovhError) {
       const msg = data.ovhError.message || data.ovhError.errorCode || JSON.stringify(data.ovhError);
@@ -1162,13 +1218,16 @@ window.sendNotifSuivi = async function() {
       if (itemId) {
         const field = isLoc ? 'notifLocataire' : 'notifBailleur';
         const ts = new Date().toISOString();
-        // Update local data
+        // Update local data — push to array
         const idx = interventions.findIndex(i => i.id === itemId);
-        if (idx !== -1) { interventions[idx][field] = ts; window.interventions = interventions; }
-        // Update Firestore via module
-        if (window._updateSuiviNotif) window._updateSuiviNotif(itemId, field, ts);
-        // Update badge in DOM immediately
-        updateNotifBadge(itemId, field, ts);
+        if (idx !== -1) {
+          const arr = toNotifArray(interventions[idx][field]);
+          arr.push(ts);
+          interventions[idx][field] = arr;
+          window.interventions = interventions;
+        }
+        if (window._updateSuiviNotifArray) window._updateSuiviNotifArray(itemId, field, ts);
+        updateNotifRow(itemId);
       }
     } else { throw new Error('Erreur serveur'); }
   } catch(e) {
@@ -1199,7 +1258,7 @@ document.getElementById('pdfViewerPanel')?.addEventListener('click', e => { if(e
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 let interventions = [];
@@ -1290,11 +1349,11 @@ onAuthStateChanged(auth, async (user) => {
   if(window.renderTable) window.renderTable(interventions);
 });
 
-// ── UPDATE NOTIF FIELDS IN FIRESTORE ──
-window._updateSuiviNotif = async function(id, field, ts) {
+// ── UPDATE NOTIF FIELDS IN FIRESTORE (array push) ──
+window._updateSuiviNotifArray = async function(id, field, ts) {
   try {
     const update = {};
-    update[field] = ts;
+    update[field] = arrayUnion(ts);
     await updateDoc(doc(db, 'suivi', id), update);
   } catch(e) { console.warn('notif update:', e); }
 };
