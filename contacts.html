@@ -829,15 +829,17 @@ window.saveTemplate = async function(type) {
   const cap = type.charAt(0).toUpperCase() + type.slice(1);
   const subjectEl = document.getElementById('tpl' + cap + 'Subject');
   const bodyEl = document.getElementById('tpl' + cap + 'Body');
-  const subject = subjectEl ? subjectEl.value.trim() : '';
+  const subject = subjectEl ? subjectEl.value.trim() : null;
   const body = bodyEl ? bodyEl.value.trim() : '';
-  if (!subject || !body) { alert('Renseignez l\'objet et le corps.'); return; }
+  // SMS templates have no subject field — only validate body
+  if (subjectEl && !subject) { alert('Renseignez l\'objet.'); return; }
+  if (!body) { alert('Renseignez le corps du message.'); return; }
   const savedEl = document.getElementById('saved' + cap);
   try {
     const snap = await getDocs(collection(db, "config"));
     const existing = snap.docs.find(x => x.id === 'templates');
     const currentData = existing ? existing.data() : {};
-    currentData[type] = { subject, body, updatedAt: new Date().toISOString() };
+    currentData[type] = subject !== null ? { subject, body, updatedAt: new Date().toISOString() } : { body, updatedAt: new Date().toISOString() };
     await setDoc(doc(db, "config", "templates"), currentData);
     if (savedEl) { savedEl.style.display = 'flex'; setTimeout(() => { savedEl.style.display = 'none'; }, 3000); }
     window.showToast('Template enregistre !');
