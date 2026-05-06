@@ -642,7 +642,7 @@ function renderRapports(list) {
       <div style="display:flex;gap:6px;align-items:center;">
         ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
         ${window._isAdmin ? `
-          <button onclick="openSendModal('rapport','${r.bc||''}','${r.site||''}','${r.date}','${r.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:#1DA870;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>
+          <button onclick="openNotifForRapport('${r.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:#1DA870;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>
           <button onclick="openEditRapport('${r.id}')" class="btn-action" style="color:#1A2E42;background:#EBF0F5;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
           <button onclick="deleteRapport('${r.id}')" class="btn-action" style="color:#E74C3C;background:#FDECEA;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
       </div>
@@ -666,6 +666,30 @@ function filterRapports() {
   });
   renderRapports(list);
 }
+
+// Ouvrir la modale de notification pour un rapport unique (bouton "Notifier" par ligne)
+window.openNotifForRapport = function(id) {
+  const r = (window.rapports || rapports || []).find(x => x.id === id);
+  if (!r) return;
+  // Réinitialiser la sélection puis sélectionner uniquement ce rapport
+  window._selectedIds = new Set([id]);
+  const modal = document.getElementById('modalNotif');
+  if (!modal) return;
+  modal.classList.add('open');
+  const recap = document.getElementById('mnRecap');
+  if (recap) recap.textContent = (r.bc ? 'BC ' + r.bc + ' — ' : '') + (r.site || '') + (r.date ? ' (' + r.date + ')' : '');
+  const title = document.getElementById('mnTitle');
+  if (title) title.textContent = 'Notifier le client';
+  const success = document.getElementById('mnSuccess');
+  if (success) success.style.display = 'none';
+  const main = document.getElementById('mnMainContent');
+  if (main) main.style.display = '';
+  const footer = document.getElementById('mnFooter');
+  if (footer) footer.innerHTML = '<button class="mn-btn-cancel" onclick="closeNotifModal()">Annuler</button><button class="mn-btn-send" id="mnBtnSend" onclick="sendNotification()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
+  if (typeof window._loadNotifData === 'function') {
+    window._loadNotifData(r.client, false, [r]);
+  }
+};
 
 // Générer les années dynamiquement
 (function() {
