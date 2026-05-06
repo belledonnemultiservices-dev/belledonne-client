@@ -99,14 +99,16 @@
   .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--green);background:#fff;}
   .form-textarea{min-height:80px;resize:vertical;line-height:1.6;}
   /* ── DROP ZONE ── */
-  .drop-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--bg);position:relative;}
-  .drop-zone:hover,.drop-zone.drag-over{border-color:var(--green);background:var(--green-pale);}
-  .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .drop-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:20px;text-align:center;transition:all 0.15s;background:var(--bg);}
+  .drop-zone.drag-over{border-color:var(--green);background:var(--green-pale);}
   .drop-zone-icon{width:28px;height:28px;margin:0 auto 8px;color:var(--text-muted);}
   .drop-zone-text{font-size:12px;color:var(--text-muted);}
-  .drop-zone-chosen{font-size:12px;font-weight:600;color:var(--green-dark);margin-top:6px;display:none;}
-  .drop-zone-preview{display:none;margin-top:10px;}
-  .drop-zone-preview button{font-size:11px;font-weight:500;color:var(--green-dark);background:var(--green-pale);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .drop-zone-btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--navy);background:#EBF0F5;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:8px;}
+  .drop-zone-chosen{font-size:12px;font-weight:600;color:var(--green-dark);margin-top:8px;display:none;}
+  .drop-zone-actions{display:none;margin-top:8px;gap:6px;justify-content:center;flex-wrap:wrap;}
+  .drop-zone-actions button{font-size:11px;font-weight:500;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:4px;}
+  .btn-preview{color:var(--green-dark);background:var(--green-pale);}
+  .btn-remove-file{color:#E74C3C;background:#FDECEA;}
   /* ── PDF VIEWER ── */
   .pdf-viewer-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.7);z-index:500;align-items:center;justify-content:center;}
   .pdf-viewer-overlay.open{display:flex;}
@@ -177,10 +179,16 @@
         <div class="page-title">Suivi des interventions</div>
         <div class="page-sub">Tableau de bord opérationnel — gestion des dossiers et bons de commande</div>
       </div>
-      <button class="btn-primary" id="btnAjouter" onclick="openModal()">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        Nouvelle intervention
-      </button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button onclick="document.getElementById('modalTech').classList.add('open');renderTechList()" style="display:inline-flex;align-items:center;gap:7px;background:var(--surface);color:var(--text-mid);border:1px solid var(--border);padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          Techniciens
+        </button>
+        <button class="btn-primary" id="btnAjouter" onclick="openModal()">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Nouvelle intervention
+        </button>
+      </div>
     </div>
 
     <!-- FILTERS -->
@@ -238,6 +246,23 @@
   </div>
 </div>
 
+<!-- MODAL GESTION TECHNICIENS -->
+<div class="modal-overlay" id="modalTech">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">Gestion des techniciens</div>
+      <button class="modal-close" onclick="document.getElementById('modalTech').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:10px;margin-bottom:18px;">
+        <input class="form-input" id="newTechNom" placeholder="Nom du technicien" style="flex:1;">
+        <button onclick="addTechnicien()" style="display:inline-flex;align-items:center;gap:6px;background:var(--navy);color:#fff;border:none;padding:10px 16px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">+ Ajouter</button>
+      </div>
+      <div id="techList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL AJOUT / ÉDITION -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
@@ -253,14 +278,13 @@
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Client <span style="color:#E74C3C">*</span></label>
-            <input class="form-input" id="fClient" placeholder="ex: Le-Toit-Forzien">
+            <select class="form-select" id="fClient">
+              <option value="">— Sélectionner un client —</option>
+            </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Service Chorus obligatoire <span style="color:#E74C3C">*</span></label>
-            <select class="form-select" id="fChorus">
-              <option value="Non">Non</option>
-              <option value="Oui">Oui</option>
-            </select>
+            <label class="form-label">N° Service Chorus <span class="opt">— optionnel</span></label>
+            <input class="form-input" id="fChorus" placeholder="">
           </div>
           <div class="form-group">
             <label class="form-label">Date d'émission</label>
@@ -268,11 +292,13 @@
           </div>
           <div class="form-group">
             <label class="form-label">Expéditeur</label>
-            <input class="form-input" id="fExpediteur" placeholder="ex: OPAC38">
+            <input class="form-input" id="fExpediteur" placeholder="">
           </div>
           <div class="form-group">
             <label class="form-label">Assigné à</label>
-            <input class="form-input" id="fAssigne" placeholder="ex: Technicien Dupont">
+            <select class="form-select" id="fAssigne">
+              <option value="">— Sélectionner un technicien —</option>
+            </select>
           </div>
           <div class="form-group">
             <label class="form-label">Statut</label>
@@ -292,16 +318,20 @@
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Numéro d'affaire (PL) <span class="opt">— optionnel</span></label>
-            <input class="form-input" id="fPL" placeholder="ex: PL/521576">
+            <input class="form-input" id="fPL" placeholder="">
           </div>
           <div class="form-group">
             <label class="form-label">PDF Affaire PL <span class="opt">— optionnel</span></label>
-            <div class="drop-zone" id="dropPL" ondragover="dragOver(event,'dropPL')" ondragleave="dragLeave('dropPL')" ondrop="dropFile(event,'dropPL','filePL','chosenPL','previewPL')">
-              <input type="file" id="filePL" accept=".pdf" onchange="fileChosen('filePL','chosenPL','previewPL')">
+            <input type="file" id="filePL" accept=".pdf" style="display:none" onchange="fileChosen('filePL','chosenPL','actionsPL')">
+            <div class="drop-zone" id="dropPL" ondragover="dragOver(event,'dropPL')" ondragleave="dragLeave('dropPL')" ondrop="dropFile(event,'dropPL','filePL','chosenPL','actionsPL')">
               <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
-              <div class="drop-zone-text">Glisser le PDF ici ou cliquer</div>
+              <div class="drop-zone-text">Glisser le PDF ici</div>
+              <button type="button" class="drop-zone-btn" onclick="document.getElementById('filePL').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Choisir un fichier</button>
               <div class="drop-zone-chosen" id="chosenPL"></div>
-              <div class="drop-zone-preview" id="previewPL"><button type="button" onclick="openPdfViewer('filePL')">👁 Aperçu PDF</button></div>
+              <div class="drop-zone-actions" id="actionsPL">
+                <button type="button" class="btn-preview" onclick="openPdfViewer('filePL')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>Aperçu</button>
+                <button type="button" class="btn-remove-file" onclick="removeFile('filePL','chosenPL','actionsPL')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Retirer</button>
+              </div>
             </div>
           </div>
         </div>
@@ -313,16 +343,20 @@
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Numéro BC</label>
-            <input class="form-input" id="fBC" placeholder="ex: BC/314292">
+            <input class="form-input" id="fBC" placeholder="">
           </div>
           <div class="form-group">
             <label class="form-label">PDF Bon de commande</label>
-            <div class="drop-zone" id="dropBC" ondragover="dragOver(event,'dropBC')" ondragleave="dragLeave('dropBC')" ondrop="dropFile(event,'dropBC','fileBC','chosenBC','previewBC')">
-              <input type="file" id="fileBC" accept=".pdf" onchange="fileChosen('fileBC','chosenBC','previewBC')">
+            <input type="file" id="fileBC" accept=".pdf" style="display:none" onchange="fileChosen('fileBC','chosenBC','actionsBC')">
+            <div class="drop-zone" id="dropBC" ondragover="dragOver(event,'dropBC')" ondragleave="dragLeave('dropBC')" ondrop="dropFile(event,'dropBC','fileBC','chosenBC','actionsBC')">
               <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
-              <div class="drop-zone-text">Glisser le PDF ici ou cliquer</div>
+              <div class="drop-zone-text">Glisser le PDF ici</div>
+              <button type="button" class="drop-zone-btn" onclick="document.getElementById('fileBC').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Choisir un fichier</button>
               <div class="drop-zone-chosen" id="chosenBC"></div>
-              <div class="drop-zone-preview" id="previewBC"><button type="button" onclick="openPdfViewer('fileBC')">👁 Aperçu PDF</button></div>
+              <div class="drop-zone-actions" id="actionsBC">
+                <button type="button" class="btn-preview" onclick="openPdfViewer('fileBC')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>Aperçu</button>
+                <button type="button" class="btn-remove-file" onclick="removeFile('fileBC','chosenBC','actionsBC')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Retirer</button>
+              </div>
             </div>
           </div>
         </div>
@@ -334,15 +368,15 @@
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Nature de la mission</label>
-            <input class="form-input" id="fNature" placeholder="ex: Traitement blattes">
+            <input class="form-input" id="fNature" placeholder="">
           </div>
           <div class="form-group">
-            <label class="form-label">Coordonnées du client</label>
-            <input class="form-input" id="fCoordonnees" placeholder="ex: 04 76 00 00 00">
+            <label class="form-label">Numéro client</label>
+            <input class="form-input" id="fCoordonnees" placeholder="">
           </div>
           <div class="form-group form-full">
             <label class="form-label">Adresse</label>
-            <input class="form-input" id="fAdresse" placeholder="ex: 6 Rue Marius Riollet 38100 Grenoble">
+            <input class="form-input" id="fAdresse" placeholder="">
           </div>
           <div class="form-group form-full">
             <label class="form-label">Observations</label>
@@ -353,21 +387,11 @@
 
       <!-- SECTION 5 : PASSAGES -->
       <div class="form-section">
-        <div class="form-section-title">Dates de passage <span style="font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;">(renseignées au fur et à mesure)</span></div>
-        <div class="form-grid-3">
-          <div class="form-group">
-            <label class="form-label">1er passage <span class="opt">— optionnel</span></label>
-            <input class="form-input" type="date" id="fDate1">
-          </div>
-          <div class="form-group">
-            <label class="form-label">2e passage <span class="opt">— optionnel</span></label>
-            <input class="form-input" type="date" id="fDate2">
-          </div>
-          <div class="form-group">
-            <label class="form-label">3e passage <span class="opt">— optionnel</span></label>
-            <input class="form-input" type="date" id="fDate3">
-          </div>
+        <div class="form-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Dates de passage <span style="font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;">(optionnel, au fur et à mesure)</span></span>
+          <button type="button" onclick="addPassage()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Ajouter un passage</button>
         </div>
+        <div id="passagesContainer" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;"></div>
       </div>
 
       <!-- SECTION 6 : NOTES -->
@@ -420,7 +444,7 @@ function dragOver(e, zoneId) {
 function dragLeave(zoneId) {
   document.getElementById(zoneId).classList.remove('drag-over');
 }
-function dropFile(e, zoneId, fileInputId, chosenId, previewId) {
+function dropFile(e, zoneId, fileInputId, chosenId, actionsId) {
   e.preventDefault();
   document.getElementById(zoneId).classList.remove('drag-over');
   const file = e.dataTransfer.files[0];
@@ -428,19 +452,26 @@ function dropFile(e, zoneId, fileInputId, chosenId, previewId) {
   const dt = new DataTransfer();
   dt.items.add(file);
   document.getElementById(fileInputId).files = dt.files;
-  fileChosen(fileInputId, chosenId, previewId);
+  fileChosen(fileInputId, chosenId, actionsId);
 }
-function fileChosen(fileInputId, chosenId, previewId) {
+function fileChosen(fileInputId, chosenId, actionsId) {
   const input = document.getElementById(fileInputId);
   const chosen = document.getElementById(chosenId);
-  const preview = document.getElementById(previewId);
+  const actions = document.getElementById(actionsId);
   if (!input.files[0]) return;
   chosen.textContent = '✓ ' + input.files[0].name;
   chosen.style.display = 'block';
-  preview.style.display = 'block';
-  // Revoke old blob URL if exists
+  if (actions) { actions.style.display = 'flex'; }
   if (pdfBlobUrls[fileInputId]) URL.revokeObjectURL(pdfBlobUrls[fileInputId]);
   pdfBlobUrls[fileInputId] = URL.createObjectURL(input.files[0]);
+}
+function removeFile(fileInputId, chosenId, actionsId) {
+  document.getElementById(fileInputId).value = '';
+  const chosen = document.getElementById(chosenId);
+  chosen.textContent = ''; chosen.style.display = 'none';
+  const actions = document.getElementById(actionsId);
+  if (actions) actions.style.display = 'none';
+  if (pdfBlobUrls[fileInputId]) { URL.revokeObjectURL(pdfBlobUrls[fileInputId]); delete pdfBlobUrls[fileInputId]; }
 }
 
 // ── PDF VIEWER ──
@@ -478,9 +509,7 @@ function openModal(id = null) {
     document.getElementById('fCoordonnees').value = item.coordonnees || '';
     document.getElementById('fAdresse').value = item.adresse || '';
     document.getElementById('fObservations').value = item.observations || '';
-    document.getElementById('fDate1').value = item.date1 || '';
-    document.getElementById('fDate2').value = item.date2 || '';
-    document.getElementById('fDate3').value = item.date3 || '';
+    (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach(d => addPassage(d));
     document.getElementById('fNotes').value = item.notes || '';
     // Show existing PDF links if any
     if (item.plUrl) { const c = document.getElementById('chosenPL'); c.textContent = '✓ Fichier existant'; c.style.display = 'block'; }
@@ -493,15 +522,45 @@ function closeModal() {
   resetForm();
   editId = null;
 }
+// ── PASSAGES DYNAMIQUES ──
+let passageCount = 0;
+const ORDINALS = ['1er','2e','3e','4e','5e','6e','7e','8e','9e','10e'];
+function addPassage(value = '') {
+  passageCount++;
+  const n = passageCount;
+  const label = ORDINALS[n-1] || (n+'e');
+  const container = document.getElementById('passagesContainer');
+  const div = document.createElement('div');
+  div.id = 'passage_' + n;
+  div.style.cssText = 'display:flex;align-items:center;gap:10px;';
+  div.innerHTML = `<label style="font-size:12px;font-weight:500;color:var(--text-mid);white-space:nowrap;min-width:80px;">${label} passage</label>
+    <input class="form-input" type="datetime-local" id="fDate${n}" value="${value}" style="flex:1;">
+    <button type="button" onclick="removePassage(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
+  container.appendChild(div);
+}
+function removePassage(n) {
+  const el = document.getElementById('passage_' + n);
+  if (el) el.remove();
+}
+function getPassageDates() {
+  const dates = [];
+  document.querySelectorAll('#passagesContainer input[type=datetime-local]').forEach(inp => {
+    dates.push(inp.value);
+  });
+  return dates;
+}
 function resetForm() {
-  ['fClient','fDateEmission','fExpediteur','fAssigne','fPL','fBC','fNature','fCoordonnees','fAdresse','fObservations','fDate1','fDate2','fDate3','fNotes'].forEach(id => {
+  ['fClient','fDateEmission','fExpediteur','fPL','fBC','fNature','fCoordonnees','fAdresse','fObservations','fNotes'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  document.getElementById('fChorus').value = 'Non';
+  document.getElementById('fChorus').value = '';
+  document.getElementById('fAssigne').value = '';
   document.getElementById('fStatut').value = 'Nouveau';
   ['chosenPL','chosenBC'].forEach(id => { const el = document.getElementById(id); if(el) { el.textContent=''; el.style.display='none'; }});
-  ['previewPL','previewBC'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
+  ['actionsPL','actionsBC'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
   ['filePL','fileBC'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('passagesContainer').innerHTML = '';
+  passageCount = 0;
 }
 
 // ── SAVE ──
@@ -521,11 +580,12 @@ async function saveIntervention() {
     if (filePL) plUrl = await window._uploadPdf(filePL, `suivi/pl/${Date.now()}_${filePL.name}`);
     if (fileBC) bcUrl = await window._uploadPdf(fileBC, `suivi/bc/${Date.now()}_${fileBC.name}`);
 
+    const passages = getPassageDates();
     const data = {
-      client, chorus: document.getElementById('fChorus').value,
+      client, chorus: document.getElementById('fChorus').value.trim(),
       dateEmission: document.getElementById('fDateEmission').value,
       expediteur: document.getElementById('fExpediteur').value.trim(),
-      assigne: document.getElementById('fAssigne').value.trim(),
+      assigne: document.getElementById('fAssigne').value,
       statut: document.getElementById('fStatut').value,
       pl: document.getElementById('fPL').value.trim(),
       plUrl,
@@ -535,9 +595,7 @@ async function saveIntervention() {
       coordonnees: document.getElementById('fCoordonnees').value.trim(),
       adresse: document.getElementById('fAdresse').value.trim(),
       observations: document.getElementById('fObservations').value.trim(),
-      date1: document.getElementById('fDate1').value,
-      date2: document.getElementById('fDate2').value,
-      date3: document.getElementById('fDate3').value,
+      passages,
       notes: document.getElementById('fNotes').value.trim(),
       updatedAt: new Date().toISOString()
     };
@@ -578,6 +636,11 @@ async function deleteIntervention(id) {
 // ── RENDER ──
 function fmtDate(d) {
   if (!d) return '—';
+  if (d.includes('T')) {
+    const [datePart, timePart] = d.split('T');
+    const [y,m,day] = datePart.split('-');
+    return `${parseInt(day)}/${parseInt(m)}/${y} ${timePart.substring(0,5)}`;
+  }
   const [y,m,day] = d.split('-');
   return `${parseInt(day)}/${parseInt(m)}/${y}`;
 }
@@ -611,9 +674,9 @@ function renderTable(list) {
       <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.adresse||''}">${item.adresse||'—'}</td>
       <td>${item.coordonnees||'—'}</td>
       <td>${item.assigne||'—'}</td>
-      <td style="white-space:nowrap;">${fmtDate(item.date1)}</td>
-      <td style="white-space:nowrap;">${fmtDate(item.date2)}</td>
-      <td style="white-space:nowrap;">${fmtDate(item.date3)}</td>
+      <td style="white-space:nowrap;">${(item.passages||[item.date1]).filter(Boolean).map(d=>fmtDate(d)).join(', ')||'—'}</td>
+      <td style="white-space:nowrap;">${fmtDate((item.passages||[])[1]||item.date2)}</td>
+      <td style="white-space:nowrap;">${fmtDate((item.passages||[])[2]||item.date3)}</td>
       <td>${statutChip(item.statut)}</td>
       <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.notes||''}">${item.notes||'—'}</td>
       <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.observations||''}">${item.observations||'—'}</td>
@@ -636,6 +699,38 @@ function filterTable() {
     return mq && ms && mc;
   });
   renderTable(filtered);
+}
+
+// ── TECHNICIENS (non-module) ──
+async function addTechnicien() {
+  const nom = document.getElementById('newTechNom').value.trim();
+  if (!nom) return;
+  await window._addTech(nom);
+  document.getElementById('newTechNom').value = '';
+  await window._loadTechniciens();
+  renderTechList();
+  showToast('Technicien ajouté !');
+}
+async function deleteTechnicien(id) {
+  await window._deleteTech(id);
+  await window._loadTechniciens();
+  renderTechList();
+}
+function renderTechList() {
+  const list = document.getElementById('techList');
+  // Read from select options (already updated)
+  const sel = document.getElementById('fAssigne');
+  const techs = Array.from(sel.options).slice(1); // skip default
+  if (!techs.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:16px;">Aucun technicien enregistré.</div>';
+    return;
+  }
+  // We need ids — use techniciens from module scope via window
+  list.innerHTML = (window._techniciens || techs.map(o=>({nom:o.value,id:''}))).map(t => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);">
+      <span style="font-size:13px;font-weight:500;color:var(--text);">${t.nom}</span>
+      ${t.id ? `<button onclick="deleteTechnicien('${t.id}')" style="border:none;background:#FDECEA;color:#E74C3C;padding:4px 10px;border-radius:6px;font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;">Supprimer</button>` : ''}
+    </div>`).join('');
 }
 
 // ── TOAST ──
@@ -702,11 +797,50 @@ onAuthStateChanged(auth, async (user) => {
   if(av)   av.textContent   = 'BM';
   if(fn)   fn.textContent   = profile.client || user.email;
 
+  // Load clients from 'clients' collection
+  try {
+    const snapClients = await getDocs(collection(db, 'clients'));
+    const clientSel = document.getElementById('fClient');
+    snapClients.docs.forEach(d => {
+      const data = d.data();
+      const name = data.nom || data.name || data.client || d.id;
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      clientSel.appendChild(opt);
+    });
+  } catch(e) { console.warn('clients load:', e); }
+
+  // Load techniciens
+  await loadTechniciens();
+
   // Load data
   const snap = await getDocs(query(collection(db,'suivi'), orderBy('createdAt','desc')));
   interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
   renderTable(interventions);
 });
+
+// ── TECHNICIENS ──
+let techniciens = [];
+window._addTech = async function(nom) {
+  return await addDoc(collection(db, 'techniciens'), {nom, createdAt: new Date().toISOString()});
+};
+window._deleteTech = async function(id) {
+  await deleteDoc(doc(db, 'techniciens', id));
+};
+async function loadTechniciens() {
+  const snap = await getDocs(collection(db, 'techniciens'));
+  techniciens = snap.docs.map(d=>({id:d.id,...d.data()}));
+  window._techniciens = techniciens;
+  const sel = document.getElementById('fAssigne');
+  // Keep default option
+  while (sel.options.length > 1) sel.remove(1);
+  techniciens.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.nom; opt.textContent = t.nom;
+    sel.appendChild(opt);
+  });
+}
+window._loadTechniciens = loadTechniciens;
 </script>
 </body>
 </html>
