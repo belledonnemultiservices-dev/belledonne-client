@@ -369,8 +369,11 @@
             <input class="form-input" id="fNomClient">
           </div>
           <div class="form-group">
-            <label class="form-label">Téléphone client</label>
-            <input class="form-input" id="fCoordonnees">
+            <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+              <span>Téléphone(s) client</span>
+              <button type="button" onclick="addPhoneField()" style="font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Ajouter</button>
+            </label>
+            <div id="phonesContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
           </div>
           <div class="form-group">
             <label class="form-label">Email client</label>
@@ -517,7 +520,12 @@ function openModal(id = null) {
     document.getElementById('fBC').value = item.bc || '';
     document.getElementById('fNature').value = item.nature || '';
     document.getElementById('fNomClient').value = item.nomClient || '';
-    document.getElementById('fCoordonnees').value = item.coordonnees || '';
+    // Load phones
+    document.getElementById('phonesContainer').innerHTML = '';
+    phoneCount = 0;
+    const phones = item.coordonnees ? (Array.isArray(item.coordonnees) ? item.coordonnees : [item.coordonnees]) : [];
+    if (phones.length) phones.forEach(p => addPhoneField(p));
+    else addPhoneField();
     document.getElementById('fEmailClient').value = item.emailClient || '';
     document.getElementById('fAdresse').value = item.adresse || '';
     document.getElementById('fObservations').value = item.observations || '';
@@ -576,7 +584,7 @@ function getPassageDates() {
   return dates;
 }
 function resetForm() {
-  ['fClient','fDateEmission','fExpediteur','fPL','fBC','fNature','fNomClient','fCoordonnees','fEmailClient','fAdresse','fObservations','fNotes'].forEach(id => {
+  ['fClient','fDateEmission','fExpediteur','fPL','fBC','fNature','fNomClient','fEmailClient','fAdresse','fObservations','fNotes'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   const elChorus = document.getElementById('fChorus'); if(elChorus) elChorus.value = '';
@@ -587,6 +595,9 @@ function resetForm() {
   ['filePL','fileBC'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   document.getElementById('passagesContainer').innerHTML = '';
   passageCount = 0;
+  document.getElementById('phonesContainer').innerHTML = '';
+  phoneCount = 0;
+  addPhoneField(); // always start with one field
 }
 
 // ── SAVE ──
@@ -619,7 +630,7 @@ async function saveIntervention() {
       bcUrl,
       nature: document.getElementById('fNature').value.trim(),
       nomClient: document.getElementById('fNomClient').value.trim(),
-      coordonnees: document.getElementById('fCoordonnees').value.trim(),
+      coordonnees: Array.from(document.querySelectorAll('#phonesContainer input')).map(i=>i.value.trim()).filter(Boolean),
       emailClient: document.getElementById('fEmailClient').value.trim(),
       adresse: document.getElementById('fAdresse').value.trim(),
       observations: document.getElementById('fObservations').value.trim(),
@@ -805,6 +816,24 @@ function renderTechList() {
   }).join('');
 }
 
+// ── TÉLÉPHONES DYNAMIQUES ──
+let phoneCount = 0;
+function addPhoneField(value = '') {
+  phoneCount++;
+  const n = phoneCount;
+  const container = document.getElementById('phonesContainer');
+  const div = document.createElement('div');
+  div.id = 'phone_' + n;
+  div.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  div.innerHTML = `<input class="form-input" type="tel" id="fPhone${n}" value="${value}" placeholder="06 XX XX XX XX" style="flex:1;">
+    ${phoneCount > 1 ? `<button type="button" onclick="removePhone(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>` : '<div style="width:28px;"></div>'}`;
+  container.appendChild(div);
+}
+function removePhone(n) {
+  const el = document.getElementById('phone_' + n);
+  if (el) el.remove();
+}
+
 // ── TOAST ──
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -815,6 +844,8 @@ function showToast(msg) {
 
 // Close modal on overlay click
 document.getElementById('modal').addEventListener('click', e => { if(e.target===document.getElementById('modal')) closeModal(); });
+// Init one phone field on load
+addPhoneField();
 document.getElementById('pdfViewer').addEventListener('click', e => { if(e.target===document.getElementById('pdfViewer')) closePdfViewer(); });
 </script>
 
