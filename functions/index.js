@@ -3,6 +3,7 @@ const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const https = require("https");
 const http = require("http");
+const crypto = require("crypto");
 
 admin.initializeApp();
 
@@ -95,6 +96,103 @@ exports.sendNotification = functions
       res.status(200).json({ success: true, attachments: mailAttachments.length });
     } catch(err) {
       console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+// ── ENVOYER SMS VIA OVH ──────────────────────────────────────────
+function ovhRequest(method, path, body, config) {
+  return new Promise((resolve, reject) => {
+    const appKey    = config.appKey;
+    const appSecret = config.appSecret;
+    const consumerKey = config.consumerKey;
+    const timestamp = Math.round(Date.now() / 1000).toString();
+    const bodyStr   = body ? JSON.stringify(body) : "";
+    const bodyHash  = crypto.createHash("sha1").update(bodyStr).digest("hex");
+    const url       = "https://eu.api.ovh.com/1.0" + path;
+    const sigStr    = [appSecret, consumerKey, method, url, bodyHash, timestamp].join("+");
+    const signature = "$1$" + crypto.createHash("sha1").update(sigStr).digest("hex");
+
+    const options = {
+      hostname: "eu.api.ovh.com",
+      path: "/1.0" + path,
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Ovh-Application": appKey,
+        "X-Ovh-Consumer": consumerKey,
+        "X-Ovh-Signature": signature,
+        "X-Ovh-Timestamp": timestamp,
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", chunk => data += chunk);
+      res.on("end", () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch(e) { resolve({ status: res.statusCode, body: data }); }
+      });
+    });
+
+    req.on("error", reject);
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
+
+exports.sendSMS = functions
+  .region("europe-west1")
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+
+    const { to, message } = req.body;
+    if (!to || !message) {
+      res.status(400).json({ error: "Champs manquants: to, message" });
+      return;
+    }
+
+    // Normalize phone number to international format
+    let phone = to.replace(/\s/g, "").replace(/-/g, "");
+    if (phone.startsWith("0")) phone = "+33" + phone.slice(1);
+    if (!phone.startsWith("+")) phone = "+33" + phone;
+
+    const config = {
+      appKey:      functions.config().ovh.app_key,
+      appSecret:   functions.config().ovh.app_secret,
+      consumerKey: functions.config().ovh.consumer_key,
+    };
+    const smsAccount = functions.config().ovh.sms_account; // sms-su78206-1
+
+    try {
+      const result = await ovhRequest(
+        "POST",
+        `/sms/${smsAccount}/jobs`,
+        {
+          message,
+          receivers: [phone],
+          sender: "Belledonne",
+          noStopClause: false,
+          priority: "high",
+          charset: "UTF-8",
+          coding: "7bit",
+        },
+        config
+      );
+
+      console.log("SMS envoye a", phone, "- Status:", result.status, result.body);
+
+      if (result.status === 200 || result.status === 201) {
+        res.status(200).json({ success: true, details: result.body });
+      } else {
+        res.status(result.status).json({ error: result.body });
+      }
+    } catch(err) {
+      console.error("Erreur SMS:", err);
       res.status(500).json({ error: err.message });
     }
   });
