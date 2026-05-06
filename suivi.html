@@ -408,12 +408,18 @@
       </div>
 
     </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
-      <button class="btn-save" id="btnSave" onclick="saveIntervention()">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
-        Enregistrer
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button id="btnNotifyClient" onclick="openNotifSuivi()" style="display:none;align-items:center;gap:7px;background:#E8F9F2;color:#1DA870;border:1px solid #A7E8CC;padding:10px 18px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        Notifier le client
       </button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+        <button class="btn-save" id="btnSave" onclick="saveIntervention()">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+          Enregistrer
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -546,6 +552,13 @@ function closeModal() {
 // ── PASSAGES DYNAMIQUES ──
 let passageCount = 0;
 const ORDINALS = ['1er','2e','3e','4e','5e','6e','7e','8e','9e','10e'];
+function updateNotifyBtn() {
+  const btn = document.getElementById('btnNotifyClient');
+  if (!btn) return;
+  const hasPsgs = document.querySelectorAll('#passagesContainer input[type=datetime-local]').length > 0;
+  const hasClient = document.getElementById('fClient')?.value;
+  btn.style.display = (hasPsgs && hasClient) ? 'inline-flex' : 'none';
+}
 function addPassage(value = '') {
   // value format: "YYYY-MM-DDTHH:MM|YYYY-MM-DDTHH:MM" (debut|fin) or single datetime
   passageCount++;
@@ -567,10 +580,12 @@ function addPassage(value = '') {
     </div>
     <button type="button" onclick="removePassage(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;margin-top:16px;">×</button>`;
   container.appendChild(div);
+  updateNotifyBtn();
 }
 function removePassage(n) {
   const el = document.getElementById('passage_' + n);
   if (el) el.remove();
+  updateNotifyBtn();
 }
 function getPassageDates() {
   const dates = [];
@@ -754,6 +769,7 @@ function renderTable(list) {
       <td>${passagesDropdown(item.passages||[])}</td>
       <td>${statutChip(item.statut)}</td>
       <td style="text-align:right;white-space:nowrap;">
+        ${(item.passages||[]).filter(Boolean).length ? `<button onclick="openNotifFromRow('${item.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1DA870;background:#E8F9F2;border:1px solid #A7E8CC;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifier</button>` : ''}
         <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>
         <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
       </td>
@@ -834,6 +850,151 @@ function removePhone(n) {
   if (el) el.remove();
 }
 
+// ── NOTIFICATION SUIVI RDV ──
+window.openNotifFromRow = function(id) {
+  // Pre-fill form state from the intervention then open notif modal
+  const item = interventions.find(i => i.id === id);
+  if (!item) return;
+  // Temporarily store current item for notification
+  window._notifRowItem = item;
+  openNotifFromItem(item);
+};
+
+window.openNotifFromItem = async function(item) {
+  const client = item.client;
+  const passages = (item.passages || []).filter(Boolean);
+  const passagesStr = passages.map((p, i) => {
+    const [debut] = p.includes('|') ? p.split('|') : [p];
+    return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
+  }).join('
+');
+  const bc = item.bc || '';
+  const pl = item.pl || '';
+  const adresse = item.adresse || '';
+  const nature = item.nature || '';
+  const plStr = pl ? ' / PL N°' + pl : '';
+  const tpl = window._suiviRdvTemplate || {};
+  const subject = (tpl.subject || 'Confirmation de rendez-vous — BC N°{{bc}}')
+    .replace('{{bc}}', bc).replace('{{pl}}', pl);
+  const body = (tpl.body || `Bonjour,
+
+Nous vous confirmons que l'intervention concernant {{nature}} est prévue aux créneaux suivants :
+
+{{passages}}
+
+Adresse : {{adresse}}
+
+Référence : BC N°{{bc}}{{pl}}
+
+Merci de vous assurer d'être présent(e) aux horaires indiqués. En cas d'empêchement, merci de nous contacter dans les plus brefs délais.
+
+Cordialement,
+Belledonne Multiservices
+📞 06 95 67 26 03`)
+    .replace('{{bc}}', bc).replace('{{pl}}', plStr)
+    .replace('{{passages}}', passagesStr).replace('{{adresse}}', adresse).replace('{{nature}}', nature);
+  document.getElementById('nsSubject').value = subject;
+  document.getElementById('nsBody').value = body;
+  document.getElementById('nsSuccess').style.display = 'none';
+  document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button><button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
+  const sel = document.getElementById('nsSel');
+  sel.innerHTML = '<option value="">Chargement...</option>';
+  await window._loadContactsForSuivi(client, sel);
+  document.getElementById('modalNotifSuivi').classList.add('open');
+};
+
+window.openNotifSuivi = async function() {
+  const client = document.getElementById('fClient')?.value;
+  if (!client) { alert('Sélectionnez un client.'); return; }
+
+  // Build passages string from form
+  const passages = getPassageDates();
+  const passagesStr = passages.filter(Boolean).map((p, i) => {
+    const [debut] = p.includes('|') ? p.split('|') : [p];
+    return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
+  }).join('
+');
+
+  const bc = document.getElementById('fBC')?.value || '';
+  const pl = document.getElementById('fPL')?.value || '';
+  const adresse = document.getElementById('fAdresse')?.value || '';
+  const nature = document.getElementById('fNature')?.value || '';
+  const plStr = pl ? ' / PL N°' + pl : '';
+
+  // Load template from Firestore
+  const tpl = window._suiviRdvTemplate || {};
+  const subject = (tpl.subject || 'Confirmation de rendez-vous — BC N°{{bc}}')
+    .replace('{{bc}}', bc).replace('{{pl}}', pl);
+  const body = (tpl.body || `Bonjour,
+
+Nous vous confirmons que l'intervention concernant {{nature}} est prévue aux créneaux suivants :
+
+{{passages}}
+
+Adresse : {{adresse}}
+
+Référence : BC N°{{bc}}{{pl}}
+
+Merci de vous assurer d'être présent(e) aux horaires indiqués. En cas d'empêchement, merci de nous contacter dans les plus brefs délais.
+
+Cordialement,
+Belledonne Multiservices
+📞 06 95 67 26 03`)
+    .replace('{{bc}}', bc)
+    .replace('{{pl}}', plStr)
+    .replace('{{passages}}', passagesStr)
+    .replace('{{adresse}}', adresse)
+    .replace('{{nature}}', nature);
+
+  document.getElementById('nsSubject').value = subject;
+  document.getElementById('nsBody').value = body;
+  document.getElementById('nsSuccess').style.display = 'none';
+  document.getElementById('nsBody').parentElement.style.display = '';
+  document.getElementById('nsSubject').parentElement.style.display = '';
+  document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button><button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
+
+  // Load contacts for this client
+  const sel = document.getElementById('nsSel');
+  sel.innerHTML = '<option value="">Chargement...</option>';
+  await window._loadContactsForSuivi(client, sel);
+
+  document.getElementById('modalNotifSuivi').classList.add('open');
+};
+
+window.closeNotifSuivi = function() {
+  document.getElementById('modalNotifSuivi').classList.remove('open');
+};
+
+window.sendNotifSuivi = async function() {
+  const to = document.getElementById('nsSel').value;
+  if (!to) { alert('Sélectionnez un destinataire.'); return; }
+  const subject = document.getElementById('nsSubject').value.trim();
+  const body = document.getElementById('nsBody').value.trim();
+  if (!subject || !body) { alert('Objet et message requis.'); return; }
+  const btn = document.getElementById('nsBtnSend');
+  btn.disabled = true; btn.textContent = 'Envoi...';
+  try {
+    const resp = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to, subject, body, attachments: []})
+    });
+    if (resp.ok) {
+      document.getElementById('nsSuccess').style.display = 'block';
+      document.getElementById('nsSuccessMsg').textContent = 'Email envoyé à ' + to;
+      document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Fermer</button>';
+      showToast('Email envoyé !');
+    } else { throw new Error('Erreur serveur'); }
+  } catch(e) {
+    alert('Erreur lors de l'envoi : ' + e.message);
+    btn.disabled = false; btn.textContent = 'Envoyer';
+  }
+};
+
+document.getElementById('modalNotifSuivi').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalNotifSuivi')) closeNotifSuivi();
+});
+
 // ── TOAST ──
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -855,6 +1016,8 @@ import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/fi
 import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
+const FUNCTION_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification";
+const LIEN_ESPACE = "https://clients-belledonne-multiservices.com";
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
@@ -915,11 +1078,45 @@ onAuthStateChanged(auth, async (user) => {
   // Load techniciens
   await loadTechniciens();
 
+  // Load suiviRdv template
+  try {
+    const snapCfg = await getDocs(collection(db, 'config'));
+    const tplDoc = snapCfg.docs.find(d => d.id === 'templates');
+    if (tplDoc && tplDoc.data().suiviRdv) {
+      window._suiviRdvTemplate = tplDoc.data().suiviRdv;
+    }
+  } catch(e) { console.warn('template load:', e); }
+
   // Load data
   const snap = await getDocs(query(collection(db,'suivi'), orderBy('createdAt','desc')));
   interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
   renderTable(interventions);
 });
+
+// ── CONTACTS POUR NOTIF SUIVI ──
+window._loadContactsForSuivi = async function(client, selEl) {
+  try {
+    const snap = await getDocs(query(collection(db, 'contacts'), where('client','==',client)));
+    selEl.innerHTML = '<option value="">— Sélectionner un destinataire —</option>';
+    if (snap.empty) {
+      selEl.innerHTML = '<option value="">Aucun contact pour ce client</option>';
+      return;
+    }
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const email = data.email || '';
+      const nom = data.nom || email;
+      if (!email) return;
+      const opt = document.createElement('option');
+      opt.value = email;
+      opt.textContent = nom + ' <' + email + '>';
+      selEl.appendChild(opt);
+    });
+  } catch(e) {
+    selEl.innerHTML = '<option value="">Erreur chargement contacts</option>';
+    console.error(e);
+  }
+};
 
 // ── TECHNICIENS ──
 let techniciens = [];
@@ -944,5 +1141,43 @@ async function loadTechniciens() {
 }
 window._loadTechniciens = loadTechniciens;
 </script>
+
+<!-- MODAL NOTIFICATION SUIVI RDV -->
+<div class="modal-overlay" id="modalNotifSuivi">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <div class="modal-title">Notifier le client — Confirmation RDV</div>
+      <button class="modal-close" onclick="closeNotifSuivi()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:22px 28px;">
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataire</div>
+        <select class="form-select" id="nsSel" style="width:100%;">
+          <option value="">— Chargement des contacts... —</option>
+        </select>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
+        <input class="form-input" id="nsSubject" style="width:100%;">
+      </div>
+      <div style="margin-bottom:4px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message <span style="font-weight:400;text-transform:none;">(modifiable)</span></div>
+        <textarea class="form-textarea" id="nsBody" style="min-height:220px;width:100%;"></textarea>
+      </div>
+    </div>
+    <div id="nsSuccess" style="display:none;text-align:center;padding:32px 28px;">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:48px;height:48px;color:var(--green);margin-bottom:12px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">Email envoyé !</div>
+      <div style="font-size:13px;color:var(--text-muted);" id="nsSuccessMsg"></div>
+    </div>
+    <div class="modal-footer" id="nsFooter">
+      <button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button>
+      <button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        Envoyer
+      </button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
