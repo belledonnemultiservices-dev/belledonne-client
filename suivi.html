@@ -806,8 +806,7 @@ window.renderTable = function renderTable(list) {
     <tr id="row-${item.id}" class="${item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':''}">
       <td class="client-cell">
         <div style="display:flex;align-items:center;gap:6px;">
-          <button class="btn-toggle-notif" onclick="toggleNotifRow('${item.id}')" title="Notifications"
-            style="padding:2px 6px;font-size:13px;border-radius:4px;">🔔</button>
+          <button class="btn-toggle-notif" onclick="toggleNotifRow('${item.id}')">🔔</button>
           ${item.client||'—'}
         </div>
       </td>
