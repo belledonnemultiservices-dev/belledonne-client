@@ -77,8 +77,8 @@
   .notif-badge-locataire{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#FEF3CD;color:#996600;padding:2px 8px;border-radius:20px;white-space:nowrap;}
   .notif-badge-sms{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#EDE9FE;color:#6D28D9;padding:2px 8px;border-radius:20px;white-space:nowrap;}
   #passagesContainer > div { padding:8px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border); }
-  .notif-row { background:#F8FAFC; border-top:none !important; }
-  .notif-row td { padding:10px 16px !important; }
+  .notif-row { background:#F8FAFC; }
+  .notif-row > td { padding:10px 16px !important; border-bottom:2px solid var(--border) !important; }
   .notif-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .notif-section { display:flex; align-items:center; gap:6px; }
   .notif-label { font-size:11px; font-weight:600; color:var(--text-muted); white-space:nowrap; }
@@ -803,7 +803,13 @@ window.renderTable = function renderTable(list) {
     const totalNotifs = nb.length + nl.length + ns.length;
     return `
     <tr id="row-${item.id}" class="${item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':''}">
-      <td class="client-cell">${item.client||'—'}</td>
+      <td class="client-cell">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button class="btn-toggle-notif" onclick="toggleNotifRow('${item.id}')" title="Notifications"
+            style="padding:2px 6px;font-size:13px;border-radius:4px;">🔔</button>
+          ${item.client||'—'}
+        </div>
+      </td>
       <td><div style="display:flex;flex-direction:column;gap:4px;">${item.pl?`<span style="font-family:monospace;font-size:12px;font-weight:600;">${item.pl}</span>`:''} ${pdfBtn(item.plUrl,'PDF')}</div></td>
       <td><div style="display:flex;flex-direction:column;gap:4px;">${item.bc?`<span style="font-family:monospace;font-size:12px;font-weight:600;">${item.bc}</span>`:''} ${pdfBtn(item.bcUrl,'PDF')}</div></td>
       <td style="font-size:13px;">${item.nature||'—'}</td>
@@ -813,7 +819,6 @@ window.renderTable = function renderTable(list) {
       <td>${statutChip(item.statut)}</td>
       <td style="text-align:right;white-space:nowrap;">
         <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;">
-          <button class="btn-toggle-notif" onclick="toggleNotifRow('${item.id}')">🔔${totalNotifs>0?' ('+totalNotifs+')':''}</button>
           <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>
           <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
         </div>
@@ -1003,8 +1008,7 @@ function updateNotifRow(itemId) {
   const nl = toNotifArray(item.notifLocataire);
   const ns = toNotifArray(item.notifSms);
   const totalNotifs = nb.length + nl.length + ns.length;
-  const btn = document.querySelector('#row-' + itemId + ' .btn-toggle-notif');
-  if (btn) btn.textContent = '🔔' + (totalNotifs > 0 ? ' (' + totalNotifs + ')' : '');
+  // btn-toggle-notif is now in first column, just update notif row content
   const notifRow = document.getElementById('notif-row-' + itemId);
   if (notifRow) {
     const bar = notifRow.querySelector('.notif-bar');
@@ -1021,7 +1025,7 @@ function toggleNotifRow(id) {
   const row = document.getElementById('notif-row-' + id);
   const btn = document.querySelector('#row-' + id + ' .btn-toggle-notif');
   if (!row) return;
-  const isOpen = row.style.display !== 'none';
+  const isOpen = row.style.display === 'table-row';
   row.style.display = isOpen ? 'none' : 'table-row';
   if (btn) btn.classList.toggle('active', !isOpen);
 }
