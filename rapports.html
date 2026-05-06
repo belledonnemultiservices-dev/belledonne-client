@@ -87,6 +87,11 @@
   .reports-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
   .report-head { display: grid; grid-template-columns: 28px 40px 2fr 1fr 1fr 1fr auto; gap: 8px; padding: 11px 18px; background: var(--bg); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); }
   .report-row { display: grid; grid-template-columns: 28px 40px 2fr 1fr 1fr 1fr auto; gap: 8px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
+  .is-client .report-head { grid-template-columns: 40px 2fr 1fr 1fr 1fr auto; }
+  .is-client .report-row { grid-template-columns: 40px 2fr 1fr 1fr 1fr auto; }
+  .is-client .report-row > div:first-child { display: none; }
+  .is-client .report-head > span:first-child { display: none; }
+  .nuisible-chip { display:inline-flex; align-items:center; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; white-space:nowrap; }
   .report-row:last-child { border-bottom: none; }
   .report-row:hover { background: var(--bg); }
   .report-icon { width: 36px; height: 36px; background: #FDECEA; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -961,6 +966,7 @@ onAuthStateChanged(auth, async function(user) {
         const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Client";
         _currentFilter = p.client;
         await loadRapports(p.client);
+        const rl = document.getElementById('reportsList'); if(rl) rl.classList.add('is-client');
       }
     } catch(e) { console.error(e); }
   }

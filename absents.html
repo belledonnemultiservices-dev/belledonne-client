@@ -84,6 +84,9 @@
   .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
   .table-head{display:grid;grid-template-columns:28px 2fr 1.2fr 0.9fr 1fr auto;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
   .table-row{display:grid;grid-template-columns:28px 2fr 1.2fr 0.9fr 1fr auto;gap:8px;padding:14px 22px;border-top:1px solid var(--border);align-items:center;transition:background 0.1s;}
+  .is-client .table-head{grid-template-columns:2fr 1.2fr 0.9fr 1fr auto;}
+  .is-client .table-row{grid-template-columns:2fr 1.2fr 0.9fr 1fr auto;}
+  .is-client .table-row > div:first-child,.is-client .table-head > span:first-child{display:none;}
   .table-row:hover{background:var(--bg);}
 
   .addr-main{font-size:13px;font-weight:500;color:var(--text);}
@@ -964,6 +967,7 @@ onAuthStateChanged(auth, async function(user) {
         const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Client";
         window._currentClientFilter = p.client;
         await window._loadAbsents(p.client);
+        const tw=document.getElementById('tableBody'); if(tw&&tw.parentElement) tw.parentElement.classList.add('is-client');
       }
     } catch(e) { console.error(e); }
   }
