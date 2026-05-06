@@ -186,11 +186,11 @@
         <div class="page-sub">Tableau de bord opérationnel — gestion des dossiers et bons de commande</div>
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
-        <button onclick="document.getElementById('modalTech').classList.add('open');renderTechList()" style="display:inline-flex;align-items:center;gap:7px;background:var(--surface);color:var(--text-mid);border:1px solid var(--border);padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;">
+        <button onclick="document.getElementById('modalTech').classList.add('open');if(typeof renderTechList==='function')renderTechList()" style="display:inline-flex;align-items:center;gap:7px;background:var(--surface);color:var(--text-mid);border:1px solid var(--border);padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
           Techniciens
         </button>
-        <button class="btn-primary" id="btnAjouter" onclick="openModal()">
+        <button class="btn-primary" id="btnAjouter" onclick="if(typeof openModal==='function')openModal()">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           Nouvelle intervention
         </button>
@@ -442,6 +442,7 @@ document.getElementById('dateChip').textContent = new Date().toLocaleDateString(
 
 // ── STATE ──
 let interventions = [];
+window.interventions = interventions;
 let editId = null;
 let pdfBlobUrls = {}; // store blob URLs for preview
 
@@ -514,7 +515,7 @@ function openModal(id = null) {
   document.getElementById('btnSave').textContent = id ? 'Mettre à jour' : 'Enregistrer';
   resetForm();
   if (id) {
-    const item = interventions.find(i => i.id === id);
+    const item = (window.interventions||[]).find(i => i.id === id);
     if (!item) return;
     document.getElementById('fClient').value = item.client || '';
     document.getElementById('fChorus').value = item.chorus || '';
@@ -658,10 +659,12 @@ async function saveIntervention() {
       await window._updateSuivi(editId, data);
       const idx = interventions.findIndex(i=>i.id===editId);
       if (idx !== -1) interventions[idx] = {...interventions[idx], ...data};
+    window.interventions = interventions;
     } else {
       data.createdAt = new Date().toISOString();
       const id = await window._addSuivi(data);
       interventions.unshift({id, ...data});
+    window.interventions = interventions;
     }
 
     closeModal();
@@ -682,6 +685,7 @@ async function deleteIntervention(id) {
   try {
     await window._deleteSuivi(id);
     interventions = interventions.filter(i=>i.id!==id);
+    window.interventions = interventions;
     renderTable(interventions);
     showToast('Intervention supprimée.');
   } catch(e) { alert('Erreur: ' + e.message); }
@@ -853,7 +857,7 @@ function removePhone(n) {
 // ── NOTIFICATION SUIVI RDV ──
 window.openNotifFromRow = function(id) {
   // Pre-fill form state from the intervention then open notif modal
-  const item = interventions.find(i => i.id === id);
+  const item = (window.interventions||[]).find(i => i.id === id);
   if (!item) return;
   // Temporarily store current item for notification
   window._notifRowItem = item;
@@ -886,7 +890,7 @@ Adresse : {{adresse}}
 
 Référence : BC N°{{bc}}{{pl}}
 
-Merci de vous assurer d'être présent(e) aux horaires indiqués. En cas d'empêchement, merci de nous contacter dans les plus brefs délais.
+Merci de vous assurer d\'être présent(e) aux horaires indiqués. En cas d\'empêchement, merci de nous contacter dans les plus brefs délais.
 
 Cordialement,
 Belledonne Multiservices
@@ -935,7 +939,7 @@ Adresse : {{adresse}}
 
 Référence : BC N°{{bc}}{{pl}}
 
-Merci de vous assurer d'être présent(e) aux horaires indiqués. En cas d'empêchement, merci de nous contacter dans les plus brefs délais.
+Merci de vous assurer d\'être présent(e) aux horaires indiqués. En cas d\'empêchement, merci de nous contacter dans les plus brefs délais.
 
 Cordialement,
 Belledonne Multiservices
@@ -1090,6 +1094,7 @@ onAuthStateChanged(auth, async (user) => {
   // Load data
   const snap = await getDocs(query(collection(db,'suivi'), orderBy('createdAt','desc')));
   interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
+  window.interventions = interventions;
   renderTable(interventions);
 });
 
