@@ -993,8 +993,8 @@ window.sendNotifSuivi = async function() {
   }
 };
 
-document.getElementById('modalNotifSuivi').addEventListener('click', e => {
-  if (e.target === document.getElementById('modalNotifSuivi')) closeNotifSuivi();
+document.addEventListener('click', e => {
+  if (e.target && e.target.id === 'modalNotifSuivi') closeNotifSuivi();
 });
 
 // ── TOAST ──
