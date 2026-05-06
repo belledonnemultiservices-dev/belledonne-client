@@ -78,6 +78,7 @@
   .notif-badge-sms{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#EDE9FE;color:#6D28D9;padding:2px 8px;border-radius:20px;white-space:nowrap;}
   #passagesContainer > div { padding:8px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border); }
   .notif-row { background:#F8FAFC; }
+  .notif-row.hidden { display:none; }
   .notif-row > td { padding:10px 16px !important; border-bottom:2px solid var(--border) !important; }
   .notif-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .notif-section { display:flex; align-items:center; gap:6px; }
@@ -824,7 +825,7 @@ window.renderTable = function renderTable(list) {
         </div>
       </td>
     </tr>
-    <tr id="notif-row-${item.id}" class="notif-row" style="display:none;">
+    <tr id="notif-row-${item.id}" class="notif-row hidden">
       <td colspan="9">
         <div class="notif-bar">
           <div class="notif-section">
@@ -1025,9 +1026,9 @@ function toggleNotifRow(id) {
   const row = document.getElementById('notif-row-' + id);
   const btn = document.querySelector('#row-' + id + ' .btn-toggle-notif');
   if (!row) return;
-  const isOpen = row.style.display === 'table-row';
-  row.style.display = isOpen ? 'none' : 'table-row';
-  if (btn) btn.classList.toggle('active', !isOpen);
+  const isHidden = row.classList.contains('hidden');
+  row.classList.toggle('hidden', !isHidden);
+  if (btn) btn.classList.toggle('active', isHidden);
 }
 
 window.openRappelSms = async function(id) {
