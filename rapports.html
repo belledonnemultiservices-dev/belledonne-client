@@ -616,13 +616,11 @@ function renderRapports(list) {
       <div style="min-width:0;">
         <div class="report-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.site || r.adresse || '—'}</div>
         ${window._isAdmin && r.client ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${r.client}</div>` : ''}
+        ${window._isAdmin && r.notifs > 0 ? `<span class="notif-badge" style="margin-top:3px;">✓ Notifié${r.notifs > 1 ? ' ×'+r.notifs : ''}</span>` : ''}
       </div>
       <div>${r.bc ? `<span class="r-bc">${r.bc}</span>` : '<span style="color:var(--text-muted)">—</span>'}</div>
       <div>${r.passage ? `<span class="passage-chip" style="white-space:nowrap;">${r.passage}</span>` : '<span style="color:var(--text-muted)">—</span>'}</div>
-      <div style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap;">
-        ${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}" style="white-space:nowrap;">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : '<span style="color:var(--text-muted)">—</span>'}
-        ${window._isAdmin && r.notifs > 0 ? `<span class="notif-badge">✓ Notifié${r.notifs > 1 ? ' ×'+r.notifs : ''}</span>` : ''}
-      </div>
+      <div>${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}" style="white-space:nowrap;">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : '<span style="color:var(--text-muted)">—</span>'}</div>
       <div><span class="r-date" style="white-space:nowrap;">${r.date || '—'}</span></div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;">
         ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger" style="white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}

@@ -562,15 +562,15 @@ function renderTable(list) {
         ${window._isAdmin ? `<input type="checkbox" class="row-checkbox" onchange="toggleRowGarantie('${g.id}', this.checked)" onclick="event.stopPropagation()">` : ''}
       </div>
       <div>
-        ${window._isAdmin && g.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:1px 7px;border-radius:10px;margin-bottom:3px;">${g.client}</span>` : ""}
+        ${window._isAdmin && g.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:1px 7px;border-radius:10px;margin-bottom:3px;">${g.client}</span><br>` : ""}
         <div class="addr-main">${(g.adresse||"").split(",")[0]}</div>
         <div class="addr-sub">${(g.adresse||"").includes(",") ? (g.adresse||"").split(",").slice(1).join(",").trim() : ""}</div>
+        ${window._isAdmin && g.notifs > 0 ? `<span class="notif-badge" style="margin-top:3px;">✓ Notifié${g.notifs > 1 ? ' ×'+g.notifs : ''}</span>` : ''}
       </div>
-      <span style="font-size:13px;color:var(--text-mid);">${g.bc||"—"}</span>
+      <span style="font-size:13px;color:var(--text-mid);">${g.nom||g.locataire||"—"}</span>
       <span class="cell-date">${formatDate(g.date)}</span>
       <span class="nuisible-pill ${getTypeColor(g.nuisible)}">${getTypeLabel(g.nuisible)}</span>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;justify-content:flex-end;">
-        ${window._isAdmin && g.notifs > 0 ? `<span class="notif-badge">✓ Notifié${g.notifs > 1 ? ' ×'+g.notifs : ''}</span>` : ''}
         ${g.rapportUrl ? `<a href="${g.rapportUrl}" target="_blank" class="btn-rapport"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
         ${window._isAdmin ? `
           <button onclick="openNotifForItem('${g.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:var(--green-dark);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>
