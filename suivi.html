@@ -976,7 +976,7 @@ window.sendNotifSuivi = async function() {
   const btn = document.getElementById('nsBtnSend');
   btn.disabled = true; btn.textContent = 'Envoi...';
   try {
-    const resp = await fetch(FUNCTION_URL, {
+    const resp = await fetch(window.FUNCTION_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({to, subject, body, attachments: []})
@@ -1009,7 +1009,7 @@ function showToast(msg) {
 document.getElementById('modal').addEventListener('click', e => { if(e.target===document.getElementById('modal')) closeModal(); });
 // Init one phone field on load
 addPhoneField();
-document.getElementById('pdfViewer').addEventListener('click', e => { if(e.target===document.getElementById('pdfViewer')) closePdfViewer(); });
+document.getElementById('pdfViewerPanel')?.addEventListener('click', e => { if(e.target===document.getElementById('pdfViewerPanel')) closePdfViewer(); });
 </script>
 
 <script type="module">
@@ -1020,6 +1020,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstati
 
 let interventions = [];
 const FUNCTION_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification";
+window.FUNCTION_URL = FUNCTION_URL;
 const LIEN_ESPACE = "https://clients-belledonne-multiservices.com";
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
