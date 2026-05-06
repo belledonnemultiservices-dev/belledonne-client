@@ -285,7 +285,7 @@
     </div>
 
     <!-- TABLE -->
-    <div class="table-wrap">
+    <div class="table-wrap is-client">
       <div class="table-head">
         <span></span>
         <span>Adresse</span>
@@ -952,6 +952,7 @@ onAuthStateChanged(auth, async function(user) {
     const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Administrateur";
     var adminNav=document.getElementById("adminNav"); if(adminNav) adminNav.style.display="block";
     var btn=document.getElementById("btnAjouter"); if(btn) btn.style.display="";
+    const tw3=document.getElementById('tableBody'); if(tw3&&tw3.parentElement) tw3.parentElement.classList.remove('is-client');
     loadClientsIntoSelect("inClient");
     window._currentClientFilter = null;
     await window._loadAbsents(null);

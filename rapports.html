@@ -85,10 +85,10 @@
 
   /* LISTE RAPPORTS */
   .reports-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .report-head { display: grid; grid-template-columns: 28px 40px 2fr 1fr 1fr 1fr auto; gap: 8px; padding: 11px 18px; background: var(--bg); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); }
-  .report-row { display: grid; grid-template-columns: 28px 40px 2fr 1fr 1fr 1fr auto; gap: 8px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
-  .is-client .report-head { grid-template-columns: 40px 2fr 1fr 1fr 1fr auto; }
-  .is-client .report-row { grid-template-columns: 40px 2fr 1fr 1fr 1fr auto; }
+  .report-head { display: grid; grid-template-columns: 28px 36px 2fr 0.9fr 1fr 1.3fr 0.8fr auto; gap: 8px; padding: 11px 18px; background: var(--bg); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+  .report-row { display: grid; grid-template-columns: 28px 36px 2fr 0.9fr 1fr 1.3fr 0.8fr auto; gap: 8px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
+  .is-client .report-head { grid-template-columns: 36px 2fr 0.9fr 1fr 1.3fr 0.8fr auto; }
+  .is-client .report-row { grid-template-columns: 36px 2fr 0.9fr 1fr 1.3fr 0.8fr auto; }
   .is-client .report-row > div:first-child { display: none; }
   .is-client .report-head > span:first-child { display: none; }
   .nuisible-chip { display:inline-flex; align-items:center; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; white-space:nowrap; }
@@ -325,12 +325,13 @@
     </div>
 
     <!-- LISTE -->
-    <div class="reports-list" id="reportsList">
+    <div class="reports-list is-client" id="reportsList">
       <div class="report-head">
         <span></span><span></span>
         <span>Adresse / Site</span>
         <span>Bon de commande</span>
-        <span>Passage / Type</span>
+        <span>Passage</span>
+        <span>Type d'intervention</span>
         <span>Date</span>
         <span></span>
       </div>
@@ -617,12 +618,12 @@ function renderRapports(list) {
         ${window._isAdmin && r.client ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${r.client}</div>` : ''}
       </div>
       <div>${r.bc ? `<span class="r-bc">${r.bc}</span>` : '<span style="color:var(--text-muted)">—</span>'}</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
-        ${r.passage ? `<span class="passage-chip">${r.passage}</span>` : ''}
-        ${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : ''}
+      <div>${r.passage ? `<span class="passage-chip" style="white-space:nowrap;">${r.passage}</span>` : '<span style="color:var(--text-muted)">—</span>'}</div>
+      <div style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap;">
+        ${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}" style="white-space:nowrap;">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : '<span style="color:var(--text-muted)">—</span>'}
         ${window._isAdmin && r.notifs > 0 ? `<span class="notif-badge">✓ Notifié${r.notifs > 1 ? ' ×'+r.notifs : ''}</span>` : ''}
       </div>
-      <div><span class="r-date">${r.date || '—'}</span></div>
+      <div><span class="r-date" style="white-space:nowrap;">${r.date || '—'}</span></div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;">
         ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger" style="white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
         ${window._isAdmin ? `
@@ -951,6 +952,7 @@ onAuthStateChanged(auth, async function(user) {
     const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Administrateur";
     var adminNav = document.getElementById("adminNav"); if (adminNav) adminNav.style.display = "block";
     var btn = document.getElementById("btnOpenModal"); if (btn) btn.style.display = "";
+    const rl2=document.getElementById('reportsList'); if(rl2) rl2.classList.remove('is-client');
     loadClientsIntoSelect();
     _currentFilter = null;
     await loadRapports(null);
