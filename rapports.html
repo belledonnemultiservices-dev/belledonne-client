@@ -603,7 +603,7 @@ function renderRapports(list) {
           ${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : ''}
           ${r.date ? `<span class="r-date">${r.date}</span>` : ''}
           ${r.size ? `<span class="r-size">${r.size}</span>` : ''}
-          ${r.notifs > 0 ? `<span class="notif-badge">✓ Notifié${r.notifs > 1 ? ' ×'+r.notifs : ''}</span>` : ''}
+          ${window._isAdmin && r.notifs > 0 ? `<span class="notif-badge">✓ Notifié${r.notifs > 1 ? ' ×'+r.notifs : ''}</span>` : ''}
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
