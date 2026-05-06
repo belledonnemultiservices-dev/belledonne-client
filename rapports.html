@@ -185,6 +185,8 @@
   .n-pigeon { background:#EAF3DE;color:#3B6D11; }
   .n-custom { background:#F1EFE8;color:#5F5E5A; }
 
+  .notif-badge { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; background:#E8F9F2; color:#1DA870; padding:3px 9px; border-radius:20px; }
+
   /* BARRE SÉLECTION + MODALE NOTIFICATION */
   .report-row.selected { background: var(--green-pale) !important; }
   .row-checkbox { width:16px; height:16px; accent-color:var(--green); cursor:pointer; flex-shrink:0; }
@@ -601,6 +603,7 @@ function renderRapports(list) {
           ${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : ''}
           ${r.date ? `<span class="r-date">${r.date}</span>` : ''}
           ${r.size ? `<span class="r-size">${r.size}</span>` : ''}
+          ${r.notifs > 0 ? `<span class="notif-badge">✓ Notifié${r.notifs > 1 ? ' ×'+r.notifs : ''}</span>` : ''}
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
@@ -891,6 +894,27 @@ window._doSendNotification = async function() {
       const resp=await fetch(FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,subject,body,attachments})});
       if(resp.ok) sent++; else errors++;
     } catch(e){errors++;}
+  }
+  if(sent>0) {
+    for(const r of sel) {
+      try {
+        const newCount = (r.notifs||0) + 1;
+        await updateDoc(doc(db,'rapports',r.id),{notifs: newCount, lastNotif: new Date().toISOString()});
+        r.notifs = newCount;
+        // Mise à jour visuelle du badge sans rechargement
+        const row = document.getElementById('row-'+r.id);
+        if(row) {
+          let badge = row.querySelector('.notif-badge');
+          if(!badge) {
+            badge = document.createElement('span');
+            badge.className = 'notif-badge';
+            const meta = row.querySelector('.report-meta');
+            if(meta) meta.appendChild(badge);
+          }
+          badge.textContent = '✓ Notifié' + (newCount > 1 ? ' ×'+newCount : '');
+        }
+      } catch(e){ console.warn('notifs update:', e); }
+    }
   }
   document.getElementById('mnSuccess').style.display='block';
   document.getElementById('mnMainContent').style.display='none';

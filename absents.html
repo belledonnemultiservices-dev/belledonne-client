@@ -139,13 +139,15 @@
 
   
   /* CHECKBOX + BARRE SELECTION */
+  .notif-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;}
   .table-row.selected,.report-row.selected{background:var(--green-pale)!important;}
   .row-checkbox{width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0;}
   .selection-bar{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;border-radius:12px;padding:12px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 8px 32px rgba(13,27,42,0.3);z-index:200;opacity:0;pointer-events:none;transition:opacity 0.2s;}
   .selection-bar.visible{opacity:1;pointer-events:all;}
   .sel-count{font-size:13px;font-weight:600;}
   .sel-clear{font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;text-decoration:underline;}
-  .btn-notif-sel{display:flex;align-items:center;gap:7px;background:var(--green);color:var(--navy);border:none;padding:9px 18px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
+  .btn-notif-sel{display:flex;align-items:center;gap:7px;background:var(--green);color:var(--navy);border:none;padding:9px 18px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .btn-notif-sel svg{width:13px;height:13px;flex-shrink:0;}
   .modal-notif-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;align-items:center;justify-content:center;}
   .modal-notif-overlay.open{display:flex;}
   .modal-notif{background:var(--surface);border-radius:var(--radius);width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(13,27,42,0.2);}
@@ -509,7 +511,7 @@ function renderTable(list) {
       <div>${e.bc ? `<span class="bc-chip">${e.bc}</span>` : '<span class="no-bc">—</span>'}</div>
       <div class="motif-cell">${e.motif || '<span class="motif-none">—</span>'}</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        ${e.notifs > 0 ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifié${e.notifs > 1 ? ' ×'+e.notifs : ''}</span>` : ''}
+        ${e.notifs > 0 ? `<span class="notif-badge">✓ Notifié${e.notifs > 1 ? ' ×'+e.notifs : ''}</span>` : ''}
         <span class="statut-pill ${e.statut === 'absent' ? 's-absent' : 's-annulation'}">${e.statut === 'absent' ? 'Absent' : 'Annulation'}</span>
         ${window._isAdmin ? `<button onclick="openNotifForItem('${e.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:#1DA870;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier
@@ -913,6 +915,26 @@ window._doSendNotification = async function() {
       const resp=await fetch(FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,subject,body,attachments})});
       if(resp.ok) sent++; else errors++;
     } catch(e){errors++;}
+  }
+  if(sent>0) {
+    for(const r of sel) {
+      try {
+        const newCount = (r.notifs||0) + 1;
+        await updateDoc(doc(db,'absents',r.id),{notifs: newCount, lastNotif: new Date().toISOString()});
+        r.notifs = newCount;
+        const row = document.getElementById('row-'+r.id);
+        if(row) {
+          let badge = row.querySelector('.notif-badge');
+          if(!badge) {
+            badge = document.createElement('span');
+            badge.className = 'notif-badge';
+            const actionsDiv = row.querySelector('div:last-child');
+            if(actionsDiv) actionsDiv.prepend(badge);
+          }
+          badge.textContent = '✓ Notifié' + (newCount > 1 ? ' ×'+newCount : '');
+        }
+      } catch(e){ console.warn('notifs update:', e); }
+    }
   }
   document.getElementById('mnSuccess').style.display='block';
   document.getElementById('mnMainContent').style.display='none';
