@@ -209,11 +209,7 @@
         <option value="Terminé">Terminé</option>
         <option value="Annulé">Annulé</option>
       </select>
-      <select class="filter-select" id="filterChorus" onchange="filterTable()">
-        <option value="">Chorus : tous</option>
-        <option value="Oui">Chorus requis</option>
-        <option value="Non">Sans Chorus</option>
-      </select>
+
       <span class="results-count" id="resultsCount"></span>
     </div>
 
@@ -221,28 +217,20 @@
     <div class="table-wrap">
       <table class="suivi-table">
         <thead>
-          <tr class="${item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':''}">
+          <tr>
             <th>Client</th>
-            <th>N° Chorus</th>
-            <th>Date émission</th>
-            <th>N° Affaire (PL)</th>
-            <th>PDF Affaire</th>
-            <th>N° BC</th>
-            <th>PDF BC</th>
-            <th>Expéditeur</th>
+            <th>Affaire PL</th>
+            <th>Bon de commande</th>
             <th>Nature mission</th>
-            <th>Observations</th>
-            <th style="min-width:220px;">Adresse</th>
-            <th>Téléphone</th>
+            <th style="min-width:200px;">Adresse</th>
             <th>Assigné</th>
             <th>Passages</th>
             <th>Statut</th>
-            <th>Notes</th>
             <th style="text-align:right;">Actions</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="19"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention enregistrée.</p></div></td></tr>
+          <tr><td colspan="9"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention enregistrée.</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -505,7 +493,7 @@ function closePdfViewer() {
 // ── MODAL ──
 function openModal(id = null) {
   editId = id;
-  document.getElementById('modalTitle').textContent = id ? 'Modifier l\'intervention' : 'Nouvelle intervention';
+  document.getElementById('modalTitle').textContent = id ? 'Mise à jour de l\'intervention' : 'Nouvelle intervention';
   document.getElementById('btnSave').textContent = id ? 'Mettre à jour' : 'Enregistrer';
   resetForm();
   if (id) {
@@ -719,29 +707,31 @@ function renderTable(list) {
   const body = document.getElementById('tableBody');
   document.getElementById('resultsCount').textContent = list.length + ' intervention' + (list.length!==1?'s':'');
   if (!list.length) {
-    body.innerHTML = `<tr><td colspan="19"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention trouvée.</p></div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="9"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention trouvée.</p></div></td></tr>`;
     return;
   }
   body.innerHTML = list.map(item => `
-    <tr>
+    <tr class="${item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':''}">
       <td class="client-cell">${item.client||'—'}</td>
-      <td>${item.chorus ? `<span class="chip ${item.chorus==='Oui'?'chip-chorus-yes':'chip-chorus-no'}">${item.chorus}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
-      <td style="white-space:nowrap;">${fmtDate(item.dateEmission)}</td>
-      <td style="font-family:monospace;font-size:12px;">${item.pl||'—'}</td>
-      <td>${pdfBtn(item.plUrl,'PL')}</td>
-      <td style="font-family:monospace;font-size:12px;">${item.bc||'—'}</td>
-      <td>${pdfBtn(item.bcUrl,'BC')}</td>
-      <td>${item.expediteur||'—'}</td>
-      <td>${item.nature||'—'}</td>
-      <td>${textPreview(item.observations)}</td>
-      <td style="min-width:220px;white-space:nowrap;" title="${item.adresse||''}">${item.adresse||'—'}</td>
-      <td>${item.coordonnees||'—'}</td>
-      <td>${item.assigne ? assigneBadge(item.assigne) : '—'}</td>
-      <td colspan="3">${passagesDropdown(item.passages||[])}</td>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          ${item.pl ? `<span style="font-family:monospace;font-size:12px;font-weight:600;">${item.pl}</span>` : ''}
+          ${pdfBtn(item.plUrl,'PDF')}
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          ${item.bc ? `<span style="font-family:monospace;font-size:12px;font-weight:600;">${item.bc}</span>` : ''}
+          ${pdfBtn(item.bcUrl,'PDF')}
+        </div>
+      </td>
+      <td style="font-size:13px;">${item.nature||'—'}</td>
+      <td style="min-width:200px;font-size:13px;">${item.adresse||'—'}</td>
+      <td>${item.assigne ? assigneBadge(item.assigne) : '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td>${passagesDropdown(item.passages||[])}</td>
       <td>${statutChip(item.statut)}</td>
-      <td>${textPreview(item.notes)}</td>
       <td style="text-align:right;white-space:nowrap;">
-        <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+        <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>
         <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
       </td>
     </tr>`).join('');
@@ -751,12 +741,10 @@ function renderTable(list) {
 function filterTable() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const statut = document.getElementById('filterStatut').value;
-  const chorus = document.getElementById('filterChorus').value;
   const filtered = interventions.filter(i => {
     const mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,i.assigne].some(v => (v||'').toLowerCase().includes(q));
     const ms = !statut || i.statut === statut;
-    const mc = !chorus || i.chorus === chorus;
-    return mq && ms && mc;
+    return mq && ms;
   });
   renderTable(filtered);
 }
