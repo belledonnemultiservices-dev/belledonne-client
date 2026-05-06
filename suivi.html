@@ -75,6 +75,7 @@
   .tech-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
   .notif-badge-bailleur{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:2px 8px;border-radius:20px;white-space:nowrap;}
   .notif-badge-locataire{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#FEF3CD;color:#996600;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+  .notif-badge-sms{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;background:#EDE9FE;color:#6D28D9;padding:2px 8px;border-radius:20px;white-space:nowrap;}
   #passagesContainer > div { padding:8px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border); }
   .chip-statut-progress{background:#FEF3CD;color:#996600;}
   .chip-statut-done{background:#E8F9F2;color:#1DA870;}
@@ -406,6 +407,20 @@
         <div class="form-section-title">Notes internes</div>
         <div class="form-group">
           <textarea class="form-textarea" id="fNotes" placeholder="Notes internes, suivi, rappels..."></textarea>
+        </div>
+      </div>
+
+      <!-- SMS PANEL -->
+      <div id="nsPanelSms" style="display:none;">
+        <div style="margin-bottom:16px;padding:14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataire SMS</div>
+          <div id="nsSmsPhoneInfo" style="font-size:13px;color:var(--text);margin-bottom:10px;"></div>
+          <select class="form-select" id="nsSmsPhoneSel" style="width:100%;"></select>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message SMS <span style="font-weight:400;text-transform:none;">(160 caractères recommandés)</span></div>
+          <textarea class="form-textarea" id="nsSmsBody" style="min-height:140px;width:100%;"></textarea>
+          <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:4px;" id="nsSmsCount">0 / 160</div>
         </div>
       </div>
 
@@ -778,6 +793,7 @@ window.renderTable = function renderTable(list) {
         <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;flex-wrap:wrap;">
           ${item.notifBailleur ? `<span class="notif-badge-bailleur" title="Bailleur notifié le ${new Date(item.notifBailleur).toLocaleDateString('fr-FR')}">🏢 ${new Date(item.notifBailleur).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>` : ''}
           ${item.notifLocataire ? `<span class="notif-badge-locataire" title="Locataire notifié le ${new Date(item.notifLocataire).toLocaleDateString('fr-FR')}">🏠 ${new Date(item.notifLocataire).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>` : ''}
+          ${item.notifSms ? `<span class="notif-badge-sms" title="SMS envoyé le ${new Date(item.notifSms).toLocaleDateString('fr-FR')}">💬 ${new Date(item.notifSms).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>` : ''}
           ${(item.passages||[]).filter(Boolean).length ? `<button onclick="openNotifFromRow('${item.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1DA870;background:#E8F9F2;border:1px solid #A7E8CC;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>Notifier</button>` : ''}
           <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>
         <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
@@ -845,12 +861,12 @@ function renderTechList() {
 let _currentNotifTab = 'bailleur';
 function switchNotifTab(tab) {
   _currentNotifTab = tab;
-  document.getElementById('nsPanelBailleur').style.display = tab === 'bailleur' ? '' : 'none';
-  document.getElementById('nsPanelLocataire').style.display = tab === 'locataire' ? '' : 'none';
-  document.getElementById('nsTabBailleur').style.background = tab === 'bailleur' ? 'var(--navy)' : 'var(--bg)';
-  document.getElementById('nsTabBailleur').style.color = tab === 'bailleur' ? '#fff' : 'var(--text-mid)';
-  document.getElementById('nsTabLocataire').style.background = tab === 'locataire' ? 'var(--navy)' : 'var(--bg)';
-  document.getElementById('nsTabLocataire').style.color = tab === 'locataire' ? '#fff' : 'var(--text-mid)';
+  ['bailleur','locataire','sms'].forEach(t => {
+    const panel = document.getElementById('nsPanel' + t.charAt(0).toUpperCase() + t.slice(1));
+    const btn = document.getElementById('nsTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+    if (btn) { btn.style.background = t === tab ? 'var(--navy)' : 'var(--bg)'; btn.style.color = t === tab ? '#fff' : 'var(--text-mid)'; }
+  });
 }
 
 // ── TÉLÉPHONES DYNAMIQUES ──
@@ -924,6 +940,8 @@ Belledonne Multiservices
   const emailLoc = item.emailClient || '';
   const nomLoc = item.nomClient || 'Madame, Monsieur';
   populateLocataireTab(nomLoc, emailLoc, passagesStr, adresse, bc, pl, nature);
+  const phonesLoc = Array.isArray(item.coordonnees) ? item.coordonnees : (item.coordonnees ? [item.coordonnees] : []);
+  populateSmsPanel(phonesLoc, passagesStr, adresse, bc, nature);
 
   switchNotifTab('bailleur');
   document.getElementById('modalNotifSuivi').classList.add('open');
@@ -987,6 +1005,9 @@ Belledonne Multiservices
   const emailClient = document.getElementById('fEmailClient')?.value || '';
   const nomClient = document.getElementById('fNomClient')?.value || 'Madame, Monsieur';
   populateLocataireTab(nomClient, emailClient, passagesStr, adresse, bc, pl, nature);
+  // Get phones from form
+  const phones = Array.from(document.querySelectorAll('#phonesContainer input')).map(i=>i.value.trim()).filter(Boolean);
+  populateSmsPanel(phones, passagesStr, adresse, bc, nature);
   switchNotifTab('bailleur');
 
   document.getElementById('modalNotifSuivi').classList.add('open');
@@ -1015,10 +1036,82 @@ function updateNotifBadge(itemId, field, ts) {
     badge.className = 'notif-badge-bailleur';
     badge.innerHTML = '🏢 ' + label;
     badge.title = 'Bailleur notifié le ' + d.toLocaleDateString('fr-FR');
-  } else {
+  } else if (field === 'notifLocataire') {
     badge.className = 'notif-badge-locataire';
     badge.innerHTML = '🏠 ' + label;
     badge.title = 'Locataire notifié le ' + d.toLocaleDateString('fr-FR');
+  } else {
+    badge.className = 'notif-badge-sms';
+    badge.innerHTML = '💬 ' + label;
+    badge.title = 'SMS envoyé le ' + d.toLocaleDateString('fr-FR');
+  }
+}
+
+async function sendSmsNotif() {
+  const sel = document.getElementById('nsSmsPhoneSel');
+  const phone = sel ? sel.value : '';
+  if (!phone) { alert('Sélectionnez un numéro de téléphone.'); return; }
+  const message = document.getElementById('nsSmsBody').value.trim();
+  if (!message) { alert('Rédigez un message.'); return; }
+  const btn = document.getElementById('nsBtnSend');
+  btn.disabled = true; btn.textContent = 'Envoi...';
+  try {
+    const resp = await fetch(window.SMS_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendSMS', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to: phone, message})
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      document.getElementById('nsSuccess').style.display = 'block';
+      document.getElementById('nsSuccessMsg').textContent = 'SMS envoyé au ' + phone;
+      document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Fermer</button>';
+      showToast('SMS envoyé !');
+      // Badge SMS
+      const itemId = window._nsCurrentItemId;
+      if (itemId) {
+        const ts = new Date().toISOString();
+        const idx = interventions.findIndex(i => i.id === itemId);
+        if (idx !== -1) { interventions[idx].notifSms = ts; window.interventions = interventions; }
+        if (window._updateSuiviNotif) window._updateSuiviNotif(itemId, 'notifSms', ts);
+        updateNotifBadge(itemId, 'notifSms', ts);
+      }
+    } else { throw new Error(data.error || 'Erreur envoi'); }
+  } catch(e) {
+    alert('Erreur SMS : ' + e.message);
+    btn.disabled = false; btn.textContent = 'Envoyer';
+  }
+}
+
+function populateSmsPanel(phones, passagesStr, adresse, bc, nature) {
+  const sel = document.getElementById('nsSmsPhoneSel');
+  const info = document.getElementById('nsSmsPhoneInfo');
+  if (!phones || !phones.length || !phones.filter(Boolean).length) {
+    if (info) { info.innerHTML = '⚠️ Aucun téléphone renseigné dans le formulaire.'; info.style.color = '#E74C3C'; }
+    if (sel) sel.innerHTML = '<option value="">Aucun numéro disponible</option>';
+  } else {
+    const valid = phones.filter(Boolean);
+    if (info) { info.innerHTML = valid.length + ' numéro' + (valid.length > 1 ? 's' : '') + ' disponible' + (valid.length > 1 ? 's' : ''); info.style.color = 'var(--text-mid)'; }
+    if (sel) sel.innerHTML = valid.map(p => `<option value="${p}">${p}</option>`).join('');
+  }
+  // Pre-fill SMS message
+  const passLignes = passagesStr.split('\n').join(' | ');
+  const msg = `Belledonne : intervention prevue ${passLignes} - ${adresse.substring(0,40)}. BC:${bc||'N/A'}. En cas d\'empechement appelez le 06 95 67 26 03.`;
+  const bodyEl = document.getElementById('nsSmsBody');
+  if (bodyEl) {
+    bodyEl.value = msg;
+    updateSmsCount();
+    bodyEl.oninput = updateSmsCount;
+  }
+}
+
+function updateSmsCount() {
+  const el = document.getElementById('nsSmsBody');
+  const count = document.getElementById('nsSmsCount');
+  if (el && count) {
+    const len = el.value.length;
+    count.textContent = len + ' / 160';
+    count.style.color = len > 160 ? '#E74C3C' : 'var(--text-muted)';
   }
 }
 
@@ -1049,6 +1142,7 @@ function populateLocataireTab(nom, email, passagesStr, adresse, bc, pl, nature) 
 }
 
 window.sendNotifSuivi = async function() {
+  if (_currentNotifTab === 'sms') { sendSmsNotif(); return; }
   const isLoc = _currentNotifTab === 'locataire';
   const to = isLoc ? window._nsLocataireEmail : document.getElementById('nsSel').value;
   if (!to) { alert('Aucun destinataire. Vérifiez l\'email client dans le formulaire.'); return; }
@@ -1118,6 +1212,8 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstati
 let interventions = [];
 const FUNCTION_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification";
 window.FUNCTION_URL = FUNCTION_URL;
+const SMS_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/sendSMS";
+window.SMS_URL = SMS_URL;
 const LIEN_ESPACE = "https://clients-belledonne-multiservices.com";
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
@@ -1268,10 +1364,13 @@ window._loadTechniciens = loadTechniciens;
       <!-- TABS -->
       <div style="display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;">
         <button id="nsTabBailleur" onclick="switchNotifTab('bailleur')" style="flex:1;padding:10px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--navy);color:#fff;border-radius:0;transition:all 0.15s;">
-          🏢 Client bailleur
+          🏢 Bailleur
         </button>
         <button id="nsTabLocataire" onclick="switchNotifTab('locataire')" style="flex:1;padding:10px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-mid);border-radius:0;transition:all 0.15s;">
           🏠 Locataire
+        </button>
+        <button id="nsTabSms" onclick="switchNotifTab('sms')" style="flex:1;padding:10px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-mid);border-radius:0;transition:all 0.15s;">
+          💬 SMS
         </button>
       </div>
 
@@ -1306,6 +1405,20 @@ window._loadTechniciens = loadTechniciens;
         <div>
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message <span style="font-weight:400;text-transform:none;">(modifiable)</span></div>
           <textarea class="form-textarea" id="nsBodyLoc" style="min-height:180px;width:100%;"></textarea>
+        </div>
+      </div>
+
+      <!-- SMS PANEL -->
+      <div id="nsPanelSms" style="display:none;">
+        <div style="margin-bottom:16px;padding:14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataire SMS</div>
+          <div id="nsSmsPhoneInfo" style="font-size:13px;color:var(--text);margin-bottom:10px;"></div>
+          <select class="form-select" id="nsSmsPhoneSel" style="width:100%;"></select>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message SMS <span style="font-weight:400;text-transform:none;">(160 caractères recommandés)</span></div>
+          <textarea class="form-textarea" id="nsSmsBody" style="min-height:140px;width:100%;"></textarea>
+          <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:4px;" id="nsSmsCount">0 / 160</div>
         </div>
       </div>
 
