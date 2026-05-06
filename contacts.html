@@ -792,7 +792,7 @@ window.saveTemplate = async function(type) {
   const bodyEl = document.getElementById('tpl' + cap + 'Body');
   const subject = subjectEl ? subjectEl.value.trim() : '';
   const body = bodyEl ? bodyEl.value.trim() : '';
-  if (!subject || !body) { alert('Renseignez l objet et le corps.'); return; }
+  if (!subject || !body) { alert('Renseignez l\'objet et le corps.'); return; }
   const savedEl = document.getElementById('saved' + cap);
   try {
     const snap = await getDocs(collection(db, "config"));
@@ -818,7 +818,7 @@ async function loadConfig() {
     const t = snap.docs.find(x => x.id === 'templates');
     if (t) {
       const tpl = t.data();
-      ['rapportSimple','rapportMulti','absentSimple','absentMulti','garantieSimple','garantieMulti'].forEach(k => {
+      ['rapportSimple','rapportMulti','absentSimple','absentMulti','garantieSimple','garantieMulti','suiviRdv','suiviRdvLocataire'].forEach(k => {
         if (tpl[k]) {
           const cap = k.charAt(0).toUpperCase() + k.slice(1);
           const subEl = document.getElementById('tpl' + cap + 'Subject');
