@@ -70,8 +70,8 @@
   .chip-statut-new{background:#EBF0F5;color:#1A5F8A;}
   .suivi-table tbody tr.row-annule{background:#FEF2F2 !important;}
   .suivi-table tbody tr.row-annule:hover{background:#FDE8E8 !important;}
-  .suivi-table tbody tr.row-termine{background:#EFF6FF !important;}
-  .suivi-table tbody tr.row-termine:hover{background:#DBEAFE !important;}
+  .suivi-table tbody tr.row-termine{background:#BFDBFE !important;}
+  .suivi-table tbody tr.row-termine:hover{background:#93C5FD !important;}
   .tech-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
   #passagesContainer > div { padding:8px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border); }
   .chip-statut-progress{background:#FEF3CD;color:#996600;}
@@ -360,17 +360,25 @@
       <div class="form-section">
         <div class="form-section-title">Mission & localisation</div>
         <div class="form-grid">
-          <div class="form-group">
+          <div class="form-group form-full">
             <label class="form-label">Nature de la mission</label>
-            <input class="form-input" id="fNature" placeholder="">
+            <input class="form-input" id="fNature">
           </div>
           <div class="form-group">
-            <label class="form-label">Numéro client</label>
-            <input class="form-input" id="fCoordonnees" placeholder="">
+            <label class="form-label">Nom du contact client</label>
+            <input class="form-input" id="fNomClient">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Téléphone client</label>
+            <input class="form-input" id="fCoordonnees">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email client</label>
+            <input class="form-input" type="email" id="fEmailClient">
           </div>
           <div class="form-group form-full">
             <label class="form-label">Adresse</label>
-            <input class="form-input" id="fAdresse" placeholder="">
+            <input class="form-input" id="fAdresse">
           </div>
           <div class="form-group form-full">
             <label class="form-label">Observations</label>
@@ -508,7 +516,9 @@ function openModal(id = null) {
     document.getElementById('fPL').value = item.pl || '';
     document.getElementById('fBC').value = item.bc || '';
     document.getElementById('fNature').value = item.nature || '';
+    document.getElementById('fNomClient').value = item.nomClient || '';
     document.getElementById('fCoordonnees').value = item.coordonnees || '';
+    document.getElementById('fEmailClient').value = item.emailClient || '';
     document.getElementById('fAdresse').value = item.adresse || '';
     document.getElementById('fObservations').value = item.observations || '';
     (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach(d => addPassage(d));
@@ -566,7 +576,7 @@ function getPassageDates() {
   return dates;
 }
 function resetForm() {
-  ['fClient','fDateEmission','fExpediteur','fPL','fBC','fNature','fCoordonnees','fAdresse','fObservations','fNotes'].forEach(id => {
+  ['fClient','fDateEmission','fExpediteur','fPL','fBC','fNature','fNomClient','fCoordonnees','fEmailClient','fAdresse','fObservations','fNotes'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   const elChorus = document.getElementById('fChorus'); if(elChorus) elChorus.value = '';
@@ -608,7 +618,9 @@ async function saveIntervention() {
       bc: document.getElementById('fBC').value.trim(),
       bcUrl,
       nature: document.getElementById('fNature').value.trim(),
+      nomClient: document.getElementById('fNomClient').value.trim(),
       coordonnees: document.getElementById('fCoordonnees').value.trim(),
+      emailClient: document.getElementById('fEmailClient').value.trim(),
       adresse: document.getElementById('fAdresse').value.trim(),
       observations: document.getElementById('fObservations').value.trim(),
       passages,
