@@ -1,9 +1,9 @@
 const functions = require("firebase-functions");
+const crypto = require("crypto");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const https = require("https");
 const http = require("http");
-const crypto = require("crypto");
 
 admin.initializeApp();
 
@@ -101,46 +101,6 @@ exports.sendNotification = functions
   });
 
 // ── ENVOYER SMS VIA OVH ──────────────────────────────────────────
-function ovhRequest(method, path, body, config) {
-  return new Promise((resolve, reject) => {
-    const appKey    = config.appKey;
-    const appSecret = config.appSecret;
-    const consumerKey = config.consumerKey;
-    const timestamp = Math.round(Date.now() / 1000).toString();
-    const bodyStr   = body ? JSON.stringify(body) : "";
-    const bodyHash  = crypto.createHash("sha1").update(bodyStr).digest("hex");
-    const url       = "https://eu.api.ovh.com/1.0" + path;
-    const sigStr    = [appSecret, consumerKey, method, url, bodyHash, timestamp].join("+");
-    const signature = "$1$" + crypto.createHash("sha1").update(sigStr).digest("hex");
-
-    const options = {
-      hostname: "eu.api.ovh.com",
-      path: "/1.0" + path,
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        "X-Ovh-Application": appKey,
-        "X-Ovh-Consumer": consumerKey,
-        "X-Ovh-Signature": signature,
-        "X-Ovh-Timestamp": timestamp,
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let data = "";
-      res.on("data", chunk => data += chunk);
-      res.on("end", () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-        catch(e) { resolve({ status: res.statusCode, body: data }); }
-      });
-    });
-
-    req.on("error", reject);
-    if (bodyStr) req.write(bodyStr);
-    req.end();
-  });
-}
-
 exports.sendSMS = functions
   .region("europe-west1")
   .https.onRequest(async (req, res) => {
@@ -156,39 +116,67 @@ exports.sendSMS = functions
       return;
     }
 
-    // Normalize phone number to international format
-    let phone = to.replace(/\s/g, "").replace(/-/g, "");
+    // Normalize phone to international format
+    let phone = to.replace(/[\s\-\.]/g, "");
     if (phone.startsWith("0")) phone = "+33" + phone.slice(1);
     if (!phone.startsWith("+")) phone = "+33" + phone;
 
-    const config = {
-      appKey:      functions.config().ovh.app_key,
-      appSecret:   functions.config().ovh.app_secret,
-      consumerKey: functions.config().ovh.consumer_key,
-    };
-    const smsAccount = functions.config().ovh.sms_account; // sms-su78206-1
+    // Strip accents to avoid signature issues with UTF-8
+    const cleanMessage = message
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\x00-\x7F]/g, "");
+
+    const appKey      = functions.config().ovh.app_key;
+    const appSecret   = functions.config().ovh.app_secret;
+    const consumerKey = functions.config().ovh.consumer_key;
+    const smsAccount  = functions.config().ovh.sms_account;
+
+    // Get OVH server time first to avoid clock skew
+    const timeRes = await new Promise((resolve, reject) => {
+      https.get("https://eu.api.ovh.com/1.0/auth/time", (r) => {
+        let d = ""; r.on("data", c => d += c); r.on("end", () => resolve(parseInt(d)));
+      }).on("error", reject);
+    });
+
+    const timestamp  = timeRes.toString();
+    const urlPath    = "/1.0/sms/" + smsAccount + "/jobs";
+    const fullUrl    = "https://eu.api.ovh.com" + urlPath;
+    const body       = JSON.stringify({ message: cleanMessage, receivers: [phone], senderForResponse: true, priority: "high" });
+    const bodyHash   = crypto.createHash("sha1").update(body).digest("hex");
+    const sigStr     = [appSecret, consumerKey, "POST", fullUrl, bodyHash, timestamp].join("+");
+    const signature  = "$1$" + crypto.createHash("sha1").update(sigStr).digest("hex");
 
     try {
-      const result = await ovhRequest(
-        "POST",
-        `/sms/${smsAccount}/jobs`,
-        {
-          message,
-          receivers: [phone],
-          senderForResponse: true,
-          priority: "high",
-          charset: "UTF-8",
-          coding: "7bit",
-        },
-        config
-      );
+      const result = await new Promise((resolve, reject) => {
+        const options = {
+          hostname: "eu.api.ovh.com",
+          path: urlPath,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(body),
+            "X-Ovh-Application": appKey,
+            "X-Ovh-Consumer": consumerKey,
+            "X-Ovh-Signature": signature,
+            "X-Ovh-Timestamp": timestamp,
+          }
+        };
+        const r = https.request(options, (res2) => {
+          let d = ""; res2.on("data", c => d += c);
+          res2.on("end", () => resolve({ status: res2.statusCode, body: d }));
+        });
+        r.on("error", reject);
+        r.write(body);
+        r.end();
+      });
 
-      console.log("SMS envoye a", phone, "- Status:", result.status, result.body);
+      console.log("SMS status:", result.status, result.body);
+      const parsed = JSON.parse(result.body);
 
       if (result.status === 200 || result.status === 201) {
-        res.status(200).json({ success: true, details: result.body });
+        res.status(200).json({ success: true, details: parsed });
       } else {
-        res.status(result.status).json({ error: result.body });
+        res.status(result.status).json({ error: parsed });
       }
     } catch(err) {
       console.error("Erreur SMS:", err);
