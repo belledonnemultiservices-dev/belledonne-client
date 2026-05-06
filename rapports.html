@@ -84,9 +84,9 @@
   .results-count { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
 
   /* LISTE RAPPORTS */
-  .reports-list { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
-
-  .report-row { display: grid; grid-template-columns: 28px 40px 1fr auto; gap: 14px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
+  .reports-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .report-head { display: grid; grid-template-columns: 28px 40px 2fr 1fr 1fr 1fr auto; gap: 8px; padding: 11px 18px; background: var(--bg); font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+  .report-row { display: grid; grid-template-columns: 28px 40px 2fr 1fr 1fr 1fr auto; gap: 8px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); transition: background 0.12s; }
   .report-row:last-child { border-bottom: none; }
   .report-row:hover { background: var(--bg); }
   .report-icon { width: 36px; height: 36px; background: #FDECEA; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -320,7 +320,16 @@
     </div>
 
     <!-- LISTE -->
-    <div class="reports-list" id="reportsList"></div>
+    <div class="reports-list" id="reportsList">
+      <div class="report-head">
+        <span></span><span></span>
+        <span>Adresse / Site</span>
+        <span>Bon de commande</span>
+        <span>Passage / Type</span>
+        <span>Date</span>
+        <span></span>
+      </div>
+    </div>
     <div class="empty-state" id="emptyState" style="display:none;">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg>
       <p>Aucun rapport ne correspond à votre recherche.</p>
@@ -589,31 +598,35 @@ function renderRapports(list) {
   if (empty) empty.style.display = 'none';
   const TYPE_LABELS = { punaise:'Punaises de lit', rongeur:'Rongeurs', blatte:'Blattes / Insectes', pigeon:'Dépigeonnage' };
   const TYPE_COLORS = { punaise:'n-punaise', rongeur:'n-rongeur', blatte:'n-blatte', pigeon:'n-pigeon' };
-  container.innerHTML = list.map(r => `
+  const header = container.querySelector('.report-head');
+  container.innerHTML = '';
+  if (header) container.appendChild(header);
+  if (list.length === 0) { if (empty) empty.style.display = 'block'; return; }
+  if (empty) empty.style.display = 'none';
+  const rows = list.map(r => `
     <div class="report-row" id="row-${r.id}">
-      <div>
-        ${window._isAdmin ? `<input type="checkbox" class="row-checkbox" onchange="toggleRowRapport('${r.id}', this.checked)" onclick="event.stopPropagation()">` : ''}
-      </div>
+      <div>${window._isAdmin ? `<input type="checkbox" class="row-checkbox" onchange="toggleRowRapport('${r.id}', this.checked)" onclick="event.stopPropagation()">` : ''}</div>
       <div class="report-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H8L2 8v14h20V2z"/></svg></div>
-      <div class="report-info">
-        <div class="report-title">${r.site || r.adresse || '—'}</div>
-        <div class="report-meta">
-          ${r.bc ? `<span class="r-bc">${r.bc}</span>` : ''}
-          ${r.passage ? `<span class="passage-chip">${r.passage}</span>` : ''}
-          ${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : ''}
-          ${r.date ? `<span class="r-date">${r.date}</span>` : ''}
-          ${r.size ? `<span class="r-size">${r.size}</span>` : ''}
-          ${window._isAdmin && r.notifs > 0 ? `<span class="notif-badge">✓ Notifié${r.notifs > 1 ? ' ×'+r.notifs : ''}</span>` : ''}
-        </div>
+      <div style="min-width:0;">
+        <div class="report-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.site || r.adresse || '—'}</div>
+        ${window._isAdmin && r.client ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${r.client}</div>` : ''}
       </div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
+      <div>${r.bc ? `<span class="r-bc">${r.bc}</span>` : '<span style="color:var(--text-muted)">—</span>'}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+        ${r.passage ? `<span class="passage-chip">${r.passage}</span>` : ''}
+        ${r.nuisible ? `<span class="nuisible-chip ${TYPE_COLORS[r.nuisible] || 'n-custom'}">${TYPE_LABELS[r.nuisible] || r.nuisible}</span>` : ''}
+        ${window._isAdmin && r.notifs > 0 ? `<span class="notif-badge">✓ Notifié${r.notifs > 1 ? ' ×'+r.notifs : ''}</span>` : ''}
+      </div>
+      <div><span class="r-date">${r.date || '—'}</span></div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;">
+        ${r.pdfUrl ? `<a href="${r.pdfUrl}" target="_blank" class="btn-action btn-telecharger" style="white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
         ${window._isAdmin ? `
           <button onclick="openNotifForRapport('${r.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:#1DA870;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>
-          <button onclick="openEditRapport('${r.id}')" class="btn-action" style="color:#1A2E42;background:#EBF0F5;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
-          <button onclick="deleteRapport('${r.id}')" class="btn-action" style="color:#E74C3C;background:#FDECEA;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
+          <button onclick="openEditRapport('${r.id}')" class="btn-action" style="color:#1A2E42;background:#EBF0F5;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+          <button onclick="deleteRapport('${r.id}')" class="btn-action" style="color:#E74C3C;background:#FDECEA;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
       </div>
     </div>`).join('');
+  container.insertAdjacentHTML('beforeend', rows);
 }
 
 let rapports = [];

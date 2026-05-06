@@ -82,8 +82,8 @@
 
   /* TABLE */
   .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .table-head{display:grid;grid-template-columns:28px 2fr 1.2fr 0.9fr 1fr 1.2fr auto;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
-  .table-row{display:grid;grid-template-columns:28px 2fr 1.2fr 0.9fr 1fr 1.2fr auto;gap:8px;padding:14px 22px;border-top:1px solid var(--border);align-items:center;transition:background 0.1s;}
+  .table-head{display:grid;grid-template-columns:28px 2fr 1.2fr 0.9fr 1fr auto;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
+  .table-row{display:grid;grid-template-columns:28px 2fr 1.2fr 0.9fr 1fr auto;gap:8px;padding:14px 22px;border-top:1px solid var(--border);align-items:center;transition:background 0.1s;}
   .table-row:hover{background:var(--bg);}
 
   .addr-main{font-size:13px;font-weight:500;color:var(--text);}
@@ -289,7 +289,6 @@
         <span>Nom / Contact</span>
         <span>Date</span>
         <span>Bon de commande</span>
-        <span>Motif</span>
         <span>Statut</span>
       </div>
       <div id="tableBody"></div>
@@ -509,7 +508,6 @@ function renderTable(list) {
       <div class="cell-nom">${e.nom || '<span style="color:var(--text-muted)">—</span>'}</div>
       <div class="cell-date">${formatDate(e.date)}</div>
       <div>${e.bc ? `<span class="bc-chip">${e.bc}</span>` : '<span class="no-bc">—</span>'}</div>
-      <div class="motif-cell">${e.motif || '<span class="motif-none">—</span>'}</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;justify-content:flex-end;">
         ${window._isAdmin && e.notifs > 0 ? `<span class="notif-badge">✓ Notifié${e.notifs > 1 ? ' ×'+e.notifs : ''}</span>` : ''}
         <span class="statut-pill ${e.statut === 'absent' ? 's-absent' : 's-annulation'}" style="white-space:nowrap;">${e.statut === 'absent' ? 'Absent' : 'Annulation'}</span>
