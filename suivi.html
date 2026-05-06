@@ -68,6 +68,11 @@
   .chip-chorus-yes{background:#E8F9F2;color:#1DA870;}
   .chip-chorus-no{background:#F2F5F8;color:#8FA4B8;}
   .chip-statut-new{background:#EBF0F5;color:#1A5F8A;}
+  .suivi-table tbody tr.row-annule{background:#FEF2F2 !important;}
+  .suivi-table tbody tr.row-annule:hover{background:#FDE8E8 !important;}
+  .suivi-table tbody tr.row-termine{background:#EFF6FF !important;}
+  .suivi-table tbody tr.row-termine:hover{background:#DBEAFE !important;}
+  .tech-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
   .chip-statut-progress{background:#FEF3CD;color:#996600;}
   .chip-statut-done{background:#E8F9F2;color:#1DA870;}
   .chip-statut-cancel{background:#FDECEA;color:#E74C3C;}
@@ -142,6 +147,7 @@
   <nav class="sidebar-nav">
     <div class="nav-group-label">Principal</div>
     <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item active" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
     <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
     <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
     <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
@@ -152,7 +158,6 @@
     <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
     <a class="nav-item" href="admin.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
     <a class="nav-item" href="contacts.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
-    <a class="nav-item active" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><span>Suivi interventions</span></a>
   </nav>
   <div class="sidebar-footer">
     <div class="footer-user">
@@ -199,7 +204,6 @@
       </div>
       <select class="filter-select" id="filterStatut" onchange="filterTable()">
         <option value="">Tous les statuts</option>
-        <option value="Nouveau">Nouveau</option>
         <option value="En cours">En cours</option>
         <option value="Terminé">Terminé</option>
         <option value="Annulé">Annulé</option>
@@ -216,25 +220,25 @@
     <div class="table-wrap">
       <table class="suivi-table">
         <thead>
-          <tr>
+          <tr class="${item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':''}">
             <th>Client</th>
-            <th>Chorus</th>
-            <th>Émission</th>
+            <th>N° Chorus</th>
+            <th>Date émission</th>
             <th>N° Affaire (PL)</th>
             <th>PDF Affaire</th>
-            <th>BC</th>
+            <th>N° BC</th>
             <th>PDF BC</th>
             <th>Expéditeur</th>
             <th>Nature mission</th>
-            <th>Adresse</th>
-            <th>Coordonnées</th>
+            <th>Observations</th>
+            <th style="min-width:220px;">Adresse</th>
+            <th>Téléphone</th>
             <th>Assigné</th>
             <th>1er passage</th>
             <th>2e passage</th>
             <th>3e passage</th>
             <th>Statut</th>
             <th>Notes</th>
-            <th>Observations</th>
             <th style="text-align:right;">Actions</th>
           </tr>
         </thead>
@@ -254,8 +258,12 @@
       <button class="modal-close" onclick="document.getElementById('modalTech').classList.remove('open')">✕</button>
     </div>
     <div class="modal-body">
-      <div style="display:flex;gap:10px;margin-bottom:18px;">
+      <div style="display:flex;gap:10px;margin-bottom:18px;align-items:center;">
         <input class="form-input" id="newTechNom" placeholder="Nom du technicien" style="flex:1;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-size:12px;color:var(--text-muted);white-space:nowrap;">Couleur</label>
+          <input type="color" id="newTechColor" value="#2ECC8F" style="width:36px;height:36px;border:1px solid var(--border);border-radius:6px;padding:2px;cursor:pointer;background:var(--bg);">
+        </div>
         <button onclick="addTechnicien()" style="display:inline-flex;align-items:center;gap:6px;background:var(--navy);color:#fff;border:none;padding:10px 16px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">+ Ajouter</button>
       </div>
       <div id="techList" style="display:flex;flex-direction:column;gap:8px;"></div>
@@ -284,7 +292,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">N° Service Chorus <span class="opt">— optionnel</span></label>
-            <input class="form-input" id="fChorus" placeholder="">
+            <input class="form-input" id="fChorus">
           </div>
           <div class="form-group">
             <label class="form-label">Date d'émission</label>
@@ -303,7 +311,6 @@
           <div class="form-group">
             <label class="form-label">Statut</label>
             <select class="form-select" id="fStatut">
-              <option value="Nouveau">Nouveau</option>
               <option value="En cours">En cours</option>
               <option value="Terminé">Terminé</option>
               <option value="Annulé">Annulé</option>
@@ -419,7 +426,7 @@
     <div id="pdfViewerTitle" style="font-size:13px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 40px);"></div>
     <button onclick="closePdfViewer()" style="width:30px;height:30px;border:none;background:rgba(255,255,255,0.1);border-radius:6px;cursor:pointer;color:#fff;font-size:16px;flex-shrink:0;">✕</button>
   </div>
-  <iframe id="pdfViewerFrame" style="flex:1;width:100%;border:none;"></iframe>
+  <iframe id="pdfViewerFrame" style="flex:1;width:100%;border:none;" allowfullscreen></iframe>
 </div>
 
 <!-- TOAST -->
@@ -478,7 +485,7 @@ function openPdfViewer(fileInputId) {
   if (!url) return;
   const input = document.getElementById(fileInputId);
   document.getElementById('pdfViewerTitle').textContent = input.files[0]?.name || 'Aperçu PDF';
-  document.getElementById('pdfViewerFrame').src = url;
+  document.getElementById('pdfViewerFrame').src = url + '#toolbar=1&navpanes=0&view=FitH';
   const panel = document.getElementById('pdfViewerPanel');
   panel.style.display = 'flex';
   // Shrink modal overlay to left half
@@ -562,9 +569,9 @@ function resetForm() {
   ['fClient','fDateEmission','fExpediteur','fPL','fBC','fNature','fCoordonnees','fAdresse','fObservations','fNotes'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  document.getElementById('fChorus').value = '';
+  const elChorus = document.getElementById('fChorus'); if(elChorus) elChorus.value = '';
   document.getElementById('fAssigne').value = '';
-  document.getElementById('fStatut').value = 'Nouveau';
+  document.getElementById('fStatut').value = 'En cours';
   ['chosenPL','chosenBC'].forEach(id => { const el = document.getElementById(id); if(el) { el.textContent=''; el.style.display='none'; }});
   ['actionsPL','actionsBC'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
   ['filePL','fileBC'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
@@ -643,6 +650,16 @@ async function deleteIntervention(id) {
 }
 
 // ── RENDER ──
+function assigneBadge(nom) {
+  const tech = (window._techniciens||[]).find(t=>t.nom===nom);
+  const color = tech?.color || '#8FA4B8';
+  const textColor = isLightColor(color) ? '#0D1B2A' : '#fff';
+  return `<span class="tech-badge" style="background:${color};color:${textColor};">${nom}</span>`;
+}
+function isLightColor(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return (r*299 + g*587 + b*114) / 1000 > 150;
+}
 function fmtDate(d) {
   if (!d) return '—';
   if (d.includes('T')) {
@@ -680,15 +697,15 @@ function renderTable(list) {
       <td>${pdfBtn(item.bcUrl,'BC')}</td>
       <td>${item.expediteur||'—'}</td>
       <td>${item.nature||'—'}</td>
-      <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.adresse||''}">${item.adresse||'—'}</td>
+      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.observations||''}">${item.observations||'—'}</td>
+      <td style="min-width:220px;white-space:nowrap;" title="${item.adresse||''}">${item.adresse||'—'}</td>
       <td>${item.coordonnees||'—'}</td>
-      <td>${item.assigne||'—'}</td>
+      <td>${item.assigne ? assigneBadge(item.assigne) : '—'}</td>
       <td style="white-space:nowrap;">${(item.passages||[item.date1]).filter(Boolean).map(d=>fmtDate(d)).join(', ')||'—'}</td>
       <td style="white-space:nowrap;">${fmtDate((item.passages||[])[1]||item.date2)}</td>
       <td style="white-space:nowrap;">${fmtDate((item.passages||[])[2]||item.date3)}</td>
       <td>${statutChip(item.statut)}</td>
       <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.notes||''}">${item.notes||'—'}</td>
-      <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.observations||''}">${item.observations||'—'}</td>
       <td style="text-align:right;white-space:nowrap;">
         <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
         <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
@@ -713,8 +730,9 @@ function filterTable() {
 // ── TECHNICIENS (non-module) ──
 async function addTechnicien() {
   const nom = document.getElementById('newTechNom').value.trim();
+  const color = document.getElementById('newTechColor').value;
   if (!nom) return;
-  await window._addTech(nom);
+  await window._addTech(nom, color);
   document.getElementById('newTechNom').value = '';
   await window._loadTechniciens();
   renderTechList();
@@ -735,11 +753,22 @@ function renderTechList() {
     return;
   }
   // We need ids — use techniciens from module scope via window
-  list.innerHTML = (window._techniciens || techs.map(o=>({nom:o.value,id:''}))).map(t => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);">
-      <span style="font-size:13px;font-weight:500;color:var(--text);">${t.nom}</span>
+  const techData = window._techniciens || [];
+  if (!techData.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:16px;">Aucun technicien enregistré.</div>';
+    return;
+  }
+  list.innerHTML = techData.map(t => {
+    const bg = t.color || '#8FA4B8';
+    const fg = isLightColor(bg) ? '#0D1B2A' : '#fff';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${bg};flex-shrink:0;"></span>
+        <span class="tech-badge" style="background:${bg};color:${fg};">${t.nom}</span>
+      </div>
       ${t.id ? `<button onclick="deleteTechnicien('${t.id}')" style="border:none;background:#FDECEA;color:#E74C3C;padding:4px 10px;border-radius:6px;font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;">Supprimer</button>` : ''}
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── TOAST ──
@@ -829,8 +858,8 @@ onAuthStateChanged(auth, async (user) => {
 
 // ── TECHNICIENS ──
 let techniciens = [];
-window._addTech = async function(nom) {
-  return await addDoc(collection(db, 'techniciens'), {nom, createdAt: new Date().toISOString()});
+window._addTech = async function(nom, color) {
+  return await addDoc(collection(db, 'techniciens'), {nom, color: color||'#8FA4B8', createdAt: new Date().toISOString()});
 };
 window._deleteTech = async function(id) {
   await deleteDoc(doc(db, 'techniciens', id));
