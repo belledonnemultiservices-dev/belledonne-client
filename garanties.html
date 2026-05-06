@@ -564,7 +564,7 @@ function renderTable(list) {
         ${g.notifs > 0 ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;">Notifié${g.notifs > 1 ? " ×"+g.notifs : ""}</span>` : ""}
         ${g.rapportUrl ? `<a href="${g.rapportUrl}" target="_blank" class="btn-rapport"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : `<span class="no-rapport">Non joint</span>`}
         ${window._isAdmin ? `
-          <button onclick="openSendModal('garantie','${g.bc||''}','${g.adresse||''}','${g.date||''}','${g.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:var(--green-dark);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>
+          <button onclick="openNotifForItem('${g.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:var(--green-dark);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>
           <button onclick="openEditGarantie('${g.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1A2E42;background:#EBF0F5;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
           <button onclick="deleteGarantie('${g.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ""}
       </div>
@@ -720,113 +720,72 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-// ── MODAL ENVOI ──
-const CONTACTS_DB = [];
-const CLIENT_PAR_DEFAUT = '';
+// ── SYSTÈME SÉLECTION + NOTIFICATION ──
+window._selectedIds = window._selectedIds || new Set();
 
-let currentSendId = null;
-let extraRecipients = [];
-
-window.addExtraRecipient = function() {
-  const nom = document.getElementById('extraNom').value.trim();
-  const email = document.getElementById('extraEmail').value.trim();
-  if (!email || !email.includes('@')) { alert('Veuillez saisir un email valide.'); return; }
-  if (extraRecipients.find(r => r.email === email)) { alert('Cet email est déjà ajouté.'); return; }
-  extraRecipients.push({ nom: nom || email, email });
-  document.getElementById('extraNom').value = '';
-  document.getElementById('extraEmail').value = '';
-  renderExtraList();
-};
-
-window.removeExtra = function(email) {
-  extraRecipients = extraRecipients.filter(r => r.email !== email);
-  renderExtraList();
-};
-
-function renderExtraList() {
-  const container = document.getElementById('extraList');
-  container.innerHTML = extraRecipients.map(r => `
-    <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:#E8F9F2;border:1px solid rgba(46,204,143,0.25);border-radius:8px;">
-      <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;color:#1DA870;flex-shrink:0;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-      <span style="flex:1;font-size:12px;font-weight:500;color:#1DA870;">${r.nom} <span style="font-weight:400;opacity:0.8;">&lt;${r.email}&gt;</span></span>
-      <button onclick="removeExtra('${r.email}')" style="border:none;background:transparent;cursor:pointer;color:#1DA870;font-size:16px;line-height:1;padding:0 2px;opacity:0.7;">×</button>
-    </div>`).join('');
+function updateSelectionBar() {
+  const bar = document.getElementById('selectionBar');
+  const count = document.getElementById('selCount');
+  const n = window._selectedIds.size;
+  if (bar) bar.classList.toggle('visible', n > 0);
+  if (count) count.textContent = n + ' sélectionné' + (n > 1 ? 's' : '');
 }
 
-window.openSendModal = function(type, bc, adresse, date, id) {
-  currentSendId = id;
-  extraRecipients = [];
-  if (document.getElementById('extraList')) document.getElementById('extraList').innerHTML = '';
-  if (document.getElementById('extraNom')) document.getElementById('extraNom').value = '';
-  if (document.getElementById('extraEmail')) document.getElementById('extraEmail').value = '';
-  const ctx = document.getElementById('sendCtxVal');
-  if(ctx) ctx.textContent = `${bc||'—'} — ${adresse} — ${formatDate(date)}`;
-  const clientContacts = CONTACTS_DB.filter(c => c.client === CLIENT_PAR_DEFAUT);
-  const list = document.getElementById('sendContactsList');
-  list.innerHTML = clientContacts.length === 0
-    ? '<div style="font-size:13px;color:#8FA4B8;text-align:center;padding:16px;">Aucun contact.<br><a href="contacts.html" style="color:#1DA870;font-weight:500;">Ajouter →</a></div>'
-    : clientContacts.map(c => {
-        const preChecked = c.notif && c.notif.includes(type);
-        return `<label style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid ${preChecked?'#2ECC8F':'rgba(13,27,42,0.09)'};border-radius:8px;cursor:pointer;background:${preChecked?'#E8F9F2':'transparent'};" onclick="this.querySelector('input').checked=!this.querySelector('input').checked;this.style.borderColor=this.querySelector('input').checked?'#2ECC8F':'rgba(13,27,42,0.09)';this.style.background=this.querySelector('input').checked?'#E8F9F2':'transparent';">
-          <input type="checkbox" ${preChecked?'checked':''} value="${c.email}" style="width:16px;height:16px;accent-color:#2ECC8F;cursor:pointer;flex-shrink:0;" onclick="event.stopPropagation();" />
-          <div style="flex:1;">
-            <div style="font-size:13px;font-weight:500;color:#0D1B2A;">${c.nom} <span style="font-weight:400;color:#8FA4B8;">· ${c.role}</span>${!preChecked?` <span style="font-size:10px;background:#EBF0F5;color:#4A6078;padding:1px 6px;border-radius:8px;margin-left:4px;">Hors liste habituelle</span>`:''}</div>
-            <div style="font-size:11px;color:#8FA4B8;">${c.email}</div>
-          </div>
-        </label>`;
-      }).join('');
-
-  const msgType = type === 'garantie' ? 'passage en garantie' : 'absent/annulation';
-  const prenom = clientContacts.length > 0 ? clientContacts[0].nom.split(' ')[0] : 'Madame, Monsieur';
-  document.getElementById('sendMsgPreview').value =
-`Bonjour ${prenom},
-
-Nous vous confirmons qu'un ${msgType} a été enregistré sur votre espace client.
-
-📍 Adresse : ${adresse}
-📅 Date : ${formatDate(date)}${bc ? '\n📋 Bon de commande : '+bc : ''}
-
-Consultez le détail ici :
-👉 https://clients-belledonne-multiservices.com
-
-Cordialement,
-L'équipe Belledonne Multiservices — 06 95 67 26 03`;
-
-  document.getElementById('sendMainContent').style.display = 'block';
-  document.getElementById('sendSuccessBlock').style.display = 'none';
-  document.getElementById('sendModalFooter').innerHTML = `
-    <button style="height:40px;padding:0 18px;border:1px solid rgba(13,27,42,0.09);background:transparent;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;color:#4A6078;cursor:pointer;" onclick="document.getElementById('modalSend').classList.remove('open')">Annuler</button>
-    <button style="height:40px;padding:0 22px;border:none;background:#2ECC8F;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#0D1B2A;cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="confirmSend()">
-      <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer l'email
-    </button>`;
-  document.getElementById('modalSend').style.display = 'flex';
+window.clearSelection = function() {
+  window._selectedIds = new Set();
+  document.querySelectorAll('.table-row.selected,.report-row.selected').forEach(r => r.classList.remove('selected'));
+  document.querySelectorAll('.row-checkbox:checked').forEach(cb => cb.checked = false);
+  updateSelectionBar();
 };
 
-window.confirmSend = function() {
-  const checked = document.querySelectorAll('#sendContactsList input:checked');
-  if (checked.length === 0 && extraRecipients.length === 0) { alert('Sélectionnez au moins un destinataire.'); return; }
-  const names = [
-    ...Array.from(checked).map(cb => (CONTACTS_DB.find(c=>c.email===cb.value)||{nom:cb.value}).nom),
-    ...extraRecipients.map(r => r.nom)
-  ];
-  if (currentSendId !== null) {
-    const g = garanties.find(x => x.id === currentSendId);
-    if (g) g.notifs = (g.notifs || 0) + 1;
-  }
-  document.getElementById('sendMainContent').style.display = 'none';
-  document.getElementById('sendSuccessBlock').style.display = 'block';
-  document.getElementById('sendSuccessMsg').textContent = 'Email envoyé à : ' + names.join(', ');
-  document.getElementById('sendModalFooter').innerHTML = `<button style="height:40px;padding:0 22px;border:none;background:#0D1B2A;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;" onclick="document.getElementById('modalSend').style.display='none';filter()">Fermer</button>`;
-  showToast('Email envoyé à ' + names.length + ' destinataire' + (names.length>1?'s':'') + ' !');
+window.openNotifForItem = function(id) {
+  window._selectedIds = new Set([id]);
+  window.openNotifModal();
 };
 
-document.getElementById('modalSend').addEventListener('click', e => { if(e.target===document.getElementById('modalSend')) document.getElementById('modalSend').style.display='none'; });
+window.openNotifModal = function() {
+  const ids = [...window._selectedIds];
+  if (ids.length === 0) return;
+  const all = window.garanties || garanties || [];
+  const selected = ids.map(id => all.find(r => r.id === id)).filter(Boolean);
+  if (selected.length === 0) return;
+  const isMulti = selected.length > 1;
+  const client = selected[0].client;
+  const modal = document.getElementById('modalNotif');
+  if (!modal) return;
+  modal.classList.add('open');
+  const recap = document.getElementById('mnRecap');
+  if (recap) recap.textContent = isMulti
+    ? selected.map(r => (r.bc ? 'BC ' + r.bc + ' — ' : '') + (r.adresse || '') + (r.date ? ' (' + r.date + ')' : '')).join('\n')
+    : (() => { const r = selected[0]; return (r.bc ? 'BC ' + r.bc + ' — ' : '') + (r.adresse || '') + (r.date ? ' (' + r.date + ')' : ''); })();
+  const title = document.getElementById('mnTitle');
+  if (title) title.textContent = isMulti ? 'Notifier (' + selected.length + ' garanties)' : 'Notifier le client';
+  const success = document.getElementById('mnSuccess');
+  if (success) success.style.display = 'none';
+  const main = document.getElementById('mnMainContent');
+  if (main) main.style.display = '';
+  const footer = document.getElementById('mnFooter');
+  if (footer) footer.innerHTML = '<button class="mn-btn-cancel" onclick="closeNotifModal()">Annuler</button><button class="mn-btn-send" id="mnBtnSend" onclick="window._doSendNotification()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
+  if (typeof window._loadNotifData === 'function') window._loadNotifData(client, isMulti, selected);
+};
+
+window.closeNotifModal = function() {
+  const modal = document.getElementById('modalNotif');
+  if (modal) modal.classList.remove('open');
+};
+
+window.sendNotification = function() {
+  if (typeof window._doSendNotification === 'function') window._doSendNotification();
+};
 </script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const LIEN_ESPACE = "https://clients-belledonne-multiservices.com";
+const FUNCTION_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);

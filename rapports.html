@@ -630,26 +630,68 @@ function filterRapports() {
 
 // Ouvrir la modale de notification pour un rapport unique (bouton "Notifier" par ligne)
 window.openNotifForRapport = function(id) {
-  const r = (window.rapports || rapports || []).find(x => x.id === id);
-  if (!r) return;
-  // Réinitialiser la sélection puis sélectionner uniquement ce rapport
   window._selectedIds = new Set([id]);
+  window.openNotifModal();
+};
+
+// ── SYSTÈME SÉLECTION + NOTIFICATION ──
+window._selectedIds = window._selectedIds || new Set();
+
+function updateSelectionBar() {
+  const bar = document.getElementById('selectionBar');
+  const count = document.getElementById('selCount');
+  const n = window._selectedIds.size;
+  if (bar) { bar.classList.toggle('visible', n > 0); }
+  if (count) count.textContent = n + ' sélectionné' + (n > 1 ? 's' : '');
+}
+
+window.clearSelection = function() {
+  window._selectedIds = new Set();
+  document.querySelectorAll('.report-row.selected').forEach(r => r.classList.remove('selected'));
+  document.querySelectorAll('.row-checkbox:checked').forEach(cb => cb.checked = false);
+  updateSelectionBar();
+};
+
+window.openNotifModal = function() {
+  const ids = [...window._selectedIds];
+  if (ids.length === 0) return;
+  const all = window.rapports || rapports || [];
+  const selected = ids.map(id => all.find(r => r.id === id)).filter(Boolean);
+  if (selected.length === 0) return;
+  const isMulti = selected.length > 1;
+  const client = selected[0].client;
   const modal = document.getElementById('modalNotif');
   if (!modal) return;
   modal.classList.add('open');
   const recap = document.getElementById('mnRecap');
-  if (recap) recap.textContent = (r.bc ? 'BC ' + r.bc + ' — ' : '') + (r.site || '') + (r.date ? ' (' + r.date + ')' : '');
+  if (recap) {
+    if (isMulti) {
+      recap.textContent = selected.map(r => (r.bc ? 'BC ' + r.bc + ' — ' : '') + (r.site || '') + (r.date ? ' (' + r.date + ')' : '')).join('\n');
+    } else {
+      const r = selected[0];
+      recap.textContent = (r.bc ? 'BC ' + r.bc + ' — ' : '') + (r.site || '') + (r.date ? ' (' + r.date + ')' : '');
+    }
+  }
   const title = document.getElementById('mnTitle');
-  if (title) title.textContent = 'Notifier le client';
+  if (title) title.textContent = isMulti ? 'Notifier (' + selected.length + ' rapports)' : 'Notifier le client';
   const success = document.getElementById('mnSuccess');
   if (success) success.style.display = 'none';
   const main = document.getElementById('mnMainContent');
   if (main) main.style.display = '';
   const footer = document.getElementById('mnFooter');
-  if (footer) footer.innerHTML = '<button class="mn-btn-cancel" onclick="closeNotifModal()">Annuler</button><button class="mn-btn-send" id="mnBtnSend" onclick="sendNotification()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
+  if (footer) footer.innerHTML = '<button class="mn-btn-cancel" onclick="closeNotifModal()">Annuler</button><button class="mn-btn-send" id="mnBtnSend" onclick="window._doSendNotification()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
   if (typeof window._loadNotifData === 'function') {
-    window._loadNotifData(r.client, false, [r]);
+    window._loadNotifData(client, isMulti, selected);
   }
+};
+
+window.closeNotifModal = function() {
+  const modal = document.getElementById('modalNotif');
+  if (modal) modal.classList.remove('open');
+};
+
+window.sendNotification = function() {
+  if (typeof window._doSendNotification === 'function') window._doSendNotification();
 };
 
 // Générer les années dynamiquement
