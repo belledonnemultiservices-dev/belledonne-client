@@ -1062,6 +1062,9 @@ async function sendSmsNotif() {
         if (window._updateSuiviNotif) window._updateSuiviNotif(itemId, 'notifSms', ts);
         updateNotifBadge(itemId, 'notifSms', ts);
       }
+    } else if (data.ovhError) {
+      const msg = data.ovhError.message || data.ovhError.errorCode || JSON.stringify(data.ovhError);
+      throw new Error('OVH: ' + msg + ' (num: ' + data.phone + ')');
     } else { throw new Error(data.error || 'Erreur envoi'); }
   } catch(e) {
     alert('Erreur SMS : ' + e.message);
