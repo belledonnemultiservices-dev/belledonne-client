@@ -836,6 +836,18 @@ function renderTechList() {
   }).join('');
 }
 
+// ── TABS NOTIFICATION ──
+let _currentNotifTab = 'bailleur';
+function switchNotifTab(tab) {
+  _currentNotifTab = tab;
+  document.getElementById('nsPanelBailleur').style.display = tab === 'bailleur' ? '' : 'none';
+  document.getElementById('nsPanelLocataire').style.display = tab === 'locataire' ? '' : 'none';
+  document.getElementById('nsTabBailleur').style.background = tab === 'bailleur' ? 'var(--navy)' : 'var(--bg)';
+  document.getElementById('nsTabBailleur').style.color = tab === 'bailleur' ? '#fff' : 'var(--text-mid)';
+  document.getElementById('nsTabLocataire').style.background = tab === 'locataire' ? 'var(--navy)' : 'var(--bg)';
+  document.getElementById('nsTabLocataire').style.color = tab === 'locataire' ? '#fff' : 'var(--text-mid)';
+}
+
 // ── TÉLÉPHONES DYNAMIQUES ──
 let phoneCount = 0;
 function addPhoneField(value = '') {
@@ -903,6 +915,13 @@ Belledonne Multiservices
   const sel = document.getElementById('nsSel');
   sel.innerHTML = '<option value="">Chargement...</option>';
   await window._loadContactsForSuivi(client, sel);
+
+  // Populate locataire tab from item data
+  const emailLoc = item.emailClient || '';
+  const nomLoc = item.nomClient || 'Madame, Monsieur';
+  populateLocataireTab(nomLoc, emailLoc, passagesStr, adresse, bc, pl, nature);
+
+  switchNotifTab('bailleur');
   document.getElementById('modalNotifSuivi').classList.add('open');
 };
 
@@ -951,14 +970,19 @@ Belledonne Multiservices
   document.getElementById('nsSubject').value = subject;
   document.getElementById('nsBody').value = body;
   document.getElementById('nsSuccess').style.display = 'none';
-  document.getElementById('nsBody').parentElement.style.display = '';
-  document.getElementById('nsSubject').parentElement.style.display = '';
   document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button><button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
 
   // Load contacts for this client
   const sel = document.getElementById('nsSel');
   sel.innerHTML = '<option value="">Chargement...</option>';
   await window._loadContactsForSuivi(client, sel);
+
+
+  // Populate locataire tab from form fields
+  const emailClient = document.getElementById('fEmailClient')?.value || '';
+  const nomClient = document.getElementById('fNomClient')?.value || 'Madame, Monsieur';
+  populateLocataireTab(nomClient, emailClient, passagesStr, adresse, bc, pl, nature);
+  switchNotifTab('bailleur');
 
   document.getElementById('modalNotifSuivi').classList.add('open');
 };
@@ -967,11 +991,40 @@ window.closeNotifSuivi = function() {
   document.getElementById('modalNotifSuivi').classList.remove('open');
 };
 
+function populateLocataireTab(nom, email, passagesStr, adresse, bc, pl, nature) {
+  window._nsLocataireEmail = email;
+  const tplLoc = window._suiviRdvLocataireTemplate || {};
+  const subjectLoc = (tplLoc.subject || 'Confirmation de votre rendez-vous')
+    .replace('{{nom}}', nom);
+  const bodyLoc = (tplLoc.body || `Bonjour {{nom}},\n\nNous vous informons qu\'une intervention est prévue à votre domicile :\n\n{{passages}}\n\nAdresse : {{adresse}}\n\nMerci d\'être présent(e) aux horaires indiqués. En cas d\'empêchement, contactez-nous dès que possible.\n\nCordialement,\nBelledonne Multiservices\n📞 06 95 67 26 03`)
+    .replace('{{nom}}', nom)
+    .replace('{{passages}}', passagesStr)
+    .replace('{{adresse}}', adresse)
+    .replace('{{bc}}', bc)
+    .replace('{{pl}}', pl)
+    .replace('{{nature}}', nature);
+  document.getElementById('nsSubjectLoc').value = subjectLoc;
+  document.getElementById('nsBodyLoc').value = bodyLoc;
+  const infoEl = document.getElementById('nsLocataireInfo');
+  if (infoEl) {
+    if (email) {
+      infoEl.innerHTML = '<strong>' + (nom||'—') + '</strong> &lt;' + email + '&gt;';
+      infoEl.style.color = 'var(--text)';
+    } else {
+      infoEl.innerHTML = '⚠️ Aucun email locataire renseigné dans le formulaire.';
+      infoEl.style.color = '#E74C3C';
+    }
+  }
+}
+
 window.sendNotifSuivi = async function() {
-  const to = document.getElementById('nsSel').value;
-  if (!to) { alert('Sélectionnez un destinataire.'); return; }
-  const subject = document.getElementById('nsSubject').value.trim();
-  const body = document.getElementById('nsBody').value.trim();
+  const isLoc = _currentNotifTab === 'locataire';
+  const to = isLoc ? window._nsLocataireEmail : document.getElementById('nsSel').value;
+  if (!to) { alert('Aucun destinataire. Vérifiez l\'email client dans le formulaire.'); return; }
+  const subjectId = isLoc ? 'nsSubjectLoc' : 'nsSubject';
+  const bodyId = isLoc ? 'nsBodyLoc' : 'nsBody';
+  const subject = document.getElementById(subjectId).value.trim();
+  const body = document.getElementById(bodyId).value.trim();
   if (!subject || !body) { alert('Objet et message requis.'); return; }
   const btn = document.getElementById('nsBtnSend');
   btn.disabled = true; btn.textContent = 'Envoi...';
@@ -1089,6 +1142,9 @@ onAuthStateChanged(auth, async (user) => {
     if (tplDoc && tplDoc.data().suiviRdv) {
       window._suiviRdvTemplate = tplDoc.data().suiviRdv;
     }
+    if (tplDoc && tplDoc.data().suiviRdvLocataire) {
+      window._suiviRdvLocataireTemplate = tplDoc.data().suiviRdvLocataire;
+    }
   } catch(e) { console.warn('template load:', e); }
 
   // Load data
@@ -1155,20 +1211,51 @@ window._loadTechniciens = loadTechniciens;
       <button class="modal-close" onclick="closeNotifSuivi()">✕</button>
     </div>
     <div class="modal-body" style="padding:22px 28px;">
-      <div style="margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataire</div>
-        <select class="form-select" id="nsSel" style="width:100%;">
-          <option value="">— Chargement des contacts... —</option>
-        </select>
+
+      <!-- TABS -->
+      <div style="display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;">
+        <button id="nsTabBailleur" onclick="switchNotifTab('bailleur')" style="flex:1;padding:10px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--navy);color:#fff;border-radius:0;transition:all 0.15s;">
+          🏢 Client bailleur
+        </button>
+        <button id="nsTabLocataire" onclick="switchNotifTab('locataire')" style="flex:1;padding:10px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-mid);border-radius:0;transition:all 0.15s;">
+          🏠 Locataire
+        </button>
       </div>
-      <div style="margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
-        <input class="form-input" id="nsSubject" style="width:100%;">
+
+      <!-- BAILLEUR PANEL -->
+      <div id="nsPanelBailleur">
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataire bailleur</div>
+          <select class="form-select" id="nsSel" style="width:100%;">
+            <option value="">— Chargement des contacts... —</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
+          <input class="form-input" id="nsSubject" style="width:100%;">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message <span style="font-weight:400;text-transform:none;">(modifiable)</span></div>
+          <textarea class="form-textarea" id="nsBody" style="min-height:180px;width:100%;"></textarea>
+        </div>
       </div>
-      <div style="margin-bottom:4px;">
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message <span style="font-weight:400;text-transform:none;">(modifiable)</span></div>
-        <textarea class="form-textarea" id="nsBody" style="min-height:220px;width:100%;"></textarea>
+
+      <!-- LOCATAIRE PANEL -->
+      <div id="nsPanelLocataire" style="display:none;">
+        <div style="margin-bottom:16px;padding:14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataire locataire</div>
+          <div id="nsLocataireInfo" style="font-size:13px;color:var(--text);"></div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
+          <input class="form-input" id="nsSubjectLoc" style="width:100%;">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message <span style="font-weight:400;text-transform:none;">(modifiable)</span></div>
+          <textarea class="form-textarea" id="nsBodyLoc" style="min-height:180px;width:100%;"></textarea>
+        </div>
       </div>
+
     </div>
     <div id="nsSuccess" style="display:none;text-align:center;padding:32px 28px;">
       <svg viewBox="0 0 24 24" fill="currentColor" style="width:48px;height:48px;color:var(--green);margin-bottom:12px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
