@@ -881,7 +881,7 @@ window._loadNotifData = async function(client, isMulti, selectedItems) {
     const tplData = tpl[key]||{};
     if(isMulti) {
       const liste = selectedItems.map(r=>'- BC ' + (r.bc||'-') + ' - ' + (r.adresse||'-').split(',')[0] + ' - ' + (r.date||'-')).join('\n');
-      const body=(tplData.body||'Bonjour,\nLes passages suivants n'ont pu etre effectues :\n{{liste}}\nConsultez votre espace client : {{lien}}\nCordialement,\nBelledonne Multiservices').replace(/{{liste}}/g,liste).replace(/{{lien}}/g,LIEN_ESPACE);
+      const body=(tplData.body||`Bonjour,\nLes passages suivants n'ont pu etre effectues :\n{{liste}}\nConsultez votre espace client : {{lien}}\nCordialement,\nBelledonne Multiservices`).replace(/{{liste}}/g,liste).replace(/{{lien}}/g,LIEN_ESPACE);
       document.getElementById('mnMsg').value=body;
       document.getElementById('mnSubject').value=tplData.subject||'Passages non effectues - recapitulatif';
     } else {
