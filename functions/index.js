@@ -175,8 +175,7 @@ exports.sendSMS = functions
         {
           message,
           receivers: [phone],
-          sender: "Belledonne",
-          noStopClause: false,
+          senderForResponse: true,
           priority: "high",
           charset: "UTF-8",
           coding: "7bit",
