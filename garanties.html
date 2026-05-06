@@ -84,9 +84,6 @@
   .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
   .table-head{display:grid;grid-template-columns:28px 2.4fr 1.2fr 1fr 1fr auto;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
   .table-row{display:grid;grid-template-columns:28px 2.4fr 1.2fr 1fr 1fr auto;gap:8px;padding:14px 22px;border-top:1px solid var(--border);align-items:center;cursor:pointer;transition:background 0.1s;}
-  .is-client .table-head{grid-template-columns:2.4fr 1.2fr 1fr 1fr auto;}
-  .is-client .table-row{grid-template-columns:2.4fr 1.2fr 1fr 1fr auto;}
-  .is-client .table-row > div:first-child,.is-client .table-head > span:first-child{display:none;}
   .table-row:hover{background:var(--bg);}
 
   .addr-main{font-size:13px;font-weight:500;color:var(--text);}
@@ -296,14 +293,14 @@
     </div>
 
     <!-- TABLE -->
-    <div class="table-wrap is-client">
+    <div class="table-wrap">
       <div class="table-head">
         <span></span>
         <span>Adresse</span>
         <span>Nom locataire</span>
         <span>Date intervention</span>
         <span>Type d'intervention</span>
-        <span></span>
+        <span>Rapport</span>
       </div>
       <div id="tableBody"></div>
     </div>
@@ -562,15 +559,15 @@ function renderTable(list) {
         ${window._isAdmin ? `<input type="checkbox" class="row-checkbox" onchange="toggleRowGarantie('${g.id}', this.checked)" onclick="event.stopPropagation()">` : ''}
       </div>
       <div>
-        ${window._isAdmin && g.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:1px 7px;border-radius:10px;margin-bottom:3px;">${g.client}</span><br>` : ""}
+        ${window._isAdmin && g.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:1px 7px;border-radius:10px;margin-bottom:3px;">${g.client}</span>` : ""}
         <div class="addr-main">${(g.adresse||"").split(",")[0]}</div>
         <div class="addr-sub">${(g.adresse||"").includes(",") ? (g.adresse||"").split(",").slice(1).join(",").trim() : ""}</div>
-        ${window._isAdmin && g.notifs > 0 ? `<span class="notif-badge" style="margin-top:3px;">✓ Notifié${g.notifs > 1 ? ' ×'+g.notifs : ''}</span>` : ''}
       </div>
-      <span style="font-size:13px;color:var(--text-mid);">${g.nom||g.locataire||"—"}</span>
+      <span style="font-size:13px;color:var(--text-mid);">${g.bc||"—"}</span>
       <span class="cell-date">${formatDate(g.date)}</span>
       <span class="nuisible-pill ${getTypeColor(g.nuisible)}">${getTypeLabel(g.nuisible)}</span>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;justify-content:flex-end;">
+        ${g.notifs > 0 ? `<span class="notif-badge">✓ Notifié${g.notifs > 1 ? ' ×'+g.notifs : ''}</span>` : ''}
         ${g.rapportUrl ? `<a href="${g.rapportUrl}" target="_blank" class="btn-rapport"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
         ${window._isAdmin ? `
           <button onclick="openNotifForItem('${g.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:var(--green-dark);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>
@@ -977,7 +974,6 @@ onAuthStateChanged(auth, async function(user) {
     const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Administrateur";
     var adminNav=document.getElementById("adminNav"); if(adminNav) adminNav.style.display="block";
     var btn=document.getElementById("btnAjouter"); if(btn) btn.style.display="";
-    const tw2=document.getElementById('tableBody'); if(tw2&&tw2.parentElement) tw2.parentElement.classList.remove('is-client');
     loadClientsIntoSelect("inClient");
     window._currentClientFilter = null;
     await window._loadGaranties(null);
@@ -993,7 +989,6 @@ onAuthStateChanged(auth, async function(user) {
         const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Client";
         window._currentClientFilter = p.client;
         await window._loadGaranties(p.client);
-        const tw=document.getElementById('tableBody'); if(tw&&tw.parentElement) tw.parentElement.classList.add('is-client');
       }
     } catch(e) { console.error(e); }
   }
