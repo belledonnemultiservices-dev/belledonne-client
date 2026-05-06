@@ -1082,7 +1082,11 @@ function populateSmsPanel(phones, passagesStr, adresse, bc, nature) {
   }
   // Pre-fill SMS message
   const passLignes = passagesStr.split('\n').join(' | ');
-  const msg = `Belledonne : intervention prevue ${passLignes} - ${adresse.substring(0,40)}. BC:${bc||'N/A'}. En cas d\'empechement appelez le 06 95 67 26 03.`;
+  const smsTpl = (window._suiviSmsTemplate?.body || 'Belledonne : intervention prevue {{passages}} - {{adresse}}. BC:{{bc}}. Empechement : 06 95 67 26 03.')
+    .replace('{{passages}}', passLignes)
+    .replace('{{adresse}}', adresse.substring(0,40))
+    .replace('{{bc}}', bc||'N/A');
+  const msg = smsTpl;
   const bodyEl = document.getElementById('nsSmsBody');
   if (bodyEl) {
     bodyEl.value = msg;
@@ -1270,6 +1274,9 @@ onAuthStateChanged(auth, async (user) => {
     }
     if (tplDoc && tplDoc.data().suiviRdvLocataire) {
       window._suiviRdvLocataireTemplate = tplDoc.data().suiviRdvLocataire;
+    }
+    if (tplDoc && tplDoc.data().suiviSms) {
+      window._suiviSmsTemplate = tplDoc.data().suiviSms;
     }
   } catch(e) { console.warn('template load:', e); }
 
