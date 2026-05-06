@@ -176,7 +176,10 @@ exports.sendSMS = functions
       if (result.status === 200 || result.status === 201) {
         res.status(200).json({ success: true, details: parsed });
       } else {
-        res.status(result.status).json({ error: parsed });
+        console.error("OVH error body:", result.body);
+        console.error("Phone used:", phone);
+        console.error("Message:", cleanMessage);
+        res.status(200).json({ success: false, ovhStatus: result.status, ovhError: parsed, phone, messageLength: cleanMessage.length });
       }
     } catch(err) {
       console.error("Erreur SMS:", err);
