@@ -82,8 +82,8 @@
 
   /* TABLE */
   .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .table-head{display:grid;grid-template-columns:2.4fr 1.2fr 1fr 1fr 0.8fr;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
-  .table-row{display:grid;grid-template-columns:2.4fr 1.2fr 1fr 1fr 0.8fr;gap:8px;padding:14px 22px;border-top:1px solid var(--border);align-items:center;cursor:pointer;transition:background 0.1s;}
+  .table-head{display:grid;grid-template-columns:28px 2.4fr 1.2fr 1fr 1fr 0.8fr;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
+  .table-row{display:grid;grid-template-columns:28px 2.4fr 1.2fr 1fr 1fr 0.8fr;gap:8px;padding:14px 22px;border-top:1px solid var(--border);align-items:center;cursor:pointer;transition:background 0.1s;}
   .table-row:hover{background:var(--bg);}
 
   .addr-main{font-size:13px;font-weight:500;color:var(--text);}
@@ -293,6 +293,7 @@
     <!-- TABLE -->
     <div class="table-wrap">
       <div class="table-head">
+        <span></span>
         <span>Adresse</span>
         <span>Nom locataire</span>
         <span>Date intervention</span>
@@ -551,7 +552,10 @@ function renderTable(list) {
   }
 
   body.innerHTML = list.map(g => `
-    <div class="table-row">
+    <div class="table-row" id="row-${g.id}">
+      <div>
+        ${window._isAdmin ? `<input type="checkbox" class="row-checkbox" onchange="toggleRowGarantie('${g.id}', this.checked)" onclick="event.stopPropagation()">` : ''}
+      </div>
       <div>
         ${window._isAdmin && g.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:1px 7px;border-radius:10px;margin-bottom:3px;">${g.client}</span>` : ""}
         <div class="addr-main">${(g.adresse||"").split(",")[0]}</div>
@@ -735,6 +739,14 @@ window.clearSelection = function() {
   window._selectedIds = new Set();
   document.querySelectorAll('.table-row.selected,.report-row.selected').forEach(r => r.classList.remove('selected'));
   document.querySelectorAll('.row-checkbox:checked').forEach(cb => cb.checked = false);
+  updateSelectionBar();
+};
+
+window.toggleRowGarantie = function(id, checked) {
+  if (checked) window._selectedIds.add(id);
+  else window._selectedIds.delete(id);
+  const row = document.getElementById('row-' + id);
+  if (row) row.classList.toggle('selected', checked);
   updateSelectionBar();
 };
 
