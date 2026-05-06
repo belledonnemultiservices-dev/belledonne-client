@@ -73,6 +73,7 @@
   .suivi-table tbody tr.row-termine{background:#EFF6FF !important;}
   .suivi-table tbody tr.row-termine:hover{background:#DBEAFE !important;}
   .tech-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+  #passagesContainer > div { padding:8px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border); }
   .chip-statut-progress{background:#FEF3CD;color:#996600;}
   .chip-statut-done{background:#E8F9F2;color:#1DA870;}
   .chip-statut-cancel{background:#FDECEA;color:#E74C3C;}
@@ -234,9 +235,7 @@
             <th style="min-width:220px;">Adresse</th>
             <th>Téléphone</th>
             <th>Assigné</th>
-            <th>1er passage</th>
-            <th>2e passage</th>
-            <th>3e passage</th>
+            <th>Passages</th>
             <th>Statut</th>
             <th>Notes</th>
             <th style="text-align:right;">Actions</th>
@@ -513,7 +512,7 @@ function openModal(id = null) {
     const item = interventions.find(i => i.id === id);
     if (!item) return;
     document.getElementById('fClient').value = item.client || '';
-    document.getElementById('fChorus').value = item.chorus || 'Non';
+    document.getElementById('fChorus').value = item.chorus || '';
     document.getElementById('fDateEmission').value = item.dateEmission || '';
     document.getElementById('fExpediteur').value = item.expediteur || '';
     document.getElementById('fAssigne').value = item.assigne || '';
@@ -542,16 +541,25 @@ function closeModal() {
 let passageCount = 0;
 const ORDINALS = ['1er','2e','3e','4e','5e','6e','7e','8e','9e','10e'];
 function addPassage(value = '') {
+  // value format: "YYYY-MM-DDTHH:MM|YYYY-MM-DDTHH:MM" (debut|fin) or single datetime
   passageCount++;
   const n = passageCount;
   const label = ORDINALS[n-1] || (n+'e');
+  const [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   const container = document.getElementById('passagesContainer');
   const div = document.createElement('div');
   div.id = 'passage_' + n;
-  div.style.cssText = 'display:flex;align-items:center;gap:10px;';
-  div.innerHTML = `<label style="font-size:12px;font-weight:500;color:var(--text-mid);white-space:nowrap;min-width:80px;">${label} passage</label>
-    <input class="form-input" type="datetime-local" id="fDate${n}" value="${value}" style="flex:1;">
-    <button type="button" onclick="removePassage(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
+  div.style.cssText = 'display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:8px;align-items:center;';
+  div.innerHTML = `<label style="font-size:12px;font-weight:500;color:var(--text-mid);white-space:nowrap;">${label} passage</label>
+    <div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div>
+      <input class="form-input" type="datetime-local" id="fDateDebut${n}" value="${debut}" style="width:100%;">
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div>
+      <input class="form-input" type="datetime-local" id="fDateFin${n}" value="${fin}" style="width:100%;">
+    </div>
+    <button type="button" onclick="removePassage(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;margin-top:16px;">×</button>`;
   container.appendChild(div);
 }
 function removePassage(n) {
@@ -560,9 +568,13 @@ function removePassage(n) {
 }
 function getPassageDates() {
   const dates = [];
-  document.querySelectorAll('#passagesContainer input[type=datetime-local]').forEach(inp => {
-    dates.push(inp.value);
-  });
+  let n = 1;
+  while (document.getElementById('fDateDebut' + n)) {
+    const debut = document.getElementById('fDateDebut' + n).value;
+    const fin = document.getElementById('fDateFin' + n)?.value || '';
+    if (debut || fin) dates.push(debut + '|' + fin);
+    n++;
+  }
   return dates;
 }
 function resetForm() {
@@ -650,6 +662,30 @@ async function deleteIntervention(id) {
 }
 
 // ── RENDER ──
+function fmtPassage(val) {
+  if (!val) return '—';
+  const [debut, fin] = val.includes('|') ? val.split('|') : [val, ''];
+  const d = debut ? fmtDate(debut) : '—';
+  const f = fin ? fmtDate(fin) : '';
+  return f ? d + ' → ' + f : d;
+}
+
+function passagesDropdown(passages) {
+  if (!passages || !passages.filter(Boolean).length) return '<span style="color:var(--text-muted)">—</span>';
+  const valid = passages.filter(Boolean);
+  const first = fmtPassage(valid[0]);
+  if (valid.length === 1) return `<span style="font-size:12px;white-space:nowrap;">${first}</span>`;
+  const opts = valid.map((p,i) => `<option>${ORDINALS[i]||i+1+'e'} : ${fmtPassage(p)}</option>`).join('');
+  return `<select style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--bg);color:var(--text-mid);cursor:pointer;max-width:200px;" onclick="event.stopPropagation()">
+    <option>${valid.length} passage${valid.length>1?'s':''} ▾</option>${opts}</select>`;
+}
+
+function textPreview(text) {
+  if (!text) return '<span style="color:var(--text-muted)">—</span>';
+  const short = text.length > 40 ? text.substring(0, 40) + '…' : text;
+  return `<span style="font-size:12px;color:var(--text-mid);cursor:help;max-width:160px;display:inline-block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;" title="${text.replace(/"/g,'&quot;')}">${short}</span>`;
+}
+
 function assigneBadge(nom) {
   const tech = (window._techniciens||[]).find(t=>t.nom===nom);
   const color = tech?.color || '#8FA4B8';
@@ -689,7 +725,7 @@ function renderTable(list) {
   body.innerHTML = list.map(item => `
     <tr>
       <td class="client-cell">${item.client||'—'}</td>
-      <td><span class="chip ${item.chorus==='Oui'?'chip-chorus-yes':'chip-chorus-no'}">${item.chorus||'Non'}</span></td>
+      <td>${item.chorus ? `<span class="chip ${item.chorus==='Oui'?'chip-chorus-yes':'chip-chorus-no'}">${item.chorus}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
       <td style="white-space:nowrap;">${fmtDate(item.dateEmission)}</td>
       <td style="font-family:monospace;font-size:12px;">${item.pl||'—'}</td>
       <td>${pdfBtn(item.plUrl,'PL')}</td>
@@ -697,15 +733,13 @@ function renderTable(list) {
       <td>${pdfBtn(item.bcUrl,'BC')}</td>
       <td>${item.expediteur||'—'}</td>
       <td>${item.nature||'—'}</td>
-      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.observations||''}">${item.observations||'—'}</td>
+      <td>${textPreview(item.observations)}</td>
       <td style="min-width:220px;white-space:nowrap;" title="${item.adresse||''}">${item.adresse||'—'}</td>
       <td>${item.coordonnees||'—'}</td>
       <td>${item.assigne ? assigneBadge(item.assigne) : '—'}</td>
-      <td style="white-space:nowrap;">${(item.passages||[item.date1]).filter(Boolean).map(d=>fmtDate(d)).join(', ')||'—'}</td>
-      <td style="white-space:nowrap;">${fmtDate((item.passages||[])[1]||item.date2)}</td>
-      <td style="white-space:nowrap;">${fmtDate((item.passages||[])[2]||item.date3)}</td>
+      <td colspan="3">${passagesDropdown(item.passages||[])}</td>
       <td>${statutChip(item.statut)}</td>
-      <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.notes||''}">${item.notes||'—'}</td>
+      <td>${textPreview(item.notes)}</td>
       <td style="text-align:right;white-space:nowrap;">
         <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
         <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
