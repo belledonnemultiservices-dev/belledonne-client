@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suivi interventions — Belledonne</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
+    --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
+    --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
+    --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
+    --sidebar-w:240px;--radius:14px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+  /* ── SIDEBAR ── */
+  .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .logo-wrap{padding:20px 16px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);}
+  .sidebar-client{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:12px 14px;}
+  .client-label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);margin-bottom:2px;}
+  .client-name{font-size:13px;font-weight:600;color:#fff;}
+  .client-contract{font-size:11px;color:var(--green);margin-top:2px;}
+  .sidebar-nav{flex:1;padding:16px 12px;overflow-y:auto;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:8px 4px 6px;margin-top:8px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:#fff;}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;}
+  .sidebar-footer{padding:12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--navy-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--green);flex-shrink:0;}
+  .footer-name{font-size:13px;font-weight:500;color:#fff;}
+  .footer-role{font-size:11px;color:rgba(255,255,255,0.4);}
+  /* ── MAIN ── */
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
+  .content{padding:28px 32px;flex:1;}
+  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:14px;color:var(--text-muted);}
+  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
+  .btn-primary:hover{background:var(--navy-mid);}
+  /* ── FILTERS ── */
+  .filters-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+  .search-wrap{position:relative;flex:1;min-width:220px;}
+  .search-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
+  .search-input{width:100%;height:42px;padding:0 14px 0 40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .search-input:focus{border-color:var(--green);}
+  .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
+  .results-count{font-size:13px;color:var(--text-muted);white-space:nowrap;margin-left:auto;}
+  /* ── TABLE ── */
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;}
+  .suivi-table{width:100%;border-collapse:collapse;min-width:1400px;}
+  .suivi-table thead th{padding:11px 14px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;}
+  .suivi-table tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+  .suivi-table tbody tr:last-child{border-bottom:none;}
+  .suivi-table tbody tr:hover{background:var(--bg);}
+  .suivi-table td{padding:12px 14px;font-size:13px;color:var(--text-mid);vertical-align:middle;}
+  .suivi-table td.client-cell{font-weight:600;color:var(--text);}
+  .chip{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap;}
+  .chip-chorus-yes{background:#E8F9F2;color:#1DA870;}
+  .chip-chorus-no{background:#F2F5F8;color:#8FA4B8;}
+  .chip-statut-new{background:#EBF0F5;color:#1A5F8A;}
+  .chip-statut-progress{background:#FEF3CD;color:#996600;}
+  .chip-statut-done{background:#E8F9F2;color:#1DA870;}
+  .chip-statut-cancel{background:#FDECEA;color:#E74C3C;}
+  .pdf-link{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--green-dark);text-decoration:none;background:var(--green-pale);padding:4px 10px;border-radius:6px;white-space:nowrap;}
+  .pdf-link:hover{background:#D0F3E7;}
+  .pdf-link svg{width:11px;height:11px;flex-shrink:0;}
+  .btn-row-edit{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1A2E42;background:#EBF0F5;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+  .btn-row-del{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+  .empty-state svg{width:40px;height:40px;opacity:0.3;margin-bottom:12px;}
+  /* ── MODAL ── */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border-radius:var(--radius);width:820px;max-width:100%;box-shadow:0 24px 60px rgba(13,27,42,0.2);margin:auto;}
+  .modal-header{padding:22px 28px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;border-radius:var(--radius) var(--radius) 0 0;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
+  .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-mid);display:flex;align-items:center;justify-content:center;}
+  .modal-body{padding:24px 28px;}
+  .modal-footer{padding:16px 28px 24px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);}
+  .form-section{margin-bottom:24px;}
+  .form-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  .form-full{grid-column:1/-1;}
+  .form-group{display:flex;flex-direction:column;gap:5px;}
+  .form-label{font-size:12px;font-weight:500;color:var(--text-mid);}
+  .form-label .opt{font-weight:400;color:var(--text-muted);font-size:11px;}
+  .form-input,.form-select,.form-textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--green);background:#fff;}
+  .form-textarea{min-height:80px;resize:vertical;line-height:1.6;}
+  /* ── DROP ZONE ── */
+  .drop-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--bg);position:relative;}
+  .drop-zone:hover,.drop-zone.drag-over{border-color:var(--green);background:var(--green-pale);}
+  .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .drop-zone-icon{width:28px;height:28px;margin:0 auto 8px;color:var(--text-muted);}
+  .drop-zone-text{font-size:12px;color:var(--text-muted);}
+  .drop-zone-chosen{font-size:12px;font-weight:600;color:var(--green-dark);margin-top:6px;display:none;}
+  .drop-zone-preview{display:none;margin-top:10px;}
+  .drop-zone-preview button{font-size:11px;font-weight:500;color:var(--green-dark);background:var(--green-pale);border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+  /* ── PDF VIEWER ── */
+  .pdf-viewer-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.7);z-index:500;align-items:center;justify-content:center;}
+  .pdf-viewer-overlay.open{display:flex;}
+  .pdf-viewer-box{background:#2a2a2a;border-radius:var(--radius);width:90vw;max-width:900px;height:85vh;display:flex;flex-direction:column;overflow:hidden;}
+  .pdf-viewer-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.1);}
+  .pdf-viewer-title{font-size:13px;font-weight:500;color:#fff;}
+  .pdf-viewer-close{width:30px;height:30px;border:none;background:rgba(255,255,255,0.1);border-radius:6px;cursor:pointer;color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;}
+  .pdf-viewer-frame{flex:1;width:100%;border:none;}
+  /* ── BTN SAVE ── */
+  .btn-save{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 24px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
+  .btn-save:hover{background:var(--navy-mid);}
+  .btn-cancel{height:42px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  /* ── TOAST ── */
+  #toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;z-index:999;opacity:0;transform:translateY(10px);transition:all 0.3s;pointer-events:none;}
+  #toast.show{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo-wrap">
+    <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+    <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+  </div>
+  <div class="sidebar-client">
+    <div class="client-label">Client</div>
+    <div class="client-name" id="sideClientName">—</div>
+    <div class="client-contract" id="sideClientId"></div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
+    <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
+    <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+    <a class="nav-item" href="admin.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+    <a class="nav-item" href="contacts.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+    <a class="nav-item active" href="suivi.html" style="color:rgba(245,166,35,0.8);background:rgba(245,166,35,0.15);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><span>Suivi interventions</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar" id="sideAvatar">—</div>
+      <div><div class="footer-name" id="sideFooterName">—</div><div class="footer-role" id="sideFooterRole">Administrateur</div></div>
+    </div>
+    <button onclick="handleLogout()" style="width:100%;margin-top:8px;padding:8px 12px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(231,76,60,0.15)';this.style.color='#E74C3C'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.5)'">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Se déconnecter
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Administration</span><span>›</span><span>Suivi interventions</span></div>
+    <div class="date-chip" id="dateChip"></div>
+  </header>
+
+  <div class="content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Suivi des interventions</div>
+        <div class="page-sub">Tableau de bord opérationnel — gestion des dossiers et bons de commande</div>
+      </div>
+      <button class="btn-primary" id="btnAjouter" onclick="openModal()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Nouvelle intervention
+      </button>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filters-bar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input class="search-input" id="searchInput" placeholder="Rechercher client, BC, PL, adresse..." oninput="filterTable()">
+      </div>
+      <select class="filter-select" id="filterStatut" onchange="filterTable()">
+        <option value="">Tous les statuts</option>
+        <option value="Nouveau">Nouveau</option>
+        <option value="En cours">En cours</option>
+        <option value="Terminé">Terminé</option>
+        <option value="Annulé">Annulé</option>
+      </select>
+      <select class="filter-select" id="filterChorus" onchange="filterTable()">
+        <option value="">Chorus : tous</option>
+        <option value="Oui">Chorus requis</option>
+        <option value="Non">Sans Chorus</option>
+      </select>
+      <span class="results-count" id="resultsCount"></span>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap">
+      <table class="suivi-table">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Chorus</th>
+            <th>Émission</th>
+            <th>N° Affaire (PL)</th>
+            <th>PDF Affaire</th>
+            <th>BC</th>
+            <th>PDF BC</th>
+            <th>Expéditeur</th>
+            <th>Nature mission</th>
+            <th>Adresse</th>
+            <th>Coordonnées</th>
+            <th>Assigné</th>
+            <th>1er passage</th>
+            <th>2e passage</th>
+            <th>3e passage</th>
+            <th>Statut</th>
+            <th>Notes</th>
+            <th>Observations</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="19"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention enregistrée.</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AJOUT / ÉDITION -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Nouvelle intervention</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- SECTION 1 : IDENTIFICATION -->
+      <div class="form-section">
+        <div class="form-section-title">Identification du dossier</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Client <span style="color:#E74C3C">*</span></label>
+            <input class="form-input" id="fClient" placeholder="ex: Le-Toit-Forzien">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Service Chorus obligatoire <span style="color:#E74C3C">*</span></label>
+            <select class="form-select" id="fChorus">
+              <option value="Non">Non</option>
+              <option value="Oui">Oui</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date d'émission</label>
+            <input class="form-input" type="date" id="fDateEmission">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Expéditeur</label>
+            <input class="form-input" id="fExpediteur" placeholder="ex: OPAC38">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Assigné à</label>
+            <input class="form-input" id="fAssigne" placeholder="ex: Technicien Dupont">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Statut</label>
+            <select class="form-select" id="fStatut">
+              <option value="Nouveau">Nouveau</option>
+              <option value="En cours">En cours</option>
+              <option value="Terminé">Terminé</option>
+              <option value="Annulé">Annulé</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2 : AFFAIRE PL -->
+      <div class="form-section">
+        <div class="form-section-title">Affaire PL <span style="font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;">(optionnel)</span></div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Numéro d'affaire (PL) <span class="opt">— optionnel</span></label>
+            <input class="form-input" id="fPL" placeholder="ex: PL/521576">
+          </div>
+          <div class="form-group">
+            <label class="form-label">PDF Affaire PL <span class="opt">— optionnel</span></label>
+            <div class="drop-zone" id="dropPL" ondragover="dragOver(event,'dropPL')" ondragleave="dragLeave('dropPL')" ondrop="dropFile(event,'dropPL','filePL','chosenPL','previewPL')">
+              <input type="file" id="filePL" accept=".pdf" onchange="fileChosen('filePL','chosenPL','previewPL')">
+              <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
+              <div class="drop-zone-text">Glisser le PDF ici ou cliquer</div>
+              <div class="drop-zone-chosen" id="chosenPL"></div>
+              <div class="drop-zone-preview" id="previewPL"><button type="button" onclick="openPdfViewer('filePL')">👁 Aperçu PDF</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3 : BON DE COMMANDE -->
+      <div class="form-section">
+        <div class="form-section-title">Bon de commande (BC)</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Numéro BC</label>
+            <input class="form-input" id="fBC" placeholder="ex: BC/314292">
+          </div>
+          <div class="form-group">
+            <label class="form-label">PDF Bon de commande</label>
+            <div class="drop-zone" id="dropBC" ondragover="dragOver(event,'dropBC')" ondragleave="dragLeave('dropBC')" ondrop="dropFile(event,'dropBC','fileBC','chosenBC','previewBC')">
+              <input type="file" id="fileBC" accept=".pdf" onchange="fileChosen('fileBC','chosenBC','previewBC')">
+              <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
+              <div class="drop-zone-text">Glisser le PDF ici ou cliquer</div>
+              <div class="drop-zone-chosen" id="chosenBC"></div>
+              <div class="drop-zone-preview" id="previewBC"><button type="button" onclick="openPdfViewer('fileBC')">👁 Aperçu PDF</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 4 : MISSION -->
+      <div class="form-section">
+        <div class="form-section-title">Mission & localisation</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Nature de la mission</label>
+            <input class="form-input" id="fNature" placeholder="ex: Traitement blattes">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Coordonnées du client</label>
+            <input class="form-input" id="fCoordonnees" placeholder="ex: 04 76 00 00 00">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Adresse</label>
+            <input class="form-input" id="fAdresse" placeholder="ex: 6 Rue Marius Riollet 38100 Grenoble">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Observations</label>
+            <textarea class="form-textarea" id="fObservations" placeholder="Détails, contexte, contraintes..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 5 : PASSAGES -->
+      <div class="form-section">
+        <div class="form-section-title">Dates de passage <span style="font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;">(renseignées au fur et à mesure)</span></div>
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label class="form-label">1er passage <span class="opt">— optionnel</span></label>
+            <input class="form-input" type="date" id="fDate1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">2e passage <span class="opt">— optionnel</span></label>
+            <input class="form-input" type="date" id="fDate2">
+          </div>
+          <div class="form-group">
+            <label class="form-label">3e passage <span class="opt">— optionnel</span></label>
+            <input class="form-input" type="date" id="fDate3">
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 6 : NOTES -->
+      <div class="form-section" style="margin-bottom:0;">
+        <div class="form-section-title">Notes internes</div>
+        <div class="form-group">
+          <textarea class="form-textarea" id="fNotes" placeholder="Notes internes, suivi, rappels..."></textarea>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-save" id="btnSave" onclick="saveIntervention()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF VIEWER -->
+<div class="pdf-viewer-overlay" id="pdfViewer">
+  <div class="pdf-viewer-box">
+    <div class="pdf-viewer-header">
+      <div class="pdf-viewer-title" id="pdfViewerTitle">Aperçu PDF</div>
+      <button class="pdf-viewer-close" onclick="closePdfViewer()">✕</button>
+    </div>
+    <iframe class="pdf-viewer-frame" id="pdfViewerFrame"></iframe>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"><span id="toastMsg"></span></div>
+
+<script>
+// ── DATE CHIP ──
+document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+// ── STATE ──
+let interventions = [];
+let editId = null;
+let pdfBlobUrls = {}; // store blob URLs for preview
+
+// ── DROP ZONE ──
+function dragOver(e, zoneId) {
+  e.preventDefault();
+  document.getElementById(zoneId).classList.add('drag-over');
+}
+function dragLeave(zoneId) {
+  document.getElementById(zoneId).classList.remove('drag-over');
+}
+function dropFile(e, zoneId, fileInputId, chosenId, previewId) {
+  e.preventDefault();
+  document.getElementById(zoneId).classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file || file.type !== 'application/pdf') { alert('Fichier PDF uniquement.'); return; }
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  document.getElementById(fileInputId).files = dt.files;
+  fileChosen(fileInputId, chosenId, previewId);
+}
+function fileChosen(fileInputId, chosenId, previewId) {
+  const input = document.getElementById(fileInputId);
+  const chosen = document.getElementById(chosenId);
+  const preview = document.getElementById(previewId);
+  if (!input.files[0]) return;
+  chosen.textContent = '✓ ' + input.files[0].name;
+  chosen.style.display = 'block';
+  preview.style.display = 'block';
+  // Revoke old blob URL if exists
+  if (pdfBlobUrls[fileInputId]) URL.revokeObjectURL(pdfBlobUrls[fileInputId]);
+  pdfBlobUrls[fileInputId] = URL.createObjectURL(input.files[0]);
+}
+
+// ── PDF VIEWER ──
+function openPdfViewer(fileInputId) {
+  const url = pdfBlobUrls[fileInputId];
+  if (!url) return;
+  const input = document.getElementById(fileInputId);
+  document.getElementById('pdfViewerTitle').textContent = input.files[0]?.name || 'Aperçu PDF';
+  document.getElementById('pdfViewerFrame').src = url;
+  document.getElementById('pdfViewer').classList.add('open');
+}
+function closePdfViewer() {
+  document.getElementById('pdfViewer').classList.remove('open');
+  document.getElementById('pdfViewerFrame').src = '';
+}
+
+// ── MODAL ──
+function openModal(id = null) {
+  editId = id;
+  document.getElementById('modalTitle').textContent = id ? 'Modifier l\'intervention' : 'Nouvelle intervention';
+  document.getElementById('btnSave').textContent = id ? 'Mettre à jour' : 'Enregistrer';
+  resetForm();
+  if (id) {
+    const item = interventions.find(i => i.id === id);
+    if (!item) return;
+    document.getElementById('fClient').value = item.client || '';
+    document.getElementById('fChorus').value = item.chorus || 'Non';
+    document.getElementById('fDateEmission').value = item.dateEmission || '';
+    document.getElementById('fExpediteur').value = item.expediteur || '';
+    document.getElementById('fAssigne').value = item.assigne || '';
+    document.getElementById('fStatut').value = item.statut || 'Nouveau';
+    document.getElementById('fPL').value = item.pl || '';
+    document.getElementById('fBC').value = item.bc || '';
+    document.getElementById('fNature').value = item.nature || '';
+    document.getElementById('fCoordonnees').value = item.coordonnees || '';
+    document.getElementById('fAdresse').value = item.adresse || '';
+    document.getElementById('fObservations').value = item.observations || '';
+    document.getElementById('fDate1').value = item.date1 || '';
+    document.getElementById('fDate2').value = item.date2 || '';
+    document.getElementById('fDate3').value = item.date3 || '';
+    document.getElementById('fNotes').value = item.notes || '';
+    // Show existing PDF links if any
+    if (item.plUrl) { const c = document.getElementById('chosenPL'); c.textContent = '✓ Fichier existant'; c.style.display = 'block'; }
+    if (item.bcUrl) { const c = document.getElementById('chosenBC'); c.textContent = '✓ Fichier existant'; c.style.display = 'block'; }
+  }
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  resetForm();
+  editId = null;
+}
+function resetForm() {
+  ['fClient','fDateEmission','fExpediteur','fAssigne','fPL','fBC','fNature','fCoordonnees','fAdresse','fObservations','fDate1','fDate2','fDate3','fNotes'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('fChorus').value = 'Non';
+  document.getElementById('fStatut').value = 'Nouveau';
+  ['chosenPL','chosenBC'].forEach(id => { const el = document.getElementById(id); if(el) { el.textContent=''; el.style.display='none'; }});
+  ['previewPL','previewBC'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
+  ['filePL','fileBC'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+}
+
+// ── SAVE ──
+async function saveIntervention() {
+  const client = document.getElementById('fClient').value.trim();
+  if (!client) { alert('Le champ Client est obligatoire.'); return; }
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+
+  try {
+    let plUrl = editId ? (interventions.find(i=>i.id===editId)?.plUrl || '') : '';
+    let bcUrl = editId ? (interventions.find(i=>i.id===editId)?.bcUrl || '') : '';
+
+    // Upload PDFs to Firebase Storage
+    const filePL = document.getElementById('filePL').files[0];
+    const fileBC = document.getElementById('fileBC').files[0];
+    if (filePL) plUrl = await window._uploadPdf(filePL, `suivi/pl/${Date.now()}_${filePL.name}`);
+    if (fileBC) bcUrl = await window._uploadPdf(fileBC, `suivi/bc/${Date.now()}_${fileBC.name}`);
+
+    const data = {
+      client, chorus: document.getElementById('fChorus').value,
+      dateEmission: document.getElementById('fDateEmission').value,
+      expediteur: document.getElementById('fExpediteur').value.trim(),
+      assigne: document.getElementById('fAssigne').value.trim(),
+      statut: document.getElementById('fStatut').value,
+      pl: document.getElementById('fPL').value.trim(),
+      plUrl,
+      bc: document.getElementById('fBC').value.trim(),
+      bcUrl,
+      nature: document.getElementById('fNature').value.trim(),
+      coordonnees: document.getElementById('fCoordonnees').value.trim(),
+      adresse: document.getElementById('fAdresse').value.trim(),
+      observations: document.getElementById('fObservations').value.trim(),
+      date1: document.getElementById('fDate1').value,
+      date2: document.getElementById('fDate2').value,
+      date3: document.getElementById('fDate3').value,
+      notes: document.getElementById('fNotes').value.trim(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (editId) {
+      await window._updateSuivi(editId, data);
+      const idx = interventions.findIndex(i=>i.id===editId);
+      if (idx !== -1) interventions[idx] = {...interventions[idx], ...data};
+    } else {
+      data.createdAt = new Date().toISOString();
+      const id = await window._addSuivi(data);
+      interventions.unshift({id, ...data});
+    }
+
+    closeModal();
+    renderTable(interventions);
+    showToast(editId ? 'Intervention mise à jour !' : 'Intervention enregistrée !');
+  } catch(e) {
+    console.error(e);
+    alert('Erreur lors de l\'enregistrement : ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editId ? 'Mettre à jour' : 'Enregistrer';
+  }
+}
+
+// ── DELETE ──
+async function deleteIntervention(id) {
+  if (!confirm('Supprimer cette intervention ?')) return;
+  try {
+    await window._deleteSuivi(id);
+    interventions = interventions.filter(i=>i.id!==id);
+    renderTable(interventions);
+    showToast('Intervention supprimée.');
+  } catch(e) { alert('Erreur: ' + e.message); }
+}
+
+// ── RENDER ──
+function fmtDate(d) {
+  if (!d) return '—';
+  const [y,m,day] = d.split('-');
+  return `${parseInt(day)}/${parseInt(m)}/${y}`;
+}
+function statutChip(s) {
+  const map = {'Nouveau':'chip-statut-new','En cours':'chip-statut-progress','Terminé':'chip-statut-done','Annulé':'chip-statut-cancel'};
+  return `<span class="chip ${map[s]||'chip-statut-new'}">${s||'Nouveau'}</span>`;
+}
+function pdfBtn(url, label) {
+  if (!url) return '<span style="color:var(--text-muted);font-size:12px;">—</span>';
+  return `<a href="${url}" target="_blank" class="pdf-link"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>${label}</a>`;
+}
+
+function renderTable(list) {
+  const body = document.getElementById('tableBody');
+  document.getElementById('resultsCount').textContent = list.length + ' intervention' + (list.length!==1?'s':'');
+  if (!list.length) {
+    body.innerHTML = `<tr><td colspan="19"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention trouvée.</p></div></td></tr>`;
+    return;
+  }
+  body.innerHTML = list.map(item => `
+    <tr>
+      <td class="client-cell">${item.client||'—'}</td>
+      <td><span class="chip ${item.chorus==='Oui'?'chip-chorus-yes':'chip-chorus-no'}">${item.chorus||'Non'}</span></td>
+      <td style="white-space:nowrap;">${fmtDate(item.dateEmission)}</td>
+      <td style="font-family:monospace;font-size:12px;">${item.pl||'—'}</td>
+      <td>${pdfBtn(item.plUrl,'PL')}</td>
+      <td style="font-family:monospace;font-size:12px;">${item.bc||'—'}</td>
+      <td>${pdfBtn(item.bcUrl,'BC')}</td>
+      <td>${item.expediteur||'—'}</td>
+      <td>${item.nature||'—'}</td>
+      <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.adresse||''}">${item.adresse||'—'}</td>
+      <td>${item.coordonnees||'—'}</td>
+      <td>${item.assigne||'—'}</td>
+      <td style="white-space:nowrap;">${fmtDate(item.date1)}</td>
+      <td style="white-space:nowrap;">${fmtDate(item.date2)}</td>
+      <td style="white-space:nowrap;">${fmtDate(item.date3)}</td>
+      <td>${statutChip(item.statut)}</td>
+      <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.notes||''}">${item.notes||'—'}</td>
+      <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${item.observations||''}">${item.observations||'—'}</td>
+      <td style="text-align:right;white-space:nowrap;">
+        <button class="btn-row-edit" onclick="openModal('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
+        <button class="btn-row-del" onclick="deleteIntervention('${item.id}')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>
+      </td>
+    </tr>`).join('');
+}
+
+// ── FILTER ──
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const statut = document.getElementById('filterStatut').value;
+  const chorus = document.getElementById('filterChorus').value;
+  const filtered = interventions.filter(i => {
+    const mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,i.assigne].some(v => (v||'').toLowerCase().includes(q));
+    const ms = !statut || i.statut === statut;
+    const mc = !chorus || i.chorus === chorus;
+    return mq && ms && mc;
+  });
+  renderTable(filtered);
+}
+
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// Close modal on overlay click
+document.getElementById('modal').addEventListener('click', e => { if(e.target===document.getElementById('modal')) closeModal(); });
+document.getElementById('pdfViewer').addEventListener('click', e => { if(e.target===document.getElementById('pdfViewer')) closePdfViewer(); });
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
+
+// ── FIREBASE HELPERS ──
+window._uploadPdf = async function(file, path) {
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file);
+  return await getDownloadURL(storageRef);
+};
+window._addSuivi = async function(data) {
+  const ref2 = await addDoc(collection(db, 'suivi'), data);
+  return ref2.id;
+};
+window._updateSuivi = async function(id, data) {
+  await updateDoc(doc(db, 'suivi', id), data);
+};
+window._deleteSuivi = async function(id) {
+  await deleteDoc(doc(db, 'suivi', id));
+};
+
+// ── AUTH ──
+window.handleLogout = async function() { await signOut(auth); window.location.href='login.html'; };
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href='login.html'; return; }
+
+  // Check admin
+  const snapU = await getDocs(query(collection(db,'users')));
+  const profile = snapU.docs.map(d=>d.data()).find(p=>p.uid===user.uid) || {};
+  if (profile.role !== 'admin' && profile.role !== 'administrateur') {
+    window.location.href='dashboard.html'; return;
+  }
+
+  // Sidebar
+  const name = document.getElementById('sideClientName');
+  const sid  = document.getElementById('sideClientId');
+  const av   = document.getElementById('sideAvatar');
+  const fn   = document.getElementById('sideFooterName');
+  if(name) name.textContent = profile.client || 'Belledonne Multiservices';
+  if(sid)  sid.textContent  = 'belledonne-admin';
+  if(av)   av.textContent   = 'BM';
+  if(fn)   fn.textContent   = profile.client || user.email;
+
+  // Load data
+  const snap = await getDocs(query(collection(db,'suivi'), orderBy('createdAt','desc')));
+  interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderTable(interventions);
+});
+</script>
+</body>
+</html>
