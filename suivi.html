@@ -745,7 +745,7 @@ function pdfBtn(url, label) {
   return `<a href="${url}" target="_blank" class="pdf-link"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>${label}</a>`;
 }
 
-function renderTable(list) {
+window.renderTable = function renderTable(list) {
   const body = document.getElementById('tableBody');
   document.getElementById('resultsCount').textContent = list.length + ' intervention' + (list.length!==1?'s':'');
   if (!list.length) {
@@ -988,7 +988,7 @@ window.sendNotifSuivi = async function() {
       showToast('Email envoyé !');
     } else { throw new Error('Erreur serveur'); }
   } catch(e) {
-    alert('Erreur lors de l'envoi : ' + e.message);
+    alert('Erreur lors de l\'envoi : ' + e.message);
     btn.disabled = false; btn.textContent = 'Envoyer';
   }
 };
@@ -1094,7 +1094,7 @@ onAuthStateChanged(auth, async (user) => {
   const snap = await getDocs(query(collection(db,'suivi'), orderBy('createdAt','desc')));
   interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
   window.interventions = interventions;
-  renderTable(interventions);
+  if(window.renderTable) window.renderTable(interventions);
 });
 
 // ── CONTACTS POUR NOTIF SUIVI ──
