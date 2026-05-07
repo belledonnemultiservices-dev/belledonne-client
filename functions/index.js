@@ -237,26 +237,39 @@ exports.addToCalendar = functions
         if (!debut) continue;
 
         // Si pas de fin, on met 1h par défaut
+        // Les dates arrivent au format "YYYY-MM-DDTHH:MM" (datetime-local, heure locale Paris)
+        // On les traite directement comme heure Europe/Paris via le timeZone du calendrier
         let startDt, endDt;
         try {
-          startDt = new Date(debut).toISOString();
-          endDt = fin ? new Date(fin).toISOString() : new Date(new Date(debut).getTime() + 3600000).toISOString();
+          // Ajouter ":00" si secondes manquantes pour compatibilité
+          const debutStr = debut.length === 16 ? debut + ":00" : debut;
+          const finStr = fin ? (fin.length === 16 ? fin + ":00" : fin) : "";
+          startDt = debutStr; // On passe la date telle quelle, Google Calendar respecte timeZone
+          endDt = finStr || (() => {
+            // +1h : calculer manuellement sur la chaîne
+            const d = new Date(debutStr);
+            d.setHours(d.getHours() + 1);
+            const pad = n => String(n).padStart(2,'0');
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+          })();
         } catch(e) {
           errors.push({ passage, error: "Format date invalide" });
           continue;
         }
 
         // Construction de la description de l'événement
+        const tels = Array.isArray(req.body.tels) ? req.body.tels : [];
         const description = [
           bc ? `N° BC : ${bc}` : "",
           nature ? `Nature : ${nature}` : "",
           nomClient ? `Client : ${nomClient}` : "",
+          tels.length ? `Téléphone(s) : ${tels.join(" / ")}` : "",
+          adresse ? `Adresse : ${adresse}` : "",
           observations ? `Observations : ${observations}` : "",
-          interventionId ? `Ref intervention : ${interventionId}` : "",
         ].filter(Boolean).join("\n");
 
         const event = {
-          summary: `[BMS] ${nature || "Intervention"} — ${nomClient || "Client"}`,
+          summary: `${nature || "Intervention"} — ${nomClient || "Client"}`,
           location: adresse || "",
           description,
           start: { dateTime: startDt, timeZone: "Europe/Paris" },
