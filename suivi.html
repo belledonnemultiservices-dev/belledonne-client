@@ -951,23 +951,15 @@ window.renderTable = function renderTable(list) {
 let _currentNotifTab = 'bailleur';
 function switchNotifTab(tab) {
   _currentNotifTab = tab;
-  ['bailleur','locataire','sms'].forEach(t => {
+  ['bailleur','locataire','sms','rappel'].forEach(t => {
     const panel = document.getElementById('nsPanel' + t.charAt(0).toUpperCase() + t.slice(1));
     const btn = document.getElementById('nsTab' + t.charAt(0).toUpperCase() + t.slice(1));
     if (panel) panel.style.display = t === tab ? '' : 'none';
     if (btn) { btn.style.background = t === tab ? 'var(--navy)' : 'var(--bg)'; btn.style.color = t === tab ? '#fff' : 'var(--text-mid)'; }
   });
-  // Load protocoles when switching to locataire
   if (tab === 'locataire' && window._loadProtocolesForClient) {
     window._loadProtocolesForClient(window._nsCurrentClient || '');
   }
-  // Populate rappel panel when switching to rappel
-  if (tab === 'rappel') { populateRappelPanel(); }
-  // Load protocoles when switching to locataire
-  if (tab === 'locataire' && window._loadProtocolesForClient) {
-    window._loadProtocolesForClient(window._nsCurrentClient || '');
-  }
-  // Populate rappel panel when switching to rappel
   if (tab === 'rappel') { populateRappelPanel(); }
 }
 
