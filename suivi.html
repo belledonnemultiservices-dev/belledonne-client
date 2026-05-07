@@ -921,6 +921,14 @@ function switchNotifTab(tab) {
     if (panel) panel.style.display = t === tab ? '' : 'none';
     if (btn) { btn.style.background = t === tab ? 'var(--navy)' : 'var(--bg)'; btn.style.color = t === tab ? '#fff' : 'var(--text-mid)'; }
   });
+  // Load protocoles when switching to locataire
+  if (tab === 'locataire' && window._loadProtocolesForClient) {
+    window._loadProtocolesForClient(window._nsCurrentClient || '');
+  }
+  // Load protocoles when switching to locataire
+  if (tab === 'locataire' && window._loadProtocolesForClient) {
+    window._loadProtocolesForClient(window._nsCurrentClient || '');
+  }
 }
 
 // ── TÉLÉPHONES DYNAMIQUES ──
@@ -944,7 +952,9 @@ function removePhone(n) {
 // ── NOTIFICATION SUIVI RDV ──
 window.openNotifFromRow = function(id) {
   window._nsCurrentItemId = id;
+  window._nsCurrentClient = '';
   const item = (window.interventions||[]).find(i => i.id === id);
+  if (item) window._nsCurrentClient = item.client || '';
   if (!item) return;
   window._notifRowItem = item;
   openNotifFromItem(item);
@@ -1004,6 +1014,7 @@ Belledonne Multiservices
 window.openNotifSuivi = async function() {
   window._nsCurrentItemId = editId;
   const client = document.getElementById('fClient')?.value;
+  window._nsCurrentClient = client;
   if (!client) { alert('Sélectionnez un client.'); return; }
 
   // Build passages string from form
@@ -1102,7 +1113,9 @@ function toggleNotifRow(id) {
 
 window.openRappelSms = async function(id) {
   window._nsCurrentItemId = id;
+  window._nsCurrentClient = '';
   const item = (window.interventions||[]).find(i => i.id === id);
+  if (item) window._nsCurrentClient = item.client || '';
   if (!item) return;
   const passages = (item.passages||[]).filter(Boolean);
   const passLignes = passages.map((p,i) => {
@@ -1239,6 +1252,9 @@ function updateSmsCount() {
 }
 
 function populateLocataireTab(nom, email, passagesStr, adresse, bc, pl, nature) {
+  // Load protocoles for this client
+  window._nsCurrentClient = window._nsCurrentClient || '';
+  if (window._loadProtocolesForClient) window._loadProtocolesForClient(window._nsCurrentClient || '');
   window._nsLocataireEmail = email;
   const tplLoc = window._suiviRdvLocataireTemplate || {};
   const subjectLoc = (tplLoc.subject || 'Confirmation de votre rendez-vous')
@@ -1274,13 +1290,20 @@ window.sendNotifSuivi = async function() {
   const subject = document.getElementById(subjectId).value.trim();
   const body = document.getElementById(bodyId).value.trim();
   if (!subject || !body) { alert('Objet et message requis.'); return; }
+  // Collect selected PJ (locataire only)
+  const attachments = [];
+  if (isLoc) {
+    document.querySelectorAll('#nsPjList input[type=checkbox]:checked').forEach(cb => {
+      attachments.push({ url: cb.dataset.url, filename: cb.dataset.name });
+    });
+  }
   const btn = document.getElementById('nsBtnSend');
   btn.disabled = true; btn.textContent = 'Envoi...';
   try {
     const resp = await fetch(window.FUNCTION_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({to, subject, body, attachments: []})
+      body: JSON.stringify({to, subject, body, attachments})
     });
     if (resp.ok) {
       document.getElementById('nsSuccess').style.display = 'block';
@@ -1432,6 +1455,37 @@ window._updateSuiviNotifArray = async function(id, field, ts) {
   } catch(e) { console.warn('notif update:', e); }
 };
 
+// ── PROTOCOLES POUR PJ LOCATAIRE ──
+window._loadProtocolesForClient = async function(client) {
+  const list = document.getElementById('nsPjList');
+  const none = document.getElementById('nsPjNone');
+  if (!list) return;
+  list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Chargement...</div>';
+  try {
+    const snap = await getDocs(collection(db, 'protocoles'));
+    // Filter: protocoles assigned to this client or all clients
+    const protos = snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(p => p.pdfUrl && (!p.client || p.client === client || p.client === '__tous__'));
+    if (!protos.length) {
+      list.innerHTML = '';
+      if (none) none.style.display = 'block';
+      return;
+    }
+    if (none) none.style.display = 'none';
+    list.innerHTML = protos.map(p => {
+      const fname = p.titre ? p.titre.replace(/[^a-zA-Z0-9\-_\.]/g,'_') + '.pdf' : 'protocole.pdf';
+      return '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px;">' +
+        '<input type="checkbox" data-url="' + p.pdfUrl + '" data-name="' + fname + '" style="width:14px;height:14px;">' +
+        '<span style="flex:1;font-weight:500;color:var(--text);">' + (p.titre||'Protocole') + '</span>' +
+        (p.type ? '<span style="font-size:10px;background:#EBF0F5;color:#1A2E42;padding:2px 7px;border-radius:10px;">' + p.type + '</span>' : '') +
+        '</label>';
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="font-size:12px;color:#E74C3C;">Erreur chargement protocoles</div>';
+    console.error(e);
+  }
+};
+
 // ── CONTACTS POUR NOTIF SUIVI ──
 window._loadContactsForSuivi = async function(client, selEl) {
   try {
@@ -1530,6 +1584,11 @@ window._loadTechniciens = loadTechniciens;
         <div style="margin-bottom:16px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
           <input class="form-input" id="nsSubjectLoc" style="width:100%;">
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Pièce jointe <span style="font-weight:400;text-transform:none;color:var(--text-muted);">(optionnel — protocoles du bailleur)</span></div>
+          <div id="nsPjList" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto;"></div>
+          <div id="nsPjNone" style="font-size:12px;color:var(--text-muted);font-style:italic;display:none;">Aucun protocole disponible pour ce client.</div>
         </div>
         <div>
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message <span style="font-weight:400;text-transform:none;">(modifiable)</span></div>
