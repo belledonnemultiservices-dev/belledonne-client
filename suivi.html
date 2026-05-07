@@ -223,19 +223,41 @@
     </div>
 
     <!-- FILTERS -->
-    <div class="filters-bar">
-      <div class="search-wrap">
+    <!-- FILTERS -->
+    <div class="filters-bar" style="flex-wrap:wrap;gap:8px;">
+      <div class="search-wrap" style="min-width:200px;flex:1;">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        <input class="search-input" id="searchInput" placeholder="Rechercher client, BC, PL, adresse..." oninput="filterTable()">
+        <input class="search-input" id="searchInput" placeholder="N° BC, PL, client, adresse..." oninput="filterTable()">
       </div>
+      <select class="filter-select" id="filterClient" onchange="filterTable()">
+        <option value="">Tous les clients</option>
+      </select>
       <select class="filter-select" id="filterStatut" onchange="filterTable()">
         <option value="">Tous les statuts</option>
         <option value="En cours">En cours</option>
         <option value="Terminé">Terminé</option>
         <option value="Annulé">Annulé</option>
       </select>
-
+      <select class="filter-select" id="filterAnnee" onchange="filterTable()">
+        <option value="">Toutes les années</option>
+      </select>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="date" class="filter-select" id="filterDateDe" onchange="filterTable()" style="font-size:12px;" title="Du">
+        <span style="font-size:12px;color:var(--text-muted);">→</span>
+        <input type="date" class="filter-select" id="filterDateA" onchange="filterTable()" style="font-size:12px;" title="Au">
+        <button onclick="clearDates()" style="font-size:11px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:4px;" title="Effacer">✕</button>
+      </div>
       <span class="results-count" id="resultsCount"></span>
+    </div>
+
+    <!-- SELECTION BAR -->
+    <div id="selectionBar" style="display:none;background:#FFF3CD;border:1px solid #FFD700;border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:12px;align-items:center;gap:12px;">
+      <span style="font-size:13px;font-weight:600;color:#664D00;" id="selectionCount">0 sélectionné(s)</span>
+      <button onclick="deleteSelected()" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#E74C3C;background:#FDECEA;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        Supprimer la sélection
+      </button>
+      <button onclick="clearSelection()" style="font-size:12px;color:var(--text-muted);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;">Annuler</button>
     </div>
 
     <!-- TABLE -->
@@ -243,6 +265,7 @@
       <table class="suivi-table">
         <thead>
           <tr>
+            <th style="width:32px;"><input type="checkbox" id="checkAll" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
             <th>Client</th>
             <th>Affaire PL</th>
             <th>Bon de commande</th>
@@ -865,7 +888,9 @@ window.renderTable = function renderTable(list) {
     const rowClass = item.statut==='Annulé' ? 'row-annule' : item.statut==='Terminé' ? 'row-termine' : '';
 
     // Build main row
+    const isChecked = selectedIds ? selectedIds.has(item.id) : false;
     html += '<tr id="row-' + item.id + '" class="' + rowClass + '">';
+    html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
     html += '<td class="client-cell">';
     html += '<div style="display:flex;align-items:center;gap:6px;">';
     html += '<button class="btn-toggle-notif" onclick="toggleNotifRow(\'' + item.id + '\')">🔔' + (totalNotifs > 0 ? ' (' + totalNotifs + ')' : '') + '</button>';
@@ -1453,6 +1478,21 @@ onAuthStateChanged(auth, async (user) => {
   const snap = await getDocs(query(collection(db,'suivi'), orderBy('createdAt','desc')));
   interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
   window.interventions = interventions;
+  // Populate client filter
+  var clientSel = document.getElementById('filterClient');
+  var clients = [...new Set(interventions.map(i=>i.client).filter(Boolean))].sort();
+  clients.forEach(function(cl) {
+    var opt = document.createElement('option'); opt.value=cl; opt.textContent=cl; clientSel.appendChild(opt);
+  });
+  // Populate year filter
+  var yearSel = document.getElementById('filterAnnee');
+  var years = [...new Set(interventions.map(function(i){
+    var d = i.dateEmission || (i.createdAt||'').substring(0,10);
+    return d ? d.substring(0,4) : null;
+  }).filter(Boolean))].sort().reverse();
+  years.forEach(function(y) {
+    var opt = document.createElement('option'); opt.value=y; opt.textContent=y; yearSel.appendChild(opt);
+  });
   if(window.renderTable) window.renderTable(interventions);
 });
 
