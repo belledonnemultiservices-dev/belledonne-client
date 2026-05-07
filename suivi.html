@@ -1556,7 +1556,8 @@ window.populateFilterDropdowns = function populateFilterDropdowns() {
   allYears.forEach(function(y) {
     var opt = document.createElement('option');
     opt.value = y; opt.textContent = y;
-    if (y === currentYear) opt.selected = true;
+    // Only restore previous selection, never auto-select current year
+    if (y === currentYear && currentYear !== '') opt.selected = true;
     yearSel.appendChild(opt);
   });
 };
@@ -1568,7 +1569,9 @@ function filterTable() {
   var annee = (document.getElementById('filterAnnee')||{value:''}).value||'';
   var dateDe = (document.getElementById('filterDateDe')||{value:''}).value||'';
   var dateA = (document.getElementById('filterDateA')||{value:''}).value||'';
-  var filtered = interventions.filter(function(i) {
+  var data = window.interventions || [];
+  if (!data.length) return; // Data not loaded yet
+  var filtered = data.filter(function(i) {
     var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,i.assigne].some(function(v){return (v||'').toLowerCase().includes(q);});
     var ms = !statut || i.statut === statut;
     var mc = !client || i.client === client;
@@ -1582,7 +1585,6 @@ function filterTable() {
     return mq && ms && mc && ma && mde && mda;
   });
   if(window.renderTable) window.renderTable(filtered);
-  else renderTable(filtered);
 }
 window.filterTable = filterTable;
 
