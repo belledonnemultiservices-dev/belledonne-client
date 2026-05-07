@@ -648,64 +648,61 @@ function updateNotifyBtn() {
 }
 
 function openCalendarConfirm() {
-  const assigne = document.getElementById('fAssigne')?.value;
-  const passages = getPassageDates();
+  var assigne = document.getElementById('fAssigne') && document.getElementById('fAssigne').value;
+  var passages = getPassageDates();
   if (!assigne || !passages.length) {
     showToast('Veuillez sélectionner un technicien et ajouter au moins un passage.', true);
     return;
   }
-  const tech = (window._techniciens || []).find(t => t.nomComplet === assigne || t.nom === assigne);
-  const techName = tech ? ((tech.prenom || '') + ' ' + (tech.nom || '')).trim() : assigne;
-  const techEmail = tech?.email || '—';
-
-  const nature = document.getElementById('fNature')?.value || '—';
-  const nomClient = document.getElementById('fNomClient')?.value || document.getElementById('fClient')?.value || '—';
-  const adresse = document.getElementById('fAdresse')?.value || '—';
-  const bc = document.getElementById('fBC')?.value || '';
-  const observations = document.getElementById('fObservations')?.value || '';
-  // Récupérer téléphones
-  const telInputs = document.querySelectorAll('#coordContainer input[type=tel], #coordContainer input[type=text]');
-  const tels = Array.from(telInputs).map(i => i.value.trim()).filter(Boolean);
+  var tech = (window._techniciens || []).find(function(t){ return t.nomComplet === assigne || t.nom === assigne; });
+  var techName = tech ? ((tech.prenom || '') + ' ' + (tech.nom || '')).trim() : assigne;
+  var techEmail = tech && tech.email ? tech.email : '—';
+  var nature = (document.getElementById('fNature') && document.getElementById('fNature').value) || '—';
+  var nomClient = (document.getElementById('fNomClient') && document.getElementById('fNomClient').value) || (document.getElementById('fClient') && document.getElementById('fClient').value) || '—';
+  var adresse = (document.getElementById('fAdresse') && document.getElementById('fAdresse').value) || '—';
+  var bc = (document.getElementById('fBC') && document.getElementById('fBC').value) || '';
+  var observations = (document.getElementById('fObservations') && document.getElementById('fObservations').value) || '';
+  var telInputs = document.querySelectorAll('#coordContainer input');
+  var tels = Array.from(telInputs).map(function(i){ return i.value.trim(); }).filter(Boolean);
 
   function fmtDate(str) {
     if (!str) return '—';
-    const d = new Date(str);
+    var d = new Date(str);
     return d.toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'long'}) + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
   }
 
-  const passagesHtml = passages.map((p, i) => {
-    const parts = p.split('|');
-    const debut = fmtDate(parts[0]);
-    const fin = parts[1] ? fmtDate(parts[1]) : '—';
-    return '<div style="padding:8px 12px;background:#F8F9FC;border-radius:6px;margin-bottom:6px;font-size:13px;">' +
-      '<strong>' + (ORDINALS[i]||((i+1)+'e')) + ' passage</strong><br>' +
-      '🕐 Début : ' + debut + '<br>' +
-      '🕐 Fin : ' + fin + '</div>';
+  var passagesHtml = passages.map(function(p, i) {
+    var parts = p.split('|');
+    var debut = fmtDate(parts[0]);
+    var fin = parts[1] ? fmtDate(parts[1]) : '—';
+    var label = ORDINALS[i] || ((i+1) + 'e');
+    return '<div style="padding:8px 12px;background:#F8F9FC;border-radius:6px;margin-bottom:6px;font-size:13px;">'
+      + '<strong>' + label + ' passage</strong><br>'
+      + '🕐 Début : ' + debut + '<br>'
+      + '🕐 Fin : ' + fin + '</div>';
   }).join('');
 
-  document.getElementById('calConfirmBody').innerHTML =
-    '<div style="margin-bottom:14px;">' +
-      '<div style="font-size:11px;color:#6B7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Technicien</div>' +
-      '<div style="font-weight:600;font-size:14px;">👤 ' + techName + '</div>' +
-      '<div style="font-size:12px;color:#6B7280;">📧 ' + techEmail + '</div>' +
-    '</div>' +
-    '<div style="margin-bottom:14px;">' +
-      '<div style="font-size:11px;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Intervention</div>' +
-      '<div style="font-size:13px;line-height:1.7;">' +
-        '<strong>Nature :</strong> ' + nature + '<br>' +
-        '<strong>Client :</strong> ' + nomClient + '<br>' +
-        '<strong>Adresse :</strong> ' + adresse + '<br>' +
-        (tels.length ? '<strong>Téléphone(s) :</strong> ' + tels.join(' / ') + '<br>' : '') +
-        (bc ? '<strong>N° BC :</strong> ' + bc + '<br>' : '') +
-        (observations ? '<strong>Observations :</strong> ' + observations : '') +
-      '</div>' +
-    '</div>' +
-    '<div>' +
-      '<div style="font-size:11px;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Passages (' + passages.length + ')</div>' +
-      passagesHtml +
-    '</div>';
+  var infoHtml = '<div style="margin-bottom:14px;">'
+    + '<div style="font-size:11px;color:#6B7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Technicien</div>'
+    + '<div style="font-weight:600;font-size:14px;">👤 ' + techName + '</div>'
+    + '<div style="font-size:12px;color:#6B7280;">📧 ' + techEmail + '</div>'
+    + '</div>'
+    + '<div style="margin-bottom:14px;">'
+    + '<div style="font-size:11px;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Intervention</div>'
+    + '<div style="font-size:13px;line-height:1.8;">'
+    + '<strong>Nature :</strong> ' + nature + '<br>'
+    + '<strong>Client :</strong> ' + nomClient + '<br>'
+    + '<strong>Adresse :</strong> ' + adresse + '<br>'
+    + (tels.length ? '<strong>Tel :</strong> ' + tels.join(' / ') + '<br>' : '')
+    + (bc ? '<strong>N° BC :</strong> ' + bc + '<br>' : '')
+    + (observations ? '<strong>Obs :</strong> ' + observations : '')
+    + '</div></div>'
+    + '<div>'
+    + '<div style="font-size:11px;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Passages (' + passages.length + ')</div>'
+    + passagesHtml + '</div>';
 
-  window._calendarPayload = { tech, assigne, passages, nature, nomClient, adresse, bc, observations, tels, techName };
+  document.getElementById('calConfirmBody').innerHTML = infoHtml;
+  window._calendarPayload = { tech: tech, assigne: assigne, passages: passages, nature: nature, nomClient: nomClient, adresse: adresse, bc: bc, observations: observations, tels: tels, techName: techName };
   document.getElementById('modalCalendarConfirm').style.display = 'flex';
 }
 
@@ -715,88 +712,69 @@ function closeCalendarConfirm() {
 }
 
 async function sendToCalendar() {
-  const payload = window._calendarPayload;
+  var payload = window._calendarPayload;
   if (!payload) return;
-  const tech = payload.tech;
-  if (!tech || !tech.email) {
-    showToast('Email du technicien introuvable. Vérifiez sa fiche.', true);
-    closeCalendarConfirm();
-    return;
-  }
-  const btnSend = document.getElementById('btnCalendarSend');
+  var tech = payload.tech;
+  if (!tech || !tech.email) { showToast('Email du technicien introuvable.', true); closeCalendarConfirm(); return; }
+  var btnSend = document.getElementById('btnCalendarSend');
   btnSend.disabled = true;
-  btnSend.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;animation:spin 1s linear infinite"><path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/></svg> Envoi...';
+  btnSend.innerHTML = 'Envoi en cours...';
   try {
-    const resp = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar', {
+    var resp = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        technicienEmail: tech.email,
-        passages: payload.passages,
-        nature: payload.nature,
-        nomClient: payload.nomClient,
-        adresse: payload.adresse,
-        bc: payload.bc,
-        observations: payload.observations,
-        tels: payload.tels,
-        interventionId: editId || '',
-      })
+      body: JSON.stringify({ technicienEmail: tech.email, passages: payload.passages, nature: payload.nature, nomClient: payload.nomClient, adresse: payload.adresse, bc: payload.bc, observations: payload.observations, tels: payload.tels, interventionId: editId || '' })
     });
-    const result = await resp.json();
+    var result = await resp.json();
     closeCalendarConfirm();
     if (result.success || result.created > 0) {
-      // Mettre à jour notifAgenda dans Firestore et dans la barre
       if (editId) {
-        const now = new Date().toISOString();
+        var now = new Date().toISOString();
         try {
-          const { doc, updateDoc, arrayUnion } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-          const { db } = await import('./firebase.js');
-          await updateDoc(doc(db, 'suivi', editId), { notifAgenda: arrayUnion(now) });
-          // Mettre à jour localement
-          const idx = interventions.findIndex(i => i.id === editId);
-          if (idx !== -1) {
-            if (!interventions[idx].notifAgenda) interventions[idx].notifAgenda = [];
-            interventions[idx].notifAgenda.push(now);
+          var fsmod = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+          var fbmod = await import('./firebase.js');
+          await fsmod.updateDoc(fsmod.doc(fbmod.db, 'suivi', editId), { notifAgenda: fsmod.arrayUnion(now) });
+          var idx3 = interventions.findIndex(function(i){ return i.id === editId; });
+          if (idx3 !== -1) {
+            if (!interventions[idx3].notifAgenda) interventions[idx3].notifAgenda = [];
+            interventions[idx3].notifAgenda.push(now);
             updateNotifRow(editId);
           }
-        } catch(e) { console.warn('notifAgenda Firestore update failed:', e); }
+        } catch(e) { console.warn('notifAgenda update failed:', e); }
       }
       showCalendarSuccessToast(payload.techName, result.created, payload.passages.length);
     } else {
-      const firstErr = result.errors?.[0]?.error || result.error || 'Erreur inconnue';
+      var firstErr = (result.errors && result.errors[0] && result.errors[0].error) || result.error || 'Erreur inconnue';
       showToast('Erreur agenda : ' + firstErr, true);
     }
   } catch(err) {
     closeCalendarConfirm();
     showToast('Erreur réseau : ' + err.message, true);
   } finally {
-    if (btnSend) {
-      btnSend.disabled = false;
-      btnSend.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg> Confirmer l\'ajout';
-    }
+    btnSend.disabled = false;
+    btnSend.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg> Confirmer';
   }
 }
 
 function showCalendarSuccessToast(techName, created, total) {
-  const existing = document.getElementById('calSuccessToast');
+  var existing = document.getElementById('calSuccessToast');
   if (existing) existing.remove();
-  const toast = document.createElement('div');
+  var toast = document.createElement('div');
   toast.id = 'calSuccessToast';
   toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9999;background:#1E1B4B;color:#fff;border-radius:12px;padding:16px 22px;display:flex;align-items:flex-start;gap:14px;box-shadow:0 8px 32px rgba(0,0,0,.22);min-width:320px;max-width:460px;';
-  const errCount = total - created;
-  toast.innerHTML =
-    '<div style="background:#4338CA;border-radius:8px;padding:8px;flex-shrink:0;">' +
-      '<svg viewBox="0 0 24 24" fill="white" style="width:20px;height:20px;display:block;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>' +
-    '</div>' +
-    '<div style="flex:1;">' +
-      '<div style="font-weight:700;font-size:14px;margin-bottom:3px;">Agenda mis à jour ✓</div>' +
-      '<div style="font-size:13px;opacity:.85;">' + created + ' passage' + (created > 1 ? 's' : '') + ' ajouté' + (created > 1 ? 's' : '') + ' dans l\'agenda de <strong>' + techName + '</strong></div>' +
-      (errCount > 0 ? '<div style="font-size:12px;color:#FCA5A5;margin-top:3px;">⚠ ' + errCount + ' passage(s) en erreur</div>' : '') +
-    '</div>' +
-    '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:20px;line-height:1;padding:0;margin-left:4px;">×</button>';
+  var errCount = total - created;
+  var pluriel = created > 1 ? 's' : '';
+  toast.innerHTML = '<div style="background:#4338CA;border-radius:8px;padding:8px;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="white" style="width:20px;height:20px;display:block;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg></div>'
+    + '<div style="flex:1;">'
+    + '<div style="font-weight:700;font-size:14px;margin-bottom:3px;">Agenda mis &agrave; jour &#10003;</div>'
+    + '<div style="font-size:13px;opacity:.85;">' + created + ' passage' + pluriel + ' ajout&eacute;' + pluriel + ' dans l&#39;agenda de <strong>' + techName + '</strong></div>'
+    + (errCount > 0 ? '<div style="font-size:12px;color:#FCA5A5;margin-top:3px;">&#9888; ' + errCount + ' passage(s) en erreur</div>' : '')
+    + '</div>'
+    + '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:20px;line-height:1;padding:0;margin-left:4px;">&times;</button>';
   document.body.appendChild(toast);
-  setTimeout(() => { if (toast.parentElement) toast.remove(); }, 7000);
+  setTimeout(function(){ if (toast.parentElement) toast.remove(); }, 7000);
 }
+
 function addPassage(value = '') {
   // value format: "YYYY-MM-DDTHH:MM|YYYY-MM-DDTHH:MM" (debut|fin) or single datetime
   passageCount++;
@@ -1097,12 +1075,12 @@ window.renderTable = function renderTable(list) {
     html += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
     html += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
     html += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
-    // Section Agenda
-    const na = toNotifArray(item.notifAgenda);
-    html += '<div class="notif-section" id="agenda-sect-' + item.id + '"><span class="notif-label">📅 Agenda</span>' + (na.length > 0 ? na.map(function(t){ return '<span class="notif-dot" title="' + new Date(t).toLocaleString(\'fr-FR\') + '">●</span>'; }).join('') : '<span class="notif-none">—</span>') + '</div>';
+    var na = toNotifArray(item.notifAgenda);
+    var agDots = na.length > 0 ? na.map(function(t){ var d=new Date(t); var ds=d.toLocaleDateString('fr-FR')+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); return '<span class=\'notif-dot\' title=\''+ds+'\'>&#9679;</span>'; }).join('') : '<span class=\'notif-none\'>&mdash;</span>';
+    html += '<div class=\'notif-section\' id=\'agenda-sect-'+item.id+'\' ><span class=\'notif-label\'>&#128197; Agenda</span>'+agDots+'</div>';
 
     if (hasPsg) {
-      html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(\'' + item.id + '\')">💬 Rappel SMS</button></div>';
+      html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(\'' + item.id + '\')">&#128172; Rappel SMS</button></div>';
     }
 
     html += '</div></td></tr>';
@@ -1295,11 +1273,10 @@ function updateNotifRow(itemId) {
       if (sects[1]) sects[1].innerHTML = '<span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur',nb,'🏢','bailleur');
       if (sects[2]) sects[2].innerHTML = '<span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire',nl,'🏠','locataire');
       if (sects[3]) sects[3].innerHTML = '<span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms',ns,'💬','sms');
-      // Agenda section
-      const na = toNotifArray(item.notifAgenda);
-      const agendaSect = document.getElementById('agenda-sect-' + itemId);
-      if (agendaSect) agendaSect.innerHTML = '<span class="notif-label">📅 Agenda</span>' + (na.length > 0 ? na.map(function(t){ return '<span class="notif-dot" title="' + new Date(t).toLocaleString(\'fr-FR\') + '">●</span>'; }).join('') : '<span class="notif-none">—</span>');
-      if (sects[4]) sects[4].innerHTML = '<span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms',nr,'🔔','sms');
+      var na2 = toNotifArray(item.notifAgenda);
+      var agDots2 = na2.length > 0 ? na2.map(function(t){ var d=new Date(t); var ds=d.toLocaleDateString('fr-FR')+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); return '<span class="notif-dot" title="'+ds+'">&#9679;</span>'; }).join('') : '<span class="notif-none">&mdash;</span>';
+      var agSect = document.getElementById('agenda-sect-'+itemId);
+      if (agSect) agSect.innerHTML = '<span class="notif-label">&#128197; Agenda</span>' + agDots2;
     }
   }
 }
