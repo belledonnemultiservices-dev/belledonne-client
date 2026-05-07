@@ -455,6 +455,24 @@
         </div>
       </div>
 
+      <!-- RAPPEL SMS PANEL -->
+      <div id="nsPanelRappel" style="display:none;">
+        <div style="margin-bottom:16px;padding:14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Numéro de téléphone</div>
+          <div id="nsRappelPhoneInfo" style="font-size:13px;color:var(--text);margin-bottom:10px;"></div>
+          <select class="form-select" id="nsRappelPhoneSel" style="width:100%;"></select>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Passage(s) à rappeler</div>
+          <div id="nsRappelPassages" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto;"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message <span style="font-weight:400;text-transform:none;">(modifiable)</span></div>
+          <textarea class="form-textarea" id="nsRappelBody" style="min-height:120px;width:100%;"></textarea>
+          <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:4px;" id="nsRappelCount">0 / 160</div>
+        </div>
+      </div>
+
     </div>
     <div class="modal-footer" style="justify-content:space-between;">
       <button id="btnNotifyClient" onclick="openNotifSuivi()" style="display:none;align-items:center;gap:7px;background:#E8F9F2;color:#1DA870;border:1px solid #A7E8CC;padding:10px 18px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">
@@ -960,10 +978,14 @@ function switchNotifTab(tab) {
   if (tab === 'locataire' && window._loadProtocolesForClient) {
     window._loadProtocolesForClient(window._nsCurrentClient || '');
   }
+  // Populate rappel panel when switching to rappel
+  if (tab === 'rappel') { populateRappelPanel(); }
   // Load protocoles when switching to locataire
   if (tab === 'locataire' && window._loadProtocolesForClient) {
     window._loadProtocolesForClient(window._nsCurrentClient || '');
   }
+  // Populate rappel panel when switching to rappel
+  if (tab === 'rappel') { populateRappelPanel(); }
 }
 
 // ── TÉLÉPHONES DYNAMIQUES ──
@@ -1317,6 +1339,7 @@ function populateLocataireTab(nom, email, passagesStr, adresse, bc, pl, nature) 
 
 window.sendNotifSuivi = async function() {
   if (_currentNotifTab === 'sms') { sendSmsNotif(); return; }
+  if (_currentNotifTab === 'rappel') { sendRappelSms(); return; }
   const isLoc = _currentNotifTab === 'locataire';
   const to = isLoc ? window._nsLocataireEmail : document.getElementById('nsSel').value;
   if (!to) { alert('Aucun destinataire. Vérifiez l\'email client dans le formulaire.'); return; }
@@ -1371,6 +1394,113 @@ window.sendNotifSuivi = async function() {
 document.addEventListener('click', e => {
   if (e.target && e.target.id === 'modalNotifSuivi') closeNotifSuivi();
 });
+
+// ── RAPPEL SMS ──
+function populateRappelPanel() {
+  // Phones
+  var itemId = window._nsCurrentItemId;
+  var item = (window.interventions||[]).find(function(i){return i.id===itemId;});
+  var phones = [];
+  if (item) {
+    phones = Array.isArray(item.coordonnees) ? item.coordonnees : (item.coordonnees ? [item.coordonnees] : []);
+    // Also check form if open
+    var formPhones = Array.from(document.querySelectorAll('#phonesContainer input')).map(function(i){return i.value.trim();}).filter(Boolean);
+    if (formPhones.length) phones = formPhones;
+  }
+  var phoneSel = document.getElementById('nsRappelPhoneSel');
+  var phoneInfo = document.getElementById('nsRappelPhoneInfo');
+  if (phoneSel) {
+    phoneSel.innerHTML = phones.filter(Boolean).map(function(p){return '<option value="'+p+'">'+p+'</option>';}).join('');
+    if (!phones.length) phoneSel.innerHTML = '<option value="">Aucun numéro disponible</option>';
+  }
+  if (phoneInfo) {
+    phoneInfo.textContent = phones.length + ' numéro' + (phones.length>1?'s':'') + ' disponible' + (phones.length>1?'s':'');
+    phoneInfo.style.color = phones.length ? 'var(--text-mid)' : '#E74C3C';
+  }
+  // Passages checkboxes
+  var passages = item ? (item.passages||[]).filter(Boolean) : [];
+  var psgsEl = document.getElementById('nsRappelPassages');
+  if (psgsEl) {
+    if (!passages.length) {
+      psgsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;">Aucun passage renseigné.</div>';
+    } else {
+      var ORDINALS = ['1er','2e','3e','4e','5e','6e'];
+      psgsEl.innerHTML = passages.map(function(p, i) {
+        var parts = p.includes('|') ? p.split('|') : [p,''];
+        var debut = parts[0] ? fmtDate(parts[0]) : '—';
+        var fin = parts[1] ? fmtDate(parts[1]) : '';
+        var label = (ORDINALS[i]||i+1+'e') + ' passage : ' + debut + (fin ? ' → ' + fin : '');
+        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px;">' +
+          '<input type="checkbox" class="rappel-psg-check" data-passage="' + label + '" checked onchange="updateRappelMessage()" style="width:14px;height:14px;">' +
+          '<span style="font-weight:500;">' + label + '</span></label>';
+      }).join('');
+    }
+  }
+  // Pre-fill message
+  updateRappelMessage();
+  var bodyEl = document.getElementById('nsRappelBody');
+  if (bodyEl) { bodyEl.oninput = function() { updateRappelCount(); }; }
+}
+
+function updateRappelMessage() {
+  var checked = Array.from(document.querySelectorAll('.rappel-psg-check:checked')).map(function(cb){return cb.dataset.passage;});
+  var passStr = checked.join(' | ');
+  var itemId = window._nsCurrentItemId;
+  var item = (window.interventions||[]).find(function(i){return i.id===itemId;});
+  var adresse = item ? (item.adresse||'') : '';
+  var bc = item ? (item.bc||'') : '';
+  var tpl = (window._rappelSmsTemplate && window._rappelSmsTemplate.body) ||
+    'Rappel Belledonne : intervention prevue {{passages}} - {{adresse}}. BC:{{bc}}. Empechement : 06 95 67 26 03.';
+  var msg = tpl.replace('{{passages}}', passStr).replace('{{adresse}}', adresse.substring(0,30)).replace('{{bc}}', bc);
+  var bodyEl = document.getElementById('nsRappelBody');
+  if (bodyEl) bodyEl.value = msg;
+  updateRappelCount();
+}
+
+function updateRappelCount() {
+  var el = document.getElementById('nsRappelBody');
+  var cnt = document.getElementById('nsRappelCount');
+  if (el && cnt) { var l = el.value.length; cnt.textContent = l + ' / 160'; cnt.style.color = l > 160 ? '#E74C3C' : 'var(--text-muted)'; }
+}
+
+async function sendRappelSms() {
+  var phone = document.getElementById('nsRappelPhoneSel').value;
+  if (!phone) { alert('Sélectionnez un numéro.'); return; }
+  var message = document.getElementById('nsRappelBody').value.trim();
+  if (!message) { alert('Message vide.'); return; }
+  var btn = document.getElementById('nsBtnSend');
+  btn.disabled = true; btn.textContent = 'Envoi...';
+  try {
+    var resp = await fetch(window.SMS_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendSMS', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to: phone, message: message})
+    });
+    var data = await resp.json();
+    if (resp.ok && data.success) {
+      document.getElementById('nsSuccess').style.display = 'block';
+      document.getElementById('nsSuccessMsg').textContent = 'Rappel SMS envoyé au ' + phone;
+      document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Fermer</button>';
+      showToast('Rappel SMS envoyé !');
+      // Badge rappelSms
+      var itemId = window._nsCurrentItemId;
+      if (itemId) {
+        var ts = new Date().toISOString();
+        var idx2 = interventions.findIndex(function(i){return i.id===itemId;});
+        if (idx2 !== -1) {
+          var arr = toNotifArray(interventions[idx2].notifRappelSms||[]);
+          arr.push(ts);
+          interventions[idx2].notifRappelSms = arr;
+          window.interventions = interventions;
+        }
+        if (window._updateSuiviNotifArray) window._updateSuiviNotifArray(itemId, 'notifRappelSms', ts);
+        updateNotifRow(itemId);
+      }
+    } else { throw new Error((data.ovhError && data.ovhError.message) || data.error || 'Erreur'); }
+  } catch(e) {
+    alert('Erreur rappel SMS : ' + e.message);
+    btn.disabled = false; btn.textContent = 'Envoyer';
+  }
+}
 
 // ── SELECTION & FILTRES ──
 window.selectedIds = new Set();
@@ -1551,6 +1681,9 @@ onAuthStateChanged(auth, async (user) => {
     if (tplDoc && tplDoc.data().suiviSms) {
       window._suiviSmsTemplate = tplDoc.data().suiviSms;
     }
+    if (tplDoc && tplDoc.data().rappelSms) {
+      window._rappelSmsTemplate = tplDoc.data().rappelSms;
+    }
   } catch(e) { console.warn('template load:', e); }
 
   // Load data
@@ -1683,6 +1816,9 @@ window._loadTechniciens = loadTechniciens;
         </button>
         <button id="nsTabSms" onclick="switchNotifTab('sms')" style="flex:1;padding:10px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-mid);border-radius:0;transition:all 0.15s;">
           💬 SMS
+        </button>
+        <button id="nsTabRappel" onclick="switchNotifTab('rappel')" style="flex:1;padding:10px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-mid);border-radius:0;transition:all 0.15s;">
+          🔔 Rappel SMS
         </button>
       </div>
 
