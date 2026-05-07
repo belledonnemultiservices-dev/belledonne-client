@@ -1526,7 +1526,7 @@ function clearDates() {
   document.getElementById('filterDateA').value='';
   filterTable();
 }
-function populateFilterDropdowns() {
+window.populateFilterDropdowns = function populateFilterDropdowns() {
   var clientSel = document.getElementById('filterClient');
   var yearSel = document.getElementById('filterAnnee');
   if (!clientSel || !yearSel) return;
@@ -1559,7 +1559,7 @@ function populateFilterDropdowns() {
     if (y === currentYear) opt.selected = true;
     yearSel.appendChild(opt);
   });
-}
+};
 
 function filterTable() {
   var q = document.getElementById('searchInput').value.toLowerCase();
@@ -1696,8 +1696,9 @@ onAuthStateChanged(auth, async (user) => {
   const snap = await getDocs(query(collection(db,'suivi'), orderBy('createdAt','desc')));
   interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
   window.interventions = interventions;
-  populateFilterDropdowns();
-  filterTable();
+  if (window.populateFilterDropdowns) window.populateFilterDropdowns();
+  if (window.filterTable) window.filterTable();
+  else if (window.renderTable) window.renderTable(interventions);
 });
 
 // ── UPDATE NOTIF FIELDS IN FIRESTORE (array push) ──
