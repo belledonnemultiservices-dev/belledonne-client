@@ -888,7 +888,7 @@ window.renderTable = function renderTable(list) {
     const rowClass = item.statut==='Annulé' ? 'row-annule' : item.statut==='Terminé' ? 'row-termine' : '';
 
     // Build main row
-    const isChecked = (window.selectedIds || selectedIds) ? (window.selectedIds || selectedIds).has(item.id) : false;
+    const isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
     html += '<tr id="row-' + item.id + '" class="' + rowClass + '">';
     html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
     html += '<td class="client-cell">';
@@ -1371,6 +1371,85 @@ window.sendNotifSuivi = async function() {
 document.addEventListener('click', e => {
   if (e.target && e.target.id === 'modalNotifSuivi') closeNotifSuivi();
 });
+
+// ── SELECTION & FILTRES ──
+window.selectedIds = new Set();
+
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.row-check').forEach(function(box) {
+    box.checked = cb.checked;
+    if (cb.checked) window.selectedIds.add(box.dataset.id);
+    else window.selectedIds.delete(box.dataset.id);
+  });
+  updateSelectionBar();
+}
+function toggleRowSelect(cb) {
+  if (cb.checked) window.selectedIds.add(cb.dataset.id);
+  else window.selectedIds.delete(cb.dataset.id);
+  updateSelectionBar();
+}
+function updateSelectionBar() {
+  var bar = document.getElementById('selectionBar');
+  var cnt = document.getElementById('selectionCount');
+  if (!bar) return;
+  bar.style.display = window.selectedIds.size > 0 ? 'flex' : 'none';
+  cnt.textContent = window.selectedIds.size + ' selectionne' + (window.selectedIds.size > 1 ? 's' : '');
+  var all = document.getElementById('checkAll');
+  if (all) {
+    var boxes = document.querySelectorAll('.row-check');
+    all.checked = boxes.length > 0 && Array.from(boxes).every(function(b){return b.checked;});
+    all.indeterminate = window.selectedIds.size > 0 && !all.checked;
+  }
+}
+function clearSelection() {
+  window.selectedIds.clear();
+  document.querySelectorAll('.row-check').forEach(function(box){box.checked=false;});
+  var all = document.getElementById('checkAll');
+  if (all) { all.checked=false; all.indeterminate=false; }
+  updateSelectionBar();
+}
+async function deleteSelected() {
+  if (!window.selectedIds.size) return;
+  if (!confirm('Supprimer ' + window.selectedIds.size + ' intervention(s) ?')) return;
+  var ids = Array.from(window.selectedIds);
+  for (var i=0;i<ids.length;i++) {
+    try {
+      await window._deleteSuivi(ids[i]);
+      interventions = interventions.filter(function(x){return x.id!==ids[i];});
+      window.interventions = interventions;
+    } catch(e){ console.error(e); }
+  }
+  window.selectedIds.clear();
+  updateSelectionBar();
+  filterTable();
+  showToast(ids.length + ' intervention(s) supprimee(s).');
+}
+function clearDates() {
+  document.getElementById('filterDateDe').value='';
+  document.getElementById('filterDateA').value='';
+  filterTable();
+}
+function filterTable() {
+  var q = document.getElementById('searchInput').value.toLowerCase();
+  var statut = document.getElementById('filterStatut').value;
+  var client = (document.getElementById('filterClient')||{value:''}).value||'';
+  var annee = (document.getElementById('filterAnnee')||{value:''}).value||'';
+  var dateDe = (document.getElementById('filterDateDe')||{value:''}).value||'';
+  var dateA = (document.getElementById('filterDateA')||{value:''}).value||'';
+  var filtered = interventions.filter(function(i) {
+    var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,i.assigne].some(function(v){return (v||'').toLowerCase().includes(q);});
+    var ms = !statut || i.statut === statut;
+    var mc = !client || i.client === client;
+    var dateRef = i.dateEmission || (i.createdAt||'').substring(0,10);
+    var ma = !annee || (dateRef && dateRef.startsWith(annee));
+    var mde = !dateDe || (dateRef && dateRef >= dateDe);
+    var mda = !dateA || (dateRef && dateRef <= dateA);
+    return mq && ms && mc && ma && mde && mda;
+  });
+  if(window.renderTable) window.renderTable(filtered);
+  else renderTable(filtered);
+}
+
 
 // ── TOAST ──
 function showToast(msg) {
