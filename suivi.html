@@ -151,6 +151,7 @@
   .btn-save{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 24px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
   .btn-save:hover{background:var(--navy-mid);}
   .btn-cancel{height:42px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  @keyframes spin { to { transform: rotate(360deg); } }
   /* ── TOAST ── */
   #toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;z-index:999;opacity:0;transform:translateY(10px);transition:all 0.3s;pointer-events:none;}
   #toast.show{opacity:1;transform:translateY(0);}
@@ -458,10 +459,16 @@
 
     </div>
     <div class="modal-footer" style="justify-content:space-between;">
-      <button id="btnNotifyClient" onclick="openNotifSuivi()" style="display:none;align-items:center;gap:7px;background:#E8F9F2;color:#1DA870;border:1px solid #A7E8CC;padding:10px 18px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-        Notifier le client
-      </button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="btnNotifyClient" onclick="openNotifSuivi()" style="display:none;align-items:center;gap:7px;background:#E8F9F2;color:#1DA870;border:1px solid #A7E8CC;padding:10px 18px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          Notifier le client
+        </button>
+        <button id="btnAddCalendar" onclick="addToCalendar()" style="display:none;align-items:center;gap:7px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:10px 18px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+          Ajouter à l'agenda
+        </button>
+      </div>
       <div style="display:flex;gap:10px;">
         <button class="btn-cancel" onclick="closeModal()">Annuler</button>
         <button class="btn-save" id="btnSave" onclick="saveIntervention()">
@@ -632,10 +639,73 @@ let passageCount = 0;
 const ORDINALS = ['1er','2e','3e','4e','5e','6e','7e','8e','9e','10e'];
 function updateNotifyBtn() {
   const btn = document.getElementById('btnNotifyClient');
-  if (!btn) return;
+  const btnCal = document.getElementById('btnAddCalendar');
   const hasPsgs = document.querySelectorAll('#passagesContainer input[type=datetime-local]').length > 0;
   const hasClient = document.getElementById('fClient')?.value;
-  btn.style.display = (hasPsgs && hasClient) ? 'inline-flex' : 'none';
+  const hasAssigne = document.getElementById('fAssigne')?.value;
+  if (btn) btn.style.display = (hasPsgs && hasClient) ? 'inline-flex' : 'none';
+  if (btnCal) btnCal.style.display = (hasPsgs && hasAssigne) ? 'inline-flex' : 'none';
+}
+
+async function addToCalendar() {
+  const assigne = document.getElementById('fAssigne')?.value;
+  const passages = getPassageDates();
+  if (!assigne || !passages.length) {
+    showToast('Veuillez sélectionner un technicien et ajouter au moins un passage.', true);
+    return;
+  }
+
+  // Récupérer l'email du technicien depuis _techniciens
+  const tech = (window._techniciens || []).find(t => t.nomComplet === assigne || t.nom === assigne);
+  if (!tech || !tech.email) {
+    showToast('Email du technicien introuvable. Vérifiez sa fiche.', true);
+    return;
+  }
+
+  const nature = document.getElementById('fNature')?.value || '';
+  const nomClient = document.getElementById('fNomClient')?.value || document.getElementById('fClient')?.value || '';
+  const adresse = document.getElementById('fAdresse')?.value || '';
+  const bc = document.getElementById('fBC')?.value || '';
+  const observations = document.getElementById('fObservations')?.value || '';
+
+  const btnCal = document.getElementById('btnAddCalendar');
+  const origText = btnCal.innerHTML;
+  btnCal.disabled = true;
+  btnCal.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;animation:spin 1s linear infinite"><path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/></svg> Envoi...';
+
+  try {
+    const resp = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        technicienEmail: tech.email,
+        passages,
+        nature,
+        nomClient,
+        adresse,
+        bc,
+        observations,
+        interventionId: editId || '',
+      })
+    });
+    const result = await resp.json();
+    if (result.success || result.created > 0) {
+      showToast(`✅ ${result.created} passage(s) ajouté(s) à l'agenda de ${tech.prenom || assigne}`);
+      if (result.errors && result.errors.length > 0) {
+        console.warn('Passages en erreur:', result.errors);
+      }
+    } else {
+      const firstErr = result.errors?.[0]?.error || result.error || 'Erreur inconnue';
+      showToast('Erreur agenda : ' + firstErr, true);
+      console.error('addToCalendar errors:', result);
+    }
+  } catch(err) {
+    showToast('Erreur réseau : ' + err.message, true);
+    console.error(err);
+  } finally {
+    btnCal.disabled = false;
+    btnCal.innerHTML = origText;
+  }
 }
 function addPassage(value = '') {
   // value format: "YYYY-MM-DDTHH:MM|YYYY-MM-DDTHH:MM" (debut|fin) or single datetime
