@@ -56,7 +56,7 @@
   .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
   .results-count{font-size:13px;color:var(--text-muted);white-space:nowrap;margin-left:auto;}
   /* ── TABLE ── */
-  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;}
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;overflow-y:visible;}
   .suivi-table{width:100%;border-collapse:collapse;min-width:1400px;}
   .suivi-table thead th{padding:11px 14px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;}
   .suivi-table tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
@@ -88,8 +88,8 @@
   .notif-history-btn.bailleur { background:#E8F9F2;color:#1DA870; }
   .notif-history-btn.locataire { background:#FEF3CD;color:#996600; }
   .notif-history-btn.sms { background:#EDE9FE;color:#6D28D9; }
-  .notif-dropdown { display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,0.1);min-width:180px;z-index:100;padding:6px 0; }
-  .notif-history:hover .notif-dropdown, .notif-history.open .notif-dropdown { display:block; }
+  .notif-dropdown { display:none;position:fixed;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,0.15);min-width:180px;z-index:9999;padding:6px 0; }
+  .notif-history.open .notif-dropdown { display:block; }
   .notif-dropdown-item { padding:6px 14px;font-size:12px;color:var(--text-mid);white-space:nowrap; }
   .notif-dropdown-item:first-child { font-weight:600;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:2px; }
   .notif-none { font-size:11px;color:var(--text-muted);font-style:italic; }
@@ -726,11 +726,34 @@ function fmtNotifDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
 }
-function toggleNotifDropdown(el) {
+function toggleNotifDropdown(btn) {
   event.stopPropagation();
-  document.querySelectorAll('.notif-history.open').forEach(x => { if(x!==el) x.classList.remove('open'); });
-  el.classList.toggle('open');
+  const el = btn.parentElement;
+  const dropdown = el.querySelector('.notif-dropdown');
+  if (!dropdown) return;
+  const isOpen = el.classList.contains('open');
+  // Close all others
+  document.querySelectorAll('.notif-history.open').forEach(x => {
+    x.classList.remove('open');
+    const d = x.querySelector('.notif-dropdown');
+    if (d) d.style.display = 'none';
+  });
+  if (!isOpen) {
+    const rect = btn.getBoundingClientRect();
+    dropdown.style.display = 'block';
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    dropdown.style.left = rect.left + 'px';
+    el.classList.add('open');
+  }
 }
+// Close dropdowns on outside click
+document.addEventListener('click', function() {
+  document.querySelectorAll('.notif-history.open').forEach(x => {
+    x.classList.remove('open');
+    const d = x.querySelector('.notif-dropdown');
+    if (d) d.style.display = 'none';
+  });
+});
 function notifHistoryHtml(field, arr, icon, cls) {
   if (!arr.length) return '<span class="notif-none">' + icon + ' Jamais</span>';
   const last = arr[arr.length-1];
@@ -739,7 +762,7 @@ function notifHistoryHtml(field, arr, icon, cls) {
   const items = arr.slice().reverse().map((ts,i) =>
     '<div class="notif-dropdown-item">' + (i===0?'Dernier : ':'') + fmtNotifDate(ts) + '</div>'
   ).join('');
-  return '<div class="notif-history" onclick="event.stopPropagation()"><button class="notif-history-btn ' + cls + '" onclick="toggleNotifDropdown(this.parentElement)">' + label + '</button><div class="notif-dropdown">' + items + '</div></div>';
+  return '<div class="notif-history" onclick="event.stopPropagation()"><button class="notif-history-btn ' + cls + '" onclick="toggleNotifDropdown(this)">' + label + '</button><div class="notif-dropdown">' + items + '</div></div>';
 }
 function fmtPassage(val) {
   if (!val) return '—';
