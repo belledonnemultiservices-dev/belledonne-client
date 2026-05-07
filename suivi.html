@@ -815,7 +815,7 @@ window.renderTable = function renderTable(list) {
     html += '<tr id="row-' + item.id + '" class="' + rowClass + '">';
     html += '<td class="client-cell">';
     html += '<div style="display:flex;align-items:center;gap:6px;">';
-    html += '<button class="btn-toggle-notif" onclick="toggleNotifRow(' + JSON.stringify(item.id) + ')">🔔' + (totalNotifs > 0 ? ' (' + totalNotifs + ')' : '') + '</button>';
+    html += '<button class="btn-toggle-notif" onclick="toggleNotifRow(' + item.id + ')">🔔' + (totalNotifs > 0 ? ' (' + totalNotifs + ')' : '') + '</button>';
     html += item.client || '—';
     html += '</div></td>';
 
@@ -835,8 +835,8 @@ window.renderTable = function renderTable(list) {
 
     html += '<td style="text-align:right;white-space:nowrap;">';
     html += '<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;">';
-    html += '<button class="btn-row-edit" onclick="openModal(' + JSON.stringify(item.id) + ')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>';
-    html += '<button class="btn-row-del" onclick="deleteIntervention(' + JSON.stringify(item.id) + ')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
+    html += '<button class="btn-row-edit" onclick="openModal(' + item.id + ')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>';
+    html += '<button class="btn-row-del" onclick="deleteIntervention(' + item.id + ')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
     html += '</div></td></tr>';
 
     // Build notification row (hidden by default)
@@ -846,7 +846,7 @@ window.renderTable = function renderTable(list) {
     // Notifier button
     html += '<div class="notif-section">';
     if (hasPsg) {
-      html += '<button class="btn-notif-open" onclick="openNotifFromRow(' + JSON.stringify(item.id) + ')">✉ Notifier</button>';
+      html += '<button class="btn-notif-open" onclick="openNotifFromRow(' + item.id + ')">✉ Notifier</button>';
     } else {
       html += '<span class="notif-none">Ajoutez des passages pour notifier</span>';
     }
@@ -859,7 +859,7 @@ window.renderTable = function renderTable(list) {
     html += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
 
     if (hasPsg) {
-      html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(' + JSON.stringify(item.id) + ')">💬 Rappel SMS</button></div>';
+      html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(' + item.id + ')">💬 Rappel SMS</button></div>';
     }
 
     html += '</div></td></tr>';
