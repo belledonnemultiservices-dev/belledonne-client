@@ -888,7 +888,7 @@ window.renderTable = function renderTable(list) {
     const rowClass = item.statut==='Annulé' ? 'row-annule' : item.statut==='Terminé' ? 'row-termine' : '';
 
     // Build main row
-    const isChecked = selectedIds ? selectedIds.has(item.id) : false;
+    const isChecked = (window.selectedIds || selectedIds) ? (window.selectedIds || selectedIds).has(item.id) : false;
     html += '<tr id="row-' + item.id + '" class="' + rowClass + '">';
     html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
     html += '<td class="client-cell">';
