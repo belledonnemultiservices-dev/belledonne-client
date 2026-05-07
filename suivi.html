@@ -537,12 +537,6 @@ function openPdfViewer(fileInputId) {
   title = input.files[0]?.name || 'Aperçu PDF';
   document.getElementById('pdfViewerTitle').textContent = title;
   document.getElementById('pdfViewerFrame').src = url + '#toolbar=1&navpanes=0&view=FitH';
-  const panel = document.getElementById('pdfViewerPanel');
-  panel.style.display = 'flex';
-  // Shrink modal overlay to left half
-  const overlay = document.getElementById('modal');
-  overlay.style.justifyContent = 'flex-start';
-  overlay.style.paddingRight = '48vw';
 }
 function closePdfViewer() {
   const panel = document.getElementById('pdfViewerPanel');
