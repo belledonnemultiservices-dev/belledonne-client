@@ -183,6 +183,7 @@
     <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
     <a class="nav-item" href="admin.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
     <a class="nav-item" href="contacts.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+    <a class="nav-item" href="techniciens.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Techniciens</span></a>
   </nav>
   <div class="sidebar-footer">
     <div class="footer-user">
@@ -210,10 +211,10 @@
         <div class="page-sub">Tableau de bord opérationnel — gestion des dossiers et bons de commande</div>
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
-        <button onclick="document.getElementById('modalTech').classList.add('open');if(typeof renderTechList==='function')renderTechList()" style="display:inline-flex;align-items:center;gap:7px;background:var(--surface);color:var(--text-mid);border:1px solid var(--border);padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;">
-          <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        <a href="techniciens.html" style="display:inline-flex;align-items:center;gap:7px;background:var(--surface);color:var(--text-mid);border:1px solid var(--border);padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;text-decoration:none;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
           Techniciens
-        </button>
+        </a>
         <button class="btn-primary" id="btnAjouter" onclick="if(typeof openModal==='function')openModal()">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           Nouvelle intervention
@@ -510,8 +511,13 @@ function removeFile(fileInputId, chosenId, actionsId) {
 
 // ── PDF VIEWER ──
 function openPdfViewer(fileInputId) {
-  const url = pdfBlobUrls[fileInputId];
-  if (!url) return;
+  let url = pdfBlobUrls[fileInputId];
+  // Fallback to existing Firebase URL
+  if (!url && fileInputId === 'filePL') url = window._existingPlUrl;
+  if (!url && fileInputId === 'fileBC') url = window._existingBcUrl;
+  if (!url) { window.open && alert && alert('Aucun fichier disponible.'); return; }
+  // If it's a Firebase URL, open in new tab (no blob)
+  if (url.startsWith('http')) { window.open(url, '_blank'); return; }
   const input = document.getElementById(fileInputId);
   document.getElementById('pdfViewerTitle').textContent = input.files[0]?.name || 'Aperçu PDF';
   document.getElementById('pdfViewerFrame').src = url + '#toolbar=1&navpanes=0&view=FitH';
@@ -563,8 +569,21 @@ function openModal(id = null) {
     (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach(d => addPassage(d));
     document.getElementById('fNotes').value = item.notes || '';
     // Show existing PDF links if any
-    if (item.plUrl) { const c = document.getElementById('chosenPL'); c.textContent = '✓ Fichier existant'; c.style.display = 'block'; }
-    if (item.bcUrl) { const c = document.getElementById('chosenBC'); c.textContent = '✓ Fichier existant'; c.style.display = 'block'; }
+    if (item.plUrl) {
+      const c = document.getElementById('chosenPL'); c.textContent = '✓ Fichier existant'; c.style.display = 'block';
+      const a = document.getElementById('actionsPL'); a.style.display = 'flex';
+      // Store firebase URL for preview
+      window._existingPlUrl = item.plUrl;
+      const btn = a.querySelector('.btn-preview');
+      if (btn) { btn.onclick = function() { window.open(item.plUrl, '_blank'); }; }
+    }
+    if (item.bcUrl) {
+      const c = document.getElementById('chosenBC'); c.textContent = '✓ Fichier existant'; c.style.display = 'block';
+      const a = document.getElementById('actionsBC'); a.style.display = 'flex';
+      window._existingBcUrl = item.bcUrl;
+      const btn = a.querySelector('.btn-preview');
+      if (btn) { btn.onclick = function() { window.open(item.bcUrl, '_blank'); }; }
+    }
   }
   document.getElementById('modal').classList.add('open');
 }
@@ -635,6 +654,7 @@ function resetForm() {
   ['filePL','fileBC'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   document.getElementById('passagesContainer').innerHTML = '';
   passageCount = 0;
+  window._existingPlUrl = null; window._existingBcUrl = null;
   document.getElementById('phonesContainer').innerHTML = '';
   phoneCount = 0;
   addPhoneField(); // always start with one field
@@ -1450,11 +1470,11 @@ async function loadTechniciens() {
   techniciens = snap.docs.map(d=>({id:d.id,...d.data()}));
   window._techniciens = techniciens;
   const sel = document.getElementById('fAssigne');
-  // Keep default option
   while (sel.options.length > 1) sel.remove(1);
   techniciens.forEach(t => {
     const opt = document.createElement('option');
-    opt.value = t.nom; opt.textContent = t.nom;
+    const label = t.nomComplet || ((t.prenom||'') + ' ' + (t.nom||'')).trim() || t.nom || t.id;
+    opt.value = label; opt.textContent = label;
     sel.appendChild(opt);
   });
 }
