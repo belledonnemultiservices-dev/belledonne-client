@@ -573,7 +573,7 @@ function closePdfViewer() {
 }
 
 // ── MODAL ──
-function openModal(id = null) {
+window.openModal = function openModal(id = null) {
   editId = id;
   document.getElementById('modalTitle').textContent = id ? 'Mise à jour de l\'intervention' : 'Nouvelle intervention';
   document.getElementById('btnSave').textContent = id ? 'Mettre à jour' : 'Enregistrer';
@@ -746,7 +746,7 @@ async function saveIntervention() {
     }
 
     closeModal();
-    renderTable(interventions);
+    filterTable();
     showToast(editId ? 'Intervention mise à jour !' : 'Intervention enregistrée !');
   } catch(e) {
     console.error(e);
@@ -764,7 +764,7 @@ async function deleteIntervention(id) {
     await window._deleteSuivi(id);
     interventions = interventions.filter(i=>i.id!==id);
     window.interventions = interventions;
-    renderTable(interventions);
+    filterTable();
     showToast('Intervention supprimée.');
   } catch(e) { alert('Erreur: ' + e.message); }
 }
@@ -884,8 +884,9 @@ window.renderTable = function renderTable(list) {
     const nb = toNotifArray(item.notifBailleur);
     const nl = toNotifArray(item.notifLocataire);
     const ns = toNotifArray(item.notifSms);
+    const nr = toNotifArray(item.notifRappelSms);
     const hasPsg = (item.passages||[]).filter(Boolean).length > 0;
-    const totalNotifs = nb.length + nl.length + ns.length;
+    const totalNotifs = nb.length + nl.length + ns.length + nr.length;
     const rowClass = item.statut==='Annulé' ? 'row-annule' : item.statut==='Terminé' ? 'row-termine' : '';
 
     // Build main row
@@ -936,6 +937,7 @@ window.renderTable = function renderTable(list) {
     html += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
     html += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
     html += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
+    html += '<div class="notif-section"><span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms', nr, '🔔', 'sms') + '</div>';
 
     if (hasPsg) {
       html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(\'' + item.id + '\')">💬 Rappel SMS</button></div>';
@@ -1120,7 +1122,8 @@ function updateNotifRow(itemId) {
   const nb = toNotifArray(item.notifBailleur);
   const nl = toNotifArray(item.notifLocataire);
   const ns = toNotifArray(item.notifSms);
-  const totalNotifs = nb.length + nl.length + ns.length;
+  const nr = toNotifArray(item.notifRappelSms);
+  const totalNotifs = nb.length + nl.length + ns.length + nr.length;
   // btn-toggle-notif is now in first column, just update notif row content
   const notifRow = document.getElementById('notif-row-' + itemId);
   if (notifRow) {
@@ -1130,6 +1133,7 @@ function updateNotifRow(itemId) {
       if (sects[1]) sects[1].innerHTML = '<span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur',nb,'🏢','bailleur');
       if (sects[2]) sects[2].innerHTML = '<span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire',nl,'🏠','locataire');
       if (sects[3]) sects[3].innerHTML = '<span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms',ns,'💬','sms');
+      if (sects[4]) sects[4].innerHTML = '<span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms',nr,'🔔','sms');
     }
   }
 }
@@ -1392,8 +1396,7 @@ function populateRappelPanel() {
       psgsEl.innerHTML = passages.map(function(p, i) {
         var parts = p.includes('|') ? p.split('|') : [p,''];
         var debut = parts[0] ? fmtDate(parts[0]) : '—';
-        var fin = parts[1] ? fmtDate(parts[1]) : '';
-        var label = (ORDINALS[i]||i+1+'e') + ' passage : ' + debut + (fin ? ' → ' + fin : '');
+        var label = (ORDINALS[i]||i+1+'e') + ' passage : ' + debut;
         return '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px;">' +
           '<input type="checkbox" class="rappel-psg-check" data-passage="' + label + '" checked onchange="updateRappelMessage()" style="width:14px;height:14px;">' +
           '<span style="font-weight:500;">' + label + '</span></label>';
@@ -1523,6 +1526,41 @@ function clearDates() {
   document.getElementById('filterDateA').value='';
   filterTable();
 }
+function populateFilterDropdowns() {
+  var clientSel = document.getElementById('filterClient');
+  var yearSel = document.getElementById('filterAnnee');
+  if (!clientSel || !yearSel) return;
+  
+  var currentClient = clientSel.value;
+  var currentYear = yearSel.value;
+  
+  // Repopulate clients
+  clientSel.innerHTML = '<option value="">Tous les clients</option>';
+  var clients = [...new Set(interventions.map(function(i){return i.client;}).filter(Boolean))].sort();
+  clients.forEach(function(cl) {
+    var opt = document.createElement('option');
+    opt.value = cl; opt.textContent = cl;
+    if (cl === currentClient) opt.selected = true;
+    clientSel.appendChild(opt);
+  });
+  
+  // Repopulate years: always include current year, next year, + years from data
+  yearSel.innerHTML = '<option value="">Toutes les années</option>';
+  var thisYear = new Date().getFullYear();
+  var dataYears = [...new Set(interventions.map(function(i){
+    var d = i.dateEmission || '';
+    return d ? d.substring(0,4) : null;
+  }).filter(Boolean))];
+  // Merge and always add current + next year
+  var allYears = [...new Set([String(thisYear), String(thisYear+1)].concat(dataYears))].sort().reverse();
+  allYears.forEach(function(y) {
+    var opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    if (y === currentYear) opt.selected = true;
+    yearSel.appendChild(opt);
+  });
+}
+
 function filterTable() {
   var q = document.getElementById('searchInput').value.toLowerCase();
   var statut = document.getElementById('filterStatut').value;
@@ -1534,8 +1572,11 @@ function filterTable() {
     var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,i.assigne].some(function(v){return (v||'').toLowerCase().includes(q);});
     var ms = !statut || i.statut === statut;
     var mc = !client || i.client === client;
-    var dateRef = i.dateEmission || (i.createdAt||'').substring(0,10);
-    var ma = !annee || (dateRef && dateRef.startsWith(annee));
+    // Try multiple date sources for filtering
+    var dateRef = i.dateEmission || '';
+    // Also check passages for date range filter
+    var allDates = [dateRef, (i.createdAt||'').substring(0,10)].filter(Boolean);
+    var ma = !annee || allDates.some(function(d){return d && d.startsWith(annee);});
     var mde = !dateDe || (dateRef && dateRef >= dateDe);
     var mda = !dateA || (dateRef && dateRef <= dateA);
     return mq && ms && mc && ma && mde && mda;
@@ -1543,6 +1584,7 @@ function filterTable() {
   if(window.renderTable) window.renderTable(filtered);
   else renderTable(filtered);
 }
+window.filterTable = filterTable;
 
 
 // ── TOAST ──
@@ -1654,22 +1696,8 @@ onAuthStateChanged(auth, async (user) => {
   const snap = await getDocs(query(collection(db,'suivi'), orderBy('createdAt','desc')));
   interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
   window.interventions = interventions;
-  // Populate client filter
-  var clientSel = document.getElementById('filterClient');
-  var clients = [...new Set(interventions.map(i=>i.client).filter(Boolean))].sort();
-  clients.forEach(function(cl) {
-    var opt = document.createElement('option'); opt.value=cl; opt.textContent=cl; clientSel.appendChild(opt);
-  });
-  // Populate year filter
-  var yearSel = document.getElementById('filterAnnee');
-  var years = [...new Set(interventions.map(function(i){
-    var d = i.dateEmission || (i.createdAt||'').substring(0,10);
-    return d ? d.substring(0,4) : null;
-  }).filter(Boolean))].sort().reverse();
-  years.forEach(function(y) {
-    var opt = document.createElement('option'); opt.value=y; opt.textContent=y; yearSel.appendChild(opt);
-  });
-  if(window.renderTable) window.renderTable(interventions);
+  populateFilterDropdowns();
+  filterTable();
 });
 
 // ── UPDATE NOTIF FIELDS IN FIRESTORE (array push) ──
