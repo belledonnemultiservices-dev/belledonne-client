@@ -662,7 +662,7 @@ function openCalendarConfirm() {
   var adresse = (document.getElementById('fAdresse') && document.getElementById('fAdresse').value) || '—';
   var bc = (document.getElementById('fBC') && document.getElementById('fBC').value) || '';
   var observations = (document.getElementById('fObservations') && document.getElementById('fObservations').value) || '';
-  var telInputs = document.querySelectorAll('#coordContainer input');
+  var telInputs = document.querySelectorAll('#phonesContainer input');
   var tels = Array.from(telInputs).map(function(i){ return i.value.trim(); }).filter(Boolean);
 
   function fmtDate(str) {
@@ -1076,12 +1076,9 @@ window.renderTable = function renderTable(list) {
     html += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
     html += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
     var na = toNotifArray(item.notifAgenda);
-    var agDots = na.length > 0 ? na.map(function(t){ var d=new Date(t); var ds=d.toLocaleDateString('fr-FR')+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); return '<span class=\'notif-dot\' title=\''+ds+'\'>&#9679;</span>'; }).join('') : '<span class=\'notif-none\'>&mdash;</span>';
-    html += '<div class=\'notif-section\' id=\'agenda-sect-'+item.id+'\' ><span class=\'notif-label\'>&#128197; Agenda</span>'+agDots+'</div>';
+    html += '<div class="notif-section" id="agenda-sect-'+item.id+'"><span class="notif-label">&#128197; Agenda</span>'+notifHistoryHtml('agenda',na,'&#128197;','sms')+'</div>';
 
-    if (hasPsg) {
-      html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(\'' + item.id + '\')">&#128172; Rappel SMS</button></div>';
-    }
+
 
     html += '</div></td></tr>';
   });
@@ -1274,9 +1271,8 @@ function updateNotifRow(itemId) {
       if (sects[2]) sects[2].innerHTML = '<span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire',nl,'🏠','locataire');
       if (sects[3]) sects[3].innerHTML = '<span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms',ns,'💬','sms');
       var na2 = toNotifArray(item.notifAgenda);
-      var agDots2 = na2.length > 0 ? na2.map(function(t){ var d=new Date(t); var ds=d.toLocaleDateString('fr-FR')+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); return '<span class="notif-dot" title="'+ds+'">&#9679;</span>'; }).join('') : '<span class="notif-none">&mdash;</span>';
       var agSect = document.getElementById('agenda-sect-'+itemId);
-      if (agSect) agSect.innerHTML = '<span class="notif-label">&#128197; Agenda</span>' + agDots2;
+      if (agSect) agSect.innerHTML = '<span class="notif-label">&#128197; Agenda</span>'+notifHistoryHtml('agenda',na2,'&#128197;','sms');
     }
   }
 }
