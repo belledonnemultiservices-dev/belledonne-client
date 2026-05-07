@@ -510,34 +510,29 @@ function removeFile(fileInputId, chosenId, actionsId) {
 }
 
 // ── PDF VIEWER ──
-async function openPdfViewer(fileInputId) {
+function openPdfViewer(fileInputId) {
   let url = pdfBlobUrls[fileInputId];
   let title = 'Aperçu PDF';
-  // Fallback to existing Firebase URL - fetch as blob for iframe display
   if (!url && fileInputId === 'filePL' && window._existingPlUrl) url = window._existingPlUrl;
   if (!url && fileInputId === 'fileBC' && window._existingBcUrl) url = window._existingBcUrl;
   if (!url) { alert('Aucun fichier disponible.'); return; }
-  // If Firebase URL, fetch and convert to blob
+
+  // Show the side panel
+  const panel = document.getElementById('pdfViewerPanel');
+  panel.style.display = 'flex';
+  const overlay = document.getElementById('modal');
+  overlay.style.justifyContent = 'flex-start';
+  overlay.style.paddingRight = '48vw';
+
   if (url.startsWith('http')) {
-    try {
-      const panel = document.getElementById('pdfViewerPanel');
-      panel.style.display = 'flex';
-      const overlay = document.getElementById('modal');
-      overlay.style.justifyContent = 'flex-start';
-      overlay.style.paddingRight = '48vw';
-      document.getElementById('pdfViewerTitle').textContent = 'Chargement...';
-      document.getElementById('pdfViewerFrame').src = '';
-      const resp = await fetch(url);
-      const blob = await resp.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      pdfBlobUrls[fileInputId] = blobUrl; // cache for next time
-      document.getElementById('pdfViewerTitle').textContent = fileInputId === 'filePL' ? 'Affaire PL' : 'Bon de commande';
-      document.getElementById('pdfViewerFrame').src = blobUrl + '#toolbar=1&navpanes=0&view=FitH';
-    } catch(e) {
-      alert('Impossible de charger le PDF. Essayez de le télécharger depuis le tableau.');
-    }
+    // Firebase Storage URL — use Google Docs Viewer to bypass CORS
+    title = fileInputId === 'filePL' ? 'Affaire PL' : 'Bon de commande';
+    const viewerUrl = 'https://docs.google.com/viewer?url=' + encodeURIComponent(url) + '&embedded=true';
+    document.getElementById('pdfViewerTitle').textContent = title;
+    document.getElementById('pdfViewerFrame').src = viewerUrl;
     return;
   }
+
   const input = document.getElementById(fileInputId);
   title = input.files[0]?.name || 'Aperçu PDF';
   document.getElementById('pdfViewerTitle').textContent = title;
