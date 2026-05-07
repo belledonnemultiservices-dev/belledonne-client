@@ -510,16 +510,37 @@ function removeFile(fileInputId, chosenId, actionsId) {
 }
 
 // ── PDF VIEWER ──
-function openPdfViewer(fileInputId) {
+async function openPdfViewer(fileInputId) {
   let url = pdfBlobUrls[fileInputId];
-  // Fallback to existing Firebase URL
-  if (!url && fileInputId === 'filePL') url = window._existingPlUrl;
-  if (!url && fileInputId === 'fileBC') url = window._existingBcUrl;
-  if (!url) { window.open && alert && alert('Aucun fichier disponible.'); return; }
-  // If it's a Firebase URL, open in new tab (no blob)
-  if (url.startsWith('http')) { window.open(url, '_blank'); return; }
+  let title = 'Aperçu PDF';
+  // Fallback to existing Firebase URL - fetch as blob for iframe display
+  if (!url && fileInputId === 'filePL' && window._existingPlUrl) url = window._existingPlUrl;
+  if (!url && fileInputId === 'fileBC' && window._existingBcUrl) url = window._existingBcUrl;
+  if (!url) { alert('Aucun fichier disponible.'); return; }
+  // If Firebase URL, fetch and convert to blob
+  if (url.startsWith('http')) {
+    try {
+      const panel = document.getElementById('pdfViewerPanel');
+      panel.style.display = 'flex';
+      const overlay = document.getElementById('modal');
+      overlay.style.justifyContent = 'flex-start';
+      overlay.style.paddingRight = '48vw';
+      document.getElementById('pdfViewerTitle').textContent = 'Chargement...';
+      document.getElementById('pdfViewerFrame').src = '';
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      pdfBlobUrls[fileInputId] = blobUrl; // cache for next time
+      document.getElementById('pdfViewerTitle').textContent = fileInputId === 'filePL' ? 'Affaire PL' : 'Bon de commande';
+      document.getElementById('pdfViewerFrame').src = blobUrl + '#toolbar=1&navpanes=0&view=FitH';
+    } catch(e) {
+      alert('Impossible de charger le PDF. Essayez de le télécharger depuis le tableau.');
+    }
+    return;
+  }
   const input = document.getElementById(fileInputId);
-  document.getElementById('pdfViewerTitle').textContent = input.files[0]?.name || 'Aperçu PDF';
+  title = input.files[0]?.name || 'Aperçu PDF';
+  document.getElementById('pdfViewerTitle').textContent = title;
   document.getElementById('pdfViewerFrame').src = url + '#toolbar=1&navpanes=0&view=FitH';
   const panel = document.getElementById('pdfViewerPanel');
   panel.style.display = 'flex';
@@ -575,14 +596,14 @@ function openModal(id = null) {
       // Store firebase URL for preview
       window._existingPlUrl = item.plUrl;
       const btn = a.querySelector('.btn-preview');
-      if (btn) { btn.onclick = function() { window.open(item.plUrl, '_blank'); }; }
+      if (btn) { btn.onclick = function() { openPdfViewer('filePL'); }; }
     }
     if (item.bcUrl) {
       const c = document.getElementById('chosenBC'); c.textContent = '✓ Fichier existant'; c.style.display = 'block';
       const a = document.getElementById('actionsBC'); a.style.display = 'flex';
       window._existingBcUrl = item.bcUrl;
       const btn = a.querySelector('.btn-preview');
-      if (btn) { btn.onclick = function() { window.open(item.bcUrl, '_blank'); }; }
+      if (btn) { btn.onclick = function() { openPdfViewer('fileBC'); }; }
     }
   }
   document.getElementById('modal').classList.add('open');
