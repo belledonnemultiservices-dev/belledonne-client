@@ -726,6 +726,11 @@ function fmtNotifDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
 }
+function toggleNotifDropdown(el) {
+  event.stopPropagation();
+  document.querySelectorAll('.notif-history.open').forEach(x => { if(x!==el) x.classList.remove('open'); });
+  el.classList.toggle('open');
+}
 function notifHistoryHtml(field, arr, icon, cls) {
   if (!arr.length) return '<span class="notif-none">' + icon + ' Jamais</span>';
   const last = arr[arr.length-1];
@@ -734,7 +739,7 @@ function notifHistoryHtml(field, arr, icon, cls) {
   const items = arr.slice().reverse().map((ts,i) =>
     '<div class="notif-dropdown-item">' + (i===0?'Dernier : ':'') + fmtNotifDate(ts) + '</div>'
   ).join('');
-  return '<div class="notif-history"><button class="notif-history-btn ' + cls + '" onclick="event.stopPropagation();this.parentElement.classList.toggle(\'open\')">' + label + '</button><div class="notif-dropdown">' + items + '</div></div>';
+  return '<div class="notif-history" onclick="event.stopPropagation()"><button class="notif-history-btn ' + cls + '" onclick="toggleNotifDropdown(this.parentElement)">' + label + '</button><div class="notif-dropdown">' + items + '</div></div>';
 }
 function fmtPassage(val) {
   if (!val) return '—';
