@@ -186,3 +186,115 @@ exports.sendSMS = functions
       res.status(500).json({ error: err.message });
     }
   });
+
+// ── AJOUTER PASSAGES AU GOOGLE CALENDAR DU TECHNICIEN ────────────
+exports.addToCalendar = functions
+  .region("europe-west1")
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+
+    const { technicienEmail, passages, nature, nomClient, adresse, bc, observations, interventionId } = req.body;
+
+    if (!technicienEmail || !passages || !passages.length) {
+      res.status(400).json({ error: "technicienEmail et passages requis" });
+      return;
+    }
+
+    try {
+      const { google } = require("googleapis");
+
+      // Authentification via Service Account avec délégation sur le calendrier du technicien
+      const serviceAccountKey = {
+        type: "service_account",
+        project_id: functions.config().gcal.project_id,
+        private_key_id: functions.config().gcal.private_key_id,
+        private_key: functions.config().gcal.private_key.replace(/\\n/g, "\n"),
+        client_email: functions.config().gcal.client_email,
+        client_id: functions.config().gcal.client_id,
+        token_uri: "https://oauth2.googleapis.com/token",
+      };
+
+      const auth = new google.auth.GoogleAuth({
+        credentials: serviceAccountKey,
+        scopes: ["https://www.googleapis.com/auth/calendar"],
+      });
+
+      const calendar = google.calendar({ version: "v3", auth });
+
+      const results = [];
+      const errors = [];
+
+      for (const passage of passages) {
+        // Format attendu : "2024-06-15T08:00|2024-06-15T12:00"
+        const parts = passage.split("|");
+        const debut = parts[0];
+        const fin = parts[1] || "";
+
+        if (!debut) continue;
+
+        // Si pas de fin, on met 1h par défaut
+        let startDt, endDt;
+        try {
+          startDt = new Date(debut).toISOString();
+          endDt = fin ? new Date(fin).toISOString() : new Date(new Date(debut).getTime() + 3600000).toISOString();
+        } catch(e) {
+          errors.push({ passage, error: "Format date invalide" });
+          continue;
+        }
+
+        // Construction de la description de l'événement
+        const description = [
+          bc ? `N° BC : ${bc}` : "",
+          nature ? `Nature : ${nature}` : "",
+          nomClient ? `Client : ${nomClient}` : "",
+          observations ? `Observations : ${observations}` : "",
+          interventionId ? `Ref intervention : ${interventionId}` : "",
+        ].filter(Boolean).join("\n");
+
+        const event = {
+          summary: `[BMS] ${nature || "Intervention"} — ${nomClient || "Client"}`,
+          location: adresse || "",
+          description,
+          start: { dateTime: startDt, timeZone: "Europe/Paris" },
+          end: { dateTime: endDt, timeZone: "Europe/Paris" },
+          colorId: "9", // blueberry
+          reminders: {
+            useDefault: false,
+            overrides: [
+              { method: "popup", minutes: 60 },
+            ],
+          },
+        };
+
+        try {
+          // On insère l'événement dans l'agenda du technicien
+          // Le technicien doit avoir partagé son agenda avec le Service Account
+          const insertResult = await calendar.events.insert({
+            calendarId: technicienEmail,
+            resource: event,
+          });
+          results.push({ passage, eventId: insertResult.data.id, htmlLink: insertResult.data.htmlLink });
+          console.log("Événement créé:", insertResult.data.id, "pour", technicienEmail);
+        } catch(insertErr) {
+          console.error("Erreur insertion événement:", insertErr.message);
+          errors.push({ passage, error: insertErr.message });
+        }
+      }
+
+      res.status(200).json({
+        success: results.length > 0,
+        created: results.length,
+        errors: errors.length,
+        results,
+        errors,
+      });
+
+    } catch(err) {
+      console.error("Erreur addToCalendar:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
