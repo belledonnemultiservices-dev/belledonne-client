@@ -1170,28 +1170,17 @@ function toggleNotifRow(id) {
 
 window.openRappelSms = async function(id) {
   window._nsCurrentItemId = id;
-  window._nsCurrentClient = '';
   const item = (window.interventions||[]).find(i => i.id === id);
-  if (item) window._nsCurrentClient = item.client || '';
   if (!item) return;
-  const passages = (item.passages||[]).filter(Boolean);
-  const passLignes = passages.map((p,i) => {
-    const [debut] = p.includes('|') ? p.split('|') : [p];
-    return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
-  }).join(' | ');
-  const phones = Array.isArray(item.coordonnees) ? item.coordonnees : (item.coordonnees ? [item.coordonnees] : []);
-  populateSmsPanel(phones, passLignes, item.adresse||'', item.bc||'', item.nature||'');
-  // Override with rappel message
-  const rappelMsg = 'Rappel Belledonne : votre intervention est prevue ' + passLignes + ' - ' + (item.adresse||'').substring(0,30) + '. Contact : 06 95 67 26 03.';
-  const bodyEl = document.getElementById('nsSmsBody');
-  if (bodyEl) { bodyEl.value = rappelMsg; updateSmsCount(); }
-  switchNotifTab('sms');
-  const sel = document.getElementById('nsSel');
-  sel.innerHTML = '<option value="">—</option>';
-  document.getElementById('nsSubject').value = '';
-  document.getElementById('nsBody').value = '';
+  window._nsCurrentClient = item.client || '';
+  // Reset modal state
   document.getElementById('nsSuccess').style.display = 'none';
   document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button><button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
+  // Load contacts for bailleur tab (needed for other tabs)
+  const sel = document.getElementById('nsSel');
+  if (sel) { sel.innerHTML = '<option value="">—</option>'; await window._loadContactsForSuivi(item.client||'', sel); }
+  // Switch to rappel tab and populate
+  switchNotifTab('rappel');
   document.getElementById('modalNotifSuivi').classList.add('open');
 };
 
