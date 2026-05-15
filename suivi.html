@@ -771,6 +771,9 @@ async function saveIntervention() {
   const btn = document.getElementById('btnSave');
   btn.disabled = true; btn.textContent = 'Enregistrement...';
 
+  // Sync local interventions array from window (populated by module)
+  if (window.interventions && window.interventions.length) interventions = window.interventions;
+
   try {
     let plUrl = editId ? (interventions.find(i=>i.id===editId)?.plUrl || '') : '';
     let bcUrl = editId ? (interventions.find(i=>i.id===editId)?.bcUrl || '') : '';
@@ -832,6 +835,7 @@ async function deleteIntervention(id) {
   if (!confirm('Supprimer cette intervention ?')) return;
   try {
     await window._deleteSuivi(id);
+    if (window.interventions && window.interventions.length) interventions = window.interventions;
     interventions = interventions.filter(i=>i.id!==id);
     window.interventions = interventions;
     filterTable();
