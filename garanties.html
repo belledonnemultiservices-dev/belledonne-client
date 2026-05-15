@@ -828,13 +828,20 @@ window._loadGaranties = async function(clientFilter) {
   } catch(e) { console.error(e); }
 };
 
-function populateClientFilter() {
+async function populateClientFilter() {
   const sel = document.getElementById('filterClient');
   if (!sel) return; sel.style.display = '';
   const current = sel.value;
-  const all = new Set((window.garanties||[]).map(g => g.client).filter(Boolean));
-  sel.innerHTML = '<option value="">Tous les clients</option>';
-  [...all].sort().forEach(cl => { const o=document.createElement('option'); o.value=cl; o.textContent=cl; if(cl===current) o.selected=true; sel.appendChild(o); });
+  try {
+    const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+    sel.innerHTML = '<option value="">Tous les clients</option>';
+    snap.docs.forEach(d => {
+      const cl = d.data().client; if (!cl) return;
+      const o = document.createElement('option'); o.value = cl; o.textContent = cl;
+      if (cl === current) o.selected = true;
+      sel.appendChild(o);
+    });
+  } catch(e) { console.error('populateClientFilter:', e); }
 }
 
 // ── Sauvegarder (ajout ou update) ──

@@ -1604,9 +1604,11 @@ window.populateFilterDropdowns = function populateFilterDropdowns() {
   var currentClient = clientSel.value;
   var currentYear = yearSel.value;
   
-  // Repopulate clients
+  // Repopulate clients: merge from interventions + registered users
   clientSel.innerHTML = '<option value="">Tous les clients</option>';
-  var clients = [...new Set(interventions.map(function(i){return i.client;}).filter(Boolean))].sort();
+  var fromData = [...new Set(interventions.map(function(i){return i.client;}).filter(Boolean))];
+  var fromUsers = window._allClients || [];
+  var clients = [...new Set(fromData.concat(fromUsers))].sort();
   clients.forEach(function(cl) {
     var opt = document.createElement('option');
     opt.value = cl; opt.textContent = cl;
@@ -1736,6 +1738,7 @@ onAuthStateChanged(auth, async (user) => {
     const snapClients = await getDocs(query(collection(db, 'users'), where('role','==','client')));
     const clientSel = document.getElementById('fClient');
     const existing = [...new Set(snapClients.docs.map(d => d.data().client).filter(Boolean))];
+    window._allClients = existing; // Store for filter dropdown
     existing.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name; opt.textContent = name;
