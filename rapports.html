@@ -638,6 +638,15 @@ function renderRapports(list) {
 
 let rapports = [];
 let _currentFilter = null;
+window._currentFilter = null;
+
+function applyClientFilter() {
+  var sel = document.getElementById('filterClient');
+  var val = sel ? sel.value || null : null;
+  _currentFilter = val;
+  window._currentFilter = val;
+  if (window.loadRapports) window.loadRapports(val);
+}
 
 function filterRapports() {
   const q = (document.getElementById('searchInput').value || '').toLowerCase();
@@ -843,17 +852,13 @@ if (btnSaveModal) {
         if (dropMsg) { dropMsg.style.display = 'none'; dropMsg.textContent = ''; }
         if (fileInput) fileInput.value = '';
       }
-      await loadRapports(_currentFilter);
+      await loadRapports(window._currentFilter);
     } catch(e) { alert('Erreur : ' + e.message); }
     _saving = false; btnSaveModal.disabled = false; btnSaveModal.textContent = window._editRapportId ? 'Mettre à jour' : 'Enregistrer le rapport';
   });
 }
 
-function applyClientFilter() {
-  var sel = document.getElementById('filterClient');
-  _currentFilter = sel ? sel.value || null : null;
-  if (window.loadRapports) window.loadRapports(_currentFilter);
-}
+
 
 async function loadClientsIntoSelect() {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
@@ -976,7 +981,7 @@ onAuthStateChanged(auth, async function(user) {
         fcSel.appendChild(opt);
       });
     })();
-    _currentFilter = null;
+    window._currentFilter = null;
     await loadRapports(null);
   } else {
     try {
@@ -989,7 +994,7 @@ onAuthStateChanged(auth, async function(user) {
         const fname = document.getElementById("sideFooterName"); if (fname) fname.textContent = p.client || user.email;
         const frole = document.getElementById("sideFooterRole"); if (frole) frole.textContent = "Client";
         const navSuivi = document.getElementById('navSuiviItem'); if (navSuivi) navSuivi.style.display = 'none';
-        _currentFilter = p.client;
+        window._currentFilter = p.client;
         await loadRapports(p.client);
         const rl = document.getElementById('reportsList'); if(rl) rl.classList.add('is-client');
       }
