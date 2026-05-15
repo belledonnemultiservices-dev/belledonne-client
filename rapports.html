@@ -764,7 +764,7 @@ const storage = getStorage(app);
 
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
 
-async function loadRapports(clientFilter) {
+window.loadRapports = async function loadRapports(clientFilter) {
   try {
     const snap = clientFilter
       ? await getDocs(query(collection(db, "rapports"), where("client", "==", clientFilter)))
@@ -852,7 +852,7 @@ if (btnSaveModal) {
 function applyClientFilter() {
   var sel = document.getElementById('filterClient');
   _currentFilter = sel ? sel.value || null : null;
-  loadRapports(_currentFilter);
+  if (window.loadRapports) window.loadRapports(_currentFilter);
 }
 
 async function loadClientsIntoSelect() {
