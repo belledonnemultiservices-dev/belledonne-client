@@ -241,14 +241,14 @@
     </div>
   </div>
         <div class="sidebar-client">
-    <div class="client-label">Client</div>
+    
     <div class="client-name" id="sideClientName">—</div>
     <div class="client-contract" id="sideClientId"></div>
   </div>
   <nav class="sidebar-nav">
     <div class="nav-group-label">Principal</div>
     <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
-    <a class="nav-item" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
+    
     <a class="nav-item active" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
     <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
     <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
@@ -292,7 +292,7 @@
     <div class="page-header">
       <div>
         <div class="page-title">Rapports d'intervention</div>
-        <div class="page-sub">Consultez les rapports d'interventions</div>
+        <div class="page-sub">Déposez et consultez tous les rapports PDF par bon de commande</div>
       </div>
       <button class="btn-upload" id="btnOpenModal" style="display:none;">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
@@ -306,6 +306,7 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         <input class="search-input" type="text" id="searchInput" placeholder="Rechercher par bon de commande, date..." />
       </div>
+      <select class="filter-select" id="filterClient" onchange="applyClientFilter()" style="display:none;"><option value="">Tous les clients</option></select>
       <select class="filter-select" id="filterPassage">
         <option value="">Tous les passages</option>
         <option value="1er passage">1er passage</option>
@@ -846,6 +847,13 @@ if (btnSaveModal) {
   });
 }
 
+function applyClientFilter() {
+  var sel = document.getElementById('filterClient');
+  var val = sel ? sel.value : '';
+  _currentFilter = val || null;
+  loadRapports(_currentFilter);
+}
+
 async function loadClientsIntoSelect() {
   const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
   const sel = document.getElementById("inputClient");
@@ -954,6 +962,18 @@ onAuthStateChanged(auth, async function(user) {
     var btn = document.getElementById("btnOpenModal"); if (btn) btn.style.display = "";
     const rl2=document.getElementById('reportsList'); if(rl2) rl2.classList.remove('is-client');
     loadClientsIntoSelect();
+    // Populate filterClient in search bar
+    const fcSel = document.getElementById('filterClient');
+    if (fcSel) {
+      fcSel.style.display = '';
+      const snapCl = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+      fcSel.innerHTML = '<option value="">Tous les clients</option>';
+      snapCl.docs.forEach(d => {
+        const cl = d.data().client; if (!cl) return;
+        const opt = document.createElement('option'); opt.value = cl; opt.textContent = cl;
+        fcSel.appendChild(opt);
+      });
+    }
     _currentFilter = null;
     await loadRapports(null);
   } else {

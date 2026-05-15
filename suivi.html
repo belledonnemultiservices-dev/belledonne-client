@@ -166,7 +166,7 @@
     <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
   </div>
   <div class="sidebar-client">
-    <div class="client-label">Client</div>
+    
     <div class="client-name" id="sideClientName">—</div>
     <div class="client-contract" id="sideClientId"></div>
   </div>
@@ -464,7 +464,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
           Notifier le client
         </button>
-        <button id="btnAddCalendar" onclick="openCalendarConfirm()" style="display:none;align-items:center;gap:7px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:10px 18px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">
+        <button id="btnAddCalendar" onclick="addToCalendar()" style="display:none;align-items:center;gap:7px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:10px 18px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
           Ajouter à l'agenda
         </button>
@@ -647,134 +647,66 @@ function updateNotifyBtn() {
   if (btnCal) btnCal.style.display = (hasPsgs && hasAssigne) ? 'inline-flex' : 'none';
 }
 
-function openCalendarConfirm() {
-  var assigne = document.getElementById('fAssigne') && document.getElementById('fAssigne').value;
-  var passages = getPassageDates();
+async function addToCalendar() {
+  const assigne = document.getElementById('fAssigne')?.value;
+  const passages = getPassageDates();
   if (!assigne || !passages.length) {
     showToast('Veuillez sélectionner un technicien et ajouter au moins un passage.', true);
     return;
   }
-  var tech = (window._techniciens || []).find(function(t){ return t.nomComplet === assigne || t.nom === assigne; });
-  var techName = tech ? ((tech.prenom || '') + ' ' + (tech.nom || '')).trim() : assigne;
-  var techEmail = tech && tech.email ? tech.email : '—';
-  var nature = (document.getElementById('fNature') && document.getElementById('fNature').value) || '—';
-  var nomClient = (document.getElementById('fNomClient') && document.getElementById('fNomClient').value) || (document.getElementById('fClient') && document.getElementById('fClient').value) || '—';
-  var adresse = (document.getElementById('fAdresse') && document.getElementById('fAdresse').value) || '—';
-  var bc = (document.getElementById('fBC') && document.getElementById('fBC').value) || '';
-  var observations = (document.getElementById('fObservations') && document.getElementById('fObservations').value) || '';
-  var telInputs = document.querySelectorAll('#phonesContainer input');
-  var tels = Array.from(telInputs).map(function(i){ return i.value.trim(); }).filter(Boolean);
 
-  function fmtDate(str) {
-    if (!str) return '—';
-    var d = new Date(str);
-    return d.toLocaleDateString('fr-FR', {weekday:'short', day:'2-digit', month:'long'}) + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  // Récupérer l'email du technicien depuis _techniciens
+  const tech = (window._techniciens || []).find(t => t.nomComplet === assigne || t.nom === assigne);
+  if (!tech || !tech.email) {
+    showToast('Email du technicien introuvable. Vérifiez sa fiche.', true);
+    return;
   }
 
-  var passagesHtml = passages.map(function(p, i) {
-    var parts = p.split('|');
-    var debut = fmtDate(parts[0]);
-    var fin = parts[1] ? fmtDate(parts[1]) : '—';
-    var label = ORDINALS[i] || ((i+1) + 'e');
-    return '<div style="padding:8px 12px;background:#F8F9FC;border-radius:6px;margin-bottom:6px;font-size:13px;">'
-      + '<strong>' + label + ' passage</strong><br>'
-      + '🕐 Début : ' + debut + '<br>'
-      + '🕐 Fin : ' + fin + '</div>';
-  }).join('');
+  const nature = document.getElementById('fNature')?.value || '';
+  const nomClient = document.getElementById('fNomClient')?.value || document.getElementById('fClient')?.value || '';
+  const adresse = document.getElementById('fAdresse')?.value || '';
+  const bc = document.getElementById('fBC')?.value || '';
+  const observations = document.getElementById('fObservations')?.value || '';
 
-  var infoHtml = '<div style="margin-bottom:14px;">'
-    + '<div style="font-size:11px;color:#6B7280;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Technicien</div>'
-    + '<div style="font-weight:600;font-size:14px;">👤 ' + techName + '</div>'
-    + '<div style="font-size:12px;color:#6B7280;">📧 ' + techEmail + '</div>'
-    + '</div>'
-    + '<div style="margin-bottom:14px;">'
-    + '<div style="font-size:11px;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Intervention</div>'
-    + '<div style="font-size:13px;line-height:1.8;">'
-    + '<strong>Nature :</strong> ' + nature + '<br>'
-    + '<strong>Client :</strong> ' + nomClient + '<br>'
-    + '<strong>Adresse :</strong> ' + adresse + '<br>'
-    + (tels.length ? '<strong>Tel :</strong> ' + tels.join(' / ') + '<br>' : '')
-    + (bc ? '<strong>N° BC :</strong> ' + bc + '<br>' : '')
-    + (observations ? '<strong>Obs :</strong> ' + observations : '')
-    + '</div></div>'
-    + '<div>'
-    + '<div style="font-size:11px;color:#6B7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">Passages (' + passages.length + ')</div>'
-    + passagesHtml + '</div>';
+  const btnCal = document.getElementById('btnAddCalendar');
+  const origText = btnCal.innerHTML;
+  btnCal.disabled = true;
+  btnCal.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;animation:spin 1s linear infinite"><path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/></svg> Envoi...';
 
-  document.getElementById('calConfirmBody').innerHTML = infoHtml;
-  window._calendarPayload = { tech: tech, assigne: assigne, passages: passages, nature: nature, nomClient: nomClient, adresse: adresse, bc: bc, observations: observations, tels: tels, techName: techName };
-  document.getElementById('modalCalendarConfirm').style.display = 'flex';
-}
-
-function closeCalendarConfirm() {
-  document.getElementById('modalCalendarConfirm').style.display = 'none';
-  window._calendarPayload = null;
-}
-
-async function sendToCalendar() {
-  var payload = window._calendarPayload;
-  if (!payload) return;
-  var tech = payload.tech;
-  if (!tech || !tech.email) { showToast('Email du technicien introuvable.', true); closeCalendarConfirm(); return; }
-  var btnSend = document.getElementById('btnCalendarSend');
-  btnSend.disabled = true;
-  btnSend.innerHTML = 'Envoi en cours...';
   try {
-    var resp = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar', {
+    const resp = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ technicienEmail: tech.email, passages: payload.passages, nature: payload.nature, nomClient: payload.nomClient, adresse: payload.adresse, bc: payload.bc, observations: payload.observations, tels: payload.tels, interventionId: editId || '' })
+      body: JSON.stringify({
+        technicienEmail: tech.email,
+        passages,
+        nature,
+        nomClient,
+        adresse,
+        bc,
+        observations,
+        interventionId: editId || '',
+      })
     });
-    var result = await resp.json();
-    closeCalendarConfirm();
+    const result = await resp.json();
     if (result.success || result.created > 0) {
-      if (editId) {
-        var now = new Date().toISOString();
-        try {
-          var fsmod = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-          var fbmod = await import('./firebase.js');
-          await fsmod.updateDoc(fsmod.doc(fbmod.db, 'suivi', editId), { notifAgenda: fsmod.arrayUnion(now) });
-          var idx3 = interventions.findIndex(function(i){ return i.id === editId; });
-          if (idx3 !== -1) {
-            if (!interventions[idx3].notifAgenda) interventions[idx3].notifAgenda = [];
-            interventions[idx3].notifAgenda.push(now);
-            updateNotifRow(editId);
-          }
-        } catch(e) { console.warn('notifAgenda update failed:', e); }
+      showToast(`✅ ${result.created} passage(s) ajouté(s) à l'agenda de ${tech.prenom || assigne}`);
+      if (result.errors && result.errors.length > 0) {
+        console.warn('Passages en erreur:', result.errors);
       }
-      showCalendarSuccessToast(payload.techName, result.created, payload.passages.length);
     } else {
-      var firstErr = (result.errors && result.errors[0] && result.errors[0].error) || result.error || 'Erreur inconnue';
+      const firstErr = result.errors?.[0]?.error || result.error || 'Erreur inconnue';
       showToast('Erreur agenda : ' + firstErr, true);
+      console.error('addToCalendar errors:', result);
     }
   } catch(err) {
-    closeCalendarConfirm();
     showToast('Erreur réseau : ' + err.message, true);
+    console.error(err);
   } finally {
-    btnSend.disabled = false;
-    btnSend.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg> Confirmer';
+    btnCal.disabled = false;
+    btnCal.innerHTML = origText;
   }
 }
-
-function showCalendarSuccessToast(techName, created, total) {
-  var existing = document.getElementById('calSuccessToast');
-  if (existing) existing.remove();
-  var toast = document.createElement('div');
-  toast.id = 'calSuccessToast';
-  toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9999;background:#1E1B4B;color:#fff;border-radius:12px;padding:16px 22px;display:flex;align-items:flex-start;gap:14px;box-shadow:0 8px 32px rgba(0,0,0,.22);min-width:320px;max-width:460px;';
-  var errCount = total - created;
-  var pluriel = created > 1 ? 's' : '';
-  toast.innerHTML = '<div style="background:#4338CA;border-radius:8px;padding:8px;flex-shrink:0;"><svg viewBox="0 0 24 24" fill="white" style="width:20px;height:20px;display:block;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg></div>'
-    + '<div style="flex:1;">'
-    + '<div style="font-weight:700;font-size:14px;margin-bottom:3px;">Agenda mis &agrave; jour &#10003;</div>'
-    + '<div style="font-size:13px;opacity:.85;">' + created + ' passage' + pluriel + ' ajout&eacute;' + pluriel + ' dans l&#39;agenda de <strong>' + techName + '</strong></div>'
-    + (errCount > 0 ? '<div style="font-size:12px;color:#FCA5A5;margin-top:3px;">&#9888; ' + errCount + ' passage(s) en erreur</div>' : '')
-    + '</div>'
-    + '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:20px;line-height:1;padding:0;margin-left:4px;">&times;</button>';
-  document.body.appendChild(toast);
-  setTimeout(function(){ if (toast.parentElement) toast.remove(); }, 7000);
-}
-
 function addPassage(value = '') {
   // value format: "YYYY-MM-DDTHH:MM|YYYY-MM-DDTHH:MM" (debut|fin) or single datetime
   passageCount++;
@@ -1075,10 +1007,11 @@ window.renderTable = function renderTable(list) {
     html += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
     html += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
     html += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
-    var na = toNotifArray(item.notifAgenda);
-    html += '<div class="notif-section" id="agenda-sect-'+item.id+'"><span class="notif-label">&#128197; Agenda</span>'+notifHistoryHtml('agenda',na,'&#128197;','sms')+'</div>';
+    html += '<div class="notif-section"><span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms', nr, '🔔', 'sms') + '</div>';
 
-
+    if (hasPsg) {
+      html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(\'' + item.id + '\')">💬 Rappel SMS</button></div>';
+    }
 
     html += '</div></td></tr>';
   });
@@ -1270,9 +1203,7 @@ function updateNotifRow(itemId) {
       if (sects[1]) sects[1].innerHTML = '<span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur',nb,'🏢','bailleur');
       if (sects[2]) sects[2].innerHTML = '<span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire',nl,'🏠','locataire');
       if (sects[3]) sects[3].innerHTML = '<span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms',ns,'💬','sms');
-      var na2 = toNotifArray(item.notifAgenda);
-      var agSect = document.getElementById('agenda-sect-'+itemId);
-      if (agSect) agSect.innerHTML = '<span class="notif-label">&#128197; Agenda</span>'+notifHistoryHtml('agenda',na2,'&#128197;','sms');
+      if (sects[4]) sects[4].innerHTML = '<span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms',nr,'🔔','sms');
     }
   }
 }
@@ -2038,30 +1969,6 @@ window._loadTechniciens = loadTechniciens;
       <button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         Envoyer
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- MODALE CALENDAR CONFIRM -->
-<div id="modalCalendarConfirm" style="display:none;position:fixed;inset:0;z-index:1200;background:rgba(10,20,40,.45);align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;margin:20px;box-shadow:0 24px 64px rgba(0,0,0,.18);overflow:hidden;">
-    <div style="padding:22px 24px 16px;border-bottom:1px solid #E5E7EB;display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="background:#EEF2FF;border-radius:8px;padding:8px;"><svg viewBox="0 0 24 24" fill="#4338CA" style="width:18px;height:18px;display:block;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg></div>
-        <div>
-          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:#1E1B4B;">Ajouter a l'agenda</div>
-          <div style="font-size:12px;color:#6B7280;">Verifiez les informations avant d'envoyer</div>
-        </div>
-      </div>
-      <button onclick="closeCalendarConfirm()" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:22px;line-height:1;padding:0;">&times;</button>
-    </div>
-    <div id="calConfirmBody" style="padding:20px 24px;max-height:60vh;overflow-y:auto;"></div>
-    <div style="padding:16px 24px 20px;border-top:1px solid #E5E7EB;display:flex;justify-content:flex-end;gap:10px;">
-      <button onclick="closeCalendarConfirm()" style="height:40px;padding:0 18px;border:1px solid #E5E7EB;background:transparent;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;color:#6B7280;cursor:pointer;">Annuler</button>
-      <button id="btnCalendarSend" onclick="sendToCalendar()" style="display:inline-flex;align-items:center;gap:7px;background:#4338CA;color:#fff;border:none;padding:0 20px;height:40px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
-        Confirmer
       </button>
     </div>
   </div>
