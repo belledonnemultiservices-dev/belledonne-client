@@ -462,10 +462,12 @@ function filterCampagnes() {
   if (window.campagnes) campagnes = window.campagnes;
   const q = document.getElementById('searchInput').value.toLowerCase();
   const y = document.getElementById('filterYear').value;
+  const cl = window._currentClientFilter || '';
   const filtered = campagnes.filter(c => {
     const matchQ = !q || c.nom.toLowerCase().includes(q);
     const matchY = !y || (c.debut||'').startsWith(y);
-    return matchQ && matchY;
+    const matchC = !cl || c.client === cl;
+    return matchQ && matchY && matchC;
   });
   renderCampagnes(filtered);
 }

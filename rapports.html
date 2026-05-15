@@ -644,12 +644,14 @@ function filterRapports() {
   const p = document.getElementById('filterPassage').value;
   const n = document.getElementById('filterNuisible') ? document.getElementById('filterNuisible').value : '';
   const y = document.getElementById('filterYear').value;
+  const cl = document.getElementById('filterClient') ? document.getElementById('filterClient').value : '';
   const list = rapports.filter(r => {
     const mq = !q || (r.site||'').toLowerCase().includes(q) || (r.bc||'').toLowerCase().includes(q);
     const mp = !p || r.passage === p;
     const mn = !n || r.nuisible === n;
     const my = !y || (r.date||'').startsWith(y);
-    return mq && mp && mn && my;
+    const mc = !cl || r.client === cl;
+    return mq && mp && mn && my && mc;
   });
   renderRapports(list);
 }
