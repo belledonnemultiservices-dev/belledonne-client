@@ -611,19 +611,42 @@ window.openModal = function openModal(id = null) {
     document.getElementById('fNotes').value = item.notes || '';
     // Show existing PDF links if any
     if (item.plUrl) {
-      const c = document.getElementById('chosenPL'); c.textContent = '✓ Fichier existant'; c.style.display = 'block';
-      const a = document.getElementById('actionsPL'); a.style.display = 'flex';
-      // Store firebase URL for preview
       window._existingPlUrl = item.plUrl;
-      const btn = a.querySelector('.btn-preview');
-      if (btn) { btn.onclick = function() { openPdfViewer('filePL'); }; }
+      const chosen = document.getElementById('chosenPL');
+      const actions = document.getElementById('actionsPL');
+      const drop = document.getElementById('dropPL');
+      // Hide drop zone placeholder elements
+      if (drop) {
+        const icon = drop.querySelector('.drop-zone-icon'); if (icon) icon.style.display = 'none';
+        const txt = drop.querySelector('.drop-zone-text'); if (txt) txt.style.display = 'none';
+        const btn = drop.querySelector('.drop-zone-btn'); if (btn) btn.style.display = 'none';
+      }
+      // Show file name and actions
+      const fname = item.plUrl.split('%2F').pop().split('?')[0].replace(/%20/g,' ') || 'Affaire PL';
+      chosen.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;color:#1DA870;vertical-align:-2px;margin-right:4px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>' + decodeURIComponent(fname).split('_').slice(1).join('_') || 'PDF Affaire PL';
+      chosen.style.display = 'block';
+      actions.style.display = 'flex';
+      const previewBtn = actions.querySelector('.btn-preview');
+      if (previewBtn) previewBtn.onclick = function() { openPdfViewer('filePL'); };
     }
     if (item.bcUrl) {
-      const c = document.getElementById('chosenBC'); c.textContent = '✓ Fichier existant'; c.style.display = 'block';
-      const a = document.getElementById('actionsBC'); a.style.display = 'flex';
       window._existingBcUrl = item.bcUrl;
-      const btn = a.querySelector('.btn-preview');
-      if (btn) { btn.onclick = function() { openPdfViewer('fileBC'); }; }
+      const chosen = document.getElementById('chosenBC');
+      const actions = document.getElementById('actionsBC');
+      const drop = document.getElementById('dropBC');
+      // Hide drop zone placeholder elements
+      if (drop) {
+        const icon = drop.querySelector('.drop-zone-icon'); if (icon) icon.style.display = 'none';
+        const txt = drop.querySelector('.drop-zone-text'); if (txt) txt.style.display = 'none';
+        const btn = drop.querySelector('.drop-zone-btn'); if (btn) btn.style.display = 'none';
+      }
+      // Show file name and actions
+      const fname = item.bcUrl.split('%2F').pop().split('?')[0].replace(/%20/g,' ') || 'Bon de commande';
+      chosen.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;color:#1DA870;vertical-align:-2px;margin-right:4px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>' + decodeURIComponent(fname).split('_').slice(1).join('_') || 'PDF Bon de commande';
+      chosen.style.display = 'block';
+      actions.style.display = 'flex';
+      const previewBtn = actions.querySelector('.btn-preview');
+      if (previewBtn) previewBtn.onclick = function() { openPdfViewer('fileBC'); };
     }
   }
   document.getElementById('modal').classList.add('open');
@@ -756,6 +779,14 @@ function resetForm() {
   ['chosenPL','chosenBC'].forEach(id => { const el = document.getElementById(id); if(el) { el.textContent=''; el.style.display='none'; }});
   ['actionsPL','actionsBC'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
   ['filePL','fileBC'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  // Restore drop zone placeholder visibility
+  ['dropPL','dropBC'].forEach(zoneId => {
+    const zone = document.getElementById(zoneId);
+    if (!zone) return;
+    const icon = zone.querySelector('.drop-zone-icon'); if (icon) icon.style.display = '';
+    const txt = zone.querySelector('.drop-zone-text'); if (txt) txt.style.display = '';
+    const btn = zone.querySelector('.drop-zone-btn'); if (btn) btn.style.display = '';
+  });
   document.getElementById('passagesContainer').innerHTML = '';
   passageCount = 0;
   window._existingPlUrl = null; window._existingBcUrl = null;
