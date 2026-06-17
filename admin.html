@@ -243,6 +243,43 @@
       </div>
 
     </div>
+
+    <!-- IMPORT AUTOMATIQUE ACTIS -->
+    <div style="margin-top:32px;">
+      <div class="page-title" style="font-size:18px;margin-bottom:4px;">Import automatique ACTIS</div>
+      <div class="page-sub" style="margin-bottom:20px;">Traitement des bons de travaux reçus par email toutes les 15 minutes.</div>
+      <div class="card" style="max-width:560px;">
+        <div class="card-header" style="align-items:flex-start;">
+          <div>
+            <div class="card-title">Vérification des emails ACTIS</div>
+            <div class="card-sub">Activez ou désactivez l'import automatique des BT.</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex-shrink:0;">
+            <div id="actisToggleWrap" style="position:relative;width:44px;height:24px;">
+              <input type="checkbox" id="actisToggle" style="opacity:0;position:absolute;width:0;height:0;" onchange="toggleActisImport(this.checked)">
+              <span id="actisToggleTrack" style="position:absolute;inset:0;background:#ccc;border-radius:12px;transition:background 0.2s;"></span>
+              <span id="actisToggleThumb" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></span>
+            </div>
+            <span id="actisToggleLabel" style="font-size:13px;font-weight:500;color:var(--text-mid);">Chargement...</span>
+          </label>
+        </div>
+        <div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);">
+            <span style="font-size:12px;color:var(--text-muted);">Dernière exécution</span>
+            <span style="font-size:13px;font-weight:500;color:var(--text);" id="actisLastRun">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);">
+            <span style="font-size:12px;color:var(--text-muted);">BT importés au total</span>
+            <span style="font-size:13px;font-weight:500;color:var(--text);" id="actisTotal">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);">
+            <span style="font-size:12px;color:var(--text-muted);">Fréquence</span>
+            <span style="font-size:13px;font-weight:500;color:var(--text);">Toutes les 15 minutes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -276,7 +313,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where, addDoc, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, addDoc, deleteDoc, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -486,6 +523,51 @@ function showToast(msg) {
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 3500);
 }
+
+// ── IMPORT AUTOMATIQUE ACTIS ──────────────────────────────────────
+function setToggleUI(enabled) {
+  const track = document.getElementById('actisToggleTrack');
+  const thumb = document.getElementById('actisToggleThumb');
+  const label = document.getElementById('actisToggleLabel');
+  const checkbox = document.getElementById('actisToggle');
+  if (!track) return;
+  track.style.background = enabled ? 'var(--green)' : '#ccc';
+  thumb.style.transform = enabled ? 'translateX(20px)' : 'translateX(0)';
+  label.textContent = enabled ? 'Activé' : 'Désactivé';
+  label.style.color = enabled ? 'var(--green)' : 'var(--text-muted)';
+  checkbox.checked = enabled;
+}
+
+function formatLastRun(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+onSnapshot(doc(db, 'config', 'actis-import'), snap => {
+  if (!snap.exists()) {
+    setToggleUI(true);
+    document.getElementById('actisLastRun').textContent = '—';
+    document.getElementById('actisTotal').textContent = '0';
+    return;
+  }
+  const data = snap.data();
+  setToggleUI(data.enabled !== false);
+  document.getElementById('actisLastRun').textContent = formatLastRun(data.lastRun);
+  document.getElementById('actisTotal').textContent = data.totalProcessed ?? 0;
+});
+
+window.toggleActisImport = async function(enabled) {
+  try {
+    await setDoc(doc(db, 'config', 'actis-import'), { enabled }, { merge: true });
+    showToast(enabled ? 'Import ACTIS activé' : 'Import ACTIS désactivé');
+  } catch(e) {
+    showToast('Erreur : ' + e.message);
+    setToggleUI(!enabled);
+  }
+};
 </script>
+<script type="module" src="suivi-badge.js"></script>
 </body>
 </html>
