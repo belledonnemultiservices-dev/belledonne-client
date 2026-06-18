@@ -212,7 +212,14 @@ exports.addToCalendar = functions
         const calendar = google.calendar({ version:"v3", auth });
         await calendar.events.delete({ calendarId: technicienEmail, eventId: calEventId });
         res.status(200).json({ success: true, deleted: true });
-      } catch(err) { res.status(500).json({ error: err.message }); }
+      } catch(err) {
+        // 404 = événement déjà absent du calendrier, on traite comme un succès
+        if (err.code === 404 || err.status === 404 || (err.errors && err.errors[0]?.domain === 'calendar' && err.errors[0]?.reason === 'notFound')) {
+          res.status(200).json({ success: true, deleted: true, alreadyGone: true });
+        } else {
+          res.status(500).json({ error: err.message });
+        }
+      }
       return;
     }
     if (!passages || !passages.length) {

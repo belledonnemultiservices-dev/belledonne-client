@@ -816,7 +816,7 @@ async function removePassageFromCalendar(n) {
     if (result.success || result.deleted) {
       renderPassageCalButtons(n, '');
       await _saveCalEventId(n, '');
-      showToast('✅ Événement retiré de l\'agenda');
+      showToast(result.alreadyGone ? 'Événement déjà absent de l\'agenda' : '✅ Événement retiré de l\'agenda');
     } else {
       showToast('Erreur : ' + (result.error || 'Erreur'), true);
       container.innerHTML = origHTML;
