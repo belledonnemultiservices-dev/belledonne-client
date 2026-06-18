@@ -636,6 +636,17 @@ function closeCalendarPanel() {
   overlay.style.justifyContent = 'center';
   overlay.style.paddingRight = '20px';
 }
+function refreshCalendarFrame(debut) {
+  if (!calendarPanelOpen) return;
+  const frame = document.getElementById('calendarFrame');
+  if (!frame) return;
+  let url = buildCalendarUrl();
+  if (debut) {
+    const d = debut.slice(0, 10).replace(/-/g, '');
+    url += '&dates=' + d + '/' + d;
+  }
+  frame.src = url;
+}
 
 // ── MODAL ──
 window.openModal = function openModal(id = null) {
@@ -771,11 +782,7 @@ async function addPassageToCalendar(n) {
       renderPassageCalButtons(n, eventId);
       await _saveCalEventId(n, eventId);
       showToast('✅ Passage ajouté à l\'agenda');
-      // Naviguer l'iframe à la semaine du passage
-      if (calendarPanelOpen && debut) {
-        const d = debut.slice(0, 10).replace(/-/g, '');
-        document.getElementById('calendarFrame').src = buildCalendarUrl() + '&dates=' + d + '/' + d;
-      }
+      refreshCalendarFrame(debut);
     } else {
       showToast('Erreur agenda : ' + (result.errors?.[0]?.error || result.error || 'Erreur'), true);
       container.innerHTML = origHTML;
@@ -797,6 +804,7 @@ async function updatePassageInCalendar(n) {
     if (result.success || result.created > 0) {
       showToast('✅ Agenda mis à jour');
       renderPassageCalButtons(n, calEventId);
+      refreshCalendarFrame(debut);
     } else {
       showToast('Erreur : ' + (result.errors?.[0]?.error || result.error || 'Erreur'), true);
       container.innerHTML = origHTML;
@@ -817,6 +825,7 @@ async function removePassageFromCalendar(n) {
       renderPassageCalButtons(n, '');
       await _saveCalEventId(n, '');
       showToast(result.alreadyGone ? 'Événement déjà absent de l\'agenda' : '✅ Événement retiré de l\'agenda');
+      refreshCalendarFrame(document.getElementById('fDateDebut' + n)?.value);
     } else {
       showToast('Erreur : ' + (result.error || 'Erreur'), true);
       container.innerHTML = origHTML;
