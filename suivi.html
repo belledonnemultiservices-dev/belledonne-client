@@ -771,9 +771,13 @@ function getPassagesFromDOM() {
   const passages = [];
   let n = 1;
   while (document.getElementById('fDateDebut' + n)) {
-    const d = document.getElementById('fDateDebut' + n).value;
-    const f = document.getElementById('fDateFin' + n)?.value || '';
-    passages.push(d + '|' + f);
+    passages.push({
+      debut: document.getElementById('fDateDebut' + n).value,
+      fin: document.getElementById('fDateFin' + n)?.value || '',
+      titre: document.getElementById('fTitre' + n)?.value || '',
+      desc: document.getElementById('fDesc' + n)?.value || '',
+      adresse: document.getElementById('fAdresseCal' + n)?.value || '',
+    });
     n++;
   }
   return passages;
@@ -888,8 +892,17 @@ function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
   const label = ORDINALS[n-1] || (n+'e');
-  const [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
-  const defaultAdresse = (document.getElementById('fAdresse')?.value || '').replace(/"/g,'&quot;');
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '';
+  if (value && typeof value === 'object') {
+    debut = value.debut || '';
+    fin = value.fin || '';
+    savedTitre = value.titre || '';
+    savedDesc = value.desc || '';
+    savedAdresse = value.adresse || '';
+  } else if (typeof value === 'string') {
+    [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
+  }
+  const defaultAdresse = (savedAdresse || document.getElementById('fAdresse')?.value || '').replace(/"/g,'&quot;');
   const container = document.getElementById('passagesContainer');
   const div = document.createElement('div');
   div.id = 'passage_' + n;
@@ -917,7 +930,7 @@ function addPassage(value = '', calEventId = '') {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Titre agenda</div>
-          <input class="form-input" id="fTitre${n}" value="" style="width:100%;font-size:12px;" placeholder="Titre de l'événement">
+          <input class="form-input" id="fTitre${n}" value="${savedTitre.replace(/"/g,'&quot;')}" style="width:100%;font-size:12px;" placeholder="Titre de l'événement">
         </div>
         <div>
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Adresse</div>
@@ -927,7 +940,7 @@ function addPassage(value = '', calEventId = '') {
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:flex-end;">
         <div>
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Description</div>
-          <textarea class="form-input" id="fDesc${n}" rows="2" style="width:100%;font-size:12px;resize:vertical;min-height:52px;" placeholder="Description..."></textarea>
+          <textarea class="form-input" id="fDesc${n}" rows="2" style="width:100%;font-size:12px;resize:vertical;min-height:52px;" placeholder="Description...">${savedDesc.replace(/</g,'&lt;')}</textarea>
         </div>
         <div id="calBtns${n}" style="margin-bottom:2px;"></div>
       </div>
@@ -942,15 +955,7 @@ function removePassage(n) {
   updateNotifyBtn();
 }
 function getPassageDates() {
-  const dates = [];
-  let n = 1;
-  while (document.getElementById('fDateDebut' + n)) {
-    const debut = document.getElementById('fDateDebut' + n).value;
-    const fin = document.getElementById('fDateFin' + n)?.value || '';
-    if (debut || fin) dates.push(debut + '|' + fin);
-    n++;
-  }
-  return dates;
+  return getPassagesFromDOM();
 }
 function resetForm() {
   ['fClient','fDateEmission','fExpediteur','fPL','fBC','fNature','fNomClient','fEmailClient','fAdresse','fObservations','fNotes'].forEach(id => {
