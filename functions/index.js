@@ -197,7 +197,7 @@ exports.addToCalendar = functions
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
 
-    const { technicienEmail, passages, nature, nomClient, adresse, bc, observations, interventionId, operation, calEventId } = req.body;
+    const { technicienEmail, passages, nature, nomClient, adresse, bc, observations, interventionId, operation, calEventId, colorId } = req.body;
 
     if (!technicienEmail) {
       res.status(400).json({ error: "technicienEmail requis" });
@@ -298,7 +298,7 @@ exports.addToCalendar = functions
           description,
           start: { dateTime: startDt, timeZone: "Europe/Paris" },
           end: { dateTime: endDt, timeZone: "Europe/Paris" },
-          colorId: "9", // blueberry
+          colorId: colorId ? String(colorId) : "9",
           reminders: {
             useDefault: false,
             overrides: [

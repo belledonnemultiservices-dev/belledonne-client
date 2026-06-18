@@ -750,12 +750,15 @@ async function _calendarRequest(payload) {
   });
   return resp.json();
 }
-function _getTechEmail() {
+function _getTech() {
   const assigne = document.getElementById('fAssigne')?.value;
   if (!assigne) { showToast('Assignez un technicien avant d\'agir sur l\'agenda.', true); return null; }
   const tech = (window._techniciens || []).find(t => t.nomComplet === assigne || t.nom === assigne);
   if (!tech || !tech.email) { showToast('Email du technicien introuvable. Vérifiez sa fiche.', true); return null; }
-  return tech.email;
+  return tech;
+}
+function _getTechEmail() {
+  return _getTech()?.email || null;
 }
 function getCalEventIds() {
   const ids = [];
@@ -798,7 +801,8 @@ async function addPassageToCalendar(n) {
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Envoi...</span>';
   try {
-    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '' });
+    const tech = _getTech();
+    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '', colorId: tech?.calendarColorId || null });
     if (result.success || result.created > 0) {
       const eventId = result.results?.[0]?.eventId || '';
       renderPassageCalButtons(n, eventId);
@@ -822,7 +826,8 @@ async function updatePassageInCalendar(n) {
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Mise à jour...</span>';
   try {
-    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '' });
+    const tech = _getTech();
+    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '', colorId: tech?.calendarColorId || null });
     if (result.success || result.created > 0) {
       showToast('✅ Agenda mis à jour');
       renderPassageCalButtons(n, calEventId);

@@ -181,6 +181,11 @@
           <span style="font-size:12px;color:var(--text-muted);">Couleur affichée dans le tableau de suivi</span>
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label">Couleur agenda <span style="font-weight:400;color:var(--text-muted);">— optionnel</span></label>
+        <div id="calColorPicker" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"></div>
+        <input type="hidden" id="fCalColorId" value="">
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal()">Annuler</button>
@@ -199,6 +204,33 @@ document.getElementById('dateChip').textContent = new Date().toLocaleDateString(
 
 let techniciens = [];
 let editId = null;
+
+const CAL_COLORS = [
+  { id:'1',  hex:'#7986CB', name:'Lavande'   },
+  { id:'2',  hex:'#33B679', name:'Sauge'     },
+  { id:'3',  hex:'#8E24AA', name:'Raisin'    },
+  { id:'4',  hex:'#E67C73', name:'Flamant'   },
+  { id:'5',  hex:'#F6BF26', name:'Banane'    },
+  { id:'6',  hex:'#F4511E', name:'Mandarine' },
+  { id:'7',  hex:'#039BE5', name:'Paon'      },
+  { id:'8',  hex:'#616161', name:'Graphite'  },
+  { id:'9',  hex:'#3F51B5', name:'Myrtille'  },
+  { id:'10', hex:'#0F9D58', name:'Basilic'   },
+  { id:'11', hex:'#D50000', name:'Tomate'    },
+];
+
+function buildCalColorPicker(selectedId) {
+  const container = document.getElementById('calColorPicker');
+  container.innerHTML = CAL_COLORS.map(c => `
+    <button type="button" data-cal-id="${c.id}" title="${c.name}" onclick="selectCalColor('${c.id}')"
+      style="width:30px;height:30px;border-radius:50%;background:${c.hex};border:3px solid ${selectedId===c.id?'#0D1B2A':'transparent'};box-shadow:${selectedId===c.id?'0 0 0 2px '+c.hex:'none'};cursor:pointer;transition:all 0.15s;">
+    </button>`).join('');
+}
+
+function selectCalColor(id) {
+  document.getElementById('fCalColorId').value = id;
+  buildCalColorPicker(id);
+}
 
 function isLightColor(hex) {
   if (!hex || hex.length < 4) return true;
@@ -222,11 +254,15 @@ function openModal(id = null) {
     document.getElementById('fTel').value = t.tel || '';
     document.getElementById('fEmail').value = t.email || '';
     document.getElementById('fColor').value = t.color || '#2ECC8F';
+    document.getElementById('fCalColorId').value = t.calendarColorId || '';
     updateColorPreview();
+    buildCalColorPicker(t.calendarColorId || '');
   } else {
     ['fPrenom','fNom','fTel','fEmail'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('fColor').value = '#2ECC8F';
+    document.getElementById('fCalColorId').value = '';
     updateColorPreview();
+    buildCalColorPicker('');
   }
   document.getElementById('modal').classList.add('open');
 }
@@ -246,6 +282,7 @@ async function saveTechnicien() {
     tel: document.getElementById('fTel').value.trim(),
     email: document.getElementById('fEmail').value.trim(),
     color: document.getElementById('fColor').value,
+    calendarColorId: document.getElementById('fCalColorId').value || null,
     updatedAt: new Date().toISOString()
   };
   try {
