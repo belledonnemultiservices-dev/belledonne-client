@@ -776,7 +776,7 @@ async function addPassageToCalendar(n) {
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Envoi...</span>';
   try {
-    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], customSummary: document.getElementById('fTitre' + n)?.value || 'Intervention', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresse')?.value || '' });
+    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '' });
     if (result.success || result.created > 0) {
       const eventId = result.results?.[0]?.eventId || '';
       renderPassageCalButtons(n, eventId);
@@ -800,7 +800,7 @@ async function updatePassageInCalendar(n) {
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Mise à jour...</span>';
   try {
-    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitre' + n)?.value || 'Intervention', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresse')?.value || '' });
+    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '' });
     if (result.success || result.created > 0) {
       showToast('✅ Agenda mis à jour');
       renderPassageCalButtons(n, calEventId);
@@ -862,7 +862,7 @@ function renderPassageCalButtons(n, calEventId) {
     container.innerHTML = `
       <button type="button" id="btnCal${n}" onclick="addPassageToCalendar(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:8px 12px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
-        Agenda
+        Ajouter dans agenda
       </button>`;
   }
 }
@@ -871,8 +871,7 @@ function addPassage(value = '', calEventId = '') {
   const n = passageCount;
   const label = ORDINALS[n-1] || (n+'e');
   const [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
-  const defaultTitle = getDefaultPassageTitle();
-  const defaultDesc = getDefaultPassageDesc();
+  const defaultAdresse = (document.getElementById('fAdresse')?.value || '').replace(/"/g,'&quot;');
   const container = document.getElementById('passagesContainer');
   const div = document.createElement('div');
   div.id = 'passage_' + n;
@@ -891,16 +890,24 @@ function addPassage(value = '', calEventId = '') {
       </div>
       <button type="button" onclick="removePassage(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;margin-top:16px;">×</button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;">
-      <div>
-        <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Titre agenda</div>
-        <input class="form-input" id="fTitre${n}" value="${defaultTitle.replace(/"/g,'&quot;')}" style="width:100%;font-size:12px;" placeholder="Titre de l'événement">
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Titre agenda</div>
+          <input class="form-input" id="fTitre${n}" value="" style="width:100%;font-size:12px;" placeholder="Titre de l'événement">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Adresse</div>
+          <input class="form-input" id="fAdresseCal${n}" value="${defaultAdresse}" style="width:100%;font-size:12px;" placeholder="Adresse...">
+        </div>
       </div>
-      <div>
-        <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Description</div>
-        <input class="form-input" id="fDesc${n}" value="${defaultDesc.replace(/"/g,'&quot;')}" style="width:100%;font-size:12px;" placeholder="Description...">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:flex-end;">
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Description</div>
+          <textarea class="form-input" id="fDesc${n}" rows="2" style="width:100%;font-size:12px;resize:vertical;min-height:52px;" placeholder="Description..."></textarea>
+        </div>
+        <div id="calBtns${n}" style="margin-bottom:2px;"></div>
       </div>
-      <div id="calBtns${n}"></div>
     </div>`;
   container.appendChild(div);
   renderPassageCalButtons(n, calEventId);
