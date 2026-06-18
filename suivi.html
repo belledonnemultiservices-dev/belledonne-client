@@ -767,11 +767,23 @@ function getCalEventIds() {
   }
   return ids;
 }
+function getPassagesFromDOM() {
+  const passages = [];
+  let n = 1;
+  while (document.getElementById('fDateDebut' + n)) {
+    const d = document.getElementById('fDateDebut' + n).value;
+    const f = document.getElementById('fDateFin' + n)?.value || '';
+    passages.push(d + '|' + f);
+    n++;
+  }
+  return passages;
+}
 async function _saveCalEventId(n, eventId) {
   if (!editId) return;
   const calEventIds = getCalEventIds();
   calEventIds[n - 1] = eventId;
-  await window._updateSuivi(editId, { calEventIds });
+  // Sauvegarde aussi les passages pour ne pas perdre ceux ajoutés sans "Mettre à jour"
+  await window._updateSuivi(editId, { calEventIds, passages: getPassagesFromDOM() });
 }
 async function addPassageToCalendar(n) {
   const techEmail = _getTechEmail(); if (!techEmail) return;
