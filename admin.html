@@ -124,6 +124,7 @@
     <a class="nav-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
     <a class="nav-item" href="contacts.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
     <a class="nav-item" href="techniciens.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Techniciens</span></a>
+    <a class="nav-item" href="imports.html" style="color:rgba(245,166,35,0.8);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import email</span></a>
   </nav>
   <div class="sidebar-footer">
     <div class="footer-user">
@@ -244,42 +245,6 @@
 
     </div>
 
-    <!-- IMPORT AUTOMATIQUE ACTIS -->
-    <div style="margin-top:32px;">
-      <div class="page-title" style="font-size:18px;margin-bottom:4px;">Import automatique ACTIS</div>
-      <div class="page-sub" style="margin-bottom:20px;">Traitement des bons de travaux reçus par email toutes les 15 minutes.</div>
-      <div class="card" style="max-width:560px;">
-        <div class="card-header" style="align-items:flex-start;">
-          <div>
-            <div class="card-title">Vérification des emails ACTIS</div>
-            <div class="card-sub">Activez ou désactivez l'import automatique des BT.</div>
-          </div>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex-shrink:0;">
-            <div id="actisToggleWrap" style="position:relative;width:44px;height:24px;">
-              <input type="checkbox" id="actisToggle" style="opacity:0;position:absolute;width:0;height:0;" onchange="toggleActisImport(this.checked)">
-              <span id="actisToggleTrack" style="position:absolute;inset:0;background:#ccc;border-radius:12px;transition:background 0.2s;"></span>
-              <span id="actisToggleThumb" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></span>
-            </div>
-            <span id="actisToggleLabel" style="font-size:13px;font-weight:500;color:var(--text-mid);">Chargement...</span>
-          </label>
-        </div>
-        <div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:10px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);">
-            <span style="font-size:12px;color:var(--text-muted);">Dernière exécution</span>
-            <span style="font-size:13px;font-weight:500;color:var(--text);" id="actisLastRun">—</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);">
-            <span style="font-size:12px;color:var(--text-muted);">BT importés au total</span>
-            <span style="font-size:13px;font-weight:500;color:var(--text);" id="actisTotal">—</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);">
-            <span style="font-size:12px;color:var(--text-muted);">Fréquence</span>
-            <span style="font-size:13px;font-weight:500;color:var(--text);">Toutes les 15 minutes</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 </div>
 
@@ -313,7 +278,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where, addDoc, deleteDoc, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -524,49 +489,6 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove("show"), 3500);
 }
 
-// ── IMPORT AUTOMATIQUE ACTIS ──────────────────────────────────────
-function setToggleUI(enabled) {
-  const track = document.getElementById('actisToggleTrack');
-  const thumb = document.getElementById('actisToggleThumb');
-  const label = document.getElementById('actisToggleLabel');
-  const checkbox = document.getElementById('actisToggle');
-  if (!track) return;
-  track.style.background = enabled ? 'var(--green)' : '#ccc';
-  thumb.style.transform = enabled ? 'translateX(20px)' : 'translateX(0)';
-  label.textContent = enabled ? 'Activé' : 'Désactivé';
-  label.style.color = enabled ? 'var(--green)' : 'var(--text-muted)';
-  checkbox.checked = enabled;
-}
-
-function formatLastRun(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-    + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-}
-
-onSnapshot(doc(db, 'config', 'actis-import'), snap => {
-  if (!snap.exists()) {
-    setToggleUI(true);
-    document.getElementById('actisLastRun').textContent = '—';
-    document.getElementById('actisTotal').textContent = '0';
-    return;
-  }
-  const data = snap.data();
-  setToggleUI(data.enabled !== false);
-  document.getElementById('actisLastRun').textContent = formatLastRun(data.lastRun);
-  document.getElementById('actisTotal').textContent = data.totalProcessed ?? 0;
-});
-
-window.toggleActisImport = async function(enabled) {
-  try {
-    await setDoc(doc(db, 'config', 'actis-import'), { enabled }, { merge: true });
-    showToast(enabled ? 'Import ACTIS activé' : 'Import ACTIS désactivé');
-  } catch(e) {
-    showToast('Erreur : ' + e.message);
-    setToggleUI(!enabled);
-  }
-};
 </script>
 <script type="module" src="suivi-badge.js"></script>
 </body>
