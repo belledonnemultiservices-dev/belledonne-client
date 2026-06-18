@@ -1743,16 +1743,13 @@ window._updateSuivi = async function(id, data) {
   await updateDoc(doc(db, 'suivi', id), data);
 };
 window._deleteSuivi = async function(id) {
-  const snap = await getDoc(doc(db, 'suivi', id));
-  if (snap.exists()) {
-    const bcUrl = snap.data().bcUrl;
-    if (bcUrl) {
-      try {
-        const pathEncoded = new URL(bcUrl).pathname.split('/o/')[1].split('?')[0];
-        await deleteObject(ref(storage, decodeURIComponent(pathEncoded)));
-      } catch(e) { /* PDF déjà supprimé ou inaccessible */ }
+  try {
+    const snap = await getDoc(doc(db, 'suivi', id));
+    if (snap.exists() && snap.data().bcUrl) {
+      const pathEncoded = new URL(snap.data().bcUrl).pathname.split('/o/')[1].split('?')[0];
+      await deleteObject(ref(storage, decodeURIComponent(pathEncoded)));
     }
-  }
+  } catch(e) { /* Ignore Storage errors — deletion must proceed regardless */ }
   await deleteDoc(doc(db, 'suivi', id));
 };
 
