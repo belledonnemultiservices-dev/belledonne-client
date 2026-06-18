@@ -1135,7 +1135,12 @@ function notifHistoryHtml(field, arr, icon, cls) {
 }
 function fmtPassage(val) {
   if (!val) return '—';
-  const [debut, fin] = val.includes('|') ? val.split('|') : [val, ''];
+  let debut, fin;
+  if (typeof val === 'object') {
+    debut = val.debut || ''; fin = val.fin || '';
+  } else {
+    [debut, fin] = val.includes('|') ? val.split('|') : [val, ''];
+  }
   const d = debut ? fmtDate(debut) : '—';
   const f = fin ? fmtDate(fin) : '';
   return f ? d + ' → ' + f : d;
@@ -1318,7 +1323,7 @@ window.openNotifFromItem = async function(item) {
   const client = item.client;
   const passages = (item.passages || []).filter(Boolean);
   const passagesStr = passages.map((p, i) => {
-    const [debut] = p.includes('|') ? p.split('|') : [p];
+    const debut = typeof p === 'object' ? (p.debut || '') : (p.includes('|') ? p.split('|')[0] : p);
     return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
   }).join('\n');
   const bc = item.bc || '';
@@ -1374,7 +1379,7 @@ window.openNotifSuivi = async function() {
   // Build passages string from form
   const passages = getPassageDates();
   const passagesStr = passages.filter(Boolean).map((p, i) => {
-    const [debut] = p.includes('|') ? p.split('|') : [p];
+    const debut = typeof p === 'object' ? (p.debut || '') : (p.includes('|') ? p.split('|')[0] : p);
     return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
   }).join('\n');
 
@@ -1714,8 +1719,8 @@ function populateRappelPanel() {
     } else {
       var ORDINALS = ['1er','2e','3e','4e','5e','6e'];
       psgsEl.innerHTML = passages.map(function(p, i) {
-        var parts = p.includes('|') ? p.split('|') : [p,''];
-        var debut = parts[0] ? fmtDate(parts[0]) : '—';
+        var debut = typeof p === 'object' ? (p.debut || '') : (p.includes('|') ? p.split('|')[0] : p);
+        debut = debut ? fmtDate(debut) : '—';
         var label = (ORDINALS[i]||i+1+'e') + ' passage : ' + debut;
         return '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px;">' +
           '<input type="checkbox" class="rappel-psg-check" data-passage="' + label + '" checked onchange="updateRappelMessage()" style="width:14px;height:14px;">' +
