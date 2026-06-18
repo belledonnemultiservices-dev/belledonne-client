@@ -400,7 +400,7 @@ async function processEmail(gmail, anthropic, messageId, labelId, db) {
 
   if (!pdfPart) {
     console.warn(`Email ${messageId}: aucun PDF trouvé, labellisation quand même`);
-    await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: [labelId] } });
+    await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: [labelId, "Label_1649438707140645411"], removeLabelIds: ["INBOX", "UNREAD"] } });
     return;
   }
 
@@ -451,7 +451,7 @@ async function processEmail(gmail, anthropic, messageId, labelId, db) {
 
   console.log(`Email ${messageId}: labellisation Gmail...`);
   try {
-    await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: [labelId] } });
+    await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: [labelId, "Label_1649438707140645411"], removeLabelIds: ["INBOX", "UNREAD"] } });
     console.log(`Email ${messageId}: Gmail label OK`);
   } catch(e) {
     throw new Error(`Gmail label ERREUR: code=${e.code} msg=${JSON.stringify(e)}`);
