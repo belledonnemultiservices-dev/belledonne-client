@@ -615,7 +615,7 @@ function buildCalendarUrl() {
   const techs = (window._techniciens || []).filter(t => t.email);
   const params = techs.map(t => 'src=' + encodeURIComponent(t.email)).join('&');
   const base = params ? params + '&' : '';
-  return 'https://calendar.google.com/calendar/embed?' + base + 'mode=WEEK&ctz=Europe%2FParis&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=1&hl=fr';
+  return 'https://calendar.google.com/calendar/embed?' + base + 'ctz=Europe%2FParis&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=1&hl=fr';
 }
 function toggleCalendarPanel() {
   if (calendarPanelOpen) { closeCalendarPanel(); return; }
