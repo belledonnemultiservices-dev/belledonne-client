@@ -197,10 +197,26 @@ exports.addToCalendar = functions
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
 
-    const { technicienEmail, passages, nature, nomClient, adresse, bc, observations, interventionId } = req.body;
+    const { technicienEmail, passages, nature, nomClient, adresse, bc, observations, interventionId, operation, calEventId } = req.body;
 
-    if (!technicienEmail || !passages || !passages.length) {
-      res.status(400).json({ error: "technicienEmail et passages requis" });
+    if (!technicienEmail) {
+      res.status(400).json({ error: "technicienEmail requis" });
+      return;
+    }
+    if (operation === 'delete') {
+      if (!calEventId) { res.status(400).json({ error: "calEventId requis pour delete" }); return; }
+      try {
+        const { google } = require("googleapis");
+        const serviceAccountKey = { type:"service_account", project_id:functions.config().gcal.project_id, private_key_id:functions.config().gcal.private_key_id, private_key:functions.config().gcal.private_key.replace(/\\n/g,"\n"), client_email:functions.config().gcal.client_email, client_id:functions.config().gcal.client_id, token_uri:"https://oauth2.googleapis.com/token" };
+        const auth = new google.auth.GoogleAuth({ credentials:serviceAccountKey, scopes:["https://www.googleapis.com/auth/calendar"] });
+        const calendar = google.calendar({ version:"v3", auth });
+        await calendar.events.delete({ calendarId: technicienEmail, eventId: calEventId });
+        res.status(200).json({ success: true, deleted: true });
+      } catch(err) { res.status(500).json({ error: err.message }); }
+      return;
+    }
+    if (!passages || !passages.length) {
+      res.status(400).json({ error: "passages requis" });
       return;
     }
 
@@ -285,16 +301,17 @@ exports.addToCalendar = functions
         };
 
         try {
-          // On insère l'événement dans l'agenda du technicien
-          // Le technicien doit avoir partagé son agenda avec le Service Account
-          const insertResult = await calendar.events.insert({
-            calendarId: technicienEmail,
-            resource: event,
-          });
-          results.push({ passage, eventId: insertResult.data.id, htmlLink: insertResult.data.htmlLink });
-          console.log("Événement créé:", insertResult.data.id, "pour", technicienEmail);
+          if (operation === 'update' && calEventId) {
+            const patchResult = await calendar.events.patch({ calendarId: technicienEmail, eventId: calEventId, resource: event });
+            results.push({ passage, eventId: patchResult.data.id });
+            console.log("Événement mis à jour:", patchResult.data.id);
+          } else {
+            const insertResult = await calendar.events.insert({ calendarId: technicienEmail, resource: event });
+            results.push({ passage, eventId: insertResult.data.id, htmlLink: insertResult.data.htmlLink });
+            console.log("Événement créé:", insertResult.data.id, "pour", technicienEmail);
+          }
         } catch(insertErr) {
-          console.error("Erreur insertion événement:", insertErr.message);
+          console.error("Erreur opération événement:", insertErr.message);
           errors.push({ passage, error: insertErr.message });
         }
       }

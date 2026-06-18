@@ -667,7 +667,8 @@ window.openModal = function openModal(id = null) {
     document.getElementById('fEmailClient').value = item.emailClient || '';
     document.getElementById('fAdresse').value = item.adresse || '';
     document.getElementById('fObservations').value = item.observations || '';
-    (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach(d => addPassage(d));
+    const calEventIds = item.calEventIds || [];
+    (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach((d, i) => addPassage(d, calEventIds[i] || ''));
     document.getElementById('fNotes').value = item.notes || '';
     // Show existing PDF links if any
     if (item.plUrl) {
@@ -728,46 +729,96 @@ function updateNotifyBtn() {
   if (btn) btn.style.display = (hasPsgs && hasClient) ? 'inline-flex' : 'none';
 }
 
-async function addPassageToCalendar(n) {
+async function _calendarRequest(payload) {
+  const resp = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  });
+  return resp.json();
+}
+function _getTechEmail() {
   const assigne = document.getElementById('fAssigne')?.value;
-  if (!assigne) { showToast('Assignez un technicien avant d\'ajouter à l\'agenda.', true); return; }
+  if (!assigne) { showToast('Assignez un technicien avant d\'agir sur l\'agenda.', true); return null; }
   const tech = (window._techniciens || []).find(t => t.nomComplet === assigne || t.nom === assigne);
-  if (!tech || !tech.email) { showToast('Email du technicien introuvable. Vérifiez sa fiche.', true); return; }
+  if (!tech || !tech.email) { showToast('Email du technicien introuvable. Vérifiez sa fiche.', true); return null; }
+  return tech.email;
+}
+function getCalEventIds() {
+  const ids = [];
+  let n = 1;
+  while (document.getElementById('fDateDebut' + n)) {
+    const div = document.getElementById('passage_' + n);
+    ids.push(div?.dataset.calEventId || '');
+    n++;
+  }
+  return ids;
+}
+async function _saveCalEventId(n, eventId) {
+  if (!editId) return;
+  const calEventIds = getCalEventIds();
+  calEventIds[n - 1] = eventId;
+  await window._updateSuivi(editId, { calEventIds });
+}
+async function addPassageToCalendar(n) {
+  const techEmail = _getTechEmail(); if (!techEmail) return;
   const debut = document.getElementById('fDateDebut' + n)?.value || '';
   if (!debut) { showToast('Ajoutez une date de début pour ce passage.', true); return; }
   const fin = document.getElementById('fDateFin' + n)?.value || '';
-  const customSummary = document.getElementById('fTitre' + n)?.value || 'Intervention';
-  const customDescription = document.getElementById('fDesc' + n)?.value || '';
-  const btn = document.getElementById('btnCal' + n);
-  const origHTML = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;animation:spin 1s linear infinite"><path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/></svg>';
+  const container = document.getElementById('calBtns' + n);
+  const origHTML = container.innerHTML;
+  container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Envoi...</span>';
   try {
-    const resp = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        technicienEmail: tech.email,
-        passages: [debut + '|' + fin],
-        customSummary,
-        customDescription,
-        adresse: document.getElementById('fAdresse')?.value || '',
-        interventionId: editId || '',
-      })
-    });
-    const result = await resp.json();
+    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], customSummary: document.getElementById('fTitre' + n)?.value || 'Intervention', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresse')?.value || '' });
     if (result.success || result.created > 0) {
-      showToast(`✅ Passage ajouté à l'agenda de ${tech.prenom || assigne}`);
-      btn.style.cssText += ';background:#E8F9F2;color:#1DA870;border-color:#A7E8CC;';
-      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Ajouté';
+      const eventId = result.results?.[0]?.eventId || '';
+      renderPassageCalButtons(n, eventId);
+      await _saveCalEventId(n, eventId);
+      showToast('✅ Passage ajouté à l\'agenda');
     } else {
       showToast('Erreur agenda : ' + (result.errors?.[0]?.error || result.error || 'Erreur'), true);
-      btn.disabled = false; btn.innerHTML = origHTML;
+      container.innerHTML = origHTML;
     }
-  } catch(err) {
-    showToast('Erreur réseau : ' + err.message, true);
-    btn.disabled = false; btn.innerHTML = origHTML;
-  }
+  } catch(err) { showToast('Erreur réseau : ' + err.message, true); container.innerHTML = origHTML; }
+}
+async function updatePassageInCalendar(n) {
+  const techEmail = _getTechEmail(); if (!techEmail) return;
+  const div = document.getElementById('passage_' + n);
+  const calEventId = div?.dataset.calEventId;
+  if (!calEventId) { showToast('Aucun événement agenda lié à ce passage.', true); return; }
+  const debut = document.getElementById('fDateDebut' + n)?.value || '';
+  const fin = document.getElementById('fDateFin' + n)?.value || '';
+  const container = document.getElementById('calBtns' + n);
+  const origHTML = container.innerHTML;
+  container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Mise à jour...</span>';
+  try {
+    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitre' + n)?.value || 'Intervention', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresse')?.value || '' });
+    if (result.success || result.created > 0) {
+      showToast('✅ Agenda mis à jour');
+      renderPassageCalButtons(n, calEventId);
+    } else {
+      showToast('Erreur : ' + (result.errors?.[0]?.error || result.error || 'Erreur'), true);
+      container.innerHTML = origHTML;
+    }
+  } catch(err) { showToast('Erreur réseau : ' + err.message, true); container.innerHTML = origHTML; }
+}
+async function removePassageFromCalendar(n) {
+  const techEmail = _getTechEmail(); if (!techEmail) return;
+  const div = document.getElementById('passage_' + n);
+  const calEventId = div?.dataset.calEventId;
+  if (!calEventId) return;
+  const container = document.getElementById('calBtns' + n);
+  const origHTML = container.innerHTML;
+  container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Suppression...</span>';
+  try {
+    const result = await _calendarRequest({ technicienEmail: techEmail, operation: 'delete', calEventId });
+    if (result.success || result.deleted) {
+      renderPassageCalButtons(n, '');
+      await _saveCalEventId(n, '');
+      showToast('✅ Événement retiré de l\'agenda');
+    } else {
+      showToast('Erreur : ' + (result.error || 'Erreur'), true);
+      container.innerHTML = origHTML;
+    }
+  } catch(err) { showToast('Erreur réseau : ' + err.message, true); container.innerHTML = origHTML; }
 }
 function getDefaultPassageTitle() {
   const nature = document.getElementById('fNature')?.value || '';
@@ -780,7 +831,30 @@ function getDefaultPassageDesc() {
   const obs = document.getElementById('fObservations')?.value || '';
   return [bc ? `BC ${bc}` : '', adresse, obs].filter(Boolean).join(' · ');
 }
-function addPassage(value = '') {
+function renderPassageCalButtons(n, calEventId) {
+  const container = document.getElementById('calBtns' + n);
+  if (!container) return;
+  const div = document.getElementById('passage_' + n);
+  if (div) div.dataset.calEventId = calEventId || '';
+  if (calEventId) {
+    container.innerHTML = `
+      <button type="button" onclick="updatePassageInCalendar(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:8px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        MàJ agenda
+      </button>
+      <button type="button" onclick="removePassageFromCalendar(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#FDECEA;color:#E74C3C;border:1px solid #FACACA;padding:8px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        Retirer
+      </button>`;
+  } else {
+    container.innerHTML = `
+      <button type="button" id="btnCal${n}" onclick="addPassageToCalendar(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:8px 12px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+        Agenda
+      </button>`;
+  }
+}
+function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
   const label = ORDINALS[n-1] || (n+'e');
@@ -790,6 +864,7 @@ function addPassage(value = '') {
   const container = document.getElementById('passagesContainer');
   const div = document.createElement('div');
   div.id = 'passage_' + n;
+  div.dataset.calEventId = calEventId || '';
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
   div.innerHTML = `
     <div style="display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:8px;align-items:center;">
@@ -813,12 +888,10 @@ function addPassage(value = '') {
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Description</div>
         <input class="form-input" id="fDesc${n}" value="${defaultDesc.replace(/"/g,'&quot;')}" style="width:100%;font-size:12px;" placeholder="Description...">
       </div>
-      <button type="button" id="btnCal${n}" onclick="addPassageToCalendar(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:8px 12px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
-        Agenda
-      </button>
+      <div id="calBtns${n}"></div>
     </div>`;
   container.appendChild(div);
+  renderPassageCalButtons(n, calEventId);
   updateNotifyBtn();
 }
 function removePassage(n) {
@@ -901,6 +974,7 @@ async function saveIntervention() {
       adresse: document.getElementById('fAdresse').value.trim(),
       observations: document.getElementById('fObservations').value.trim(),
       passages,
+      calEventIds: getCalEventIds(),
       notes: document.getElementById('fNotes').value.trim(),
       updatedAt: new Date().toISOString()
     };
