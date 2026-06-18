@@ -28,14 +28,15 @@ function setup() {
   });
 
   onSnapshot(
-    query(collection(db, 'suivi'), where('source', '==', 'auto'), where('statut', '==', 'À valider')),
+    query(collection(db, 'suivi'), where('statut', '==', 'À valider')),
     snap => {
       const n = snap.size;
       badges.forEach(b => {
         b.textContent = n;
         b.style.display = n ? '' : 'none';
       });
-    }
+    },
+    err => console.error('suivi-badge:', err)
   );
 }
 
