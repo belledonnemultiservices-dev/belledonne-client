@@ -1,4 +1,5 @@
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const FC = {
@@ -11,6 +12,7 @@ const FC = {
 };
 
 const app = getApps().length ? getApps()[0] : initializeApp(FC);
+const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 
 function setup() {
@@ -27,17 +29,20 @@ function setup() {
     return b;
   });
 
-  onSnapshot(
-    query(collection(db, 'suivi'), where('statut', '==', 'À valider')),
-    snap => {
-      const n = snap.size;
-      badges.forEach(b => {
-        b.textContent = n;
-        b.style.display = n ? '' : 'none';
-      });
-    },
-    err => console.error('suivi-badge:', err)
-  );
+  onAuthStateChanged(auth, user => {
+    if (!user) return;
+    onSnapshot(
+      query(collection(db, 'suivi'), where('statut', '==', 'À valider')),
+      snap => {
+        const n = snap.size;
+        badges.forEach(b => {
+          b.textContent = n;
+          b.style.display = n ? '' : 'none';
+        });
+      },
+      err => console.error('suivi-badge:', err)
+    );
+  });
 }
 
 document.readyState === 'loading'
