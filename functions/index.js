@@ -492,7 +492,7 @@ exports.processIncomingBC = functions
 
     const searchRes = await gmail.users.messages.list({
       userId: "me",
-      q: 'from:noreply@actis.fr subject:"Actis - Demande de commande" -label:bc-traité',
+      q: 'from:noreply@actis.fr subject:"Actis - Demande de commande" -label:bc-traité after:2026/06/18',
       maxResults: 20,
     });
 
