@@ -16,8 +16,6 @@ const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 
 function setup() {
-  if (window.location.pathname.endsWith('suivi.html')) return;
-
   const links = document.querySelectorAll('a[href="suivi.html"]');
   if (!links.length) return;
 
