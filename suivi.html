@@ -106,6 +106,10 @@
   .pdf-link svg{width:11px;height:11px;flex-shrink:0;}
   .btn-row-edit{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1A2E42;background:#EBF0F5;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
   .btn-row-del{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+  .btn-row-valider{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#fff;background:#2ECC8F;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+  .btn-row-rejeter{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#E74C3C;background:#FDECEA;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+  .chip-statut-pending{background:#FEF3CD;color:#996600;}
+  .row-a-valider td{background:#FFFBF0;}
   .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
   .empty-state svg{width:40px;height:40px;opacity:0.3;margin-bottom:12px;}
   /* ── MODAL ── */
@@ -236,6 +240,7 @@
       </select>
       <select class="filter-select" id="filterStatut" onchange="filterTable()">
         <option value="">Tous les statuts</option>
+        <option value="À valider">À valider</option>
         <option value="En cours">En cours</option>
         <option value="Terminé">Terminé</option>
         <option value="Annulé">Annulé</option>
@@ -863,6 +868,27 @@ async function saveIntervention() {
 }
 
 // ── DELETE ──
+async function validerIntervention(id) {
+  try {
+    await window._updateSuivi(id, { statut: 'En cours' });
+    const idx = interventions.findIndex(i => i.id === id);
+    if (idx !== -1) { interventions[idx].statut = 'En cours'; window.interventions = interventions; }
+    filterTable();
+    showToast('BT validé — passé en cours.');
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function rejeterIntervention(id) {
+  if (!confirm('Rejeter ce BT ? Il sera définitivement supprimé.')) return;
+  try {
+    await window._deleteSuivi(id);
+    interventions = interventions.filter(i => i.id !== id);
+    window.interventions = interventions;
+    filterTable();
+    showToast('BT rejeté et supprimé.');
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
 async function deleteIntervention(id) {
   if (!confirm('Supprimer cette intervention ?')) return;
   try {
@@ -969,7 +995,7 @@ function fmtDate(d) {
   return `${parseInt(day)}/${parseInt(m)}/${y}`;
 }
 function statutChip(s) {
-  const map = {'Nouveau':'chip-statut-new','En cours':'chip-statut-progress','Terminé':'chip-statut-done','Annulé':'chip-statut-cancel'};
+  const map = {'Nouveau':'chip-statut-new','En cours':'chip-statut-progress','Terminé':'chip-statut-done','Annulé':'chip-statut-cancel','À valider':'chip-statut-pending'};
   return `<span class="chip ${map[s]||'chip-statut-new'}">${s||'Nouveau'}</span>`;
 }
 function pdfBtn(url, label) {
@@ -993,7 +1019,7 @@ window.renderTable = function renderTable(list) {
     const nr = toNotifArray(item.notifRappelSms);
     const hasPsg = (item.passages||[]).filter(Boolean).length > 0;
     const totalNotifs = nb.length + nl.length + ns.length + nr.length;
-    const rowClass = item.statut==='Annulé' ? 'row-annule' : item.statut==='Terminé' ? 'row-termine' : '';
+    const rowClass = item.statut==='Annulé' ? 'row-annule' : item.statut==='Terminé' ? 'row-termine' : item.statut==='À valider' ? 'row-a-valider' : '';
 
     // Build main row
     const isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
@@ -1021,8 +1047,13 @@ window.renderTable = function renderTable(list) {
 
     html += '<td style="text-align:right;white-space:nowrap;">';
     html += '<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;">';
-    html += '<button class="btn-row-edit" onclick="openModal(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>';
-    html += '<button class="btn-row-del" onclick="deleteIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
+    if (item.statut === 'À valider') {
+      html += '<button class="btn-row-valider" onclick="validerIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Valider</button>';
+      html += '<button class="btn-row-rejeter" onclick="rejeterIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>Rejeter</button>';
+    } else {
+      html += '<button class="btn-row-edit" onclick="openModal(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>';
+      html += '<button class="btn-row-del" onclick="deleteIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
+    }
     html += '</div></td></tr>';
 
     // Build notification row (hidden by default)
