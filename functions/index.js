@@ -258,8 +258,9 @@ exports.addToCalendar = functions
         }
 
         // Construction de la description de l'événement
+        const { customSummary, customDescription } = req.body;
         const tels = Array.isArray(req.body.tels) ? req.body.tels : [];
-        const description = [
+        const description = customDescription !== undefined ? customDescription : [
           bc ? `N° BC : ${bc}` : "",
           nature ? `Nature : ${nature}` : "",
           nomClient ? `Client : ${nomClient}` : "",
@@ -269,7 +270,7 @@ exports.addToCalendar = functions
         ].filter(Boolean).join("\n");
 
         const event = {
-          summary: `${nature || "Intervention"} — ${nomClient || "Client"}`,
+          summary: customSummary || `${nature || "Intervention"} — ${nomClient || "Client"}`,
           location: adresse || "",
           description,
           start: { dateTime: startDt, timeZone: "Europe/Paris" },
