@@ -1053,6 +1053,13 @@ function addPassage(value = '', calEventId = '') {
         <button type="button" onclick="removePassage(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>
       </div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:-2px;">
+      <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Si modif/suppression :</span>
+      <select id="fPassageRaison${n}" style="font-size:11px;font-weight:500;padding:3px 22px 3px 8px;border:1px solid var(--border);border-radius:20px;color:var(--text-mid);background:var(--bg);font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238FA4B8' opacity='.8'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 6px center;background-size:8px;">
+        <option value="correction">Correction (erreur)</option>
+        <option value="locataire">Locataire</option>
+      </select>
+    </div>
     <div style="display:flex;flex-direction:column;gap:6px;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
@@ -1077,13 +1084,18 @@ function addPassage(value = '', calEventId = '') {
   updateNotifyBtn();
 }
 function removePassage(n) {
-  const debutVal = document.getElementById('fDateDebut' + n)?.value;
-  const finVal   = document.getElementById('fDateFin'   + n)?.value;
+  const debutVal  = document.getElementById('fDateDebut' + n)?.value;
+  const finVal    = document.getElementById('fDateFin'   + n)?.value;
+  const raison    = document.getElementById('fPassageRaison' + n)?.value || 'correction';
+  const isLoc     = raison === 'locataire';
   if (debutVal) {
+    const label = isLoc ? 'Annulation locataire' : 'Correction';
     _pendingLogs.push({
       ts: new Date().toISOString(),
       type: 'passage_supprime',
-      details: 'Passage supprimé : ' + fmtPassageLog(debutVal) + (finVal ? ' → ' + fmtPassageLog(finVal) : '')
+      raison,
+      details: '[' + label + '] Passage supprimé : '
+        + fmtPassageLog(debutVal) + (finVal ? ' → ' + fmtPassageLog(finVal) : '')
     });
     _deletedDebuts.add(debutVal);
   }
@@ -1093,6 +1105,14 @@ function removePassage(n) {
 }
 function getPassageDates() {
   return getPassagesFromDOM();
+}
+function getPassageReasonsFromDOM() {
+  const out = []; let n = 1;
+  while (document.getElementById('fDateDebut' + n)) {
+    out.push(document.getElementById('fPassageRaison' + n)?.value || 'correction');
+    n++;
+  }
+  return out;
 }
 function resetForm() {
   ['fDateEmission','fExpediteur','fPL','fBC','fDevis','fNature','fNomClient','fEmailClient','fAdresse','fObservations','fNotes','fClientLibre'].forEach(id => {
@@ -1152,18 +1172,23 @@ async function saveIntervention() {
     // Détection des modifications de créneau
     if (editId) {
       const remaining = _passagesSnapshot.filter(p => !_deletedDebuts.has(p.debut));
-      const current = passages;
+      const current   = passages;
+      const reasons   = getPassageReasonsFromDOM();
       const len = Math.min(remaining.length, current.length);
       for (let i = 0; i < len; i++) {
-        const o = remaining[i], n = current[i];
-        if (o.debut !== n.debut || o.fin !== n.fin) {
+        const o = remaining[i], c = current[i];
+        if (o.debut !== c.debut || o.fin !== c.fin) {
+          const raison   = reasons[i] || 'correction';
+          const isLoc    = raison === 'locataire';
+          const label    = isLoc ? 'Report locataire' : 'Correction';
           _pendingLogs.push({
             ts: new Date().toISOString(),
             type: 'passage_modifie',
-            details: 'Passage modifié : '
+            raison,
+            details: '[' + label + '] Passage modifié : '
               + fmtPassageLog(o.debut) + (o.fin ? '–' + fmtPassageLog(o.fin) : '')
               + ' → '
-              + fmtPassageLog(n.debut) + (n.fin ? '–' + fmtPassageLog(n.fin) : '')
+              + fmtPassageLog(c.debut) + (c.fin ? '–' + fmtPassageLog(c.fin) : '')
           });
         }
       }
@@ -1474,8 +1499,10 @@ function renderLogTimeline(log) {
     const d = new Date(e.ts);
     const ds = d.toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric'})
       + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
-    const dotCls = e.type === 'passage_supprime' ? 'log-dot log-dot-del' : 'log-dot log-dot-mod';
-    return `<div class="log-entry"><div class="${dotCls}"></div><div class="log-body"><span class="log-time">${ds}</span><span class="log-text">${e.details}</span></div></div>`;
+    const isLoc = e.raison === 'locataire';
+    const dotCls = isLoc ? 'log-dot log-dot-del' : 'log-dot';
+    const textStyle = isLoc ? 'color:#C2410C;font-weight:600;' : '';
+    return `<div class="log-entry"><div class="${dotCls}"></div><div class="log-body"><span class="log-time">${ds}</span><span class="log-text" style="${textStyle}">${e.details}</span></div></div>`;
   }).join('');
 }
 function getClientValue() {
