@@ -517,11 +517,15 @@ async function marquerChorus(id) {
 async function deleteFact(id) {
   if (!confirm('Supprimer cette ligne de facturation ?')) return;
   try {
+    const item = factures.find(f => f.id === id);
     await window._deleteFacture(id);
+    if (item && item.suiviId) {
+      await window._resetSuiviFacturation(item.suiviId);
+    }
     factures = factures.filter(f => f.id !== id);
     filterTable();
     updateStats();
-    showToast('Ligne supprimée.');
+    showToast('Ligne supprimée. Le BT repasse en "→ Facturer" dans le suivi.');
   } catch(e) { alert('Erreur : ' + e.message); }
 }
 
@@ -548,6 +552,9 @@ window._updateFacture = async function(id, data) {
 };
 window._deleteFacture = async function(id) {
   await deleteDoc(doc(db, 'facturation', id));
+};
+window._resetSuiviFacturation = async function(suiviId) {
+  await updateDoc(doc(db, 'suivi', suiviId), { enFacturation: false });
 };
 window._uploadFacturePdf = async function(file, path) {
   const storageRef = ref(storage, path);
