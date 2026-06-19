@@ -1242,6 +1242,8 @@ async function basculerEnFacturation(id) {
       dateEmission: item.dateEmission || '',
       passages: item.passages || [],
       bcUrl: item.bcUrl || '',
+      devis: item.devis || '',
+      devisUrl: item.devisUrl || '',
       statut: 'À facturer',
       createdAt: new Date().toISOString(),
     });

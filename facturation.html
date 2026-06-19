@@ -246,6 +246,7 @@
           <tr>
             <th>Client</th>
             <th>N° BC</th>
+            <th>N° Devis</th>
             <th>N° Chorus</th>
             <th>Nature</th>
             <th>Date</th>
@@ -258,7 +259,7 @@
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="9"><div class="empty-state"><p>Chargement...</p></div></td></tr>
+          <tr><td colspan="12"><div class="empty-state"><p>Chargement...</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -481,7 +482,7 @@ function renderTable(list) {
   const body = document.getElementById('tableBody');
   document.getElementById('resultsCount').textContent = list.length + ' facture' + (list.length!==1?'s':'');
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="11"><div class="empty-state"><p>Aucune ligne de facturation.</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="12"><div class="empty-state"><p>Aucune ligne de facturation.</p></div></td></tr>';
     return;
   }
   let html = '';
@@ -492,6 +493,12 @@ function renderTable(list) {
     if (item.bc) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + item.bc + '</span>';
     if (item.bcUrl) html += pdfBtn(item.bcUrl, 'BC');
     html += '</div></td>';
+    const _devisInfo = (item.suiviId && window._suiviDevisMap && window._suiviDevisMap[item.suiviId]) || {};
+    const _devis    = item.devis    || _devisInfo.devis    || '';
+    const _devisUrl = item.devisUrl || _devisInfo.devisUrl || '';
+    html += '<td><div style="display:flex;flex-direction:column;gap:4px;">';
+    if (_devis) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + _devis + '</span>';
+    html += pdfBtn(_devisUrl, 'Devis') + '</div></td>';
     html += '<td style="font-family:monospace;font-size:12px;color:' + (item.chorus ? 'var(--text)' : 'var(--text-muted)') + ';">' + (item.chorus||'—') + '</td>';
     html += '<td style="font-size:12px;max-width:160px;">' + (item.nature||'—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (item.dateFacture ? fmtDate(item.dateFacture) : '<span style="color:var(--text-muted)">—</span>') + '</td>';
@@ -788,7 +795,7 @@ document.getElementById('modalFact').addEventListener('click', e => {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
@@ -831,11 +838,15 @@ onAuthStateChanged(auth, async (user) => {
     const snap = await getDocs(query(collection(db, 'facturation'), orderBy('createdAt', 'desc')));
     factures = snap.docs.map(d => ({id:d.id,...d.data()}));
     window.factures = factures;
+    // Charge les devis depuis suivi pour les lignes déjà existantes
+    const suiviSnap = await getDocs(query(collection(db, 'suivi'), where('enFacturation', '==', true)));
+    window._suiviDevisMap = {};
+    suiviSnap.docs.forEach(d => { const s = d.data(); window._suiviDevisMap[d.id] = {devis: s.devis||'', devisUrl: s.devisUrl||''}; });
     populateClientFilter();
     setPeriodDates('month', document.getElementById('btnPeriodMonth'));
   } catch(e) {
     console.error('Erreur chargement facturation:', e);
-    document.getElementById('tableBody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>Erreur de chargement.</p></div></td></tr>';
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="12"><div class="empty-state"><p>Erreur de chargement.</p></div></td></tr>';
   }
 });
 </script>
