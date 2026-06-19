@@ -289,6 +289,7 @@
                 <div class="drop-zone-chosen" id="chosenFacture"></div>
               </div>
               <div id="existingFactureLink" style="display:none;margin-top:6px;"></div>
+              <div id="extractMsg" style="display:none;margin-top:8px;font-size:12px;font-weight:500;"></div>
             </div>
           </div>
         </div>
@@ -430,6 +431,8 @@ function openModalFact(id) {
   const chosen = document.getElementById('chosenFacture');
   chosen.textContent = ''; chosen.style.display = 'none';
   document.getElementById('fileFacture').value = '';
+  const extractMsg = document.getElementById('extractMsg');
+  if (extractMsg) { extractMsg.style.display = 'none'; extractMsg.textContent = ''; }
 
   const existLink = document.getElementById('existingFactureLink');
   if (item.factureUrl) {
@@ -458,6 +461,89 @@ function factureFileChosen() {
   const chosen = document.getElementById('chosenFacture');
   chosen.textContent = '✓ ' + input.files[0].name;
   chosen.style.display = 'block';
+  extractFromFacturePdf(input.files[0]);
+}
+
+function loadPdfJs() {
+  return new Promise((resolve, reject) => {
+    if (window.pdfjsLib) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      resolve();
+    };
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+function parseFactureText(text) {
+  const result = {};
+
+  // N° Facture : "FACTURE N° 26-05-1756"
+  const numMatch = text.match(/FACTURE\s+N[°o]\s*([\d-]+)/i);
+  if (numMatch) result.numFacture = numMatch[1].trim();
+
+  // Date : "Le lundi 18 mai 2026"
+  const MOIS = {janvier:'01',fevrier:'02',mars:'03',avril:'04',mai:'05',juin:'06',
+                juillet:'07',aout:'08',septembre:'09',octobre:'10',novembre:'11',decembre:'12'};
+  const dateMatch = text.match(/Le\s+\w+\s+(\d{1,2})\s+(\S+)\s+(\d{4})/i);
+  if (dateMatch) {
+    const norm = dateMatch[2].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const moisNum = MOIS[norm];
+    if (moisNum) result.dateFacture = dateMatch[3] + '-' + moisNum + '-' + dateMatch[1].padStart(2,'0');
+  }
+
+  // Montant HT : dans Henrri les montants apparaissent après "Total TTC" dans cet ordre : HT, TVA, TTC
+  // Regex tolère les espaces dans les nombres (ex: "1 500,00 €")
+  const amtPat = '([\\d][\\d\\s]*,\\d{2})\\s*€';
+  const htMatch = text.match(new RegExp('Total\\s+TTC\\s+' + amtPat, 'i'));
+  if (htMatch) {
+    result.montantHT = parseFloat(htMatch[1].replace(/\s/g,'').replace(',','.'));
+  } else {
+    // Fallback : premier montant après "Total HT"
+    const fallback = text.match(new RegExp('Total\\s+HT\\D{0,40}?' + amtPat, 'i'));
+    if (fallback) result.montantHT = parseFloat(fallback[1].replace(/\s/g,'').replace(',','.'));
+  }
+
+  return result;
+}
+
+async function extractFromFacturePdf(file) {
+  const msg = document.getElementById('extractMsg');
+  if (msg) { msg.textContent = 'Extraction en cours...'; msg.style.color = 'var(--text-muted)'; msg.style.display = ''; }
+  try {
+    await loadPdfJs();
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: buffer}).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it => it.str).join(' ') + '\n';
+    }
+    const parsed = parseFactureText(text);
+    let filled = 0;
+    if (parsed.numFacture) { document.getElementById('fNumFacture').value = parsed.numFacture; filled++; }
+    if (parsed.dateFacture) { document.getElementById('fDateFacture').value = parsed.dateFacture; filled++; }
+    if (parsed.montantHT !== undefined && !isNaN(parsed.montantHT)) {
+      document.getElementById('fMontant').value = parsed.montantHT.toFixed(2);
+      filled++;
+    }
+    if (msg) {
+      if (filled > 0) {
+        msg.textContent = '✓ ' + filled + ' champ' + (filled > 1 ? 's extraits' : ' extrait') + ' automatiquement';
+        msg.style.color = 'var(--green-dark)';
+      } else {
+        msg.textContent = 'Extraction non conclusive — remplissez manuellement';
+        msg.style.color = 'var(--text-muted)';
+      }
+    }
+  } catch(e) {
+    console.error('Extraction PDF:', e);
+    if (msg) { msg.textContent = 'Extraction échouée — remplissez manuellement'; msg.style.color = '#E74C3C'; }
+  }
 }
 
 function factDragOver(e) { e.preventDefault(); document.getElementById('dropFacture').classList.add('drag-over'); }
