@@ -433,6 +433,31 @@
         </div>
       </div>
 
+      <!-- SECTION : DEVIS -->
+      <div class="form-section">
+        <div class="form-section-title">Devis</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Numéro devis</label>
+            <input class="form-input" id="fDevis" placeholder="">
+          </div>
+          <div class="form-group">
+            <label class="form-label">PDF Devis</label>
+            <input type="file" id="fileDevis" accept=".pdf" style="display:none" onchange="fileChosen('fileDevis','chosenDevis','actionsDevis')">
+            <div class="drop-zone" id="dropDevis" ondragover="dragOver(event,'dropDevis')" ondragleave="dragLeave('dropDevis')" ondrop="dropFile(event,'dropDevis','fileDevis','chosenDevis','actionsDevis')">
+              <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
+              <div class="drop-zone-text">Glisser le PDF ici</div>
+              <button type="button" class="drop-zone-btn" onclick="document.getElementById('fileDevis').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Choisir un fichier</button>
+              <div class="drop-zone-chosen" id="chosenDevis"></div>
+              <div class="drop-zone-actions" id="actionsDevis">
+                <button type="button" class="btn-preview" onclick="openPdfViewer('fileDevis')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>Aperçu</button>
+                <button type="button" class="btn-remove-file" onclick="removeFile('fileDevis','chosenDevis','actionsDevis')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Retirer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- SECTION 4 : MISSION -->
       <div class="form-section">
         <div class="form-section-title">Mission & localisation</div>
@@ -580,8 +605,9 @@ function removeFile(fileInputId, chosenId, actionsId) {
 function openPdfViewer(fileInputId) {
   let url = pdfBlobUrls[fileInputId];
   let title = 'Aperçu PDF';
-  if (!url && fileInputId === 'filePL' && window._existingPlUrl) url = window._existingPlUrl;
-  if (!url && fileInputId === 'fileBC' && window._existingBcUrl) url = window._existingBcUrl;
+  if (!url && fileInputId === 'filePL'    && window._existingPlUrl)    url = window._existingPlUrl;
+  if (!url && fileInputId === 'fileBC'    && window._existingBcUrl)    url = window._existingBcUrl;
+  if (!url && fileInputId === 'fileDevis' && window._existingDevisUrl) url = window._existingDevisUrl;
   if (!url) { alert('Aucun fichier disponible.'); return; }
 
   // Show the side panel
@@ -720,13 +746,11 @@ window.openModal = function openModal(id = null) {
       const chosen = document.getElementById('chosenBC');
       const actions = document.getElementById('actionsBC');
       const drop = document.getElementById('dropBC');
-      // Hide drop zone placeholder elements
       if (drop) {
         const icon = drop.querySelector('.drop-zone-icon'); if (icon) icon.style.display = 'none';
         const txt = drop.querySelector('.drop-zone-text'); if (txt) txt.style.display = 'none';
         const btn = drop.querySelector('.drop-zone-btn'); if (btn) btn.style.display = 'none';
       }
-      // Show file name and actions
       const fname = item.bcUrl.split('%2F').pop().split('?')[0].replace(/%20/g,' ') || 'Bon de commande';
       chosen.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;color:#1DA870;vertical-align:-2px;margin-right:4px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>' + decodeURIComponent(fname).split('_').slice(1).join('_') || 'PDF Bon de commande';
       chosen.style.display = 'block';
@@ -734,6 +758,24 @@ window.openModal = function openModal(id = null) {
       const previewBtn = actions.querySelector('.btn-preview');
       if (previewBtn) previewBtn.onclick = function() { openPdfViewer('fileBC'); };
     }
+    if (item.devisUrl) {
+      window._existingDevisUrl = item.devisUrl;
+      const chosen = document.getElementById('chosenDevis');
+      const actions = document.getElementById('actionsDevis');
+      const drop = document.getElementById('dropDevis');
+      if (drop) {
+        const icon = drop.querySelector('.drop-zone-icon'); if (icon) icon.style.display = 'none';
+        const txt = drop.querySelector('.drop-zone-text'); if (txt) txt.style.display = 'none';
+        const btn = drop.querySelector('.drop-zone-btn'); if (btn) btn.style.display = 'none';
+      }
+      const fname = item.devisUrl.split('%2F').pop().split('?')[0].replace(/%20/g,' ') || 'Devis';
+      chosen.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;color:#1DA870;vertical-align:-2px;margin-right:4px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>' + decodeURIComponent(fname).split('_').slice(1).join('_') || 'PDF Devis';
+      chosen.style.display = 'block';
+      actions.style.display = 'flex';
+      const previewBtn = actions.querySelector('.btn-preview');
+      if (previewBtn) previewBtn.onclick = function() { openPdfViewer('fileDevis'); };
+    }
+    if (item.devis) document.getElementById('fDevis').value = item.devis;
   }
   document.getElementById('modal').classList.add('open');
 }
@@ -973,17 +1015,17 @@ function getPassageDates() {
   return getPassagesFromDOM();
 }
 function resetForm() {
-  ['fClient','fDateEmission','fExpediteur','fPL','fBC','fNature','fNomClient','fEmailClient','fAdresse','fObservations','fNotes'].forEach(id => {
+  ['fClient','fDateEmission','fExpediteur','fPL','fBC','fDevis','fNature','fNomClient','fEmailClient','fAdresse','fObservations','fNotes'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   const elChorus = document.getElementById('fChorus'); if(elChorus) elChorus.value = '';
   document.getElementById('fAssigne').value = '';
   document.getElementById('fStatut').value = 'En cours';
-  ['chosenPL','chosenBC'].forEach(id => { const el = document.getElementById(id); if(el) { el.textContent=''; el.style.display='none'; }});
-  ['actionsPL','actionsBC'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
-  ['filePL','fileBC'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  ['chosenPL','chosenBC','chosenDevis'].forEach(id => { const el = document.getElementById(id); if(el) { el.textContent=''; el.style.display='none'; }});
+  ['actionsPL','actionsBC','actionsDevis'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display='none'; });
+  ['filePL','fileBC','fileDevis'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   // Restore drop zone placeholder visibility
-  ['dropPL','dropBC'].forEach(zoneId => {
+  ['dropPL','dropBC','dropDevis'].forEach(zoneId => {
     const zone = document.getElementById(zoneId);
     if (!zone) return;
     const icon = zone.querySelector('.drop-zone-icon'); if (icon) icon.style.display = '';
@@ -992,7 +1034,7 @@ function resetForm() {
   });
   document.getElementById('passagesContainer').innerHTML = '';
   passageCount = 0;
-  window._existingPlUrl = null; window._existingBcUrl = null;
+  window._existingPlUrl = null; window._existingBcUrl = null; window._existingDevisUrl = null;
   document.getElementById('phonesContainer').innerHTML = '';
   phoneCount = 0;
   addPhoneField(); // always start with one field
@@ -1009,14 +1051,17 @@ async function saveIntervention() {
   if (window.interventions && window.interventions.length) interventions = window.interventions;
 
   try {
-    let plUrl = editId ? (interventions.find(i=>i.id===editId)?.plUrl || '') : '';
-    let bcUrl = editId ? (interventions.find(i=>i.id===editId)?.bcUrl || '') : '';
+    let plUrl    = editId ? (interventions.find(i=>i.id===editId)?.plUrl    || '') : '';
+    let bcUrl    = editId ? (interventions.find(i=>i.id===editId)?.bcUrl    || '') : '';
+    let devisUrl = editId ? (interventions.find(i=>i.id===editId)?.devisUrl || '') : '';
 
     // Upload PDFs to Firebase Storage
-    const filePL = document.getElementById('filePL').files[0];
-    const fileBC = document.getElementById('fileBC').files[0];
-    if (filePL) plUrl = await window._uploadPdf(filePL, `suivi/pl/${Date.now()}_${filePL.name}`);
-    if (fileBC) bcUrl = await window._uploadPdf(fileBC, `suivi/bc/${Date.now()}_${fileBC.name}`);
+    const filePL    = document.getElementById('filePL').files[0];
+    const fileBC    = document.getElementById('fileBC').files[0];
+    const fileDevis = document.getElementById('fileDevis').files[0];
+    if (filePL)    plUrl    = await window._uploadPdf(filePL,    `suivi/pl/${Date.now()}_${filePL.name}`);
+    if (fileBC)    bcUrl    = await window._uploadPdf(fileBC,    `suivi/bc/${Date.now()}_${fileBC.name}`);
+    if (fileDevis) devisUrl = await window._uploadPdf(fileDevis, `suivi/devis/${Date.now()}_${fileDevis.name}`);
 
     const passages = getPassageDates();
     const data = {
@@ -1029,6 +1074,8 @@ async function saveIntervention() {
       plUrl,
       bc: document.getElementById('fBC').value.trim(),
       bcUrl,
+      devis: document.getElementById('fDevis').value.trim(),
+      devisUrl,
       nature: document.getElementById('fNature').value.trim(),
       nomClient: document.getElementById('fNomClient').value.trim(),
       coordonnees: Array.from(document.querySelectorAll('#phonesContainer input')).map(i=>i.value.trim()).filter(Boolean),
