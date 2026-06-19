@@ -63,8 +63,10 @@
   .fact-table td.client-cell{font-weight:600;color:var(--text);}
   .chip{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap;}
   .chip-a-facturer{background:#FEF3CD;color:#996600;}
-  .chip-facture{background:#E8F9F2;color:#1DA870;}
+  .chip-facture{background:#DBEAFE;color:#1D4ED8;}
+  .chip-envoye{background:#FEF3CD;color:#B45309;}
   .chip-chorus{background:#EEF2FF;color:#4338CA;}
+  .chip-paye{background:#E8F9F2;color:#1DA870;}
   .montant-cell{font-family:monospace;font-size:13px;font-weight:600;color:var(--text);}
   .pdf-link{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--green-dark);text-decoration:none;background:var(--green-pale);padding:4px 10px;border-radius:6px;white-space:nowrap;}
   .pdf-link:hover{background:#D0F3E7;}
@@ -72,7 +74,13 @@
   .btn-action{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
   .btn-completer{color:#fff;background:var(--navy);}
   .btn-chorus{color:#4338CA;background:#EEF2FF;}
+  .btn-envoye{color:#B45309;background:#FEF3CD;}
+  .btn-paye{color:#1DA870;background:#E8F9F2;}
   .btn-del{color:#E74C3C;background:#FDECEA;}
+  .period-bar{display:flex;align-items:center;gap:8px;margin-bottom:20px;}
+  .period-btn{font-size:12px;font-weight:500;padding:6px 14px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+  .period-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .period-label{font-size:11px;color:var(--text-muted);font-weight:500;}
   .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px;}
   .modal-overlay.open{display:flex;}
@@ -169,6 +177,16 @@
       </div>
     </div>
 
+    <!-- PERIOD FILTER -->
+    <div class="period-bar">
+      <span class="period-label">Période :</span>
+      <button class="period-btn" onclick="setPeriod('week')">Cette semaine</button>
+      <button class="period-btn active" onclick="setPeriod('month')">Ce mois</button>
+      <button class="period-btn" onclick="setPeriod('quarter')">Ce trimestre</button>
+      <button class="period-btn" onclick="setPeriod('year')">Cette année</button>
+      <button class="period-btn" onclick="setPeriod('all')">Tout</button>
+    </div>
+
     <!-- STATS -->
     <div class="stats-bar">
       <div class="stat-card">
@@ -177,19 +195,19 @@
         <div class="stat-sub">en attente</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Facturé</div>
+        <div class="stat-label">Factures émises</div>
         <div class="stat-value" id="statFacture">—</div>
-        <div class="stat-sub">ce mois</div>
+        <div class="stat-sub" id="statFactureSub">sur la période</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Montant facturé</div>
+        <div class="stat-label">Montant HT</div>
         <div class="stat-value" id="statMontant">—</div>
-        <div class="stat-sub">HT ce mois</div>
+        <div class="stat-sub" id="statMontantSub">sur la période</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Chorus à déposer</div>
+        <div class="stat-label">Non payé</div>
         <div class="stat-value" id="statChorus">—</div>
-        <div class="stat-sub">en attente</div>
+        <div class="stat-sub">factures en attente de règlement</div>
       </div>
     </div>
 
@@ -206,7 +224,9 @@
         <option value="">Tous les statuts</option>
         <option value="À facturer">À facturer</option>
         <option value="Facturé">Facturé</option>
+        <option value="Envoyé client">Envoyé client</option>
         <option value="Déposé Chorus">Déposé Chorus</option>
+        <option value="Payé">Payé</option>
       </select>
       <span class="results-count" id="resultsCount"></span>
     </div>
@@ -225,6 +245,7 @@
             <th>N° Facture</th>
             <th>PDF Facture</th>
             <th>Statut</th>
+            <th>Payé</th>
             <th style="text-align:right;">Actions</th>
           </tr>
         </thead>
@@ -334,34 +355,83 @@ function fmtMontant(v) {
   return parseFloat(v).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
 }
 
-function statutChip(s) {
-  const map = {'À facturer':'chip-a-facturer','Facturé':'chip-facture','Déposé Chorus':'chip-chorus'};
-  return '<span class="chip ' + (map[s]||'chip-a-facturer') + '">' + (s||'À facturer') + '</span>';
-}
-
 function pdfBtn(url, label) {
   if (!url) return '<span style="color:var(--text-muted);font-size:12px;">—</span>';
   return '<a href="' + url + '" target="_blank" class="pdf-link"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>' + label + '</a>';
 }
 
-function updateStats() {
+let currentPeriod = 'month';
+
+function getPeriodRange(period) {
   const now = new Date();
-  const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  if (period === 'week') {
+    const day = now.getDay() || 7;
+    const mon = new Date(y, m, d - day + 1);
+    const sun = new Date(y, m, d - day + 7);
+    return [mon.toISOString().split('T')[0], sun.toISOString().split('T')[0]];
+  }
+  if (period === 'month') {
+    return [y + '-' + String(m+1).padStart(2,'0') + '-01',
+            y + '-' + String(m+1).padStart(2,'0') + '-31'];
+  }
+  if (period === 'quarter') {
+    const q = Math.floor(m / 3);
+    return [y + '-' + String(q*3+1).padStart(2,'0') + '-01',
+            y + '-' + String(Math.min(q*3+3, 12)).padStart(2,'0') + '-31'];
+  }
+  if (period === 'year') {
+    return [y + '-01-01', y + '-12-31'];
+  }
+  return [null, null];
+}
+
+function inPeriod(dateStr, period) {
+  if (period === 'all' || !dateStr) return period === 'all';
+  const [from, to] = getPeriodRange(period);
+  return dateStr >= from && dateStr <= to;
+}
+
+function setPeriod(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  updateStats();
+}
+
+function updateStats() {
+  const STATUTS_EMIS = ['Facturé','Envoyé client','Déposé Chorus','Payé'];
   const aFacturer = factures.filter(f => f.statut === 'À facturer').length;
-  const thisMois = factures.filter(f => f.statut !== 'À facturer' && (f.dateFacture||'').startsWith(ym));
-  const montant = thisMois.reduce((s,f) => s + (parseFloat(f.montantHT)||0), 0);
-  const chorus = factures.filter(f => f.statut === 'Facturé' && f.chorus).length;
+  const emises = factures.filter(f => STATUTS_EMIS.includes(f.statut) && inPeriod(f.dateFacture, currentPeriod));
+  const montant = emises.reduce((s,f) => s + (parseFloat(f.montantHT)||0), 0);
+  const nonPaye = factures.filter(f => ['Facturé','Envoyé client','Déposé Chorus'].includes(f.statut) && !f.paye).length;
+
   document.getElementById('statAFacturer').textContent = aFacturer;
-  document.getElementById('statFacture').textContent = thisMois.length;
+  document.getElementById('statFacture').textContent = emises.length;
   document.getElementById('statMontant').textContent = montant ? montant.toLocaleString('fr-FR',{minimumFractionDigits:2}) + ' €' : '—';
-  document.getElementById('statChorus').textContent = chorus;
+  document.getElementById('statChorus').textContent = nonPaye;
+
+  const labels = {week:'cette semaine',month:'ce mois',quarter:'ce trimestre',year:'cette année',all:'au total'};
+  const sub = labels[currentPeriod] || '';
+  document.getElementById('statFactureSub').textContent = sub;
+  document.getElementById('statMontantSub').textContent = 'HT ' + sub;
+}
+
+function statutChipClass(s) {
+  return {
+    'À facturer':'chip-a-facturer',
+    'Facturé':'chip-facture',
+    'Envoyé client':'chip-envoye',
+    'Déposé Chorus':'chip-chorus',
+    'Payé':'chip-paye'
+  }[s] || 'chip-a-facturer';
 }
 
 function renderTable(list) {
   const body = document.getElementById('tableBody');
   document.getElementById('resultsCount').textContent = list.length + ' facture' + (list.length!==1?'s':'');
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="10"><div class="empty-state"><p>Aucune ligne de facturation.</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="11"><div class="empty-state"><p>Aucune ligne de facturation.</p></div></td></tr>';
     return;
   }
   let html = '';
@@ -378,14 +448,32 @@ function renderTable(list) {
     html += '<td class="montant-cell">' + fmtMontant(item.montantHT) + '</td>';
     html += '<td style="font-family:monospace;font-size:12px;">' + (item.numFacture||'—') + '</td>';
     html += '<td>' + pdfBtn(item.factureUrl, 'Facture') + '</td>';
-    html += '<td>' + statutChip(item.statut) + '</td>';
+    html += '<td><span class="chip ' + statutChipClass(item.statut) + '">' + (item.statut||'À facturer') + '</span></td>';
+
+    // Colonne Payé
+    if (item.statut === 'À facturer') {
+      html += '<td><span style="color:var(--text-muted);font-size:12px;">—</span></td>';
+    } else if (item.paye) {
+      html += '<td><div style="display:flex;flex-direction:column;gap:2px;"><span class="chip chip-paye">Payé</span>';
+      if (item.datePaiement) html += '<span style="font-size:10px;color:var(--text-muted);">' + fmtDate(item.datePaiement) + '</span>';
+      html += '</div></td>';
+    } else {
+      html += '<td><button class="btn-action btn-paye" onclick="marquerPaye(\'' + item.id + '\')">Marquer payé</button></td>';
+    }
+
+    // Actions
     html += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:4px;justify-content:flex-end;">';
     html += '<button class="btn-action btn-completer" onclick="openModalFact(\'' + item.id + '\')">';
     html += '<svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
     html += (item.statut === 'À facturer' ? 'Compléter' : 'Modifier') + '</button>';
-    if (item.statut === 'Facturé' && item.chorus) {
-      html += '<button class="btn-action btn-chorus" onclick="marquerChorus(\'' + item.id + '\')">';
-      html += '<svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Chorus</button>';
+    if (item.statut === 'Facturé') {
+      if (item.chorus) {
+        html += '<button class="btn-action btn-chorus" onclick="marquerChorus(\'' + item.id + '\')">';
+        html += '<svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Chorus</button>';
+      } else {
+        html += '<button class="btn-action btn-envoye" onclick="marquerEnvoyeClient(\'' + item.id + '\')">';
+        html += '<svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyé client</button>';
+      }
     }
     html += '<button class="btn-action btn-del" onclick="deleteFact(\'' + item.id + '\')">';
     html += '<svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>';
@@ -593,12 +681,35 @@ async function saveFact() {
 async function marquerChorus(id) {
   if (!confirm('Marquer ce dossier comme déposé sur Chorus Pro ?')) return;
   try {
-    await window._updateFacture(id, { statut: 'Déposé Chorus', dateDepotChorus: new Date().toISOString().split('T')[0] });
+    const today = new Date().toISOString().split('T')[0];
+    await window._updateFacture(id, { statut: 'Déposé Chorus', dateDepotChorus: today });
     const idx = factures.findIndex(f => f.id === id);
     if (idx !== -1) { factures[idx].statut = 'Déposé Chorus'; }
-    filterTable();
-    updateStats();
+    filterTable(); updateStats();
     showToast('Déposé sur Chorus Pro.');
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function marquerEnvoyeClient(id) {
+  if (!confirm('Marquer la facture comme envoyée au client ?')) return;
+  try {
+    await window._updateFacture(id, { statut: 'Envoyé client' });
+    const idx = factures.findIndex(f => f.id === id);
+    if (idx !== -1) { factures[idx].statut = 'Envoyé client'; }
+    filterTable(); updateStats();
+    showToast('Facture marquée envoyée au client.');
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function marquerPaye(id) {
+  if (!confirm('Marquer cette facture comme payée ?')) return;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    await window._updateFacture(id, { paye: true, datePaiement: today });
+    const idx = factures.findIndex(f => f.id === id);
+    if (idx !== -1) { factures[idx].paye = true; factures[idx].datePaiement = today; }
+    filterTable(); updateStats();
+    showToast('Facture marquée payée.');
   } catch(e) { alert('Erreur : ' + e.message); }
 }
 
