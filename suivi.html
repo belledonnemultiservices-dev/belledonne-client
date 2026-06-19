@@ -290,6 +290,7 @@
             <th>Client</th>
             <th>Affaire PL</th>
             <th>Bon de commande</th>
+            <th>Devis</th>
             <th>Nature mission</th>
             <th style="min-width:200px;">Adresse</th>
             <th>Assigné</th>
@@ -299,7 +300,7 @@
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="9"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention enregistrée.</p></div></td></tr>
+          <tr><td colspan="10"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention enregistrée.</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -1354,7 +1355,7 @@ window.renderTable = function renderTable(list) {
   const body = document.getElementById('tableBody');
   document.getElementById('resultsCount').textContent = list.length + ' intervention' + (list.length!==1?'s':'');
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="10"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
     return;
   }
 
@@ -1386,6 +1387,10 @@ window.renderTable = function renderTable(list) {
     if (item.bc) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + item.bc + '</span>';
     html += pdfBtn(item.bcUrl, 'PDF') + '</div></td>';
 
+    html += '<td><div style="display:flex;flex-direction:column;gap:4px;">';
+    if (item.devis) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + item.devis + '</span>';
+    html += pdfBtn(item.devisUrl, 'PDF') + '</div></td>';
+
     html += '<td style="font-size:13px;">' + (item.nature || '—') + '</td>';
     html += '<td style="min-width:200px;font-size:13px;">' + (item.adresse || '—') + '</td>';
     html += '<td>' + (item.assigne ? assigneBadge(item.assigne) : '<span style="color:var(--text-muted)">—</span>') + '</td>';
@@ -1412,7 +1417,7 @@ window.renderTable = function renderTable(list) {
 
     // Build notification row (hidden by default)
     html += '<tr id="notif-row-' + item.id + '" class="notif-row hidden">';
-    html += '<td colspan="9"><div class="notif-bar">';
+    html += '<td colspan="10"><div class="notif-bar">';
 
     // Notifier button
     html += '<div class="notif-section">';
