@@ -897,36 +897,52 @@ function setAssignesInModal(arr) {
   });
   refreshAllPassageTechs();
 }
-function refreshPassageTech(n, defaultVal) {
-  const sel = document.getElementById('fPassageTech' + n);
-  if (!sel) return;
+function refreshPassageTechs(n, selectedArr) {
+  const container = document.getElementById('fPassageTechChips' + n);
+  if (!container) return;
+  const current = selectedArr !== undefined ? selectedArr : getPassageTechsFromDOM(n);
   const assignes = getAssignesFromModal();
   const list = assignes.length ? assignes : (window._techniciens||[]).map(t=>t.nomComplet||t.nom||t.id);
-  const current = defaultVal !== undefined ? defaultVal : sel.value;
-  sel.innerHTML = list.map(a => `<option value="${a}"${a===current?' selected':''}>${a}</option>`).join('') || '<option value="">—</option>';
+  container.innerHTML = '';
+  list.forEach(techName => {
+    const t = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    const color = t?.color || '#8FA4B8';
+    const isSelected = current.includes(techName);
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'tech-chip' + (isSelected ? ' selected' : '');
+    btn.textContent = techName; btn.dataset.id = techName; btn.dataset.color = color;
+    if (isSelected) {
+      btn.style.background = color; btn.style.borderColor = color;
+      btn.style.color = isLightColor(color) ? '#0D1B2A' : '#fff';
+    }
+    btn.onclick = function() {
+      const isNow = !this.classList.contains('selected');
+      this.classList.toggle('selected', isNow);
+      if (isNow) { this.style.background = color; this.style.borderColor = color; this.style.color = isLightColor(color)?'#0D1B2A':'#fff'; }
+      else { this.style.background=''; this.style.borderColor=''; this.style.color=''; }
+    };
+    container.appendChild(btn);
+  });
+}
+function getPassageTechsFromDOM(n) {
+  return Array.from(document.querySelectorAll('#fPassageTechChips' + n + ' .tech-chip.selected')).map(b=>b.dataset.id);
 }
 function refreshAllPassageTechs() {
   let n = 1;
-  while (document.getElementById('fDateDebut' + n)) { refreshPassageTech(n); n++; }
+  while (document.getElementById('fDateDebut' + n)) { refreshPassageTechs(n, getPassageTechsFromDOM(n)); n++; }
 }
-function _getTech(n) {
-  let label;
-  if (n !== undefined) label = document.getElementById('fPassageTech' + n)?.value;
-  if (!label) label = getAssignesFromModal()[0];
-  if (!label) { showToast('Assignez un technicien avant d\'agir sur l\'agenda.', true); return null; }
-  const tech = (window._techniciens||[]).find(t => t.nomComplet===label || t.nom===label);
-  if (!tech || !tech.email) { showToast('Email du technicien introuvable. Vérifiez sa fiche.', true); return null; }
-  return tech;
-}
-function _getTechEmail(n) {
-  return _getTech(n)?.email || null;
+function getPassageCalMap(n) {
+  const div = document.getElementById('passage_' + n);
+  const raw = div?.dataset.calEventId || '';
+  if (!raw) return {};
+  try { const p = JSON.parse(raw); return (typeof p === 'object' && p !== null) ? p : (raw ? {_: raw} : {}); }
+  catch { return raw ? {_: raw} : {}; }
 }
 function getCalEventIds() {
   const ids = [];
   let n = 1;
   while (document.getElementById('fDateDebut' + n)) {
-    const div = document.getElementById('passage_' + n);
-    ids.push(div?.dataset.calEventId || '');
+    ids.push(getPassageCalMap(n));
     n++;
   }
   return ids;
@@ -941,85 +957,86 @@ function getPassagesFromDOM() {
       titre: document.getElementById('fTitre' + n)?.value || '',
       desc: document.getElementById('fDesc' + n)?.value || '',
       adresse: document.getElementById('fAdresseCal' + n)?.value || '',
-      tech: document.getElementById('fPassageTech' + n)?.value || '',
+      techs: getPassageTechsFromDOM(n),
     });
     n++;
   }
   return passages;
 }
-async function _saveCalEventId(n, eventId) {
+async function _saveCalEventId(n, eventMap) {
   if (!editId) return;
   const calEventIds = getCalEventIds();
-  calEventIds[n - 1] = eventId;
+  calEventIds[n - 1] = eventMap;
+  const div = document.getElementById('passage_' + n);
+  if (div) div.dataset.calEventId = JSON.stringify(eventMap);
   // Sauvegarde aussi les passages pour ne pas perdre ceux ajoutés sans "Mettre à jour"
   await window._updateSuivi(editId, { calEventIds, passages: getPassagesFromDOM() });
 }
 async function addPassageToCalendar(n) {
-  const techEmail = _getTechEmail(n); if (!techEmail) return;
+  const techs = getPassageTechsFromDOM(n);
+  if (!techs.length) { showToast('Sélectionnez au moins un technicien pour ce passage.', true); return; }
   const debut = document.getElementById('fDateDebut' + n)?.value || '';
   if (!debut) { showToast('Ajoutez une date de début pour ce passage.', true); return; }
   const fin = document.getElementById('fDateFin' + n)?.value || '';
   const container = document.getElementById('calBtns' + n);
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Envoi...</span>';
-  try {
-    const tech = _getTech(n);
-    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '', colorId: tech?.calendarColorId || null });
-    if (result.success || result.created > 0) {
-      const eventId = result.results?.[0]?.eventId || '';
-      renderPassageCalButtons(n, eventId);
-      await _saveCalEventId(n, eventId);
-      showToast('✅ Passage ajouté à l\'agenda');
-      refreshCalendarFrame(debut);
-    } else {
-      showToast('Erreur agenda : ' + (result.errors?.[0]?.error || result.error || 'Erreur'), true);
-      container.innerHTML = origHTML;
-    }
-  } catch(err) { showToast('Erreur réseau : ' + err.message, true); container.innerHTML = origHTML; }
+  const calMap = {...getPassageCalMap(n)};
+  let added = 0;
+  for (const techName of techs) {
+    const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    if (!tech?.email) continue;
+    try {
+      const result = await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], customSummary: document.getElementById('fTitre'+n)?.value||'', customDescription: document.getElementById('fDesc'+n)?.value||'', adresse: document.getElementById('fAdresseCal'+n)?.value||'', colorId: tech.calendarColorId||null });
+      if (result.success || result.created > 0) { calMap[techName] = result.results?.[0]?.eventId || ''; added++; }
+      else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
+    } catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }
+  }
+  if (added > 0) {
+    renderPassageCalButtons(n, calMap);
+    await _saveCalEventId(n, calMap);
+    showToast('✅ Passage ajouté à l\'agenda (' + added + ' technicien(s))');
+    refreshCalendarFrame(debut);
+  } else { container.innerHTML = origHTML; }
 }
 async function updatePassageInCalendar(n) {
-  const techEmail = _getTechEmail(n); if (!techEmail) return;
-  const div = document.getElementById('passage_' + n);
-  const calEventId = div?.dataset.calEventId;
-  if (!calEventId) { showToast('Aucun événement agenda lié à ce passage.', true); return; }
+  const calMap = getPassageCalMap(n);
+  const techsWithEvents = Object.entries(calMap).filter(([,id])=>id);
+  if (!techsWithEvents.length) { showToast('Aucun événement agenda lié à ce passage.', true); return; }
   const debut = document.getElementById('fDateDebut' + n)?.value || '';
   const fin = document.getElementById('fDateFin' + n)?.value || '';
   const container = document.getElementById('calBtns' + n);
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Mise à jour...</span>';
-  try {
-    const tech = _getTech(n);
-    const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '', colorId: tech?.calendarColorId || null });
-    if (result.success || result.created > 0) {
-      showToast('✅ Agenda mis à jour');
-      renderPassageCalButtons(n, calEventId);
-      refreshCalendarFrame(debut);
-    } else {
-      showToast('Erreur : ' + (result.errors?.[0]?.error || result.error || 'Erreur'), true);
-      container.innerHTML = origHTML;
-    }
-  } catch(err) { showToast('Erreur réseau : ' + err.message, true); container.innerHTML = origHTML; }
+  let updated = 0;
+  for (const [techName, calEventId] of techsWithEvents) {
+    const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    if (!tech?.email) continue;
+    try {
+      const result = await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitre'+n)?.value||'', customDescription: document.getElementById('fDesc'+n)?.value||'', adresse: document.getElementById('fAdresseCal'+n)?.value||'', colorId: tech.calendarColorId||null });
+      if (result.success || result.created > 0) updated++;
+      else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
+    } catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }
+  }
+  if (updated > 0) { showToast('✅ Agenda mis à jour'); renderPassageCalButtons(n, calMap); refreshCalendarFrame(debut); }
+  else container.innerHTML = origHTML;
 }
 async function removePassageFromCalendar(n) {
-  const techEmail = _getTechEmail(n); if (!techEmail) return;
-  const div = document.getElementById('passage_' + n);
-  const calEventId = div?.dataset.calEventId;
-  if (!calEventId) return;
+  const calMap = getPassageCalMap(n);
+  const techsWithEvents = Object.entries(calMap).filter(([,id])=>id);
+  if (!techsWithEvents.length) return;
   const container = document.getElementById('calBtns' + n);
-  const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Suppression...</span>';
-  try {
-    const result = await _calendarRequest({ technicienEmail: techEmail, operation: 'delete', calEventId });
-    if (result.success || result.deleted) {
-      renderPassageCalButtons(n, '');
-      await _saveCalEventId(n, '');
-      showToast(result.alreadyGone ? 'Événement déjà absent de l\'agenda' : '✅ Événement retiré de l\'agenda');
-      refreshCalendarFrame(document.getElementById('fDateDebut' + n)?.value);
-    } else {
-      showToast('Erreur : ' + (result.error || 'Erreur'), true);
-      container.innerHTML = origHTML;
-    }
-  } catch(err) { showToast('Erreur réseau : ' + err.message, true); container.innerHTML = origHTML; }
+  for (const [techName, calEventId] of techsWithEvents) {
+    const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    if (!tech?.email) continue;
+    try { await _calendarRequest({ technicienEmail: tech.email, operation: 'delete', calEventId }); }
+    catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }
+  }
+  renderPassageCalButtons(n, {});
+  await _saveCalEventId(n, {});
+  showToast('✅ Événements retirés de l\'agenda');
+  refreshCalendarFrame(document.getElementById('fDateDebut' + n)?.value);
 }
 function getDefaultPassageTitle() {
   const nature = document.getElementById('fNature')?.value || '';
@@ -1032,12 +1049,14 @@ function getDefaultPassageDesc() {
   const obs = document.getElementById('fObservations')?.value || '';
   return [bc ? `BC ${bc}` : '', adresse, obs].filter(Boolean).join(' · ');
 }
-function renderPassageCalButtons(n, calEventId) {
+function renderPassageCalButtons(n, calEventMap) {
   const container = document.getElementById('calBtns' + n);
   if (!container) return;
   const div = document.getElementById('passage_' + n);
-  if (div) div.dataset.calEventId = calEventId || '';
-  if (calEventId) {
+  const mapObj = (calEventMap && typeof calEventMap === 'object') ? calEventMap : (calEventMap ? {_: calEventMap} : {});
+  if (div) div.dataset.calEventId = JSON.stringify(mapObj);
+  const hasEvents = Object.values(mapObj).some(Boolean);
+  if (hasEvents) {
     container.innerHTML = `
       <button type="button" onclick="updatePassageInCalendar(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:8px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
@@ -1059,22 +1078,23 @@ function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
   const label = ORDINALS[n-1] || (n+'e');
-  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTech = '';
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [];
   if (value && typeof value === 'object') {
     debut = value.debut || '';
     fin = value.fin || '';
     savedTitre = value.titre || '';
     savedDesc = value.desc || '';
     savedAdresse = value.adresse || '';
-    savedTech = value.tech || '';
+    savedTechs = Array.isArray(value.techs) ? value.techs : (value.tech ? [value.tech] : []);
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   }
+  const calMap = (calEventId && typeof calEventId === 'object') ? calEventId : (calEventId ? {_: calEventId} : {});
   const defaultAdresse = (savedAdresse || document.getElementById('fAdresse')?.value || '').replace(/"/g,'&quot;');
   const container = document.getElementById('passagesContainer');
   const div = document.createElement('div');
   div.id = 'passage_' + n;
-  div.dataset.calEventId = calEventId || '';
+  div.dataset.calEventId = JSON.stringify(calMap);
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
   div.innerHTML = `
     <div style="display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:8px;align-items:center;">
@@ -1094,9 +1114,9 @@ function addPassage(value = '', calEventId = '') {
         <button type="button" onclick="removePassage(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
-      <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Technicien :</span>
-      <select id="fPassageTech${n}" style="font-size:11px;font-weight:500;padding:3px 8px;border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;color:var(--text-mid);outline:none;background:var(--bg);"></select>
+    <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
+      <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Technicien(s) :</span>
+      <div id="fPassageTechChips${n}" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -1118,8 +1138,8 @@ function addPassage(value = '', calEventId = '') {
       </div>
     </div>`;
   container.appendChild(div);
-  refreshPassageTech(n, savedTech);
-  renderPassageCalButtons(n, calEventId);
+  refreshPassageTechs(n, savedTechs);
+  renderPassageCalButtons(n, calMap);
   updateNotifyBtn();
 }
 function removePassage(n) {
