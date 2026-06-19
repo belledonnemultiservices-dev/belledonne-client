@@ -406,7 +406,7 @@
         </div>
         <div id="secDocsBody" style="margin-top:12px;">
           <div class="doc-rows">
-            <div class="doc-row">
+            <div class="doc-row" id="docRowPL">
               <span class="doc-row-label">PL</span>
               <input class="form-input doc-num" id="fPL" placeholder="N° affaire">
               <div id="dropPL" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
@@ -419,7 +419,7 @@
                 </div>
               </div>
             </div>
-            <div class="doc-row">
+            <div class="doc-row" id="docRowBC">
               <span class="doc-row-label">BC</span>
               <input class="form-input doc-num" id="fBC" placeholder="N° BC">
               <div id="dropBC" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
@@ -459,7 +459,7 @@
       </div>
 
       <!-- 4 · INFOS ADMIN (collapsible, fermé par défaut) -->
-      <div class="form-section">
+      <div class="form-section" id="secAdmin">
         <div class="form-section-title section-toggle" onclick="toggleCollapse('secAdminBody','chevronAdmin')">
           <span>Infos administratives <span class="sec-hint">Chorus · date · expéditeur</span></span>
           <svg id="chevronAdmin" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
@@ -1401,6 +1401,15 @@ function setClientType(type) {
   document.getElementById('clientLibre').style.display  = type !== 'contrat' ? '' : 'none';
   const libre = document.getElementById('fClientLibre');
   if (libre && type !== 'contrat') libre.placeholder = type === 'particulier' ? 'Nom et prénom...' : "Nom de l'entreprise...";
+  // PL : uniquement pour les contrats
+  const plRow = document.getElementById('docRowPL');
+  if (plRow) plRow.style.display = type === 'contrat' ? '' : 'none';
+  // BC : contrat + entreprise (pas particulier)
+  const bcRow = document.getElementById('docRowBC');
+  if (bcRow) bcRow.style.display = type === 'particulier' ? 'none' : '';
+  // Infos admin (Chorus, date émission…) : uniquement pour les contrats
+  const secAdmin = document.getElementById('secAdmin');
+  if (secAdmin) secAdmin.style.display = type === 'contrat' ? '' : 'none';
 }
 function statutChip(s) {
   const map = {'Nouveau':'chip-statut-new','À valider':'chip-statut-pending','À traiter':'chip-statut-toprocess','En cours':'chip-statut-progress','En attente':'chip-statut-waiting','Terminé':'chip-statut-done','Annulé':'chip-statut-cancel'};
