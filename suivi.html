@@ -118,6 +118,8 @@
   .row-en-attente td{background:#F7F3FF;}
   .btn-client-type{font-size:11px;font-weight:500;padding:5px 12px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;white-space:nowrap;}
   .btn-client-type.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .tech-chip{font-size:12px;font-weight:500;padding:4px 12px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;user-select:none;}
+  .tech-chip.selected{border-color:transparent;}
   .statut-inline{font-size:11px;font-weight:600;padding:5px 22px 5px 10px;border-radius:20px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;outline:none;-webkit-appearance:none;-moz-appearance:none;appearance:none;background-repeat:no-repeat;background-position:right 7px center;background-size:10px 6px;}
   .sstat-new{background-color:#EBF0F5;color:#1A5F8A;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%231A5F8A' opacity='.5'/%3E%3C/svg%3E");}
   .sstat-pending{background-color:#FEF3CD;color:#B45309;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23B45309' opacity='.5'/%3E%3C/svg%3E");}
@@ -374,7 +376,7 @@
             <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
               <button type="button" class="btn-client-type active" id="btnTypeContrat" onclick="setClientType('contrat')">En contrat</button>
               <button type="button" class="btn-client-type" id="btnTypeParticulier" onclick="setClientType('particulier')">Particulier</button>
-              <button type="button" class="btn-client-type" id="btnTypeEntreprise" onclick="setClientType('entreprise')">Entreprise ponctuelle</button>
+              <button type="button" class="btn-client-type" id="btnTypeEntreprise" onclick="setClientType('entreprise')">Entreprise</button>
             </div>
             <div id="clientContrat">
               <select class="form-select" id="fClient"><option value="">— Sélectionner —</option></select>
@@ -387,9 +389,11 @@
             <label class="form-label">N° SIRET <span class="opt">— optionnel</span></label>
             <input class="form-input" id="fSiret" placeholder="XXX XXX XXX XXXXX" maxlength="17">
           </div>
-          <div class="form-group">
+          <div class="form-group form-full">
             <label class="form-label">Assigné à</label>
-            <select class="form-select" id="fAssigne"><option value="">— Sélectionner —</option></select>
+            <div id="fAssigneMulti" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);min-height:38px;align-items:center;">
+              <span id="assigneEmptyHint" style="font-size:12px;color:var(--text-muted);font-style:italic;">Chargement des techniciens...</span>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Nature de la mission</label>
@@ -744,7 +748,7 @@ window.openModal = function openModal(id = null) {
     document.getElementById('fChorus').value = item.chorus || '';
     document.getElementById('fDateEmission').value = item.dateEmission || '';
     document.getElementById('fExpediteur').value = item.expediteur || '';
-    document.getElementById('fAssigne').value = item.assigne || '';
+    setAssignesInModal(item.assignes || (item.assigne ? [item.assigne] : []));
     document.getElementById('fPL').value = item.pl || '';
     document.getElementById('fBC').value = item.bc || '';
     document.getElementById('fNature').value = item.nature || '';
@@ -846,15 +850,76 @@ async function _calendarRequest(payload) {
   });
   return resp.json();
 }
-function _getTech() {
-  const assigne = document.getElementById('fAssigne')?.value;
-  if (!assigne) { showToast('Assignez un technicien avant d\'agir sur l\'agenda.', true); return null; }
-  const tech = (window._techniciens || []).find(t => t.nomComplet === assigne || t.nom === assigne);
+function populateTechChips() {
+  const container = document.getElementById('fAssigneMulti');
+  if (!container) return;
+  const hint = document.getElementById('assigneEmptyHint');
+  if (hint) hint.remove();
+  Array.from(container.querySelectorAll('.tech-chip')).forEach(b => b.remove());
+  const techs = window._techniciens || [];
+  if (!techs.length) {
+    container.innerHTML = '<span style="font-size:12px;color:var(--text-muted);font-style:italic;">Aucun technicien enregistré</span>';
+    return;
+  }
+  techs.forEach(t => {
+    const label = t.nomComplet || ((t.prenom||'') + ' ' + (t.nom||'')).trim() || t.nom || t.id;
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'tech-chip';
+    btn.textContent = label; btn.dataset.id = label; btn.dataset.color = t.color || '#8FA4B8';
+    btn.onclick = function() { toggleTechChip(this); };
+    container.appendChild(btn);
+  });
+}
+function toggleTechChip(el) {
+  const isNowSelected = !el.classList.contains('selected');
+  el.classList.toggle('selected', isNowSelected);
+  if (isNowSelected) {
+    const color = el.dataset.color || '#0D1B2A';
+    el.style.background = color; el.style.borderColor = color;
+    el.style.color = isLightColor(color) ? '#0D1B2A' : '#fff';
+  } else {
+    el.style.background = ''; el.style.borderColor = ''; el.style.color = '';
+  }
+  refreshAllPassageTechs();
+}
+function getAssignesFromModal() {
+  return Array.from(document.querySelectorAll('#fAssigneMulti .tech-chip.selected')).map(b => b.dataset.id);
+}
+function setAssignesInModal(arr) {
+  document.querySelectorAll('#fAssigneMulti .tech-chip').forEach(btn => {
+    const sel = arr.includes(btn.dataset.id);
+    btn.classList.toggle('selected', sel);
+    if (sel) {
+      const color = btn.dataset.color || '#0D1B2A';
+      btn.style.background = color; btn.style.borderColor = color;
+      btn.style.color = isLightColor(color) ? '#0D1B2A' : '#fff';
+    } else { btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; }
+  });
+  refreshAllPassageTechs();
+}
+function refreshPassageTech(n, defaultVal) {
+  const sel = document.getElementById('fPassageTech' + n);
+  if (!sel) return;
+  const assignes = getAssignesFromModal();
+  const list = assignes.length ? assignes : (window._techniciens||[]).map(t=>t.nomComplet||t.nom||t.id);
+  const current = defaultVal !== undefined ? defaultVal : sel.value;
+  sel.innerHTML = list.map(a => `<option value="${a}"${a===current?' selected':''}>${a}</option>`).join('') || '<option value="">—</option>';
+}
+function refreshAllPassageTechs() {
+  let n = 1;
+  while (document.getElementById('fDateDebut' + n)) { refreshPassageTech(n); n++; }
+}
+function _getTech(n) {
+  let label;
+  if (n !== undefined) label = document.getElementById('fPassageTech' + n)?.value;
+  if (!label) label = getAssignesFromModal()[0];
+  if (!label) { showToast('Assignez un technicien avant d\'agir sur l\'agenda.', true); return null; }
+  const tech = (window._techniciens||[]).find(t => t.nomComplet===label || t.nom===label);
   if (!tech || !tech.email) { showToast('Email du technicien introuvable. Vérifiez sa fiche.', true); return null; }
   return tech;
 }
-function _getTechEmail() {
-  return _getTech()?.email || null;
+function _getTechEmail(n) {
+  return _getTech(n)?.email || null;
 }
 function getCalEventIds() {
   const ids = [];
@@ -876,6 +941,7 @@ function getPassagesFromDOM() {
       titre: document.getElementById('fTitre' + n)?.value || '',
       desc: document.getElementById('fDesc' + n)?.value || '',
       adresse: document.getElementById('fAdresseCal' + n)?.value || '',
+      tech: document.getElementById('fPassageTech' + n)?.value || '',
     });
     n++;
   }
@@ -889,7 +955,7 @@ async function _saveCalEventId(n, eventId) {
   await window._updateSuivi(editId, { calEventIds, passages: getPassagesFromDOM() });
 }
 async function addPassageToCalendar(n) {
-  const techEmail = _getTechEmail(); if (!techEmail) return;
+  const techEmail = _getTechEmail(n); if (!techEmail) return;
   const debut = document.getElementById('fDateDebut' + n)?.value || '';
   if (!debut) { showToast('Ajoutez une date de début pour ce passage.', true); return; }
   const fin = document.getElementById('fDateFin' + n)?.value || '';
@@ -897,7 +963,7 @@ async function addPassageToCalendar(n) {
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Envoi...</span>';
   try {
-    const tech = _getTech();
+    const tech = _getTech(n);
     const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '', colorId: tech?.calendarColorId || null });
     if (result.success || result.created > 0) {
       const eventId = result.results?.[0]?.eventId || '';
@@ -912,7 +978,7 @@ async function addPassageToCalendar(n) {
   } catch(err) { showToast('Erreur réseau : ' + err.message, true); container.innerHTML = origHTML; }
 }
 async function updatePassageInCalendar(n) {
-  const techEmail = _getTechEmail(); if (!techEmail) return;
+  const techEmail = _getTechEmail(n); if (!techEmail) return;
   const div = document.getElementById('passage_' + n);
   const calEventId = div?.dataset.calEventId;
   if (!calEventId) { showToast('Aucun événement agenda lié à ce passage.', true); return; }
@@ -922,7 +988,7 @@ async function updatePassageInCalendar(n) {
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Mise à jour...</span>';
   try {
-    const tech = _getTech();
+    const tech = _getTech(n);
     const result = await _calendarRequest({ technicienEmail: techEmail, passages: [debut + '|' + fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitre' + n)?.value || '', customDescription: document.getElementById('fDesc' + n)?.value || '', adresse: document.getElementById('fAdresseCal' + n)?.value || '', colorId: tech?.calendarColorId || null });
     if (result.success || result.created > 0) {
       showToast('✅ Agenda mis à jour');
@@ -935,7 +1001,7 @@ async function updatePassageInCalendar(n) {
   } catch(err) { showToast('Erreur réseau : ' + err.message, true); container.innerHTML = origHTML; }
 }
 async function removePassageFromCalendar(n) {
-  const techEmail = _getTechEmail(); if (!techEmail) return;
+  const techEmail = _getTechEmail(n); if (!techEmail) return;
   const div = document.getElementById('passage_' + n);
   const calEventId = div?.dataset.calEventId;
   if (!calEventId) return;
@@ -993,13 +1059,14 @@ function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
   const label = ORDINALS[n-1] || (n+'e');
-  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '';
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTech = '';
   if (value && typeof value === 'object') {
     debut = value.debut || '';
     fin = value.fin || '';
     savedTitre = value.titre || '';
     savedDesc = value.desc || '';
     savedAdresse = value.adresse || '';
+    savedTech = value.tech || '';
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   }
@@ -1027,6 +1094,10 @@ function addPassage(value = '', calEventId = '') {
         <button type="button" onclick="removePassage(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>
       </div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
+      <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Technicien :</span>
+      <select id="fPassageTech${n}" style="font-size:11px;font-weight:500;padding:3px 8px;border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;color:var(--text-mid);outline:none;background:var(--bg);"></select>
+    </div>
     <div style="display:flex;flex-direction:column;gap:6px;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
@@ -1047,6 +1118,7 @@ function addPassage(value = '', calEventId = '') {
       </div>
     </div>`;
   container.appendChild(div);
+  refreshPassageTech(n, savedTech);
   renderPassageCalButtons(n, calEventId);
   updateNotifyBtn();
 }
@@ -1063,7 +1135,7 @@ function resetForm() {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   const elChorus = document.getElementById('fChorus'); if(elChorus) elChorus.value = '';
-  document.getElementById('fAssigne').value = '';
+  setAssignesInModal([]);
   setClientType('contrat');
   document.getElementById('fClient').value = '';
   ['chosenPL','chosenBC','chosenDevis'].forEach(id => { const el = document.getElementById(id); if(el) { el.textContent=''; el.style.display='none'; }});
@@ -1117,7 +1189,8 @@ async function saveIntervention() {
       chorus: document.getElementById('fChorus').value.trim(),
       dateEmission: document.getElementById('fDateEmission').value,
       expediteur: document.getElementById('fExpediteur').value.trim(),
-      assigne: document.getElementById('fAssigne').value,
+      assignes: getAssignesFromModal(),
+      assigne: getAssignesFromModal()[0] || '',
       statut: editId ? (interventions.find(i=>i.id===editId)?.statut || 'À traiter') : 'À traiter',
       pl: document.getElementById('fPL').value.trim(),
       plUrl,
@@ -1485,7 +1558,8 @@ window.renderTable = function renderTable(list) {
 
     html += '<td style="font-size:13px;">' + (item.nature || '—') + '</td>';
     html += '<td style="min-width:200px;font-size:13px;">' + (item.adresse || '—') + '</td>';
-    html += '<td>' + (item.assigne ? assigneBadge(item.assigne) : '<span style="color:var(--text-muted)">—</span>') + '</td>';
+    const _assignes = item.assignes || (item.assigne ? [item.assigne] : []);
+    html += '<td>' + (_assignes.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + _assignes.map(a=>assigneBadge(a)).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
     html += '<td>' + passagesDropdown(item.passages || []) + '</td>';
     html += '<td>' + statutSelect(item.id, item.statut) + '</td>';
 
@@ -2162,7 +2236,8 @@ function filterTable() {
   var data = window.interventions || [];
   if (!data.length) return; // Data not loaded yet
   var filtered = data.filter(function(i) {
-    var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,i.assigne].some(function(v){return (v||'').toLowerCase().includes(q);});
+    var allAssignes = (i.assignes||[]).concat(i.assigne||[]).join(' ');
+    var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,allAssignes].some(function(v){return (v||'').toLowerCase().includes(q);});
     var ms = !statut || i.statut === statut;
     var mc = !client || i.client === client;
     // Try multiple date sources for filtering
@@ -2381,14 +2456,7 @@ async function loadTechniciens() {
   const snap = await getDocs(collection(db, 'techniciens'));
   techniciens = snap.docs.map(d=>({id:d.id,...d.data()}));
   window._techniciens = techniciens;
-  const sel = document.getElementById('fAssigne');
-  while (sel.options.length > 1) sel.remove(1);
-  techniciens.forEach(t => {
-    const opt = document.createElement('option');
-    const label = t.nomComplet || ((t.prenom||'') + ' ' + (t.nom||'')).trim() || t.nom || t.id;
-    opt.value = label; opt.textContent = label;
-    sel.appendChild(opt);
-  });
+  populateTechChips();
 }
 window._loadTechniciens = loadTechniciens;
 </script>
