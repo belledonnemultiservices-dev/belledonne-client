@@ -126,15 +126,6 @@
   .sstat-waiting{background-color:#F0EAFF;color:#7B2FBE;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237B2FBE' opacity='.5'/%3E%3C/svg%3E");}
   .sstat-done{background-color:#E8F9F2;color:#1DA870;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%231DA870' opacity='.5'/%3E%3C/svg%3E");}
   .sstat-cancel{background-color:#FDECEA;color:#E74C3C;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23E74C3C' opacity='.5'/%3E%3C/svg%3E");}
-  .log-timeline{display:flex;flex-direction:column;gap:0;}
-  .log-entry{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
-  .log-entry:last-child{border-bottom:none;}
-  .log-dot{width:8px;height:8px;border-radius:50%;background:var(--text-muted);flex-shrink:0;margin-top:4px;}
-  .log-dot-del{background:#E74C3C;}
-  .log-dot-mod{background:#F5A623;}
-  .log-body{display:flex;flex-direction:column;gap:2px;}
-  .log-time{font-size:10px;color:var(--text-muted);}
-  .log-text{color:var(--text-mid);line-height:1.4;}
   .btn-row-attente{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#7B2FBE;background:#F0EAFF;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
   .section-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;}
   .section-toggle:hover{color:var(--text);}
@@ -519,7 +510,7 @@
       </div>
 
       <!-- 6 · NOTES (collapsible, fermé par défaut) -->
-      <div class="form-section">
+      <div class="form-section" style="margin-bottom:0;">
         <div class="form-section-title section-toggle" onclick="toggleCollapse('secNotesBody','chevronNotes')">
           <span>Observations & Notes <span class="sec-hint">contexte · suivi interne</span></span>
           <svg id="chevronNotes" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
@@ -533,17 +524,6 @@
             <label class="form-label">Notes internes</label>
             <textarea class="form-textarea" id="fNotes" placeholder="Notes internes, suivi, rappels..."></textarea>
           </div>
-        </div>
-      </div>
-
-      <!-- 7 · HISTORIQUE (visible seulement en édition) -->
-      <div class="form-section" style="margin-bottom:0;" id="secHisto">
-        <div class="form-section-title section-toggle" onclick="toggleCollapse('secHistoBody','chevronHisto')">
-          <span>Historique des passages <span class="sec-hint">suppressions · modifications</span></span>
-          <svg id="chevronHisto" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
-        </div>
-        <div id="secHistoBody" style="display:none;margin-top:12px;">
-          <div id="logTimeline" class="log-timeline"></div>
         </div>
       </div>
 
@@ -775,9 +755,6 @@ window.openModal = function openModal(id = null) {
     document.getElementById('fObservations').value = item.observations || '';
     const calEventIds = item.calEventIds || [];
     (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach((d, i) => addPassage(d, calEventIds[i] || ''));
-    _passagesSnapshot = getPassagesFromDOM();
-    _pendingLogs = [];
-    _deletedDebuts = new Set();
     document.getElementById('fNotes').value = item.notes || '';
     // Show existing PDF links if any
     if (item.plUrl) {
@@ -838,14 +815,6 @@ window.openModal = function openModal(id = null) {
       if (previewBtn) previewBtn.onclick = function() { openPdfViewer('fileDevis'); };
     }
     if (item.devis) document.getElementById('fDevis').value = item.devis;
-    // Historique
-    const secHisto = document.getElementById('secHisto');
-    if (secHisto) secHisto.style.display = '';
-    renderLogTimeline(item.log || []);
-    if (item.log && item.log.length) _expandSec('secHistoBody','chevronHisto');
-  } else {
-    const secHisto = document.getElementById('secHisto');
-    if (secHisto) secHisto.style.display = 'none';
   }
   document.getElementById('modal').classList.add('open');
 }
@@ -1053,13 +1022,6 @@ function addPassage(value = '', calEventId = '') {
         <button type="button" onclick="removePassage(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-top:-2px;">
-      <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Si modif/suppression :</span>
-      <select id="fPassageRaison${n}" style="font-size:11px;font-weight:500;padding:3px 22px 3px 8px;border:1px solid var(--border);border-radius:20px;color:var(--text-mid);background:var(--bg);font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238FA4B8' opacity='.8'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 6px center;background-size:8px;">
-        <option value="correction">Correction (erreur)</option>
-        <option value="locataire">Locataire</option>
-      </select>
-    </div>
     <div style="display:flex;flex-direction:column;gap:6px;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
@@ -1084,35 +1046,12 @@ function addPassage(value = '', calEventId = '') {
   updateNotifyBtn();
 }
 function removePassage(n) {
-  const debutVal  = document.getElementById('fDateDebut' + n)?.value;
-  const finVal    = document.getElementById('fDateFin'   + n)?.value;
-  const raison    = document.getElementById('fPassageRaison' + n)?.value || 'correction';
-  const isLoc     = raison === 'locataire';
-  if (debutVal) {
-    const label = isLoc ? 'Annulation locataire' : 'Correction';
-    _pendingLogs.push({
-      ts: new Date().toISOString(),
-      type: 'passage_supprime',
-      raison,
-      details: '[' + label + '] Passage supprimé : '
-        + fmtPassageLog(debutVal) + (finVal ? ' → ' + fmtPassageLog(finVal) : '')
-    });
-    _deletedDebuts.add(debutVal);
-  }
   const el = document.getElementById('passage_' + n);
   if (el) el.remove();
   updateNotifyBtn();
 }
 function getPassageDates() {
   return getPassagesFromDOM();
-}
-function getPassageReasonsFromDOM() {
-  const out = []; let n = 1;
-  while (document.getElementById('fDateDebut' + n)) {
-    out.push(document.getElementById('fPassageRaison' + n)?.value || 'correction');
-    n++;
-  }
-  return out;
 }
 function resetForm() {
   ['fDateEmission','fExpediteur','fPL','fBC','fDevis','fNature','fNomClient','fEmailClient','fAdresse','fObservations','fNotes','fClientLibre'].forEach(id => {
@@ -1136,9 +1075,8 @@ function resetForm() {
   document.getElementById('passagesContainer').innerHTML = '';
   passageCount = 0;
   window._existingPlUrl = null; window._existingBcUrl = null; window._existingDevisUrl = null;
-  ['secAdminBody','secContactBody','secNotesBody','secHistoBody'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
-  ['chevronAdmin','chevronContact','chevronNotes','chevronHisto'].forEach(id => { const el=document.getElementById(id); if(el) el.style.transform='rotate(-90deg)'; });
-  _pendingLogs = []; _deletedDebuts = new Set(); _passagesSnapshot = [];
+  ['secAdminBody','secContactBody','secNotesBody'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+  ['chevronAdmin','chevronContact','chevronNotes'].forEach(id => { const el=document.getElementById(id); if(el) el.style.transform='rotate(-90deg)'; });
   document.getElementById('phonesContainer').innerHTML = '';
   phoneCount = 0;
   addPhoneField(); // always start with one field
@@ -1168,34 +1106,6 @@ async function saveIntervention() {
     if (fileDevis) devisUrl = await window._uploadPdf(fileDevis, `suivi/devis/${Date.now()}_${fileDevis.name}`);
 
     const passages = getPassageDates();
-
-    // Détection des modifications de créneau
-    if (editId) {
-      const remaining = _passagesSnapshot.filter(p => !_deletedDebuts.has(p.debut));
-      const current   = passages;
-      const reasons   = getPassageReasonsFromDOM();
-      const len = Math.min(remaining.length, current.length);
-      for (let i = 0; i < len; i++) {
-        const o = remaining[i], c = current[i];
-        if (o.debut !== c.debut || o.fin !== c.fin) {
-          const raison   = reasons[i] || 'correction';
-          const isLoc    = raison === 'locataire';
-          const label    = isLoc ? 'Report locataire' : 'Correction';
-          _pendingLogs.push({
-            ts: new Date().toISOString(),
-            type: 'passage_modifie',
-            raison,
-            details: '[' + label + '] Passage modifié : '
-              + fmtPassageLog(o.debut) + (o.fin ? '–' + fmtPassageLog(o.fin) : '')
-              + ' → '
-              + fmtPassageLog(c.debut) + (c.fin ? '–' + fmtPassageLog(c.fin) : '')
-          });
-        }
-      }
-    }
-    const existingLog = editId ? (interventions.find(i=>i.id===editId)?.log || []) : [];
-    const log = [...existingLog, ..._pendingLogs];
-
     const data = {
       client, clientType: currentClientType,
       chorus: document.getElementById('fChorus').value.trim(),
@@ -1218,7 +1128,6 @@ async function saveIntervention() {
       passages,
       calEventIds: getCalEventIds(),
       notes: document.getElementById('fNotes').value.trim(),
-      log,
       updatedAt: new Date().toISOString()
     };
 
@@ -1478,33 +1387,6 @@ function fmtDate(d) {
   return `${parseInt(day)}/${parseInt(m)}/${y}`;
 }
 let currentClientType = 'contrat';
-let _pendingLogs = [];
-let _deletedDebuts = new Set();
-let _passagesSnapshot = [];
-
-function fmtPassageLog(dt) {
-  if (!dt) return '?';
-  const d = new Date(dt);
-  return d.toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric'})
-    + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
-}
-function renderLogTimeline(log) {
-  const el = document.getElementById('logTimeline');
-  if (!el) return;
-  if (!log || !log.length) {
-    el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:4px 0;">Aucun changement enregistré.</p>';
-    return;
-  }
-  el.innerHTML = [...log].reverse().map(e => {
-    const d = new Date(e.ts);
-    const ds = d.toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric'})
-      + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
-    const isLoc = e.raison === 'locataire';
-    const dotCls = isLoc ? 'log-dot log-dot-del' : 'log-dot';
-    const textStyle = isLoc ? 'color:#C2410C;font-weight:600;' : '';
-    return `<div class="log-entry"><div class="${dotCls}"></div><div class="log-body"><span class="log-time">${ds}</span><span class="log-text" style="${textStyle}">${e.details}</span></div></div>`;
-  }).join('');
-}
 function getClientValue() {
   if (currentClientType === 'contrat') return (document.getElementById('fClient')?.value || '').trim();
   return (document.getElementById('fClientLibre')?.value || '').trim();
