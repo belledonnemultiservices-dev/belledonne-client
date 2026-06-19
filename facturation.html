@@ -77,10 +77,13 @@
   .btn-envoye{color:#B45309;background:#FEF3CD;}
   .btn-paye{color:#1DA870;background:#E8F9F2;}
   .btn-del{color:#E74C3C;background:#FDECEA;}
-  .period-bar{display:flex;align-items:center;gap:8px;margin-bottom:20px;}
+  .period-bar{display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
   .period-btn{font-size:12px;font-weight:500;padding:6px 14px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
   .period-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
   .period-label{font-size:11px;color:var(--text-muted);font-weight:500;}
+  .period-date-input{height:32px;border:1px solid var(--border);border-radius:8px;padding:0 10px;font-size:12px;color:var(--text);background:var(--bg-card);font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;transition:border-color 0.15s;}
+  .period-date-input:focus{border-color:var(--green);}
+  .period-sep{width:1px;height:20px;background:var(--border);margin:0 2px;}
   .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px;}
   .modal-overlay.open{display:flex;}
@@ -179,25 +182,17 @@
 
     <!-- PERIOD FILTER -->
     <div class="period-bar">
-      <span class="period-label">Période :</span>
-      <button class="period-btn" onclick="setPeriod('week',this)">Cette semaine</button>
-      <button class="period-btn active" id="btnPeriodMonth" onclick="setPeriod('month',this)">Ce mois</button>
-      <button class="period-btn" onclick="setPeriod('quarter',this)">Ce trimestre</button>
-      <button class="period-btn" onclick="setPeriod('year',this)">Cette année</button>
-      <button class="period-btn" onclick="setPeriod('all',this)">Tout</button>
-      <span style="width:1px;height:20px;background:var(--border);margin:0 4px;"></span>
-      <span class="period-label">Mois précis :</span>
-      <select id="filterMoisStats" class="filter-select" style="height:34px;font-size:12px;padding:0 10px;" onchange="setCustomPeriod()">
-        <option value="">Mois</option>
-        <option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option>
-        <option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option>
-        <option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option>
-        <option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option>
-      </select>
-      <select id="filterAnneeStats" class="filter-select" style="height:34px;font-size:12px;padding:0 10px;" onchange="setCustomPeriod()">
-        <option value="">Année</option>
-        <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
-      </select>
+      <button class="period-btn" onclick="setPeriodDates('week',this)">Cette semaine</button>
+      <button class="period-btn active" id="btnPeriodMonth" onclick="setPeriodDates('month',this)">Ce mois</button>
+      <button class="period-btn" onclick="setPeriodDates('quarter',this)">Ce trimestre</button>
+      <button class="period-btn" onclick="setPeriodDates('year',this)">Cette année</button>
+      <button class="period-btn" onclick="setPeriodDates('all',this)">Tout</button>
+      <span class="period-sep"></span>
+      <span class="period-label">Du</span>
+      <input type="date" id="dateFrom" class="period-date-input" onchange="clearPeriodBtns(); applyFilters()">
+      <span class="period-label">au</span>
+      <input type="date" id="dateTo" class="period-date-input" onchange="clearPeriodBtns(); applyFilters()">
+      <button class="period-btn" style="padding:5px 10px;border-radius:50%;line-height:1;" onclick="clearDateRange()" title="Effacer les dates">✕</button>
     </div>
 
     <!-- STATS -->
@@ -228,12 +223,12 @@
     <div class="filters-bar">
       <div class="search-wrap">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        <input class="search-input" id="searchInput" placeholder="Client, BC, N° facture..." oninput="filterTable()">
+        <input class="search-input" id="searchInput" placeholder="Client, BC, N° facture..." oninput="applyFilters()">
       </div>
-      <select class="filter-select" id="filterClient" onchange="filterTable()">
+      <select class="filter-select" id="filterClient" onchange="applyFilters()">
         <option value="">Tous les clients</option>
       </select>
-      <select class="filter-select" id="filterStatut" onchange="filterTable()">
+      <select class="filter-select" id="filterStatut" onchange="applyFilters()">
         <option value="">Tous les statuts</option>
         <option value="À facturer">À facturer</option>
         <option value="Facturé">Facturé</option>
@@ -383,84 +378,93 @@ function pdfBtn(url, label) {
   return '<a href="' + url + '" target="_blank" class="pdf-link"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>' + label + '</a>';
 }
 
-let currentPeriod = 'month';
-
-function getPeriodRange(period) {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
-  if (period === 'week') {
-    const day = now.getDay() || 7;
-    const mon = new Date(y, m, d - day + 1);
-    const sun = new Date(y, m, d - day + 7);
-    return [mon.toISOString().split('T')[0], sun.toISOString().split('T')[0]];
-  }
-  if (period === 'month') {
-    return [y + '-' + String(m+1).padStart(2,'0') + '-01',
-            y + '-' + String(m+1).padStart(2,'0') + '-31'];
-  }
-  if (period === 'quarter') {
-    const q = Math.floor(m / 3);
-    return [y + '-' + String(q*3+1).padStart(2,'0') + '-01',
-            y + '-' + String(Math.min(q*3+3, 12)).padStart(2,'0') + '-31'];
-  }
-  if (period === 'year') {
-    return [y + '-01-01', y + '-12-31'];
-  }
-  return [null, null];
-}
-
-let customFrom = null, customTo = null;
-
-function inPeriod(dateStr, period) {
-  if (period === 'all') return true;
-  if (!dateStr) return false;
-  if (period === 'custom') return customFrom && customTo ? dateStr >= customFrom && dateStr <= customTo : true;
-  const [from, to] = getPeriodRange(period);
-  return dateStr >= from && dateStr <= to;
-}
-
-function setPeriod(period, btn) {
-  currentPeriod = period;
-  customFrom = null; customTo = null;
+function setPeriodDates(period, btn) {
   document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  document.getElementById('filterMoisStats').value = '';
-  document.getElementById('filterAnneeStats').value = '';
-  updateStats();
+  const now = new Date();
+  const y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+  let from = '', to = '';
+  if (period === 'week') {
+    const day = now.getDay() || 7;
+    from = new Date(y, mo, d - day + 1).toISOString().split('T')[0];
+    to   = new Date(y, mo, d - day + 7).toISOString().split('T')[0];
+  } else if (period === 'month') {
+    from = y + '-' + String(mo+1).padStart(2,'0') + '-01';
+    to   = new Date(y, mo+1, 0).toISOString().split('T')[0];
+  } else if (period === 'quarter') {
+    const q = Math.floor(mo / 3);
+    from = y + '-' + String(q*3+1).padStart(2,'0') + '-01';
+    to   = new Date(y, q*3+3, 0).toISOString().split('T')[0];
+  } else if (period === 'year') {
+    from = y + '-01-01';
+    to   = y + '-12-31';
+  }
+  document.getElementById('dateFrom').value = from;
+  document.getElementById('dateTo').value = to;
+  applyFilters();
 }
 
-function setCustomPeriod() {
-  const mois = document.getElementById('filterMoisStats').value;
-  const annee = document.getElementById('filterAnneeStats').value;
-  if (!mois || !annee) return;
-  customFrom = annee + '-' + mois + '-01';
-  customTo = annee + '-' + mois + '-31';
-  currentPeriod = 'custom';
+function clearPeriodBtns() {
   document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-  updateStats();
 }
 
-function updateStats() {
+function clearDateRange() {
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  clearPeriodBtns();
+  applyFilters();
+}
+
+function getFilteredFacts() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const statut = document.getElementById('filterStatut').value;
+  const client = document.getElementById('filterClient').value;
+  const from = document.getElementById('dateFrom').value;
+  const to   = document.getElementById('dateTo').value;
+  return factures.filter(function(f) {
+    const mq = !q || [f.client,f.bc,f.numFacture,f.nature,f.chorus].some(function(v){return (v||'').toLowerCase().includes(q);});
+    const ms = !statut || f.statut === statut;
+    const mc = !client || f.client === client;
+    let md = true;
+    if (from || to) {
+      const fd = f.dateFacture || '';
+      if (from && fd < from) md = false;
+      if (to   && fd > to)   md = false;
+    }
+    return mq && ms && mc && md;
+  });
+}
+
+function applyFilters() {
+  const filtered = getFilteredFacts();
+  renderTable(filtered);
+  updateStats(filtered);
+}
+
+function filterTable() { applyFilters(); }
+
+function updateStats(filtered) {
+  if (!filtered) filtered = getFilteredFacts();
   const STATUTS_EMIS = ['Facturé','Envoyé client','Déposé Chorus','Payé'];
-  const aFacturer = factures.filter(f => f.statut === 'À facturer').length;
-  const emises = factures.filter(f => STATUTS_EMIS.includes(f.statut) && inPeriod(f.dateFacture, currentPeriod));
-  const montant = emises.reduce((s,f) => s + (parseFloat(f.montantHT)||0), 0);
-  const nonPaye = factures.filter(f => ['Facturé','Envoyé client','Déposé Chorus'].includes(f.statut) && !f.paye).length;
+  const aFacturer = filtered.filter(f => f.statut === 'À facturer').length;
+  const emises    = filtered.filter(f => STATUTS_EMIS.includes(f.statut));
+  const montant   = emises.reduce((s,f) => s + (parseFloat(f.montantHT)||0), 0);
+  const nonPaye   = filtered.filter(f => ['Facturé','Envoyé client','Déposé Chorus'].includes(f.statut) && !f.paye).length;
 
   document.getElementById('statAFacturer').textContent = aFacturer;
-  document.getElementById('statFacture').textContent = emises.length;
-  document.getElementById('statMontant').textContent = montant ? montant.toLocaleString('fr-FR',{minimumFractionDigits:2}) + ' €' : '—';
-  document.getElementById('statChorus').textContent = nonPaye;
+  document.getElementById('statFacture').textContent   = emises.length;
+  document.getElementById('statMontant').textContent   = montant ? montant.toLocaleString('fr-FR',{minimumFractionDigits:2}) + ' €' : '—';
+  document.getElementById('statChorus').textContent    = nonPaye;
 
-  const labels = {week:'cette semaine',month:'ce mois',quarter:'ce trimestre',year:'cette année',all:'au total'};
-  let sub = labels[currentPeriod] || '';
-  if (currentPeriod === 'custom' && customFrom) {
-    const moisNoms = ['','jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
-    const parts = customFrom.split('-');
-    sub = moisNoms[parseInt(parts[1])] + ' ' + parts[0];
-  }
-  document.getElementById('statFactureSub').textContent = sub;
-  document.getElementById('statMontantSub').textContent = 'HT ' + sub;
+  const from = document.getElementById('dateFrom').value;
+  const to   = document.getElementById('dateTo').value;
+  const fmt  = s => s ? s.split('-').reverse().join('/') : '';
+  let sub = '';
+  if (from && to)   sub = 'du ' + fmt(from) + ' au ' + fmt(to);
+  else if (from)    sub = 'depuis le ' + fmt(from);
+  else if (to)      sub = 'jusqu\'au ' + fmt(to);
+  document.getElementById('statFactureSub').textContent = sub || 'sur la période';
+  document.getElementById('statMontantSub').textContent = sub ? 'HT ' + sub : 'HT sur la période';
 }
 
 function statutChipClass(s) {
@@ -719,8 +723,7 @@ async function saveFact() {
     const idx = factures.findIndex(f => f.id === editFactId);
     if (idx !== -1) { Object.assign(factures[idx], changes); }
     closeModalFact();
-    filterTable();
-    updateStats();
+    applyFilters();
     showToast('Facture enregistrée.');
   } catch(e) {
     alert('Erreur : ' + e.message);
@@ -735,7 +738,7 @@ async function marquerChorus(id) {
     await window._updateFacture(id, { statut: 'Déposé Chorus', dateDepotChorus: today });
     const idx = factures.findIndex(f => f.id === id);
     if (idx !== -1) { factures[idx].statut = 'Déposé Chorus'; }
-    filterTable(); updateStats();
+    applyFilters();
     showToast('Déposé sur Chorus Pro.');
   } catch(e) { alert('Erreur : ' + e.message); }
 }
@@ -746,7 +749,7 @@ async function marquerEnvoyeClient(id) {
     await window._updateFacture(id, { statut: 'Envoyé client' });
     const idx = factures.findIndex(f => f.id === id);
     if (idx !== -1) { factures[idx].statut = 'Envoyé client'; }
-    filterTable(); updateStats();
+    applyFilters();
     showToast('Facture marquée envoyée au client.');
   } catch(e) { alert('Erreur : ' + e.message); }
 }
@@ -758,7 +761,7 @@ async function marquerPaye(id) {
     await window._updateFacture(id, { paye: true, datePaiement: today });
     const idx = factures.findIndex(f => f.id === id);
     if (idx !== -1) { factures[idx].paye = true; factures[idx].datePaiement = today; }
-    filterTable(); updateStats();
+    applyFilters();
     showToast('Facture marquée payée.');
   } catch(e) { alert('Erreur : ' + e.message); }
 }
@@ -772,8 +775,7 @@ async function deleteFact(id) {
       await window._resetSuiviFacturation(item.suiviId);
     }
     factures = factures.filter(f => f.id !== id);
-    filterTable();
-    updateStats();
+    applyFilters();
     showToast('Ligne supprimée. Le BT repasse en "→ Facturer" dans le suivi.');
   } catch(e) { alert('Erreur : ' + e.message); }
 }
@@ -830,8 +832,7 @@ onAuthStateChanged(auth, async (user) => {
     factures = snap.docs.map(d => ({id:d.id,...d.data()}));
     window.factures = factures;
     populateClientFilter();
-    filterTable();
-    updateStats();
+    setPeriodDates('month', document.getElementById('btnPeriodMonth'));
   } catch(e) {
     console.error('Erreur chargement facturation:', e);
     document.getElementById('tableBody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>Erreur de chargement.</p></div></td></tr>';
