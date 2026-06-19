@@ -373,7 +373,7 @@ function renderTable(list) {
     html += '</div></td>';
     html += '<td style="font-family:monospace;font-size:12px;color:' + (item.chorus ? 'var(--text)' : 'var(--text-muted)') + ';">' + (item.chorus||'—') + '</td>';
     html += '<td style="font-size:12px;max-width:160px;">' + (item.nature||'—') + '</td>';
-    html += '<td style="white-space:nowrap;">' + fmtDate(item.dateEmission) + '</td>';
+    html += '<td style="white-space:nowrap;">' + (item.dateFacture ? fmtDate(item.dateFacture) : '<span style="color:var(--text-muted)">—</span>') + '</td>';
     html += '<td class="montant-cell">' + fmtMontant(item.montantHT) + '</td>';
     html += '<td style="font-family:monospace;font-size:12px;">' + (item.numFacture||'—') + '</td>';
     html += '<td>' + pdfBtn(item.factureUrl, 'Facture') + '</td>';
@@ -425,7 +425,7 @@ function openModalFact(id) {
   document.getElementById('fInfoNature').textContent = item.nature || '—';
   document.getElementById('fMontant').value = item.montantHT || '';
   document.getElementById('fNumFacture').value = item.numFacture || '';
-  document.getElementById('fDateFacture').value = item.dateFacture || new Date().toISOString().split('T')[0];
+  document.getElementById('fDateFacture').value = item.dateFacture || '';
 
   const chosen = document.getElementById('chosenFacture');
   chosen.textContent = ''; chosen.style.display = 'none';
