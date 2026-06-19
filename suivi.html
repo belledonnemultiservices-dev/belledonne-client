@@ -1354,12 +1354,7 @@ window.renderTable = function renderTable(list) {
           html += '<button class="btn-row-edit" style="color:#4338CA;background:#EEF2FF;" onclick="basculerEnFacturation(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>→ Facturer</button>';
         }
       }
-      if (item.statut === 'En cours') {
-        html += '<button class="btn-row-attente" onclick="setStatutRapide(\'' + item.id + '\',\'En attente\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>En attente</button>';
-      } else if (item.statut === 'En attente') {
-        html += '<button class="btn-row-attente" style="color:#1A5F8A;background:#EBF0F5;" onclick="setStatutRapide(\'' + item.id + '\',\'En cours\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M8 5v14l11-7z"/></svg>Reprendre</button>';
-      }
-      html += '<button class="btn-row-edit" onclick="openModal(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>';
+      html += '<button class="btn-row-edit" onclick="openModal(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Compléter</button>';
       html += '<button class="btn-row-del" onclick="deleteIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
     }
     html += '</div></td></tr>';
