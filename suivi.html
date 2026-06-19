@@ -184,6 +184,7 @@
     <div class="nav-group-label">Principal</div>
     <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
     <a class="nav-item active" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
+    <a class="nav-item" href="facturation.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg><span>Facturation</span></a>
     <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
     <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
     <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
@@ -1055,14 +1056,101 @@ async function saveIntervention() {
   }
 }
 
-// ── DELETE ──
+// ── VALIDATION MODALE ──
+let _validerItemId = null;
+
 async function validerIntervention(id) {
+  const item = (window.interventions||[]).find(i => i.id === id);
+  if (!item) return;
+  _validerItemId = id;
+
+  document.getElementById('vClient').textContent = item.client || '—';
+  document.getElementById('vBC').value = item.bc || '';
+  document.getElementById('vNature').value = item.nature || '';
+  document.getElementById('vNomClient').value = item.nomClient || '';
+  document.getElementById('vAdresse').value = item.adresse || '';
+  document.getElementById('vDateEmission').value = item.dateEmission || '';
+  document.getElementById('vExpediteur').value = item.expediteur || '';
+  document.getElementById('vObservations').value = item.observations || '';
+
+  const sourceBanner = document.getElementById('validerSourceBanner');
+  sourceBanner.style.display = item.source === 'auto' ? 'flex' : 'none';
+
+  const pdfRow = document.getElementById('validerPdfRow');
+  if (item.bcUrl) {
+    document.getElementById('validerPdfLink').href = item.bcUrl;
+    pdfRow.style.display = '';
+  } else {
+    pdfRow.style.display = 'none';
+  }
+
+  const btn = document.getElementById('btnConfirmerValider');
+  if (btn) { btn.disabled = false; btn.textContent = 'Valider — passer en cours'; }
+
+  document.getElementById('modalValider').classList.add('open');
+}
+
+function closeModalValider() {
+  document.getElementById('modalValider').classList.remove('open');
+  _validerItemId = null;
+}
+
+async function rejeterFromModal() {
+  const id = _validerItemId;
+  closeModalValider();
+  if (id) await rejeterIntervention(id);
+}
+
+async function confirmerValidation() {
+  if (!_validerItemId) return;
+  const btn = document.getElementById('btnConfirmerValider');
+  if (btn) { btn.disabled = true; btn.textContent = 'Validation en cours...'; }
   try {
-    await window._updateSuivi(id, { statut: 'En cours' });
-    const idx = interventions.findIndex(i => i.id === id);
-    if (idx !== -1) { interventions[idx].statut = 'En cours'; window.interventions = interventions; }
+    const changes = {
+      statut: 'En cours',
+      bc: document.getElementById('vBC').value.trim(),
+      nature: document.getElementById('vNature').value.trim(),
+      nomClient: document.getElementById('vNomClient').value.trim(),
+      adresse: document.getElementById('vAdresse').value.trim(),
+      dateEmission: document.getElementById('vDateEmission').value,
+      expediteur: document.getElementById('vExpediteur').value.trim(),
+      observations: document.getElementById('vObservations').value.trim(),
+    };
+    await window._updateSuivi(_validerItemId, changes);
+    const idx = interventions.findIndex(i => i.id === _validerItemId);
+    if (idx !== -1) { Object.assign(interventions[idx], changes); window.interventions = interventions; }
+    closeModalValider();
     filterTable();
     showToast('BT validé — passé en cours.');
+  } catch(e) {
+    alert('Erreur : ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Valider — passer en cours'; }
+  }
+}
+
+async function basculerEnFacturation(id) {
+  const item = (window.interventions||[]).find(i => i.id === id);
+  if (!item) return;
+  try {
+    await window._createFacture({
+      suiviId: id,
+      client: item.client || '',
+      bc: item.bc || '',
+      chorus: item.chorus || '',
+      nature: item.nature || '',
+      adresse: item.adresse || '',
+      nomClient: item.nomClient || '',
+      dateEmission: item.dateEmission || '',
+      passages: item.passages || [],
+      bcUrl: item.bcUrl || '',
+      statut: 'À facturer',
+      createdAt: new Date().toISOString(),
+    });
+    await window._updateSuivi(id, { enFacturation: true });
+    const idx = interventions.findIndex(i => i.id === id);
+    if (idx !== -1) { interventions[idx].enFacturation = true; window.interventions = interventions; }
+    filterTable();
+    showToast('Basculé en facturation.');
   } catch(e) { alert('Erreur : ' + e.message); }
 }
 
@@ -1244,6 +1332,13 @@ window.renderTable = function renderTable(list) {
       html += '<button class="btn-row-valider" onclick="validerIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Valider</button>';
       html += '<button class="btn-row-rejeter" onclick="rejeterIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>Rejeter</button>';
     } else {
+      if (item.statut === 'Terminé') {
+        if (item.enFacturation) {
+          html += '<a href="facturation.html" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1DA870;background:#E8F9F2;padding:4px 8px;border-radius:6px;text-decoration:none;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>Voir facture</a>';
+        } else {
+          html += '<button class="btn-row-edit" style="color:#4338CA;background:#EEF2FF;" onclick="basculerEnFacturation(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>→ Facturer</button>';
+        }
+      }
       html += '<button class="btn-row-edit" onclick="openModal(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>';
       html += '<button class="btn-row-del" onclick="deleteIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
     }
@@ -1966,6 +2061,9 @@ window._addSuivi = async function(data) {
 window._updateSuivi = async function(id, data) {
   await updateDoc(doc(db, 'suivi', id), data);
 };
+window._createFacture = async function(data) {
+  await addDoc(collection(db, 'facturation'), data);
+};
 window._deleteSuivi = async function(id) {
   try {
     const snap = await getDoc(doc(db, 'suivi', id));
@@ -2131,6 +2229,84 @@ async function loadTechniciens() {
 }
 window._loadTechniciens = loadTechniciens;
 </script>
+
+<!-- MODAL VALIDATION BT -->
+<div class="modal-overlay" id="modalValider">
+  <div class="modal" style="max-width:660px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Valider le bon de commande</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Vérifiez et corrigez les informations avant de confirmer</div>
+      </div>
+      <button class="modal-close" onclick="closeModalValider()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div id="validerSourceBanner" style="display:none;background:#FFFBF0;border:1px solid #F5A623;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12px;font-weight:500;color:#664D00;align-items:center;gap:8px;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:#F5A623;flex-shrink:0;"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+        Import automatique ACTIS — vérifiez les champs extraits par l'IA avant de valider
+      </div>
+
+      <div id="validerPdfRow" style="display:none;margin-bottom:18px;">
+        <a id="validerPdfLink" href="#" target="_blank" class="pdf-link" style="font-size:12px;padding:6px 14px;">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          Ouvrir le PDF du bon de commande
+        </a>
+      </div>
+
+      <div class="form-section" style="margin-bottom:0;">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Client</label>
+            <div id="vClient" style="padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:600;color:var(--text);min-height:40px;"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">N° BC</label>
+            <input class="form-input" id="vBC">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date d'émission</label>
+            <input class="form-input" type="date" id="vDateEmission">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Expéditeur</label>
+            <input class="form-input" id="vExpediteur">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Nature de la mission</label>
+            <input class="form-input" id="vNature">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nom du contact / locataire</label>
+            <input class="form-input" id="vNomClient">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Adresse</label>
+            <input class="form-input" id="vAdresse">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Observations <span class="opt">— optionnel</span></label>
+            <textarea class="form-textarea" id="vObservations" style="min-height:70px;"></textarea>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button onclick="rejeterFromModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#E74C3C;background:#FDECEA;border:none;padding:10px 18px;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        Rejeter
+      </button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-cancel" onclick="closeModalValider()">Annuler</button>
+        <button class="btn-save" id="btnConfirmerValider" onclick="confirmerValidation()">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          Valider — passer en cours
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL NOTIFICATION SUIVI RDV -->
 <div class="modal-overlay" id="modalNotifSuivi">
