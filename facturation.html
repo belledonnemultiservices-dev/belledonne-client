@@ -218,6 +218,7 @@
           <tr>
             <th>Client</th>
             <th>N° BC</th>
+            <th>N° Chorus</th>
             <th>Nature</th>
             <th>Date</th>
             <th>Montant HT</th>
@@ -359,7 +360,7 @@ function renderTable(list) {
   const body = document.getElementById('tableBody');
   document.getElementById('resultsCount').textContent = list.length + ' facture' + (list.length!==1?'s':'');
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>Aucune ligne de facturation.</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="10"><div class="empty-state"><p>Aucune ligne de facturation.</p></div></td></tr>';
     return;
   }
   let html = '';
@@ -370,6 +371,7 @@ function renderTable(list) {
     if (item.bc) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + item.bc + '</span>';
     if (item.bcUrl) html += pdfBtn(item.bcUrl, 'BC');
     html += '</div></td>';
+    html += '<td style="font-family:monospace;font-size:12px;color:' + (item.chorus ? 'var(--text)' : 'var(--text-muted)') + ';">' + (item.chorus||'—') + '</td>';
     html += '<td style="font-size:12px;max-width:160px;">' + (item.nature||'—') + '</td>';
     html += '<td style="white-space:nowrap;">' + fmtDate(item.dateEmission) + '</td>';
     html += '<td class="montant-cell">' + fmtMontant(item.montantHT) + '</td>';
@@ -396,7 +398,7 @@ function filterTable() {
   const statut = document.getElementById('filterStatut').value;
   const client = document.getElementById('filterClient').value;
   const filtered = factures.filter(function(f) {
-    const mq = !q || [f.client,f.bc,f.numFacture,f.nature].some(function(v){return (v||'').toLowerCase().includes(q);});
+    const mq = !q || [f.client,f.bc,f.numFacture,f.nature,f.chorus].some(function(v){return (v||'').toLowerCase().includes(q);});
     const ms = !statut || f.statut === statut;
     const mc = !client || f.client === client;
     return mq && ms && mc;
