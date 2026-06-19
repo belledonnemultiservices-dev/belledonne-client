@@ -180,11 +180,24 @@
     <!-- PERIOD FILTER -->
     <div class="period-bar">
       <span class="period-label">Période :</span>
-      <button class="period-btn" onclick="setPeriod('week')">Cette semaine</button>
-      <button class="period-btn active" onclick="setPeriod('month')">Ce mois</button>
-      <button class="period-btn" onclick="setPeriod('quarter')">Ce trimestre</button>
-      <button class="period-btn" onclick="setPeriod('year')">Cette année</button>
-      <button class="period-btn" onclick="setPeriod('all')">Tout</button>
+      <button class="period-btn" onclick="setPeriod('week',this)">Cette semaine</button>
+      <button class="period-btn active" id="btnPeriodMonth" onclick="setPeriod('month',this)">Ce mois</button>
+      <button class="period-btn" onclick="setPeriod('quarter',this)">Ce trimestre</button>
+      <button class="period-btn" onclick="setPeriod('year',this)">Cette année</button>
+      <button class="period-btn" onclick="setPeriod('all',this)">Tout</button>
+      <span style="width:1px;height:20px;background:var(--border);margin:0 4px;"></span>
+      <span class="period-label">Mois précis :</span>
+      <select id="filterMoisStats" class="filter-select" style="height:34px;font-size:12px;padding:0 10px;" onchange="setCustomPeriod()">
+        <option value="">Mois</option>
+        <option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option>
+        <option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option>
+        <option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option>
+        <option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option>
+      </select>
+      <select id="filterAnneeStats" class="filter-select" style="height:34px;font-size:12px;padding:0 10px;" onchange="setCustomPeriod()">
+        <option value="">Année</option>
+        <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
+      </select>
     </div>
 
     <!-- STATS -->
@@ -285,13 +298,23 @@
       <div class="form-section">
         <div class="form-section-title">Détails de la facture</div>
         <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">Statut</label>
+            <select class="form-select" id="fStatut">
+              <option value="À facturer">À facturer</option>
+              <option value="Facturé">Facturé</option>
+              <option value="Envoyé client">Envoyé client</option>
+              <option value="Déposé Chorus">Déposé Chorus</option>
+              <option value="Payé">Payé</option>
+            </select>
+          </div>
           <div class="form-group">
-            <label class="form-label">Montant HT (€) <span style="color:#E74C3C">*</span></label>
+            <label class="form-label">Montant HT (€)</label>
             <input class="form-input" id="fMontant" type="number" step="0.01" min="0" placeholder="0.00">
           </div>
           <div class="form-group">
-            <label class="form-label">N° Facture Henrri <span style="color:#E74C3C">*</span></label>
-            <input class="form-input" id="fNumFacture" placeholder="ex: FA-2026-0042">
+            <label class="form-label">N° Facture Henrri</label>
+            <input class="form-input" id="fNumFacture" placeholder="ex: 26-05-1756">
           </div>
           <div class="form-group">
             <label class="form-label">Date de facturation</label>
@@ -386,16 +409,34 @@ function getPeriodRange(period) {
   return [null, null];
 }
 
+let customFrom = null, customTo = null;
+
 function inPeriod(dateStr, period) {
-  if (period === 'all' || !dateStr) return period === 'all';
+  if (period === 'all') return true;
+  if (!dateStr) return false;
+  if (period === 'custom') return customFrom && customTo ? dateStr >= customFrom && dateStr <= customTo : true;
   const [from, to] = getPeriodRange(period);
   return dateStr >= from && dateStr <= to;
 }
 
-function setPeriod(period) {
+function setPeriod(period, btn) {
   currentPeriod = period;
+  customFrom = null; customTo = null;
   document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (btn) btn.classList.add('active');
+  document.getElementById('filterMoisStats').value = '';
+  document.getElementById('filterAnneeStats').value = '';
+  updateStats();
+}
+
+function setCustomPeriod() {
+  const mois = document.getElementById('filterMoisStats').value;
+  const annee = document.getElementById('filterAnneeStats').value;
+  if (!mois || !annee) return;
+  customFrom = annee + '-' + mois + '-01';
+  customTo = annee + '-' + mois + '-31';
+  currentPeriod = 'custom';
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
   updateStats();
 }
 
@@ -412,7 +453,12 @@ function updateStats() {
   document.getElementById('statChorus').textContent = nonPaye;
 
   const labels = {week:'cette semaine',month:'ce mois',quarter:'ce trimestre',year:'cette année',all:'au total'};
-  const sub = labels[currentPeriod] || '';
+  let sub = labels[currentPeriod] || '';
+  if (currentPeriod === 'custom' && customFrom) {
+    const moisNoms = ['','jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
+    const parts = customFrom.split('-');
+    sub = moisNoms[parseInt(parts[1])] + ' ' + parts[0];
+  }
   document.getElementById('statFactureSub').textContent = sub;
   document.getElementById('statMontantSub').textContent = 'HT ' + sub;
 }
@@ -512,6 +558,7 @@ function openModalFact(id) {
   document.getElementById('fInfoClient').textContent = item.client || '—';
   document.getElementById('fInfoBC').textContent = item.bc || '—';
   document.getElementById('fInfoNature').textContent = item.nature || '—';
+  document.getElementById('fStatut').value = item.statut || 'À facturer';
   document.getElementById('fMontant').value = item.montantHT || '';
   document.getElementById('fNumFacture').value = item.numFacture || '';
   document.getElementById('fDateFacture').value = item.dateFacture || '';
@@ -648,20 +695,23 @@ function factDropFile(e) {
 
 async function saveFact() {
   if (!editFactId) return;
+  const statut = document.getElementById('fStatut').value;
   const montant = document.getElementById('fMontant').value;
   const numFacture = document.getElementById('fNumFacture').value.trim();
-  if (!montant || !numFacture) { alert('Montant HT et N° Facture sont requis.'); return; }
+  if (statut !== 'À facturer' && (!montant || !numFacture)) {
+    alert('Montant HT et N° Facture sont requis pour ce statut.');
+    return;
+  }
 
   const btn = document.getElementById('btnSaveFact');
   if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement...'; }
 
   try {
-    const changes = {
-      montantHT: parseFloat(montant),
-      numFacture: numFacture,
-      dateFacture: document.getElementById('fDateFacture').value,
-      statut: 'Facturé',
-    };
+    const changes = { statut };
+    if (montant) changes.montantHT = parseFloat(montant);
+    if (numFacture) changes.numFacture = numFacture;
+    const dateVal = document.getElementById('fDateFacture').value;
+    if (dateVal) changes.dateFacture = dateVal;
     if (factFilePdfBlob) {
       changes.factureUrl = await window._uploadFacturePdf(factFilePdfBlob, 'facturation/' + editFactId + '_facture.pdf');
     }
