@@ -117,6 +117,18 @@
   .row-a-valider td{background:#FFFBF0;}
   .row-en-attente td{background:#F7F3FF;}
   .btn-row-attente{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#7B2FBE;background:#F0EAFF;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+  .section-toggle{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;}
+  .section-toggle:hover{color:var(--text);}
+  .chevron{transition:transform 0.2s;flex-shrink:0;}
+  .chevron.collapsed{transform:rotate(-90deg);}
+  .doc-rows{display:flex;flex-direction:column;}
+  .doc-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .doc-row:last-child{border-bottom:none;}
+  .doc-row-label{font-size:11px;font-weight:700;color:var(--text-mid);width:44px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.05em;}
+  .doc-num{max-width:150px!important;}
+  .btn-doc-pdf{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:6px 10px;border:1px dashed var(--border);border-radius:6px;background:var(--bg);color:var(--text-muted);cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;}
+  .btn-doc-pdf:hover{border-color:var(--green);color:var(--green-dark);background:var(--green-pale);}
+  .sec-hint{font-weight:400;font-size:10px;text-transform:none;letter-spacing:0;color:var(--text-muted);margin-left:6px;}
   .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
   .empty-state svg{width:40px;height:40px;opacity:0.3;margin-bottom:12px;}
   /* ── MODAL ── */
@@ -343,33 +355,13 @@
     </div>
     <div class="modal-body">
 
-      <!-- SECTION 1 : IDENTIFICATION -->
+      <!-- 1 · DOSSIER (toujours visible) -->
       <div class="form-section">
-        <div class="form-section-title">Identification du dossier</div>
+        <div class="form-section-title">Dossier</div>
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Client <span style="color:#E74C3C">*</span></label>
-            <select class="form-select" id="fClient">
-              <option value="">— Sélectionner un client —</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">N° Service Chorus <span class="opt">— optionnel</span></label>
-            <input class="form-input" id="fChorus">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Date d'émission</label>
-            <input class="form-input" type="date" id="fDateEmission">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Expéditeur</label>
-            <input class="form-input" id="fExpediteur" placeholder="">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Assigné à</label>
-            <select class="form-select" id="fAssigne">
-              <option value="">— Sélectionner un technicien —</option>
-            </select>
+            <select class="form-select" id="fClient"><option value="">— Sélectionner —</option></select>
           </div>
           <div class="form-group">
             <label class="form-label">Statut</label>
@@ -381,135 +373,149 @@
               <option value="Annulé">Annulé</option>
             </select>
           </div>
-        </div>
-      </div>
-
-      <!-- SECTION 2 : AFFAIRE PL -->
-      <div class="form-section">
-        <div class="form-section-title">Affaire PL <span style="font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;">(optionnel)</span></div>
-        <div class="form-grid">
           <div class="form-group">
-            <label class="form-label">Numéro d'affaire (PL) <span class="opt">— optionnel</span></label>
-            <input class="form-input" id="fPL" placeholder="">
+            <label class="form-label">Assigné à</label>
+            <select class="form-select" id="fAssigne"><option value="">— Sélectionner —</option></select>
           </div>
           <div class="form-group">
-            <label class="form-label">PDF Affaire PL <span class="opt">— optionnel</span></label>
-            <input type="file" id="filePL" accept=".pdf" style="display:none" onchange="fileChosen('filePL','chosenPL','actionsPL')">
-            <div class="drop-zone" id="dropPL" ondragover="dragOver(event,'dropPL')" ondragleave="dragLeave('dropPL')" ondrop="dropFile(event,'dropPL','filePL','chosenPL','actionsPL')">
-              <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
-              <div class="drop-zone-text">Glisser le PDF ici</div>
-              <button type="button" class="drop-zone-btn" onclick="document.getElementById('filePL').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Choisir un fichier</button>
-              <div class="drop-zone-chosen" id="chosenPL"></div>
-              <div class="drop-zone-actions" id="actionsPL">
-                <button type="button" class="btn-preview" onclick="openPdfViewer('filePL')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>Aperçu</button>
-                <button type="button" class="btn-remove-file" onclick="removeFile('filePL','chosenPL','actionsPL')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Retirer</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECTION 3 : BON DE COMMANDE -->
-      <div class="form-section">
-        <div class="form-section-title">Bon de commande (BC)</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">Numéro BC</label>
-            <input class="form-input" id="fBC" placeholder="">
-          </div>
-          <div class="form-group">
-            <label class="form-label">PDF Bon de commande</label>
-            <input type="file" id="fileBC" accept=".pdf" style="display:none" onchange="fileChosen('fileBC','chosenBC','actionsBC')">
-            <div class="drop-zone" id="dropBC" ondragover="dragOver(event,'dropBC')" ondragleave="dragLeave('dropBC')" ondrop="dropFile(event,'dropBC','fileBC','chosenBC','actionsBC')">
-              <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
-              <div class="drop-zone-text">Glisser le PDF ici</div>
-              <button type="button" class="drop-zone-btn" onclick="document.getElementById('fileBC').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Choisir un fichier</button>
-              <div class="drop-zone-chosen" id="chosenBC"></div>
-              <div class="drop-zone-actions" id="actionsBC">
-                <button type="button" class="btn-preview" onclick="openPdfViewer('fileBC')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>Aperçu</button>
-                <button type="button" class="btn-remove-file" onclick="removeFile('fileBC','chosenBC','actionsBC')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Retirer</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECTION : DEVIS -->
-      <div class="form-section">
-        <div class="form-section-title">Devis</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">Numéro devis</label>
-            <input class="form-input" id="fDevis" placeholder="">
-          </div>
-          <div class="form-group">
-            <label class="form-label">PDF Devis</label>
-            <input type="file" id="fileDevis" accept=".pdf" style="display:none" onchange="fileChosen('fileDevis','chosenDevis','actionsDevis')">
-            <div class="drop-zone" id="dropDevis" ondragover="dragOver(event,'dropDevis')" ondragleave="dragLeave('dropDevis')" ondrop="dropFile(event,'dropDevis','fileDevis','chosenDevis','actionsDevis')">
-              <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
-              <div class="drop-zone-text">Glisser le PDF ici</div>
-              <button type="button" class="drop-zone-btn" onclick="document.getElementById('fileDevis').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>Choisir un fichier</button>
-              <div class="drop-zone-chosen" id="chosenDevis"></div>
-              <div class="drop-zone-actions" id="actionsDevis">
-                <button type="button" class="btn-preview" onclick="openPdfViewer('fileDevis')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>Aperçu</button>
-                <button type="button" class="btn-remove-file" onclick="removeFile('fileDevis','chosenDevis','actionsDevis')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Retirer</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECTION 4 : MISSION -->
-      <div class="form-section">
-        <div class="form-section-title">Mission & localisation</div>
-        <div class="form-grid">
-          <div class="form-group form-full">
             <label class="form-label">Nature de la mission</label>
             <input class="form-input" id="fNature">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Nom du contact client</label>
-            <input class="form-input" id="fNomClient">
-          </div>
-          <div class="form-group">
-            <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
-              <span>Téléphone(s) client</span>
-              <button type="button" onclick="addPhoneField()" style="font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Ajouter</button>
-            </label>
-            <div id="phonesContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Email client</label>
-            <input class="form-input" type="email" id="fEmailClient">
           </div>
           <div class="form-group form-full">
             <label class="form-label">Adresse</label>
             <input class="form-input" id="fAdresse">
           </div>
-          <div class="form-group form-full">
-            <label class="form-label">Observations</label>
-            <textarea class="form-textarea" id="fObservations" placeholder="Détails, contexte, contraintes..."></textarea>
+        </div>
+      </div>
+
+      <!-- 2 · DOCUMENTS (collapsible, ouvert par défaut) -->
+      <div class="form-section">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secDocsBody','chevronDocs')">
+          <span>Documents <span class="sec-hint">PL · BC · Devis</span></span>
+          <svg id="chevronDocs" class="chevron" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secDocsBody" style="margin-top:12px;">
+          <div class="doc-rows">
+            <div class="doc-row">
+              <span class="doc-row-label">PL</span>
+              <input class="form-input doc-num" id="fPL" placeholder="N° affaire">
+              <div id="dropPL" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+                <input type="file" id="filePL" accept=".pdf" style="display:none" onchange="fileChosen('filePL','chosenPL','actionsPL')">
+                <button type="button" class="drop-zone-btn btn-doc-pdf" onclick="document.getElementById('filePL').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>Charger PDF</button>
+                <div class="drop-zone-chosen" id="chosenPL" style="display:none;font-size:11px;color:var(--text-mid);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+                <div class="drop-zone-actions" id="actionsPL" style="display:none;gap:6px;">
+                  <button type="button" class="btn-preview" onclick="openPdfViewer('filePL')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>Voir</button>
+                  <button type="button" class="btn-remove-file" onclick="removeFile('filePL','chosenPL','actionsPL')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Retirer</button>
+                </div>
+              </div>
+            </div>
+            <div class="doc-row">
+              <span class="doc-row-label">BC</span>
+              <input class="form-input doc-num" id="fBC" placeholder="N° BC">
+              <div id="dropBC" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+                <input type="file" id="fileBC" accept=".pdf" style="display:none" onchange="fileChosen('fileBC','chosenBC','actionsBC')">
+                <button type="button" class="drop-zone-btn btn-doc-pdf" onclick="document.getElementById('fileBC').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>Charger PDF</button>
+                <div class="drop-zone-chosen" id="chosenBC" style="display:none;font-size:11px;color:var(--text-mid);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+                <div class="drop-zone-actions" id="actionsBC" style="display:none;gap:6px;">
+                  <button type="button" class="btn-preview" onclick="openPdfViewer('fileBC')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>Voir</button>
+                  <button type="button" class="btn-remove-file" onclick="removeFile('fileBC','chosenBC','actionsBC')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Retirer</button>
+                </div>
+              </div>
+            </div>
+            <div class="doc-row">
+              <span class="doc-row-label">Devis</span>
+              <input class="form-input doc-num" id="fDevis" placeholder="N° devis">
+              <div id="dropDevis" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+                <input type="file" id="fileDevis" accept=".pdf" style="display:none" onchange="fileChosen('fileDevis','chosenDevis','actionsDevis')">
+                <button type="button" class="drop-zone-btn btn-doc-pdf" onclick="document.getElementById('fileDevis').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>Charger PDF</button>
+                <div class="drop-zone-chosen" id="chosenDevis" style="display:none;font-size:11px;color:var(--text-mid);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+                <div class="drop-zone-actions" id="actionsDevis" style="display:none;gap:6px;">
+                  <button type="button" class="btn-preview" onclick="openPdfViewer('fileDevis')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>Voir</button>
+                  <button type="button" class="btn-remove-file" onclick="removeFile('fileDevis','chosenDevis','actionsDevis')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Retirer</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- SECTION 5 : PASSAGES -->
+      <!-- 3 · PASSAGES (toujours visible) -->
       <div class="form-section">
         <div class="form-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-          <span>Dates de passage <span style="font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;">(optionnel, au fur et à mesure)</span></span>
-          <button type="button" onclick="addPassage()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Ajouter un passage</button>
+          <span>Dates de passage</span>
+          <button type="button" onclick="addPassage()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Ajouter</button>
         </div>
         <div id="passagesContainer" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;"></div>
       </div>
 
-      <!-- SECTION 6 : NOTES -->
-      <div class="form-section" style="margin-bottom:0;">
-        <div class="form-section-title">Notes internes</div>
-        <div class="form-group">
-          <textarea class="form-textarea" id="fNotes" placeholder="Notes internes, suivi, rappels..."></textarea>
+      <!-- 4 · INFOS ADMIN (collapsible, fermé par défaut) -->
+      <div class="form-section">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secAdminBody','chevronAdmin')">
+          <span>Infos administratives <span class="sec-hint">Chorus · date · expéditeur</span></span>
+          <svg id="chevronAdmin" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secAdminBody" style="display:none;margin-top:12px;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">N° Chorus <span class="opt">— optionnel</span></label>
+              <input class="form-input" id="fChorus">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date d'émission</label>
+              <input class="form-input" type="date" id="fDateEmission">
+            </div>
+            <div class="form-group form-full">
+              <label class="form-label">Expéditeur</label>
+              <input class="form-input" id="fExpediteur">
+            </div>
+          </div>
         </div>
       </div>
 
+      <!-- 5 · CONTACT (collapsible, fermé par défaut) -->
+      <div class="form-section">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secContactBody','chevronContact')">
+          <span>Contact <span class="sec-hint">nom · téléphone · email</span></span>
+          <svg id="chevronContact" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secContactBody" style="display:none;margin-top:12px;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Nom du contact client</label>
+              <input class="form-input" id="fNomClient">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>Téléphone(s)</span>
+                <button type="button" onclick="addPhoneField()" style="font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Ajouter</button>
+              </label>
+              <div id="phonesContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+            <div class="form-group form-full">
+              <label class="form-label">Email client</label>
+              <input class="form-input" type="email" id="fEmailClient">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 · NOTES (collapsible, fermé par défaut) -->
+      <div class="form-section" style="margin-bottom:0;">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secNotesBody','chevronNotes')">
+          <span>Observations & Notes <span class="sec-hint">contexte · suivi interne</span></span>
+          <svg id="chevronNotes" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secNotesBody" style="display:none;margin-top:12px;">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Observations</label>
+            <textarea class="form-textarea" id="fObservations" placeholder="Détails, contexte, contraintes..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes internes</label>
+            <textarea class="form-textarea" id="fNotes" placeholder="Notes internes, suivi, rappels..."></textarea>
+          </div>
+        </div>
+      </div>
 
     </div>
     <div class="modal-footer" style="justify-content:space-between;">
@@ -582,6 +588,18 @@ function dropFile(e, zoneId, fileInputId, chosenId, actionsId) {
   document.getElementById(fileInputId).files = dt.files;
   fileChosen(fileInputId, chosenId, actionsId);
 }
+function toggleCollapse(bodyId, chevronId) {
+  const body = document.getElementById(bodyId);
+  const chevron = document.getElementById(chevronId);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : '';
+  if (chevron) chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+}
+function _expandSec(bodyId, chevronId) {
+  const b = document.getElementById(bodyId); if(b) b.style.display = '';
+  const c = document.getElementById(chevronId); if(c) c.style.transform = 'rotate(0deg)';
+}
 function fileChosen(fileInputId, chosenId, actionsId) {
   const input = document.getElementById(fileInputId);
   const chosen = document.getElementById(chosenId);
@@ -590,6 +608,8 @@ function fileChosen(fileInputId, chosenId, actionsId) {
   chosen.textContent = '✓ ' + input.files[0].name;
   chosen.style.display = 'block';
   if (actions) { actions.style.display = 'flex'; }
+  const drop = document.getElementById(fileInputId.replace(/^file/, 'drop'));
+  if (drop) { const btn = drop.querySelector('.drop-zone-btn'); if(btn) btn.style.display = 'none'; }
   if (pdfBlobUrls[fileInputId]) URL.revokeObjectURL(pdfBlobUrls[fileInputId]);
   pdfBlobUrls[fileInputId] = URL.createObjectURL(input.files[0]);
 }
@@ -599,6 +619,8 @@ function removeFile(fileInputId, chosenId, actionsId) {
   chosen.textContent = ''; chosen.style.display = 'none';
   const actions = document.getElementById(actionsId);
   if (actions) actions.style.display = 'none';
+  const drop = document.getElementById(fileInputId.replace(/^file/, 'drop'));
+  if (drop) { const btn = drop.querySelector('.drop-zone-btn'); if(btn) btn.style.display = ''; }
   if (pdfBlobUrls[fileInputId]) { URL.revokeObjectURL(pdfBlobUrls[fileInputId]); delete pdfBlobUrls[fileInputId]; }
 }
 
@@ -620,7 +642,7 @@ function openPdfViewer(fileInputId) {
 
   if (url.startsWith('http')) {
     // Firebase Storage URL — use Google Docs Viewer to bypass CORS
-    title = fileInputId === 'filePL' ? 'Affaire PL' : 'Bon de commande';
+    title = fileInputId === 'filePL' ? 'Affaire PL' : fileInputId === 'fileDevis' ? 'Devis' : 'Bon de commande';
     const viewerUrl = 'https://docs.google.com/viewer?url=' + encodeURIComponent(url) + '&embedded=true';
     document.getElementById('pdfViewerTitle').textContent = title;
     document.getElementById('pdfViewerFrame').src = viewerUrl;
@@ -759,6 +781,10 @@ window.openModal = function openModal(id = null) {
       const previewBtn = actions.querySelector('.btn-preview');
       if (previewBtn) previewBtn.onclick = function() { openPdfViewer('fileBC'); };
     }
+    // Auto-expand collapsible sections si données présentes
+    if (item.chorus || item.dateEmission || item.expediteur) _expandSec('secAdminBody','chevronAdmin');
+    if (item.nomClient || (phones && phones.length) || item.emailClient) _expandSec('secContactBody','chevronContact');
+    if (item.observations || item.notes) _expandSec('secNotesBody','chevronNotes');
     if (item.devisUrl) {
       window._existingDevisUrl = item.devisUrl;
       const chosen = document.getElementById('chosenDevis');
@@ -1036,6 +1062,8 @@ function resetForm() {
   document.getElementById('passagesContainer').innerHTML = '';
   passageCount = 0;
   window._existingPlUrl = null; window._existingBcUrl = null; window._existingDevisUrl = null;
+  ['secAdminBody','secContactBody','secNotesBody'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+  ['chevronAdmin','chevronContact','chevronNotes'].forEach(id => { const el=document.getElementById(id); if(el) el.style.transform='rotate(-90deg)'; });
   document.getElementById('phonesContainer').innerHTML = '';
   phoneCount = 0;
   addPhoneField(); // always start with one field
