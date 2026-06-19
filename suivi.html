@@ -111,7 +111,10 @@
   .btn-row-valider{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#fff;background:#2ECC8F;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
   .btn-row-rejeter{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#E74C3C;background:#FDECEA;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
   .chip-statut-pending{background:#FEF3CD;color:#996600;}
+  .chip-statut-waiting{background:#F0EAFF;color:#7B2FBE;}
   .row-a-valider td{background:#FFFBF0;}
+  .row-en-attente td{background:#F7F3FF;}
+  .btn-row-attente{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#7B2FBE;background:#F0EAFF;border:none;padding:4px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
   .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
   .empty-state svg{width:40px;height:40px;opacity:0.3;margin-bottom:12px;}
   /* ── MODAL ── */
@@ -249,6 +252,7 @@
         <option value="">Tous les statuts</option>
         <option value="À valider">À valider</option>
         <option value="En cours">En cours</option>
+        <option value="En attente">En attente</option>
         <option value="Terminé">Terminé</option>
         <option value="Annulé">Annulé</option>
       </select>
@@ -367,6 +371,7 @@
             <label class="form-label">Statut</label>
             <select class="form-select" id="fStatut">
               <option value="En cours">En cours</option>
+              <option value="En attente">En attente</option>
               <option value="Terminé">Terminé</option>
               <option value="Annulé">Annulé</option>
             </select>
@@ -1177,6 +1182,16 @@ async function deleteIntervention(id) {
   } catch(e) { alert('Erreur: ' + e.message); }
 }
 
+async function setStatutRapide(id, newStatut) {
+  try {
+    await window._updateSuivi(id, { statut: newStatut });
+    const idx = interventions.findIndex(i => i.id === id);
+    if (idx !== -1) interventions[idx].statut = newStatut;
+    filterTable();
+    showToast('Statut mis à jour : ' + newStatut + '.');
+  } catch(e) { alert('Erreur: ' + e.message); }
+}
+
 // ── RENDER ──
 // Normalize notif field to array (rétrocompat)
 function toNotifArray(val) {
@@ -1276,7 +1291,7 @@ function fmtDate(d) {
   return `${parseInt(day)}/${parseInt(m)}/${y}`;
 }
 function statutChip(s) {
-  const map = {'Nouveau':'chip-statut-new','En cours':'chip-statut-progress','Terminé':'chip-statut-done','Annulé':'chip-statut-cancel','À valider':'chip-statut-pending'};
+  const map = {'Nouveau':'chip-statut-new','En cours':'chip-statut-progress','Terminé':'chip-statut-done','Annulé':'chip-statut-cancel','À valider':'chip-statut-pending','En attente':'chip-statut-waiting'};
   return `<span class="chip ${map[s]||'chip-statut-new'}">${s||'Nouveau'}</span>`;
 }
 function pdfBtn(url, label) {
@@ -1300,7 +1315,7 @@ window.renderTable = function renderTable(list) {
     const nr = toNotifArray(item.notifRappelSms);
     const hasPsg = (item.passages||[]).filter(Boolean).length > 0;
     const totalNotifs = nb.length + nl.length + ns.length + nr.length;
-    const rowClass = item.statut==='Annulé' ? 'row-annule' : item.statut==='Terminé' ? 'row-termine' : item.statut==='À valider' ? 'row-a-valider' : '';
+    const rowClass = item.statut==='Annulé' ? 'row-annule' : item.statut==='Terminé' ? 'row-termine' : item.statut==='À valider' ? 'row-a-valider' : item.statut==='En attente' ? 'row-en-attente' : '';
 
     // Build main row
     const isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
@@ -1338,6 +1353,11 @@ window.renderTable = function renderTable(list) {
         } else {
           html += '<button class="btn-row-edit" style="color:#4338CA;background:#EEF2FF;" onclick="basculerEnFacturation(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>→ Facturer</button>';
         }
+      }
+      if (item.statut === 'En cours') {
+        html += '<button class="btn-row-attente" onclick="setStatutRapide(\'' + item.id + '\',\'En attente\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>En attente</button>';
+      } else if (item.statut === 'En attente') {
+        html += '<button class="btn-row-attente" style="color:#1A5F8A;background:#EBF0F5;" onclick="setStatutRapide(\'' + item.id + '\',\'En cours\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M8 5v14l11-7z"/></svg>Reprendre</button>';
       }
       html += '<button class="btn-row-edit" onclick="openModal(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Mise à jour</button>';
       html += '<button class="btn-row-del" onclick="deleteIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
