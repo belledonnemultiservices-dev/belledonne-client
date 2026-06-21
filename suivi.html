@@ -193,6 +193,8 @@
   .admin-badge{margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);padding:8px 12px;display:flex;align-items:center;gap:8px;}
   .admin-badge svg{width:14px;height:14px;color:var(--amber);flex-shrink:0;}
   .admin-badge span{font-size:11px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:0.06em;}
+  .tab-pill{font-size:13px;font-weight:500;padding:8px 20px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;white-space:nowrap;}
+  .tab-pill.active{background:var(--navy);color:#fff;border-color:var(--navy);}
 </style>
 </head>
 <body>
@@ -257,14 +259,20 @@
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
           Techniciens
         </a>
-        <button class="btn-primary" id="btnAjouter" onclick="if(typeof openModal==='function')openModal()">
+        <button class="btn-primary" id="btnAjouter" onclick="ouvrirNouvelleIntervention()">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           Nouvelle intervention
         </button>
       </div>
     </div>
 
-    <!-- FILTERS -->
+    <!-- TABS -->
+    <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <button class="tab-pill active" id="tab_contrat" onclick="switchTab('contrat')">En contrat</button>
+      <button class="tab-pill" id="tab_particulier" onclick="switchTab('particulier')">Particuliers</button>
+      <button class="tab-pill" id="tab_entreprise" onclick="switchTab('entreprise')">Entreprises</button>
+    </div>
+
     <!-- FILTERS -->
     <div class="filters-bar" style="flex-wrap:wrap;gap:8px;">
       <div class="search-wrap" style="min-width:200px;flex:1;">
@@ -305,8 +313,8 @@
       <button onclick="clearSelection()" style="font-size:12px;color:var(--text-muted);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;">Annuler</button>
     </div>
 
-    <!-- TABLE -->
-    <div class="table-wrap">
+    <!-- TABLE EN CONTRAT -->
+    <div class="table-wrap" id="tableWrap_contrat">
       <table class="suivi-table">
         <thead>
           <tr>
@@ -323,8 +331,53 @@
             <th style="text-align:right;">Actions</th>
           </tr>
         </thead>
-        <tbody id="tableBody">
-          <tr><td colspan="10"><div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg><p>Aucune intervention enregistrée.</p></div></td></tr>
+        <tbody id="tableBodyContrat">
+          <tr><td colspan="11"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TABLE PARTICULIERS -->
+    <div class="table-wrap" id="tableWrap_particulier" style="display:none;">
+      <table class="suivi-table" style="min-width:900px;">
+        <thead>
+          <tr>
+            <th style="width:32px;"><input type="checkbox" id="checkAllP" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
+            <th>Nom</th>
+            <th>Nature mission</th>
+            <th style="min-width:200px;">Adresse</th>
+            <th>Assigné</th>
+            <th>Passages</th>
+            <th>Statut</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBodyParticulier">
+          <tr><td colspan="8"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TABLE ENTREPRISES -->
+    <div class="table-wrap" id="tableWrap_entreprise" style="display:none;">
+      <table class="suivi-table" style="min-width:1100px;">
+        <thead>
+          <tr>
+            <th style="width:32px;"><input type="checkbox" id="checkAllE" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
+            <th>Nom</th>
+            <th>SIRET</th>
+            <th>Bon de commande</th>
+            <th>Devis</th>
+            <th>Nature mission</th>
+            <th style="min-width:180px;">Adresse</th>
+            <th>Assigné</th>
+            <th>Passages</th>
+            <th>Statut</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBodyEntreprise">
+          <tr><td colspan="11"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -550,6 +603,226 @@
           Enregistrer
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PARTICULIER -->
+<div class="modal-overlay" id="modalParticulier">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitleP">Nouvelle intervention — Particulier</div>
+      <button class="modal-close" onclick="closeModalParticulier()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-section-title">Dossier</div>
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">Nom et prénom <span style="color:#E74C3C">*</span></label>
+            <input class="form-input" id="fNomP" placeholder="Nom et prénom...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nature de la mission</label>
+            <input class="form-input" id="fNatureP">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Adresse</label>
+            <input class="form-input" id="fAdresseP">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Assigné à</label>
+            <div id="fAssigneMultiP" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);min-height:38px;align-items:center;">
+              <span style="font-size:12px;color:var(--text-muted);font-style:italic;">Chargement...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Dates de passage</span>
+          <button type="button" onclick="addPassageP()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Ajouter</button>
+        </div>
+        <div id="passagesContainerP" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;"></div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secContactPBody','chevronContactP')">
+          <span>Contact <span class="sec-hint">nom · téléphone · email</span></span>
+          <svg id="chevronContactP" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secContactPBody" style="display:none;margin-top:12px;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Nom du contact</label>
+              <input class="form-input" id="fNomContactP">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>Téléphone(s)</span>
+                <button type="button" onclick="addPhoneFieldP()" style="font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Ajouter</button>
+              </label>
+              <div id="phonesContainerP" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+            <div class="form-group form-full">
+              <label class="form-label">Email</label>
+              <input class="form-input" type="email" id="fEmailP">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-section" style="margin-bottom:0;">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secNotesPBody','chevronNotesP')">
+          <span>Observations & Notes <span class="sec-hint">contexte · suivi interne</span></span>
+          <svg id="chevronNotesP" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secNotesPBody" style="display:none;margin-top:12px;">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Observations</label>
+            <textarea class="form-textarea" id="fObservationsP" placeholder="Détails, contexte, contraintes..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes internes</label>
+            <textarea class="form-textarea" id="fNotesP" placeholder="Notes internes, suivi, rappels..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModalParticulier()">Annuler</button>
+      <button class="btn-save" id="btnSaveP" onclick="saveInterventionParticulier()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENTREPRISE -->
+<div class="modal-overlay" id="modalEntreprise">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitleE">Nouvelle intervention — Entreprise</div>
+      <button class="modal-close" onclick="closeModalEntreprise()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-section-title">Dossier</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Nom de l'entreprise <span style="color:#E74C3C">*</span></label>
+            <input class="form-input" id="fNomE" placeholder="Nom de l'entreprise...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">N° SIRET <span class="opt">— optionnel</span></label>
+            <input class="form-input" id="fSiretE" placeholder="XXX XXX XXX XXXXX" maxlength="17">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Assigné à</label>
+            <div id="fAssigneMultiE" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);min-height:38px;align-items:center;">
+              <span style="font-size:12px;color:var(--text-muted);font-style:italic;">Chargement...</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nature de la mission</label>
+            <input class="form-input" id="fNatureE">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Adresse</label>
+            <input class="form-input" id="fAdresseE">
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secDocsEBody','chevronDocsE')">
+          <span>Documents <span class="sec-hint">BC · Devis</span></span>
+          <svg id="chevronDocsE" class="chevron" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secDocsEBody" style="margin-top:12px;">
+          <div class="doc-rows">
+            <div class="doc-row">
+              <span class="doc-row-label">BC</span>
+              <input class="form-input doc-num" id="fBCE" placeholder="N° BC">
+              <div id="dropBCE" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+                <input type="file" id="fileBCE" accept=".pdf" style="display:none" onchange="fileChosenE('fileBCE','chosenBCE','actionsBCE')">
+                <button type="button" class="drop-zone-btn btn-doc-pdf" onclick="document.getElementById('fileBCE').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>Charger PDF</button>
+                <div class="drop-zone-chosen" id="chosenBCE" style="display:none;font-size:11px;color:var(--text-mid);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+                <div class="drop-zone-actions" id="actionsBCE" style="display:none;gap:6px;">
+                  <button type="button" class="btn-preview" onclick="showExistingPdfE('BC',window._existingBcUrlE||'')">Voir</button>
+                  <button type="button" class="btn-remove-file" onclick="removeFileE('fileBCE','chosenBCE','actionsBCE')">Retirer</button>
+                </div>
+              </div>
+            </div>
+            <div class="doc-row">
+              <span class="doc-row-label">Devis</span>
+              <input class="form-input doc-num" id="fDevisE" placeholder="N° devis">
+              <div id="dropDevisE" style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+                <input type="file" id="fileDevisE" accept=".pdf" style="display:none" onchange="fileChosenE('fileDevisE','chosenDevisE','actionsDevisE')">
+                <button type="button" class="drop-zone-btn btn-doc-pdf" onclick="document.getElementById('fileDevisE').click()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>Charger PDF</button>
+                <div class="drop-zone-chosen" id="chosenDevisE" style="display:none;font-size:11px;color:var(--text-mid);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+                <div class="drop-zone-actions" id="actionsDevisE" style="display:none;gap:6px;">
+                  <button type="button" class="btn-preview" onclick="showExistingPdfE('Devis',window._existingDevisUrlE||'')">Voir</button>
+                  <button type="button" class="btn-remove-file" onclick="removeFileE('fileDevisE','chosenDevisE','actionsDevisE')">Retirer</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Dates de passage</span>
+          <button type="button" onclick="addPassageE()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Ajouter</button>
+        </div>
+        <div id="passagesContainerE" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;"></div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secContactEBody','chevronContactE')">
+          <span>Contact <span class="sec-hint">nom · téléphone · email</span></span>
+          <svg id="chevronContactE" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secContactEBody" style="display:none;margin-top:12px;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Nom du contact</label>
+              <input class="form-input" id="fNomContactE">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>Téléphone(s)</span>
+                <button type="button" onclick="addPhoneFieldE()" style="font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Ajouter</button>
+              </label>
+              <div id="phonesContainerE" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+            <div class="form-group form-full">
+              <label class="form-label">Email</label>
+              <input class="form-input" type="email" id="fEmailE">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-section" style="margin-bottom:0;">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secNotesEBody','chevronNotesE')">
+          <span>Observations & Notes <span class="sec-hint">contexte · suivi interne</span></span>
+          <svg id="chevronNotesE" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secNotesEBody" style="display:none;margin-top:12px;">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Observations</label>
+            <textarea class="form-textarea" id="fObservationsE" placeholder="Détails, contexte, contraintes..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes internes</label>
+            <textarea class="form-textarea" id="fNotesE" placeholder="Notes internes, suivi, rappels..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModalEntreprise()">Annuler</button>
+      <button class="btn-save" id="btnSaveE" onclick="saveInterventionEntreprise()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+        Enregistrer
+      </button>
     </div>
   </div>
 </div>
@@ -1537,10 +1810,10 @@ function pdfBtn(url, label) {
 }
 
 window.renderTable = function renderTable(list) {
-  const body = document.getElementById('tableBody');
+  const body = document.getElementById('tableBodyContrat');
   document.getElementById('resultsCount').textContent = list.length + ' intervention' + (list.length!==1?'s':'');
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="10"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="11"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
     return;
   }
 
@@ -2247,29 +2520,30 @@ window.populateFilterDropdowns = function populateFilterDropdowns() {
 };
 
 function filterTable() {
-  var q = document.getElementById('searchInput').value.toLowerCase();
-  var statut = document.getElementById('filterStatut').value;
-  var client = (document.getElementById('filterClient')||{value:''}).value||'';
-  var annee = (document.getElementById('filterAnnee')||{value:''}).value||'';
-  var dateDe = (document.getElementById('filterDateDe')||{value:''}).value||'';
-  var dateA = (document.getElementById('filterDateA')||{value:''}).value||'';
-  var data = window.interventions || [];
-  if (!data.length) return; // Data not loaded yet
+  var q = (document.getElementById('searchInput')?.value||'').toLowerCase();
+  var statut = (document.getElementById('filterStatut')?.value)||'';
+  var clientFilter = activeTab === 'contrat' ? ((document.getElementById('filterClient')?.value)||'') : '';
+  var annee = (document.getElementById('filterAnnee')?.value)||'';
+  var dateDe = (document.getElementById('filterDateDe')?.value)||'';
+  var dateA = (document.getElementById('filterDateA')?.value)||'';
+  var allData = window.interventions || [];
+  var data = allData.filter(function(i){ return (i.clientType||'contrat') === activeTab; });
   var filtered = data.filter(function(i) {
     var allAssignes = (i.assignes||[]).concat(i.assigne||[]).join(' ');
-    var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,allAssignes].some(function(v){return (v||'').toLowerCase().includes(q);});
+    var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,allAssignes,i.siret].some(function(v){return (v||'').toLowerCase().includes(q);});
     var ms = !statut || i.statut === statut;
-    var mc = !client || i.client === client;
-    // Try multiple date sources for filtering
+    var mc = !clientFilter || i.client === clientFilter;
     var dateRef = i.dateEmission || '';
-    // Also check passages for date range filter
     var allDates = [dateRef, (i.createdAt||'').substring(0,10)].filter(Boolean);
     var ma = !annee || allDates.some(function(d){return d && d.startsWith(annee);});
     var mde = !dateDe || (dateRef && dateRef >= dateDe);
     var mda = !dateA || (dateRef && dateRef <= dateA);
     return mq && ms && mc && ma && mde && mda;
   });
-  if(window.renderTable) window.renderTable(filtered);
+  document.getElementById('resultsCount').textContent = filtered.length + ' intervention' + (filtered.length!==1?'s':'');
+  if (activeTab === 'contrat') { if(window.renderTable) window.renderTable(filtered); }
+  else if (activeTab === 'particulier') { renderTableParticulier(filtered); }
+  else { renderTableEntreprise(filtered); }
 }
 window.filterTable = filterTable;
 
@@ -2287,6 +2561,410 @@ document.getElementById('modal').addEventListener('click', e => { if(e.target===
 // Init one phone field on load
 addPhoneField();
 document.getElementById('pdfViewerPanel')?.addEventListener('click', e => { if(e.target===document.getElementById('pdfViewerPanel')) closePdfViewer(); });
+
+// ── TABS ──
+let activeTab = 'contrat';
+
+function switchTab(tab) {
+  activeTab = tab;
+  ['contrat','particulier','entreprise'].forEach(t => {
+    const wrap = document.getElementById('tableWrap_' + t);
+    const pill = document.getElementById('tab_' + t);
+    if (wrap) wrap.style.display = t === tab ? '' : 'none';
+    if (pill) pill.classList.toggle('active', t === tab);
+  });
+  const clientSel = document.getElementById('filterClient');
+  if (clientSel) clientSel.style.display = tab === 'contrat' ? '' : 'none';
+  filterTable();
+}
+
+function ouvrirNouvelleIntervention() {
+  if (activeTab === 'particulier') openModalParticulier();
+  else if (activeTab === 'entreprise') openModalEntreprise();
+  else openModal();
+}
+
+// ── TECH CHIPS HELPER (new modals) ──
+function populateTechChipsForContainer(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  const techs = window._techniciens || [];
+  if (!techs.length) {
+    container.innerHTML = '<span style="font-size:12px;color:var(--text-muted);font-style:italic;">Aucun technicien</span>';
+    return;
+  }
+  techs.forEach(t => {
+    const label = t.nomComplet || ((t.prenom||'') + ' ' + (t.nom||'')).trim() || t.nom || t.id;
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'tech-chip';
+    btn.textContent = label; btn.dataset.id = label; btn.dataset.color = t.color || '#8FA4B8';
+    btn.onclick = function() {
+      const isNow = !this.classList.contains('selected');
+      this.classList.toggle('selected', isNow);
+      const color = this.dataset.color || '#0D1B2A';
+      if (isNow) { this.style.background=color; this.style.borderColor=color; this.style.color=isLightColor(color)?'#0D1B2A':'#fff'; }
+      else { this.style.background=''; this.style.borderColor=''; this.style.color=''; }
+    };
+    container.appendChild(btn);
+  });
+}
+function getAssignesFromContainer(containerId) {
+  return Array.from(document.querySelectorAll('#'+containerId+' .tech-chip.selected')).map(b=>b.dataset.id);
+}
+function setAssignesInContainer(containerId, arr) {
+  document.querySelectorAll('#'+containerId+' .tech-chip').forEach(btn => {
+    const sel = arr.includes(btn.dataset.id);
+    btn.classList.toggle('selected', sel);
+    if (sel) { const c=btn.dataset.color||'#0D1B2A'; btn.style.background=c; btn.style.borderColor=c; btn.style.color=isLightColor(c)?'#0D1B2A':'#fff'; }
+    else { btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; }
+  });
+}
+
+// ── PASSAGES PARTICULIER ──
+let passageCountP = 0;
+function addPassageP(value='') {
+  passageCountP++;
+  const n = passageCountP;
+  const label = ORDINALS[n-1]||(n+'e');
+  let debut='', fin='';
+  if (value && typeof value === 'object') { debut=value.debut||''; fin=value.fin||''; }
+  else if (typeof value === 'string' && value.includes('|')) { [debut,fin]=value.split('|'); }
+  else { debut=value||''; }
+  const div = document.createElement('div');
+  div.id = 'passageP_'+n;
+  div.style.cssText = 'display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:8px;align-items:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border);';
+  div.innerHTML = `<label style="font-size:12px;font-weight:500;color:var(--text-mid);white-space:nowrap;">${label} passage</label>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutP${n}" value="${debut}" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinP${n}" value="${fin}" style="width:100%;"></div>
+    <button type="button" onclick="removePassageP(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;margin-top:16px;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
+  document.getElementById('passagesContainerP').appendChild(div);
+}
+function removePassageP(n) { const el=document.getElementById('passageP_'+n); if(el) el.remove(); }
+function getPassagesFromContainerP() {
+  const passages=[]; let n=1;
+  while(document.getElementById('fDateDebutP'+n)) {
+    passages.push({debut:document.getElementById('fDateDebutP'+n).value, fin:document.getElementById('fDateFinP'+n)?.value||''});
+    n++;
+  }
+  return passages;
+}
+
+// ── PASSAGES ENTREPRISE ──
+let passageCountE = 0;
+function addPassageE(value='') {
+  passageCountE++;
+  const n = passageCountE;
+  const label = ORDINALS[n-1]||(n+'e');
+  let debut='', fin='';
+  if (value && typeof value === 'object') { debut=value.debut||''; fin=value.fin||''; }
+  else if (typeof value === 'string' && value.includes('|')) { [debut,fin]=value.split('|'); }
+  else { debut=value||''; }
+  const div = document.createElement('div');
+  div.id = 'passageE_'+n;
+  div.style.cssText = 'display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:8px;align-items:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border);';
+  div.innerHTML = `<label style="font-size:12px;font-weight:500;color:var(--text-mid);white-space:nowrap;">${label} passage</label>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutE${n}" value="${debut}" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinE${n}" value="${fin}" style="width:100%;"></div>
+    <button type="button" onclick="removePassageE(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;margin-top:16px;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
+  document.getElementById('passagesContainerE').appendChild(div);
+}
+function removePassageE(n) { const el=document.getElementById('passageE_'+n); if(el) el.remove(); }
+function getPassagesFromContainerE() {
+  const passages=[]; let n=1;
+  while(document.getElementById('fDateDebutE'+n)) {
+    passages.push({debut:document.getElementById('fDateDebutE'+n).value, fin:document.getElementById('fDateFinE'+n)?.value||''});
+    n++;
+  }
+  return passages;
+}
+
+// ── PHONES PARTICULIER ──
+let phoneCountP = 0;
+function addPhoneFieldP(value='') {
+  phoneCountP++;
+  const n = phoneCountP;
+  const container = document.getElementById('phonesContainerP');
+  const div = document.createElement('div');
+  div.id = 'phoneP_'+n; div.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  div.innerHTML = `<input class="form-input" type="tel" id="fPhoneP${n}" value="${value}" placeholder="06 XX XX XX XX" style="flex:1;">${phoneCountP>1?`<button type="button" onclick="removePhoneP(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`:'<div style="width:28px;"></div>'}`;
+  container.appendChild(div);
+}
+function removePhoneP(n) { const el=document.getElementById('phoneP_'+n); if(el) el.remove(); }
+
+// ── PHONES ENTREPRISE ──
+let phoneCountE = 0;
+function addPhoneFieldE(value='') {
+  phoneCountE++;
+  const n = phoneCountE;
+  const container = document.getElementById('phonesContainerE');
+  const div = document.createElement('div');
+  div.id = 'phoneE_'+n; div.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  div.innerHTML = `<input class="form-input" type="tel" id="fPhoneE${n}" value="${value}" placeholder="06 XX XX XX XX" style="flex:1;">${phoneCountE>1?`<button type="button" onclick="removePhoneE(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`:'<div style="width:28px;"></div>'}`;
+  container.appendChild(div);
+}
+function removePhoneE(n) { const el=document.getElementById('phoneE_'+n); if(el) el.remove(); }
+
+// ── PDF ENTREPRISE ──
+let pdfBlobUrlsE = {};
+function fileChosenE(fileInputId, chosenId, actionsId) {
+  const input = document.getElementById(fileInputId);
+  const chosen = document.getElementById(chosenId);
+  const actions = document.getElementById(actionsId);
+  if (!input.files[0]) return;
+  chosen.textContent = '✓ ' + input.files[0].name; chosen.style.display = 'block';
+  if (actions) actions.style.display = 'flex';
+  const drop = document.getElementById(fileInputId.replace(/^file/,'drop'));
+  if (drop) { const btn=drop.querySelector('.drop-zone-btn'); if(btn) btn.style.display='none'; }
+  if (pdfBlobUrlsE[fileInputId]) URL.revokeObjectURL(pdfBlobUrlsE[fileInputId]);
+  pdfBlobUrlsE[fileInputId] = URL.createObjectURL(input.files[0]);
+}
+function removeFileE(fileInputId, chosenId, actionsId) {
+  document.getElementById(fileInputId).value = '';
+  const chosen=document.getElementById(chosenId); chosen.textContent=''; chosen.style.display='none';
+  const actions=document.getElementById(actionsId); if(actions) actions.style.display='none';
+  const drop=document.getElementById(fileInputId.replace(/^file/,'drop'));
+  if(drop){const btn=drop.querySelector('.drop-zone-btn');if(btn)btn.style.display='';}
+  if(pdfBlobUrlsE[fileInputId]){URL.revokeObjectURL(pdfBlobUrlsE[fileInputId]);delete pdfBlobUrlsE[fileInputId];}
+}
+function showExistingPdfE(fileType, url) {
+  const ids = fileType==='BC' ? ['chosenBCE','actionsBCE','dropBCE','fileBCE'] : ['chosenDevisE','actionsDevisE','dropDevisE','fileDevisE'];
+  if (fileType==='BC') window._existingBcUrlE = url; else window._existingDevisUrlE = url;
+  const drop = document.getElementById(ids[2]);
+  if (drop){const btn=drop.querySelector('.drop-zone-btn');if(btn)btn.style.display='none';}
+  const chosen = document.getElementById(ids[0]);
+  if (chosen){chosen.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;color:#1DA870;vertical-align:-2px;margin-right:4px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>'+(fileType==='BC'?'Bon de commande':'Devis')+'.pdf';chosen.style.display='block';}
+  const actions = document.getElementById(ids[1]);
+  if (actions){actions.style.display='flex';const pbtn=actions.querySelector('.btn-preview');if(pbtn)pbtn.onclick=()=>window.open(url,'_blank');}
+}
+
+// ── RENDER TABLE PARTICULIERS ──
+function renderTableParticulier(list) {
+  const body = document.getElementById('tableBodyParticulier');
+  if (!body) return;
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
+    return;
+  }
+  let html = '';
+  list.forEach(function(item) {
+    const rowClass = item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':item.statut==='À traiter'?'row-a-traiter':item.statut==='En attente'?'row-en-attente':'';
+    const isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
+    const _assignes = item.assignes || (item.assigne ? [item.assigne] : []);
+    html += '<tr id="row-'+item.id+'" class="'+rowClass+'">';
+    html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="'+item.id+'" '+(isChecked?'checked':'')+' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
+    html += '<td class="client-cell">'+(item.client||'—')+'</td>';
+    html += '<td style="font-size:13px;">'+(item.nature||'—')+'</td>';
+    html += '<td style="min-width:180px;font-size:13px;">'+(item.adresse||'—')+'</td>';
+    html += '<td>'+(_assignes.length?'<div style="display:flex;flex-wrap:wrap;gap:3px;">'+_assignes.map(a=>assigneBadge(a)).join('')+'</div>':'<span style="color:var(--text-muted)">—</span>')+'</td>';
+    html += '<td>'+passagesDropdown(item.passages||[])+'</td>';
+    html += '<td>'+statutSelect(item.id, item.statut)+'</td>';
+    html += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;">';
+    html += '<button class="btn-row-edit" onclick="openModalParticulier(\''+item.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Compléter</button>';
+    html += '<button class="btn-row-del" onclick="deleteIntervention(\''+item.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
+    html += '</div></td></tr>';
+  });
+  body.innerHTML = html;
+}
+
+// ── RENDER TABLE ENTREPRISES ──
+function renderTableEntreprise(list) {
+  const body = document.getElementById('tableBodyEntreprise');
+  if (!body) return;
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="11"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
+    return;
+  }
+  let html = '';
+  list.forEach(function(item) {
+    const rowClass = item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':item.statut==='À traiter'?'row-a-traiter':item.statut==='En attente'?'row-en-attente':'';
+    const isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
+    const _assignes = item.assignes || (item.assigne ? [item.assigne] : []);
+    html += '<tr id="row-'+item.id+'" class="'+rowClass+'">';
+    html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="'+item.id+'" '+(isChecked?'checked':'')+' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
+    html += '<td class="client-cell">'+(item.client||'—')+'</td>';
+    html += '<td style="font-size:12px;color:var(--text-muted);">'+(item.siret||'—')+'</td>';
+    html += '<td><div style="display:flex;flex-direction:column;gap:4px;">'+(item.bc?'<span style="font-family:monospace;font-size:12px;font-weight:600;">'+item.bc+'</span>':'')+pdfBtn(item.bcUrl,'PDF')+'</div></td>';
+    html += '<td><div style="display:flex;flex-direction:column;gap:4px;">'+(item.devis?'<span style="font-family:monospace;font-size:12px;font-weight:600;">'+item.devis+'</span>':'')+pdfBtn(item.devisUrl,'PDF')+'</div></td>';
+    html += '<td style="font-size:13px;">'+(item.nature||'—')+'</td>';
+    html += '<td style="min-width:180px;font-size:13px;">'+(item.adresse||'—')+'</td>';
+    html += '<td>'+(_assignes.length?'<div style="display:flex;flex-wrap:wrap;gap:3px;">'+_assignes.map(a=>assigneBadge(a)).join('')+'</div>':'<span style="color:var(--text-muted)">—</span>')+'</td>';
+    html += '<td>'+passagesDropdown(item.passages||[])+'</td>';
+    html += '<td>'+statutSelect(item.id, item.statut)+'</td>';
+    html += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;">';
+    html += '<button class="btn-row-edit" onclick="openModalEntreprise(\''+item.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Compléter</button>';
+    html += '<button class="btn-row-del" onclick="deleteIntervention(\''+item.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
+    html += '</div></td></tr>';
+  });
+  body.innerHTML = html;
+}
+
+// ── MODAL PARTICULIER ──
+let editIdP = null;
+window.openModalParticulier = function(id=null) {
+  editIdP = id;
+  document.getElementById('modalTitleP').textContent = id ? "Mise à jour de l'intervention" : 'Nouvelle intervention — Particulier';
+  document.getElementById('btnSaveP').textContent = id ? 'Mettre à jour' : 'Enregistrer';
+  resetFormParticulier();
+  populateTechChipsForContainer('fAssigneMultiP');
+  if (id) {
+    const item = (window.interventions||[]).find(i=>i.id===id);
+    if (!item) return;
+    document.getElementById('fNomP').value = item.client||'';
+    document.getElementById('fNatureP').value = item.nature||'';
+    document.getElementById('fAdresseP').value = item.adresse||'';
+    document.getElementById('fNomContactP').value = item.nomClient||'';
+    document.getElementById('fEmailP').value = item.emailClient||'';
+    document.getElementById('fObservationsP').value = item.observations||'';
+    document.getElementById('fNotesP').value = item.notes||'';
+    setAssignesInContainer('fAssigneMultiP', item.assignes||(item.assigne?[item.assigne]:[]));
+    document.getElementById('phonesContainerP').innerHTML=''; phoneCountP=0;
+    const phones=item.coordonnees?(Array.isArray(item.coordonnees)?item.coordonnees:[item.coordonnees]):[];
+    if(phones.length) phones.forEach(p=>addPhoneFieldP(p)); else addPhoneFieldP();
+    (item.passages||[]).filter(Boolean).forEach(p=>addPassageP(p));
+    if(item.observations||item.notes){const b=document.getElementById('secNotesPBody');if(b)b.style.display='';const c=document.getElementById('chevronNotesP');if(c)c.style.transform='rotate(0deg)';}
+  } else { addPhoneFieldP(); }
+  document.getElementById('modalParticulier').classList.add('open');
+};
+function closeModalParticulier() {
+  document.getElementById('modalParticulier').classList.remove('open');
+  resetFormParticulier(); editIdP=null;
+}
+function resetFormParticulier() {
+  ['fNomP','fNatureP','fAdresseP','fNomContactP','fEmailP','fObservationsP','fNotesP'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('passagesContainerP').innerHTML=''; passageCountP=0;
+  document.getElementById('phonesContainerP').innerHTML=''; phoneCountP=0;
+  ['secContactPBody','secNotesPBody'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  ['chevronContactP','chevronNotesP'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.transform='rotate(-90deg)';});
+}
+async function saveInterventionParticulier() {
+  const client=(document.getElementById('fNomP')?.value||'').trim();
+  if(!client){alert('Le nom est obligatoire.');return;}
+  const btn=document.getElementById('btnSaveP');
+  btn.disabled=true; btn.textContent='Enregistrement...';
+  try {
+    const data={
+      client, clientType:'particulier',
+      nature:(document.getElementById('fNatureP')?.value||'').trim(),
+      adresse:(document.getElementById('fAdresseP')?.value||'').trim(),
+      assignes:getAssignesFromContainer('fAssigneMultiP'),
+      assigne:getAssignesFromContainer('fAssigneMultiP')[0]||'',
+      passages:getPassagesFromContainerP(), calEventIds:[],
+      nomClient:(document.getElementById('fNomContactP')?.value||'').trim(),
+      coordonnees:Array.from(document.querySelectorAll('#phonesContainerP input')).map(i=>i.value.trim()).filter(Boolean),
+      emailClient:(document.getElementById('fEmailP')?.value||'').trim(),
+      observations:(document.getElementById('fObservationsP')?.value||'').trim(),
+      notes:(document.getElementById('fNotesP')?.value||'').trim(),
+      statut:editIdP?((window.interventions||[]).find(i=>i.id===editIdP)?.statut||'À traiter'):'À traiter',
+      updatedAt:new Date().toISOString()
+    };
+    if(editIdP){
+      await window._updateSuivi(editIdP,data);
+      const idx=(window.interventions||[]).findIndex(i=>i.id===editIdP);
+      if(idx!==-1) window.interventions[idx]={...window.interventions[idx],...data};
+    } else {
+      data.createdAt=new Date().toISOString();
+      const id=await window._addSuivi(data);
+      (window.interventions=window.interventions||[]).unshift({id,...data});
+    }
+    closeModalParticulier(); filterTable();
+    showToast(editIdP?'Intervention mise à jour !':'Intervention enregistrée !');
+  } catch(e){console.error(e);alert('Erreur : '+e.message);}
+  finally{btn.disabled=false;btn.textContent=editIdP?'Mettre à jour':'Enregistrer';}
+}
+
+// ── MODAL ENTREPRISE ──
+let editIdE = null;
+window.openModalEntreprise = function(id=null) {
+  editIdE = id;
+  document.getElementById('modalTitleE').textContent = id ? "Mise à jour de l'intervention" : 'Nouvelle intervention — Entreprise';
+  document.getElementById('btnSaveE').textContent = id ? 'Mettre à jour' : 'Enregistrer';
+  resetFormEntreprise();
+  populateTechChipsForContainer('fAssigneMultiE');
+  if (id) {
+    const item=(window.interventions||[]).find(i=>i.id===id);
+    if(!item) return;
+    document.getElementById('fNomE').value=item.client||'';
+    document.getElementById('fSiretE').value=item.siret||'';
+    document.getElementById('fBCE').value=item.bc||'';
+    document.getElementById('fDevisE').value=item.devis||'';
+    document.getElementById('fNatureE').value=item.nature||'';
+    document.getElementById('fAdresseE').value=item.adresse||'';
+    document.getElementById('fNomContactE').value=item.nomClient||'';
+    document.getElementById('fEmailE').value=item.emailClient||'';
+    document.getElementById('fObservationsE').value=item.observations||'';
+    document.getElementById('fNotesE').value=item.notes||'';
+    setAssignesInContainer('fAssigneMultiE', item.assignes||(item.assigne?[item.assigne]:[]));
+    document.getElementById('phonesContainerE').innerHTML=''; phoneCountE=0;
+    const phones=item.coordonnees?(Array.isArray(item.coordonnees)?item.coordonnees:[item.coordonnees]):[];
+    if(phones.length) phones.forEach(p=>addPhoneFieldE(p)); else addPhoneFieldE();
+    (item.passages||[]).filter(Boolean).forEach(p=>addPassageE(p));
+    if(item.bcUrl) showExistingPdfE('BC',item.bcUrl);
+    if(item.devisUrl) showExistingPdfE('Devis',item.devisUrl);
+    if(item.observations||item.notes){const b=document.getElementById('secNotesEBody');if(b)b.style.display='';const c=document.getElementById('chevronNotesE');if(c)c.style.transform='rotate(0deg)';}
+  } else { addPhoneFieldE(); }
+  document.getElementById('modalEntreprise').classList.add('open');
+};
+function closeModalEntreprise() {
+  document.getElementById('modalEntreprise').classList.remove('open');
+  resetFormEntreprise(); editIdE=null;
+}
+function resetFormEntreprise() {
+  ['fNomE','fSiretE','fBCE','fDevisE','fNatureE','fAdresseE','fNomContactE','fEmailE','fObservationsE','fNotesE'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['fileBCE','fileDevisE'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['chosenBCE','chosenDevisE'].forEach(id=>{const el=document.getElementById(id);if(el){el.textContent='';el.style.display='none';}});
+  ['actionsBCE','actionsDevisE'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  ['dropBCE','dropDevisE'].forEach(id=>{const el=document.getElementById(id);if(el){const b=el.querySelector('.drop-zone-btn');if(b)b.style.display='';}});
+  document.getElementById('passagesContainerE').innerHTML=''; passageCountE=0;
+  document.getElementById('phonesContainerE').innerHTML=''; phoneCountE=0;
+  window._existingBcUrlE=null; window._existingDevisUrlE=null;
+  ['secContactEBody','secNotesEBody'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  ['chevronContactE','chevronNotesE'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.transform='rotate(-90deg)';});
+}
+async function saveInterventionEntreprise() {
+  const client=(document.getElementById('fNomE')?.value||'').trim();
+  if(!client){alert("Le nom de l'entreprise est obligatoire.");return;}
+  const btn=document.getElementById('btnSaveE');
+  btn.disabled=true; btn.textContent='Enregistrement...';
+  try {
+    let bcUrl=editIdE?((window.interventions||[]).find(i=>i.id===editIdE)?.bcUrl||''):'';
+    let devisUrl=editIdE?((window.interventions||[]).find(i=>i.id===editIdE)?.devisUrl||''):'';
+    const fileBCE=document.getElementById('fileBCE')?.files[0];
+    const fileDevisE=document.getElementById('fileDevisE')?.files[0];
+    if(fileBCE) bcUrl=await window._uploadPdf(fileBCE,`suivi/bc/${Date.now()}_${fileBCE.name}`);
+    if(fileDevisE) devisUrl=await window._uploadPdf(fileDevisE,`suivi/devis/${Date.now()}_${fileDevisE.name}`);
+    const data={
+      client, clientType:'entreprise',
+      siret:(document.getElementById('fSiretE')?.value||'').trim(),
+      bc:(document.getElementById('fBCE')?.value||'').trim(), bcUrl,
+      devis:(document.getElementById('fDevisE')?.value||'').trim(), devisUrl,
+      nature:(document.getElementById('fNatureE')?.value||'').trim(),
+      adresse:(document.getElementById('fAdresseE')?.value||'').trim(),
+      assignes:getAssignesFromContainer('fAssigneMultiE'),
+      assigne:getAssignesFromContainer('fAssigneMultiE')[0]||'',
+      passages:getPassagesFromContainerE(), calEventIds:[],
+      nomClient:(document.getElementById('fNomContactE')?.value||'').trim(),
+      coordonnees:Array.from(document.querySelectorAll('#phonesContainerE input')).map(i=>i.value.trim()).filter(Boolean),
+      emailClient:(document.getElementById('fEmailE')?.value||'').trim(),
+      observations:(document.getElementById('fObservationsE')?.value||'').trim(),
+      notes:(document.getElementById('fNotesE')?.value||'').trim(),
+      statut:editIdE?((window.interventions||[]).find(i=>i.id===editIdE)?.statut||'À traiter'):'À traiter',
+      updatedAt:new Date().toISOString()
+    };
+    if(editIdE){
+      await window._updateSuivi(editIdE,data);
+      const idx=(window.interventions||[]).findIndex(i=>i.id===editIdE);
+      if(idx!==-1) window.interventions[idx]={...window.interventions[idx],...data};
+    } else {
+      data.createdAt=new Date().toISOString();
+      const id=await window._addSuivi(data);
+      (window.interventions=window.interventions||[]).unshift({id,...data});
+    }
+    closeModalEntreprise(); filterTable();
+    showToast(editIdE?'Intervention mise à jour !':'Intervention enregistrée !');
+  } catch(e){console.error(e);alert('Erreur : '+e.message);}
+  finally{btn.disabled=false;btn.textContent=editIdE?'Mettre à jour':'Enregistrer';}
+}
 </script>
 
 <script type="module">
