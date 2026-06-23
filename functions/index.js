@@ -337,37 +337,23 @@ exports.addToCalendar = functions
     }
   });
 
-// ── TRAITEMENT AUTOMATIQUE DES BT ACTIS (toutes les 15 min) ──────
-const BT_TOOL = {
-  name: "save_bt_actis",
-  description: "Enregistre les données extraites d'un Bon de Travaux ACTIS.",
+// ── IMPORT EMAIL GÉNÉRIQUE (toutes les 15 min) ────────────────────
+
+const EXTRACTION_TOOL = {
+  name: "save_document_data",
+  description: "Enregistre les données extraites du document PDF.",
   input_schema: {
     type: "object",
     properties: {
-      client:       { type: "string", enum: ["ACTIS-TPC", "ACTIS-TMR"] },
-      chorus:       { type: "string" },
-      expediteur:   { type: "string" },
-      dateEmission: { type: "string" },
-      nomClient:    { type: "string" },
-      adresse:      { type: "string" },
-      observations: { type: "string" },
+      data: {
+        type: "object",
+        description: "Les données extraites du document, toutes les valeurs en chaîne de caractères",
+        additionalProperties: { type: "string" },
+      },
     },
-    required: ["client", "nomClient", "adresse"],
+    required: ["data"],
   },
 };
-
-const BT_SYSTEM_PROMPT = `Tu es un assistant d'extraction de données pour Belledonne Multiservices, société de désinsectisation à Grenoble.
-
-Tu reçois un PDF de Bon de Travaux ACTIS. Extrais uniquement ces champs via l'outil save_bt_actis :
-- client : "ACTIS-TPC" ou "ACTIS-TMR" — source fiable : la ligne "Service : Chargé Rési Secteur X TMR/TPC" dans la section Intervention, confirmée par "2D - TMR" ou "2D - TPC" dans le bloc Info Entreprise
-- chorus : le N° Service Chorus (numéro de marché ou accord-cadre)
-- expediteur : nom et prénom de la personne qui a émis le bon
-- dateEmission : date d'émission au format YYYY-MM-DD
-- nomClient : nom du locataire/bénéficiaire (pas Belledonne, pas ACTIS)
-- adresse : adresse complète de l'intervention (numéro, rue, code postal, ville)
-- observations : remarques, contraintes ou instructions particulières
-
-Règles : les dates en format ISO YYYY-MM-DD. Si un champ est absent du PDF, chaîne vide. Ne jamais inventer.`;
 
 async function getOrCreateLabel(gmail, labelName) {
   const res = await gmail.users.labels.list({ userId: "me" });
@@ -387,35 +373,41 @@ function flattenParts(payload, acc = []) {
   return acc;
 }
 
-async function parseBTPdf(anthropic, pdfBase64, filename) {
+async function parsePdfWithClaude(anthropic, pdfBase64, filename, systemPrompt) {
   const response = await anthropic.messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 2048,
-    system: BT_SYSTEM_PROMPT,
-    tools: [BT_TOOL],
-    tool_choice: { type: "tool", name: "save_bt_actis" },
+    system: systemPrompt,
+    tools: [EXTRACTION_TOOL],
+    tool_choice: { type: "tool", name: "save_document_data" },
     messages: [{
       role: "user",
       content: [
         { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
-        { type: "text", text: `Extrais les données de ce Bon de Travaux ACTIS (fichier: ${filename}) et appelle l'outil save_bt_actis avec le résultat.` },
+        { type: "text", text: `Extrais les données de ce document (${filename}) et appelle l'outil save_document_data.` },
       ],
     }],
   });
   const toolUse = response.content.find(b => b.type === "tool_use");
-  if (!toolUse) throw new Error(`Le modèle n'a pas appelé l'outil. stop_reason=${response.stop_reason}`);
-  return toolUse.input;
+  if (!toolUse) throw new Error(`Claude n'a pas utilisé l'outil. stop_reason=${response.stop_reason}`);
+  return toolUse.input.data || {};
 }
 
-async function processEmail(gmail, anthropic, messageId, labelId, db) {
+async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteId, labelArchiveId, source, sourceId) {
   const email = await gmail.users.messages.get({ userId: "me", id: messageId, format: "full" });
-
-  // BC depuis l'objet du mail (format : "Actis - Demande de commande N° 319066")
   const headers = email.data.payload.headers || [];
   const subject = (headers.find(h => h.name === "Subject") || {}).value || "";
-  const bcMatch = subject.match(/N[°º]\s*(\d+)/);
-  const bc = bcMatch ? bcMatch[1] : "";
-  console.log(`Email ${messageId}: sujet="${subject}", BC="${bc}"`);
+
+  let docNumber = "";
+  if (source.subjectNumberRegex) {
+    try {
+      const match = subject.match(new RegExp(source.subjectNumberRegex));
+      if (match && match[1]) docNumber = match[1];
+    } catch(e) {
+      console.warn(`Source ${sourceId}: regex invalide "${source.subjectNumberRegex}"`);
+    }
+  }
+  console.log(`Email ${messageId}: sujet="${subject}", N°="${docNumber}"`);
 
   const allParts = flattenParts(email.data.payload);
   const pdfPart = allParts.find(p =>
@@ -423,9 +415,12 @@ async function processEmail(gmail, anthropic, messageId, labelId, db) {
     p.body && p.body.attachmentId
   );
 
+  const labelIds = [labelTraiteId];
+  if (labelArchiveId) labelIds.push(labelArchiveId);
+
   if (!pdfPart) {
-    console.warn(`Email ${messageId}: aucun PDF trouvé, labellisation quand même`);
-    await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: [labelId, "Label_1649438707140645411"], removeLabelIds: ["INBOX", "UNREAD"] } });
+    console.warn(`Email ${messageId}: aucun PDF, labellisation uniquement`);
+    await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: labelIds, removeLabelIds: ["INBOX", "UNREAD"] } });
     return;
   }
 
@@ -434,55 +429,77 @@ async function processEmail(gmail, anthropic, messageId, labelId, db) {
   const pdfBase64 = att.data.data.replace(/-/g, "+").replace(/_/g, "/");
   const pdfBuffer = Buffer.from(pdfBase64, "base64");
 
-  console.log(`Email ${messageId}: parsing Claude...`);
-  const btData = await parseBTPdf(anthropic, pdfBase64, pdfPart.filename || "BT.pdf");
+  console.log(`Email ${messageId}: extraction Claude...`);
+  const extractedData = await parsePdfWithClaude(anthropic, pdfBase64, pdfPart.filename || "document.pdf", source.claudeSystemPrompt || "");
 
-  console.log(`Email ${messageId}: upload Storage (BC ${bc})...`);
+  console.log(`Email ${messageId}: upload Storage...`);
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-  const storagePath = `suivi/bc/${Date.now()}_${(pdfPart.filename || "BT.pdf").replace(/\s/g, "_")}`;
-  const file = bucket.file(storagePath);
+  const storageFolder = source.pdfType === "PL" ? "suivi/pl" : "suivi/bc";
+  const storagePath = `${storageFolder}/${Date.now()}_${(pdfPart.filename || "doc.pdf").replace(/\s/g, "_")}`;
   const downloadToken = crypto.randomUUID();
   try {
-    await file.save(pdfBuffer, {
+    await bucket.file(storagePath).save(pdfBuffer, {
       contentType: "application/pdf",
       metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
     });
-    console.log(`Email ${messageId}: Storage OK`);
   } catch(e) {
-    throw new Error(`Storage ERREUR: code=${e.code} msg=${e.message}`);
+    throw new Error(`Storage ERREUR: ${e.message}`);
   }
   const bcUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
 
   console.log(`Email ${messageId}: écriture Firestore...`);
   try {
     const docRef = await db.collection("suivi").add({
-      client:       btData.client       || "",
-      bc,
-      chorus:       btData.chorus       || "",
-      expediteur:   btData.expediteur   || "",
-      dateEmission: btData.dateEmission || "",
-      nomClient:    btData.nomClient    || "",
-      adresse:      btData.adresse      || "",
-      observations: btData.observations || "",
+      ...extractedData,
+      bc: docNumber,
       bcUrl,
       statut: "À valider",
       source: "auto",
+      sourceId,
+      pdfType: source.pdfType || "BC",
       createdAt: new Date().toISOString(),
     });
     console.log(`Email ${messageId}: Firestore OK doc=${docRef.id}`);
   } catch(e) {
-    throw new Error(`Firestore ERREUR: code=${e.code} msg=${e.message}`);
+    throw new Error(`Firestore ERREUR: ${e.message}`);
   }
 
-  console.log(`Email ${messageId}: labellisation Gmail...`);
-  try {
-    await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: [labelId, "Label_1649438707140645411"], removeLabelIds: ["INBOX", "UNREAD"] } });
-    console.log(`Email ${messageId}: Gmail label OK`);
-  } catch(e) {
-    throw new Error(`Gmail label ERREUR: code=${e.code} msg=${JSON.stringify(e)}`);
+  await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: labelIds, removeLabelIds: ["INBOX", "UNREAD"] } });
+  console.log(`✅ ${source.pdfType || "BC"} ${docNumber || "?"} importé — ${source.clientLabel}`);
+}
+
+async function processSource(gmail, anthropic, db, source, sourceRef) {
+  const labelTraiteId = await getOrCreateLabel(gmail, source.gmailLabelTraite);
+  let labelArchiveId = null;
+  if (source.gmailDossierArchive) {
+    labelArchiveId = await getOrCreateLabel(gmail, source.gmailDossierArchive);
   }
 
-  console.log(`✅ BT ${bc} créé — ${btData.client} — ${btData.adresse}`);
+  const fromFilter = (source.senderEmails || []).map(e => `from:${e}`).join(" OR ");
+  let q = `(${fromFilter}) -label:${source.gmailLabelTraite}`;
+  if (source.subjectContains) q += ` subject:"${source.subjectContains}"`;
+  if (source.startDate) q += ` after:${source.startDate.replace(/-/g, "/")}`;
+
+  const searchRes = await gmail.users.messages.list({ userId: "me", q, maxResults: 20 });
+  const messages = searchRes.data.messages || [];
+  console.log(`Source ${sourceRef.id}: ${messages.length} email(s) à traiter`);
+
+  let processed = 0;
+  for (const msg of messages) {
+    try {
+      await processEmailGeneric(gmail, anthropic, db, msg.id, labelTraiteId, labelArchiveId, source, sourceRef.id);
+      processed++;
+    } catch(e) {
+      console.error(`Source ${sourceRef.id} - Email ${msg.id}:`, e.message);
+    }
+  }
+
+  await sourceRef.update({
+    lastRun: new Date().toISOString(),
+    totalProcessed: (source.totalProcessed || 0) + processed,
+  });
+
+  return processed;
 }
 
 exports.processIncomingBC = functions
@@ -493,14 +510,6 @@ exports.processIncomingBC = functions
   .onRun(async () => {
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
-
-    // Vérifie si l'import est activé dans la config admin
-    const configSnap = await db.collection("config").doc("actis-import").get();
-    if (configSnap.exists && configSnap.data().enabled === false) {
-      console.log("processIncomingBC: import désactivé par l'admin, abandon.");
-      return;
-    }
-
     const { google } = require("googleapis");
     const Anthropic = require("@anthropic-ai/sdk");
 
@@ -509,42 +518,41 @@ exports.processIncomingBC = functions
       functions.config().gmail.oauth_client_secret
     );
     oAuth2Client.setCredentials({ refresh_token: functions.config().gmail.oauth_refresh_token });
-
     const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
     const anthropic = new Anthropic({ apiKey: functions.config().anthropic.api_key });
 
-    const labelId = await getOrCreateLabel(gmail, "bc-traité");
-
-    const searchRes = await gmail.users.messages.list({
-      userId: "me",
-      q: 'from:noreply@actis.fr subject:"Actis - Demande de commande" -label:bc-traité after:2026/06/18',
-      maxResults: 20,
-    });
-
-    const messages = searchRes.data.messages || [];
-    console.log(`processIncomingBC: ${messages.length} email(s) à traiter`);
-
-    let processed = 0;
-    for (const msg of messages) {
-      try {
-        await processEmail(gmail, anthropic, msg.id, labelId, db);
-        processed++;
-      } catch (e) {
-        console.error(`Erreur traitement email ${msg.id}:`, e.message);
-      }
+    let sourcesSnap;
+    try {
+      sourcesSnap = await db.collection("email-sources").where("enabled", "==", true).get();
+    } catch(e) {
+      console.error("Erreur lecture email-sources:", e.message);
+      return;
     }
 
-    // Met à jour le statut dans Firestore (lastRun + total)
-    if (processed > 0 || messages.length === 0) {
+    if (sourcesSnap.empty) {
+      console.log("processIncomingBC: aucune source active dans email-sources.");
+      return;
+    }
+
+    const now = new Date();
+
+    for (const sourceDoc of sourcesSnap.docs) {
+      const source = sourceDoc.data();
+
+      // Pour les fréquences > 15 min, vérifier si assez de temps s'est écoulé
+      if (source.lastRun && (source.checkFrequencyMinutes || 15) > 15) {
+        const minutesSinceLast = (now - new Date(source.lastRun)) / 60000;
+        if (minutesSinceLast < source.checkFrequencyMinutes) {
+          console.log(`Source ${sourceDoc.id}: skip (${Math.round(minutesSinceLast)}min / ${source.checkFrequencyMinutes}min requis)`);
+          continue;
+        }
+      }
+
       try {
-        const prevTotal = configSnap.exists ? (configSnap.data().totalProcessed || 0) : 0;
-        await db.collection("config").doc("actis-import").set({
-          enabled: true,
-          lastRun: new Date().toISOString(),
-          totalProcessed: prevTotal + processed,
-        }, { merge: true });
+        const processed = await processSource(gmail, anthropic, db, source, sourceDoc.ref);
+        console.log(`Source ${sourceDoc.id}: ${processed} document(s) importé(s).`);
       } catch(e) {
-        console.warn("Impossible de mettre à jour config/actis-import:", e.message);
+        console.error(`Source ${sourceDoc.id}: erreur:`, e.message);
       }
     }
   });
