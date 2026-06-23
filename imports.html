@@ -328,6 +328,7 @@ const db = getFirestore(app, "belledonne-client");
 const ACTIS_DEFAULT_PROMPT = `Tu es un assistant d'extraction de données pour Belledonne Multiservices, société de désinsectisation à Grenoble.
 
 Tu reçois un PDF de Bon de Travaux ACTIS. Extrais ces champs via l'outil save_document_data (dans le champ data) :
+- bc : numéro du bon de commande (chiffres uniquement, ex: "319066"), visible dans le titre "Demande de commande N° XXXXXX" ou en en-tête du document
 - client : "ACTIS-TPC" ou "ACTIS-TMR" — la ligne "Service : Chargé Rési Secteur X TMR/TPC" dans la section Intervention, confirmée par "2D - TMR" ou "2D - TPC" dans le bloc Info Entreprise
 - chorus : le N° Service Chorus (accord-cadre)
 - expediteur : nom et prénom de l'émetteur

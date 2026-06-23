@@ -393,6 +393,34 @@ async function parsePdfWithClaude(anthropic, pdfBase64, filename, systemPrompt) 
   return toolUse.input.data || {};
 }
 
+async function parseDocWithClaude(anthropic, docBuffer, filename, systemPrompt) {
+  const mammoth = require("mammoth");
+  let text;
+  try {
+    const result = await mammoth.extractRawText({ buffer: docBuffer });
+    text = result.value;
+  } catch(e) {
+    throw new Error(`Impossible de lire le fichier DOC (${filename}): ${e.message}`);
+  }
+  if (!text || text.trim().length < 20) {
+    throw new Error(`Fichier DOC vide ou illisible: ${filename}`);
+  }
+  const response = await anthropic.messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 2048,
+    system: systemPrompt,
+    tools: [EXTRACTION_TOOL],
+    tool_choice: { type: "tool", name: "save_document_data" },
+    messages: [{
+      role: "user",
+      content: [{ type: "text", text: `Extrais les données de ce document (${filename}) :\n\n${text}\n\nAppelle l'outil save_document_data avec le résultat.` }],
+    }],
+  });
+  const toolUse = response.content.find(b => b.type === "tool_use");
+  if (!toolUse) throw new Error(`Claude n'a pas utilisé l'outil. stop_reason=${response.stop_reason}`);
+  return toolUse.input.data || {};
+}
+
 async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteId, labelArchiveId, source, sourceId) {
   const email = await gmail.users.messages.get({ userId: "me", id: messageId, format: "full" });
   const headers = email.data.payload.headers || [];
@@ -410,36 +438,50 @@ async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteI
   console.log(`Email ${messageId}: sujet="${subject}", N°="${docNumber}"`);
 
   const allParts = flattenParts(email.data.payload);
+
   const pdfPart = allParts.find(p =>
     (p.mimeType === "application/pdf" || (p.filename && p.filename.toUpperCase().endsWith(".PDF"))) &&
     p.body && p.body.attachmentId
   );
+  const docPart = !pdfPart && allParts.find(p => {
+    const fname = (p.filename || "").toUpperCase();
+    return (p.mimeType === "application/msword" ||
+            p.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+            fname.endsWith(".DOC") || fname.endsWith(".DOCX")) &&
+           p.body && p.body.attachmentId;
+  });
+  const attachPart = pdfPart || docPart;
 
   const labelIds = [labelTraiteId];
   if (labelArchiveId) labelIds.push(labelArchiveId);
 
-  if (!pdfPart) {
-    console.warn(`Email ${messageId}: aucun PDF, labellisation uniquement`);
+  if (!attachPart) {
+    console.warn(`Email ${messageId}: aucune pièce jointe PDF/DOC, labellisation uniquement`);
     await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: labelIds, removeLabelIds: ["INBOX", "UNREAD"] } });
     return;
   }
 
-  console.log(`Email ${messageId}: PDF "${pdfPart.filename}" — téléchargement...`);
-  const att = await gmail.users.messages.attachments.get({ userId: "me", messageId, id: pdfPart.body.attachmentId });
-  const pdfBase64 = att.data.data.replace(/-/g, "+").replace(/_/g, "/");
-  const pdfBuffer = Buffer.from(pdfBase64, "base64");
+  console.log(`Email ${messageId}: pièce jointe "${attachPart.filename}" — téléchargement...`);
+  const att = await gmail.users.messages.attachments.get({ userId: "me", messageId, id: attachPart.body.attachmentId });
+  const fileBase64 = att.data.data.replace(/-/g, "+").replace(/_/g, "/");
+  const fileBuffer = Buffer.from(fileBase64, "base64");
 
   console.log(`Email ${messageId}: extraction Claude...`);
-  const extractedData = await parsePdfWithClaude(anthropic, pdfBase64, pdfPart.filename || "document.pdf", source.claudeSystemPrompt || "");
+  let extractedData;
+  if (pdfPart) {
+    extractedData = await parsePdfWithClaude(anthropic, fileBase64, attachPart.filename || "document.pdf", source.claudeSystemPrompt || "");
+  } else {
+    extractedData = await parseDocWithClaude(anthropic, fileBuffer, attachPart.filename || "document.doc", source.claudeSystemPrompt || "");
+  }
 
   console.log(`Email ${messageId}: upload Storage...`);
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
   const storageFolder = source.pdfType === "PL" ? "suivi/pl" : "suivi/bc";
-  const storagePath = `${storageFolder}/${Date.now()}_${(pdfPart.filename || "doc.pdf").replace(/\s/g, "_")}`;
+  const storagePath = `${storageFolder}/${Date.now()}_${(attachPart.filename || "doc").replace(/\s/g, "_")}`;
   const downloadToken = crypto.randomUUID();
   try {
-    await bucket.file(storagePath).save(pdfBuffer, {
-      contentType: "application/pdf",
+    await bucket.file(storagePath).save(fileBuffer, {
+      contentType: pdfPart ? "application/pdf" : "application/octet-stream",
       metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
     });
   } catch(e) {
@@ -448,10 +490,11 @@ async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteI
   const bcUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
 
   console.log(`Email ${messageId}: écriture Firestore...`);
+  const finalBc = extractedData.bc || docNumber || "";
   try {
     const docRef = await db.collection("suivi").add({
       ...extractedData,
-      bc: docNumber,
+      bc: finalBc,
       bcUrl,
       statut: "À valider",
       source: "auto",
@@ -465,7 +508,7 @@ async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteI
   }
 
   await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: labelIds, removeLabelIds: ["INBOX", "UNREAD"] } });
-  console.log(`✅ ${source.pdfType || "BC"} ${docNumber || "?"} importé — ${source.clientLabel}`);
+  console.log(`✅ ${source.pdfType || "BC"} ${finalBc || "?"} importé — ${source.clientLabel}`);
 }
 
 async function processSource(gmail, anthropic, db, source, sourceRef) {
