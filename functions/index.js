@@ -496,6 +496,7 @@ async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteI
       ...extractedData,
       bc: finalBc,
       bcUrl,
+      clientType: "contrat",
       statut: "À valider",
       source: "auto",
       sourceId,
