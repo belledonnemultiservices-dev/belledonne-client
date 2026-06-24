@@ -2540,6 +2540,11 @@ function filterTable() {
     var mda = !dateA || (dateRef && dateRef <= dateA);
     return mq && ms && mc && ma && mde && mda;
   });
+  filtered.sort(function(a, b) {
+    var da = a.dateEmission || (a.createdAt || '').substring(0, 10) || '';
+    var db = b.dateEmission || (b.createdAt || '').substring(0, 10) || '';
+    return db.localeCompare(da);
+  });
   document.getElementById('resultsCount').textContent = filtered.length + ' intervention' + (filtered.length!==1?'s':'');
   if (activeTab === 'contrat') { if(window.renderTable) window.renderTable(filtered); }
   else if (activeTab === 'particulier') { renderTableParticulier(filtered); }
