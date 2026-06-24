@@ -854,7 +854,7 @@ document.getElementById('dateChip').textContent = new Date().toLocaleDateString(
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where, orderBy }
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, doc, setDoc, query, where, orderBy }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({
@@ -935,14 +935,15 @@ window.saveConfig = async function() {
 };
 
 // ── CONTACTS ──────────────────────────────────────────────────────
-async function loadContacts() {
-  try {
-    const snap = await getDocs(collection(db, "contacts"));
+let _unsubContacts = null;
+function loadContacts() {
+  if (_unsubContacts) return;
+  _unsubContacts = onSnapshot(collection(db, "contacts"), (snap) => {
     window.contacts = contacts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     contacts.sort((a,b) => (a.client||'').localeCompare(b.client||'') || (a.nom||'').localeCompare(b.nom||''));
     populateFilterClient();
     renderContacts();
-  } catch(e) { console.error(e); showToast('Erreur chargement contacts'); }
+  }, (e) => { console.error(e); showToast('Erreur chargement contacts'); });
 }
 
 async function loadClientsSelect() {

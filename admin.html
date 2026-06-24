@@ -279,7 +279,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query, where, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, onSnapshot, query, where, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -434,9 +434,10 @@ window.createAccount = async function() {
   }
 };
 
-async function loadAccounts() {
-  try {
-    const snap = await getDocs(query(collection(db, 'users'), where('role', 'in', ['client', 'admin'])));
+let _unsubAccounts = null;
+function loadAccounts() {
+  if (_unsubAccounts) return;
+  _unsubAccounts = onSnapshot(query(collection(db, 'users'), where('role', 'in', ['client', 'admin'])), (snap) => {
     const accounts = snap.docs.map(d => ({ docId: d.id, ...d.data() })).filter(a => a.email !== 'belledonne.multiservices@gmail.com');
     document.getElementById('statTotal').textContent = accounts.filter(a => a.role === 'client').length;
     document.getElementById('statClients').textContent = [...new Set(accounts.filter(a=>a.role==='client').map(a => a.client))].length;
@@ -460,7 +461,7 @@ async function loadAccounts() {
           <button class="btn-delete" onclick="deleteAccount('${a.docId}','${a.identifiant}','${a.uid}')">Supprimer</button>
         </div>
       </div>`).join('');
-  } catch(e) { console.error('loadAccounts error:', e); }
+  }, (e) => console.error('loadAccounts error:', e));
 }
 
 window.deleteAccount = async function(docId, identifiant, uid) {

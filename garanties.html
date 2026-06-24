@@ -807,7 +807,7 @@ window.sendNotification = function() {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, onSnapshot, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const LIEN_ESPACE = "https://clients-belledonne-multiservices.com";
@@ -822,18 +822,24 @@ window.handleLogout = async function() { await signOut(auth); window.location.hr
 window._currentClientFilter = null;
 
 // ── Charger les garanties ──
-window._loadGaranties = async function(clientFilter) {
-  try {
-    const snap = await getDocs(collection(db, "garanties"));
-    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (clientFilter) docs = docs.filter(g => g.client === clientFilter);
-    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-    window.garanties = docs;
-    if (window._isAdmin) populateClientFilter();
-    updateKPIs(window.garanties);
-    filter();
-  } catch(e) { console.error(e); }
+let _unsubGaranties = null;
+window._loadGaranties = function(clientFilter) {
+  window._currentClientFilter = clientFilter;
+  if (_unsubGaranties) { _applyGarantiesFilter(); return; }
+  _unsubGaranties = onSnapshot(collection(db, "garanties"), (snap) => {
+    window._garantiesAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _applyGarantiesFilter();
+  }, (e) => console.error(e));
 };
+function _applyGarantiesFilter() {
+  let docs = (window._garantiesAll || []).slice();
+  if (window._currentClientFilter) docs = docs.filter(g => g.client === window._currentClientFilter);
+  docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+  window.garanties = docs;
+  if (window._isAdmin) populateClientFilter();
+  updateKPIs(window.garanties);
+  filter();
+}
 
 async function populateClientFilter() {
   const sel = document.getElementById('filterClient');

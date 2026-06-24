@@ -784,7 +784,7 @@ window.sendNotification = function() {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, onSnapshot, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const LIEN_ESPACE = "https://clients-belledonne-multiservices.com";
@@ -799,18 +799,24 @@ window.handleLogout = async function() { await signOut(auth); window.location.hr
 window._currentClientFilter = null;
 
 // ── Charger les absents ──
-window._loadAbsents = async function(clientFilter) {
-  try {
-    const snap = await getDocs(collection(db, "absents"));
-    let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (clientFilter) docs = docs.filter(e => e.client === clientFilter);
-    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-    window.absents = docs;
-    if (window._isAdmin) populateClientFilter();
-    updateKPIs();
-    filter();
-  } catch(e) { console.error(e); }
+let _unsubAbsents = null;
+window._loadAbsents = function(clientFilter) {
+  window._currentClientFilter = clientFilter;
+  if (_unsubAbsents) { _applyAbsentsFilter(); return; }
+  _unsubAbsents = onSnapshot(collection(db, "absents"), (snap) => {
+    window._absentsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _applyAbsentsFilter();
+  }, (e) => console.error(e));
 };
+function _applyAbsentsFilter() {
+  let docs = (window._absentsAll || []).slice();
+  if (window._currentClientFilter) docs = docs.filter(e => e.client === window._currentClientFilter);
+  docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+  window.absents = docs;
+  if (window._isAdmin) populateClientFilter();
+  updateKPIs();
+  filter();
+}
 
 async function populateClientFilter() {
   const sel = document.getElementById('filterClient');
