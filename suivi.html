@@ -320,6 +320,7 @@
           <tr>
             <th style="width:32px;"><input type="checkbox" id="checkAll" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
             <th>Client</th>
+            <th>Date</th>
             <th>Affaire PL</th>
             <th>Bon de commande</th>
             <th>Devis</th>
@@ -332,7 +333,7 @@
           </tr>
         </thead>
         <tbody id="tableBodyContrat">
-          <tr><td colspan="11"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
+          <tr><td colspan="12"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -344,6 +345,7 @@
           <tr>
             <th style="width:32px;"><input type="checkbox" id="checkAllP" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
             <th>Nom</th>
+            <th>Date</th>
             <th>Nature mission</th>
             <th style="min-width:200px;">Adresse</th>
             <th>Assigné</th>
@@ -353,7 +355,7 @@
           </tr>
         </thead>
         <tbody id="tableBodyParticulier">
-          <tr><td colspan="8"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
+          <tr><td colspan="9"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -365,6 +367,7 @@
           <tr>
             <th style="width:32px;"><input type="checkbox" id="checkAllE" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
             <th>Nom</th>
+            <th>Date</th>
             <th>SIRET</th>
             <th>Bon de commande</th>
             <th>Devis</th>
@@ -377,7 +380,7 @@
           </tr>
         </thead>
         <tbody id="tableBodyEntreprise">
-          <tr><td colspan="11"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
+          <tr><td colspan="12"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -1709,6 +1712,12 @@ function notifHistoryHtml(field, arr, icon, cls) {
   ).join('');
   return '<div class="notif-history" onclick="event.stopPropagation()"><button class="notif-history-btn ' + cls + '" onclick="toggleNotifDropdown(this)">' + label + '</button><div class="notif-dropdown">' + items + '</div></div>';
 }
+function fmtDate(d) {
+  if (!d) return '—';
+  var p = d.split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : d;
+}
+
 function fmtPassage(val) {
   if (!val) return '—';
   let debut, fin;
@@ -1813,7 +1822,7 @@ window.renderTable = function renderTable(list) {
   const body = document.getElementById('tableBodyContrat');
   document.getElementById('resultsCount').textContent = list.length + ' intervention' + (list.length!==1?'s':'');
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="11"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="12"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
     return;
   }
 
@@ -1836,6 +1845,8 @@ window.renderTable = function renderTable(list) {
     html += '<button class="btn-toggle-notif" onclick="toggleNotifRow(\'' + item.id + '\')">🔔' + (totalNotifs > 0 ? ' (' + totalNotifs + ')' : '') + '</button>';
     html += item.client || '—';
     html += '</div></td>';
+
+    html += '<td style="font-size:12px;white-space:nowrap;color:var(--text-muted);">' + fmtDate(item.dateEmission) + '</td>';
 
     html += '<td><div style="display:flex;flex-direction:column;gap:4px;">';
     if (item.pl) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + item.pl + '</span>';
@@ -2748,7 +2759,7 @@ function renderTableParticulier(list) {
   const body = document.getElementById('tableBodyParticulier');
   if (!body) return;
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
     return;
   }
   let html = '';
@@ -2759,6 +2770,7 @@ function renderTableParticulier(list) {
     html += '<tr id="row-'+item.id+'" class="'+rowClass+'">';
     html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="'+item.id+'" '+(isChecked?'checked':'')+' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
     html += '<td class="client-cell">'+(item.client||'—')+'</td>';
+    html += '<td style="font-size:12px;white-space:nowrap;color:var(--text-muted);">'+fmtDate(item.dateEmission)+'</td>';
     html += '<td style="font-size:13px;">'+(item.nature||'—')+'</td>';
     html += '<td style="min-width:180px;font-size:13px;">'+(item.adresse||'—')+'</td>';
     html += '<td>'+(_assignes.length?'<div style="display:flex;flex-wrap:wrap;gap:3px;">'+_assignes.map(a=>assigneBadge(a)).join('')+'</div>':'<span style="color:var(--text-muted)">—</span>')+'</td>';
@@ -2777,7 +2789,7 @@ function renderTableEntreprise(list) {
   const body = document.getElementById('tableBodyEntreprise');
   if (!body) return;
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="11"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="12"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
     return;
   }
   let html = '';
@@ -2788,6 +2800,7 @@ function renderTableEntreprise(list) {
     html += '<tr id="row-'+item.id+'" class="'+rowClass+'">';
     html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="'+item.id+'" '+(isChecked?'checked':'')+' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
     html += '<td class="client-cell">'+(item.client||'—')+'</td>';
+    html += '<td style="font-size:12px;white-space:nowrap;color:var(--text-muted);">'+fmtDate(item.dateEmission)+'</td>';
     html += '<td style="font-size:12px;color:var(--text-muted);">'+(item.siret||'—')+'</td>';
     html += '<td><div style="display:flex;flex-direction:column;gap:4px;">'+(item.bc?'<span style="font-family:monospace;font-size:12px;font-weight:600;">'+item.bc+'</span>':'')+pdfBtn(item.bcUrl,'PDF')+'</div></td>';
     html += '<td><div style="display:flex;flex-direction:column;gap:4px;">'+(item.devis?'<span style="font-family:monospace;font-size:12px;font-weight:600;">'+item.devis+'</span>':'')+pdfBtn(item.devisUrl,'PDF')+'</div></td>';
