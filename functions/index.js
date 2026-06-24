@@ -456,8 +456,7 @@ async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteI
   if (labelArchiveId) labelIds.push(labelArchiveId);
 
   if (!attachPart) {
-    console.warn(`Email ${messageId}: aucune pièce jointe PDF/DOC, labellisation uniquement`);
-    await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: labelIds, removeLabelIds: ["INBOX", "UNREAD"] } });
+    console.log(`Email ${messageId}: aucune pièce jointe PDF/DOC — email ignoré (probablement hors-sujet)`);
     return;
   }
 
