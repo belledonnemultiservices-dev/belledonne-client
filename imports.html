@@ -216,6 +216,14 @@
       </div>
 
       <div class="form-group">
+        <label class="form-label">Client associé</label>
+        <select class="form-select" id="fClientFirestore">
+          <option value="">— Multi-clients (Claude détermine) —</option>
+        </select>
+        <div class="form-hint">Le client qui sera lié aux interventions importées. Laissez vide si Claude doit choisir depuis le document (ex: ACTIS TPC/TMR).</div>
+      </div>
+
+      <div class="form-group">
         <label class="form-label">Emails expéditeurs *</label>
         <div class="tag-input-row">
           <input class="form-input" type="email" id="fEmailInput" placeholder="jean.dupont@alpeshabitat.fr" onkeydown="handleEmailKey(event)">
@@ -310,7 +318,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, getDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -341,10 +349,30 @@ Règles : dates en ISO YYYY-MM-DD. Champ absent = chaîne vide. Ne jamais invent
 
 let currentEmails = [];
 let unsubSources = null;
+let registeredClients = [];
+
+async function loadRegisteredClients() {
+  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+  const names = [...new Set(snap.docs.map(d => d.data().client).filter(Boolean))].sort();
+  registeredClients = names;
+}
+
+function populateClientDropdown(selectedValue) {
+  const sel = document.getElementById("fClientFirestore");
+  sel.innerHTML = '<option value="">— Multi-clients (Claude détermine) —</option>';
+  registeredClients.forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    if (name === selectedValue) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
 
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = "login.html"; return; }
   if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
+  loadRegisteredClients();
   loadSources();
 });
 
@@ -427,6 +455,7 @@ function renderSources(sources) {
         <div class="stat-line"><span class="stat-lbl">Documents importés</span><span class="stat-val">${s.totalProcessed ?? 0}</span></div>
         <div class="stat-line"><span class="stat-lbl">Label Gmail traité</span><span class="stat-val">${s.gmailLabelTraite || "—"}</span></div>
         <div class="stat-line"><span class="stat-lbl">Dossier archivage</span><span class="stat-val">${s.gmailDossierArchive || "—"}</span></div>
+        <div class="stat-line"><span class="stat-lbl">Client lié</span><span class="stat-val">${s.clientFirestore ? `<strong>${s.clientFirestore}</strong>` : '<span style="color:var(--text-muted)">Claude détermine</span>'}</span></div>
         <div class="stat-line"><span class="stat-lbl">Prompt Claude</span><span class="stat-val">${hasPrompt}</span></div>
       </div>
     </div>`;
@@ -471,6 +500,7 @@ window.openModal = async function(docId) {
     document.getElementById("fPrompt").value = s.claudeSystemPrompt || "";
     currentEmails = [...(s.senderEmails || [])];
     selectType(s.pdfType || "BC");
+    populateClientDropdown(s.clientFirestore || "");
   } else {
     document.getElementById("fClientLabel").value = "";
     document.getElementById("fSubjectContains").value = "";
@@ -482,6 +512,7 @@ window.openModal = async function(docId) {
     document.getElementById("fPrompt").value = "";
     currentEmails = [];
     selectType("BC");
+    populateClientDropdown("");
   }
 
   renderEmailTags();
@@ -540,6 +571,7 @@ window.saveSource = async function() {
   const gmailDossierArchive = document.getElementById("fDossierArchive").value.trim();
   const claudeSystemPrompt = document.getElementById("fPrompt").value.trim();
   const pdfType = document.querySelector("input[name='pdfType']:checked").value;
+  const clientFirestore = document.getElementById("fClientFirestore").value;
 
   if (!clientLabel) { showToast("Nom affiché requis"); return; }
   if (currentEmails.length === 0) { showToast("Au moins un email expéditeur requis"); return; }
@@ -549,6 +581,7 @@ window.saveSource = async function() {
 
   const data = {
     clientLabel,
+    clientFirestore,
     senderEmails: currentEmails,
     subjectContains,
     startDate,

@@ -494,6 +494,7 @@ async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteI
     const docRef = await db.collection("suivi").add({
       ...extractedData,
       bc: finalBc,
+      client: source.clientFirestore || extractedData.client || "",
       bcUrl,
       clientType: "contrat",
       statut: "À valider",
