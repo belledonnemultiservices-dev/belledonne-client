@@ -278,6 +278,9 @@
         <div class="page-sub">Tableau de bord opérationnel — gestion des dossiers et bons de commande</div>
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
+        <button onclick="openColorSettings()" title="Couleurs des statuts" style="display:inline-flex;align-items:center;gap:7px;background:var(--surface);color:var(--text-mid);border:1px solid var(--border);padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+        </button>
         <button onclick="toggleCalendarPanel()" style="display:inline-flex;align-items:center;gap:7px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
           Agenda
@@ -858,6 +861,21 @@
 </div>
 
 <!-- CALENDAR PANEL - side panel that opens alongside the modal -->
+<!-- ── MODAL COULEURS STATUTS ── -->
+<div id="colorSettingsOverlay" onclick="if(event.target===this)closeColorSettings()" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,0.4);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;width:400px;max-width:95vw;box-shadow:0 20px 60px rgba(13,27,42,0.2);overflow:hidden;">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;">Couleurs des statuts</div>
+      <button onclick="closeColorSettings()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted);line-height:1;">✕</button>
+    </div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px;" id="colorSettingsBody"></div>
+    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="resetStatusColors()" style="background:var(--bg);border:1px solid var(--border);color:var(--text-mid);padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;">Réinitialiser</button>
+      <button onclick="saveStatusColors()" style="background:var(--navy);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div id="calendarPanel" style="display:none;position:fixed;top:0;right:0;width:52vw;height:100vh;background:#fff;z-index:400;flex-direction:column;box-shadow:-8px 0 32px rgba(0,0,0,0.2);">
   <div style="padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7eb;flex-shrink:0;background:#fff;">
     <div style="font-size:13px;font-weight:600;color:#1e293b;display:flex;align-items:center;gap:8px;">
@@ -989,6 +1007,80 @@ function closePdfViewer() {
 window.openModalAndCalendar = function(id) {
   openModal(id);
   setTimeout(function() { if (!calendarPanelOpen) toggleCalendarPanel(); }, 250);
+};
+
+// ── COULEURS STATUTS ──────────────────────────────────────────────
+const STATUS_COLOR_CONFIG = [
+  { key: 'aValider',  label: 'À valider',  css: 'row-a-valider',  def: '#FEFCE8' },
+  { key: 'aTraiter',  label: 'À traiter',  css: 'row-a-traiter',  def: '#FFF7ED' },
+  { key: 'enCours',   label: 'En cours',   css: 'row-en-cours',   def: '#F0FDF4' },
+  { key: 'enAttente', label: 'En attente', css: 'row-en-attente', def: '#F5F3FF' },
+  { key: 'termine',   label: 'Terminé',    css: 'row-termine',    def: '#EFF6FF' },
+  { key: 'annule',    label: 'Annulé',     css: 'row-annule',     def: '#FEF2F2' },
+];
+
+let _currentStatusColors = {};
+
+async function loadStatusColors() {
+  const snap = await getDoc(doc(db, 'config', 'statut-colors'));
+  _currentStatusColors = snap.exists() ? snap.data() : {};
+  applyStatusColors(_currentStatusColors);
+}
+
+function applyStatusColors(colors) {
+  let existing = document.getElementById('dynamic-status-colors');
+  if (!existing) { existing = document.createElement('style'); existing.id = 'dynamic-status-colors'; document.head.appendChild(existing); }
+  existing.textContent = STATUS_COLOR_CONFIG.map(s => {
+    const color = colors[s.key] || s.def;
+    return `.${s.css} td,.${s.css}:hover td{background:${color}!important;}`;
+  }).join('');
+}
+
+window.openColorSettings = function() {
+  const body = document.getElementById('colorSettingsBody');
+  body.innerHTML = STATUS_COLOR_CONFIG.map(s => {
+    const color = _currentStatusColors[s.key] || s.def;
+    return `<div style="display:flex;align-items:center;gap:10px;">
+      <span style="flex:1;font-size:13px;font-weight:500;color:var(--text-mid);">${s.label}</span>
+      <input type="color" id="cpicker_${s.key}" value="${color}"
+        oninput="document.getElementById('chex_${s.key}').value=this.value;applyStatusColors(getColorSettingsValues())"
+        style="width:36px;height:36px;border:none;border-radius:8px;cursor:pointer;padding:2px;">
+      <input type="text" id="chex_${s.key}" value="${color}" maxlength="7"
+        oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)){document.getElementById('cpicker_${s.key}').value=this.value;applyStatusColors(getColorSettingsValues());}"
+        style="width:82px;font-family:monospace;font-size:13px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;outline:none;">
+    </div>`;
+  }).join('');
+  document.getElementById('colorSettingsOverlay').style.display = 'flex';
+};
+
+window.closeColorSettings = function() {
+  document.getElementById('colorSettingsOverlay').style.display = 'none';
+};
+
+function getColorSettingsValues() {
+  const vals = {};
+  STATUS_COLOR_CONFIG.forEach(s => { vals[s.key] = document.getElementById('cpicker_' + s.key)?.value || s.def; });
+  return vals;
+}
+
+window.saveStatusColors = async function() {
+  const colors = getColorSettingsValues();
+  await setDoc(doc(db, 'config', 'statut-colors'), colors);
+  _currentStatusColors = colors;
+  showToast('Couleurs enregistrées');
+  closeColorSettings();
+};
+
+window.resetStatusColors = function() {
+  const defaults = {};
+  STATUS_COLOR_CONFIG.forEach(s => { defaults[s.key] = s.def; });
+  STATUS_COLOR_CONFIG.forEach(s => {
+    const p = document.getElementById('cpicker_' + s.key);
+    const h = document.getElementById('chex_' + s.key);
+    if (p) p.value = s.def;
+    if (h) h.value = s.def;
+  });
+  applyStatusColors(defaults);
 };
 
 let calendarPanelOpen = false;
@@ -3036,7 +3128,7 @@ async function saveInterventionEntreprise() {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, orderBy, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc, doc, orderBy, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 let interventions = [];
@@ -3112,6 +3204,9 @@ onAuthStateChanged(auth, async (user) => {
       clientSel.appendChild(opt);
     });
   } catch(e) { console.warn('clients load:', e); }
+
+  // Load couleurs statuts
+  await loadStatusColors();
 
   // Load techniciens
   await loadTechniciens();
