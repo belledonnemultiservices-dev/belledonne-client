@@ -795,7 +795,7 @@ document.getElementById('modalFact').addEventListener('click', e => {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
@@ -834,20 +834,21 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById('sideAvatar').textContent = 'BM';
   document.getElementById('sideFooterName').textContent = profile.client || user.email;
 
+  // Charge les devis depuis suivi une seule fois (donnée de référence)
   try {
-    const snap = await getDocs(query(collection(db, 'facturation'), orderBy('createdAt', 'desc')));
-    factures = snap.docs.map(d => ({id:d.id,...d.data()}));
-    window.factures = factures;
-    // Charge les devis depuis suivi pour les lignes déjà existantes
     const suiviSnap = await getDocs(query(collection(db, 'suivi'), where('enFacturation', '==', true)));
     window._suiviDevisMap = {};
     suiviSnap.docs.forEach(d => { const s = d.data(); window._suiviDevisMap[d.id] = {devis: s.devis||'', devisUrl: s.devisUrl||''}; });
+  } catch(e) { console.warn('suiviDevisMap:', e); }
+
+  // Facturation en temps réel
+  onSnapshot(query(collection(db, 'facturation'), orderBy('createdAt', 'desc')), (snap) => {
+    factures = snap.docs.map(d => ({id:d.id,...d.data()}));
+    window.factures = factures;
     populateClientFilter();
-    setPeriodDates('month', document.getElementById('btnPeriodMonth'));
-  } catch(e) {
-    console.error('Erreur chargement facturation:', e);
-    document.getElementById('tableBody').innerHTML = '<tr><td colspan="12"><div class="empty-state"><p>Erreur de chargement.</p></div></td></tr>';
-  }
+    if (typeof renderTable === 'function') renderTable();
+    else setPeriodDates('month', document.getElementById('btnPeriodMonth'));
+  });
 });
 </script>
 <script type="module" src="suivi-badge.js"></script>

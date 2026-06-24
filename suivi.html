@@ -3054,7 +3054,7 @@ async function saveInterventionEntreprise() {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc, doc, orderBy, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, doc, orderBy, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 let interventions = [];
@@ -3155,13 +3155,14 @@ onAuthStateChanged(auth, async (user) => {
     }
   } catch(e) { console.warn('template load:', e); }
 
-  // Load data
-  const snap = await getDocs(query(collection(db,'suivi'), orderBy('createdAt','desc')));
-  interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
-  window.interventions = interventions;
-  if (window.populateFilterDropdowns) window.populateFilterDropdowns();
-  if (window.filterTable) window.filterTable();
-  else if (window.renderTable) window.renderTable(interventions);
+  // Load data — écoute temps réel
+  onSnapshot(query(collection(db,'suivi'), orderBy('createdAt','desc')), (snap) => {
+    interventions = snap.docs.map(d=>({id:d.id,...d.data()}));
+    window.interventions = interventions;
+    if (window.populateFilterDropdowns) window.populateFilterDropdowns();
+    if (window.filterTable) window.filterTable();
+    else if (window.renderTable) window.renderTable(interventions);
+  });
 });
 
 // ── UPDATE NOTIF FIELDS IN FIRESTORE (array push) ──
