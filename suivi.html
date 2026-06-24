@@ -1009,80 +1009,6 @@ window.openModalAndCalendar = function(id) {
   setTimeout(function() { if (!calendarPanelOpen) toggleCalendarPanel(); }, 250);
 };
 
-// ── COULEURS STATUTS ──────────────────────────────────────────────
-const STATUS_COLOR_CONFIG = [
-  { key: 'aValider',  label: 'À valider',  css: 'row-a-valider',  def: '#FEFCE8' },
-  { key: 'aTraiter',  label: 'À traiter',  css: 'row-a-traiter',  def: '#FFF7ED' },
-  { key: 'enCours',   label: 'En cours',   css: 'row-en-cours',   def: '#F0FDF4' },
-  { key: 'enAttente', label: 'En attente', css: 'row-en-attente', def: '#F5F3FF' },
-  { key: 'termine',   label: 'Terminé',    css: 'row-termine',    def: '#EFF6FF' },
-  { key: 'annule',    label: 'Annulé',     css: 'row-annule',     def: '#FEF2F2' },
-];
-
-let _currentStatusColors = {};
-
-async function loadStatusColors() {
-  const snap = await getDoc(doc(db, 'config', 'statut-colors'));
-  _currentStatusColors = snap.exists() ? snap.data() : {};
-  applyStatusColors(_currentStatusColors);
-}
-
-function applyStatusColors(colors) {
-  let existing = document.getElementById('dynamic-status-colors');
-  if (!existing) { existing = document.createElement('style'); existing.id = 'dynamic-status-colors'; document.head.appendChild(existing); }
-  existing.textContent = STATUS_COLOR_CONFIG.map(s => {
-    const color = colors[s.key] || s.def;
-    return `.${s.css} td,.${s.css}:hover td{background:${color}!important;}`;
-  }).join('');
-}
-
-window.openColorSettings = function() {
-  const body = document.getElementById('colorSettingsBody');
-  body.innerHTML = STATUS_COLOR_CONFIG.map(s => {
-    const color = _currentStatusColors[s.key] || s.def;
-    return `<div style="display:flex;align-items:center;gap:10px;">
-      <span style="flex:1;font-size:13px;font-weight:500;color:var(--text-mid);">${s.label}</span>
-      <input type="color" id="cpicker_${s.key}" value="${color}"
-        oninput="document.getElementById('chex_${s.key}').value=this.value;applyStatusColors(getColorSettingsValues())"
-        style="width:36px;height:36px;border:none;border-radius:8px;cursor:pointer;padding:2px;">
-      <input type="text" id="chex_${s.key}" value="${color}" maxlength="7"
-        oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)){document.getElementById('cpicker_${s.key}').value=this.value;applyStatusColors(getColorSettingsValues());}"
-        style="width:82px;font-family:monospace;font-size:13px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;outline:none;">
-    </div>`;
-  }).join('');
-  document.getElementById('colorSettingsOverlay').style.display = 'flex';
-};
-
-window.closeColorSettings = function() {
-  document.getElementById('colorSettingsOverlay').style.display = 'none';
-};
-
-function getColorSettingsValues() {
-  const vals = {};
-  STATUS_COLOR_CONFIG.forEach(s => { vals[s.key] = document.getElementById('cpicker_' + s.key)?.value || s.def; });
-  return vals;
-}
-
-window.saveStatusColors = async function() {
-  const colors = getColorSettingsValues();
-  await setDoc(doc(db, 'config', 'statut-colors'), colors);
-  _currentStatusColors = colors;
-  showToast('Couleurs enregistrées');
-  closeColorSettings();
-};
-
-window.resetStatusColors = function() {
-  const defaults = {};
-  STATUS_COLOR_CONFIG.forEach(s => { defaults[s.key] = s.def; });
-  STATUS_COLOR_CONFIG.forEach(s => {
-    const p = document.getElementById('cpicker_' + s.key);
-    const h = document.getElementById('chex_' + s.key);
-    if (p) p.value = s.def;
-    if (h) h.value = s.def;
-  });
-  applyStatusColors(defaults);
-};
-
 let calendarPanelOpen = false;
 function buildCalendarUrl() {
   const techs = (window._techniciens || []).filter(t => t.email);
@@ -3318,6 +3244,79 @@ async function loadTechniciens() {
   populateTechChips();
 }
 window._loadTechniciens = loadTechniciens;
+
+// ── COULEURS STATUTS ──────────────────────────────────────────────
+const STATUS_COLOR_CONFIG = [
+  { key: 'aValider',  label: 'À valider',  css: 'row-a-valider',  def: '#FEFCE8' },
+  { key: 'aTraiter',  label: 'À traiter',  css: 'row-a-traiter',  def: '#FFF7ED' },
+  { key: 'enCours',   label: 'En cours',   css: 'row-en-cours',   def: '#F0FDF4' },
+  { key: 'enAttente', label: 'En attente', css: 'row-en-attente', def: '#F5F3FF' },
+  { key: 'termine',   label: 'Terminé',    css: 'row-termine',    def: '#EFF6FF' },
+  { key: 'annule',    label: 'Annulé',     css: 'row-annule',     def: '#FEF2F2' },
+];
+let _currentStatusColors = {};
+
+window.loadStatusColors = async function() {
+  const snap = await getDoc(doc(db, 'config', 'statut-colors'));
+  _currentStatusColors = snap.exists() ? snap.data() : {};
+  window.applyStatusColors(_currentStatusColors);
+};
+
+window.applyStatusColors = function(colors) {
+  let el = document.getElementById('dynamic-status-colors');
+  if (!el) { el = document.createElement('style'); el.id = 'dynamic-status-colors'; document.head.appendChild(el); }
+  el.textContent = STATUS_COLOR_CONFIG.map(s => {
+    const c = colors[s.key] || s.def;
+    return `.${s.css} td,.${s.css}:hover td{background:${c}!important;}`;
+  }).join('');
+};
+
+window.getColorSettingsValues = function() {
+  const vals = {};
+  STATUS_COLOR_CONFIG.forEach(s => { vals[s.key] = document.getElementById('cpicker_' + s.key)?.value || s.def; });
+  return vals;
+};
+
+window.openColorSettings = function() {
+  const body = document.getElementById('colorSettingsBody');
+  body.innerHTML = STATUS_COLOR_CONFIG.map(s => {
+    const color = _currentStatusColors[s.key] || s.def;
+    return `<div style="display:flex;align-items:center;gap:10px;">
+      <span style="flex:1;font-size:13px;font-weight:500;color:var(--text-mid);">${s.label}</span>
+      <input type="color" id="cpicker_${s.key}" value="${color}"
+        oninput="document.getElementById('chex_${s.key}').value=this.value;applyStatusColors(getColorSettingsValues())"
+        style="width:36px;height:36px;border:none;border-radius:8px;cursor:pointer;padding:2px;">
+      <input type="text" id="chex_${s.key}" value="${color}" maxlength="7"
+        oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value)){document.getElementById('cpicker_${s.key}').value=this.value;applyStatusColors(getColorSettingsValues());}"
+        style="width:82px;font-family:monospace;font-size:13px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;outline:none;">
+    </div>`;
+  }).join('');
+  document.getElementById('colorSettingsOverlay').style.display = 'flex';
+};
+
+window.closeColorSettings = function() {
+  document.getElementById('colorSettingsOverlay').style.display = 'none';
+};
+
+window.saveStatusColors = async function() {
+  const colors = window.getColorSettingsValues();
+  await setDoc(doc(db, 'config', 'statut-colors'), colors);
+  _currentStatusColors = colors;
+  showToast('Couleurs enregistrées');
+  window.closeColorSettings();
+};
+
+window.resetStatusColors = function() {
+  const defaults = {};
+  STATUS_COLOR_CONFIG.forEach(s => {
+    defaults[s.key] = s.def;
+    const p = document.getElementById('cpicker_' + s.key);
+    const h = document.getElementById('chex_' + s.key);
+    if (p) p.value = s.def;
+    if (h) h.value = s.def;
+  });
+  window.applyStatusColors(defaults);
+};
 </script>
 
 <!-- MODAL VALIDATION BT -->
