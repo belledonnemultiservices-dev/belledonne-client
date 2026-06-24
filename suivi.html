@@ -3206,7 +3206,7 @@ onAuthStateChanged(auth, async (user) => {
   } catch(e) { console.warn('clients load:', e); }
 
   // Load couleurs statuts
-  await loadStatusColors();
+  try { await loadStatusColors(); } catch(e) { console.warn('loadStatusColors:', e); }
 
   // Load techniciens
   await loadTechniciens();
