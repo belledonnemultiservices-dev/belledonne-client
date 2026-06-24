@@ -1225,18 +1225,19 @@ function getCalEventIds() {
 }
 function getPassagesFromDOM() {
   const passages = [];
-  let n = 1;
-  while (document.getElementById('fDateDebut' + n)) {
+  document.querySelectorAll('#passagesContainer > [id^="passage_"]').forEach(div => {
+    const n = div.id.replace('passage_', '');
     passages.push({
-      debut: document.getElementById('fDateDebut' + n).value,
+      num: parseInt(document.getElementById('fPassageNum' + n)?.value) || null,
+      debut: document.getElementById('fDateDebut' + n)?.value || '',
       fin: document.getElementById('fDateFin' + n)?.value || '',
       titre: document.getElementById('fTitre' + n)?.value || '',
       desc: document.getElementById('fDesc' + n)?.value || '',
       adresse: document.getElementById('fAdresseCal' + n)?.value || '',
       techs: getPassageTechsFromDOM(n),
     });
-    n++;
-  }
+  });
+  passages.sort((a, b) => (a.num || 0) - (b.num || 0));
   return passages;
 }
 async function _saveCalEventId(n, eventMap) {
@@ -1353,8 +1354,7 @@ function renderPassageCalButtons(n, calEventMap) {
 function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
-  const label = ORDINALS[n-1] || (n+'e');
-  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [];
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null;
   if (value && typeof value === 'object') {
     debut = value.debut || '';
     fin = value.fin || '';
@@ -1362,9 +1362,12 @@ function addPassage(value = '', calEventId = '') {
     savedDesc = value.desc || '';
     savedAdresse = value.adresse || '';
     savedTechs = Array.isArray(value.techs) ? value.techs : (value.tech ? [value.tech] : []);
+    savedNum = value.num || null;
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   }
+  const existingNums = Array.from(document.querySelectorAll('#passagesContainer [id^="fPassageNum"]')).map(el => parseInt(el.value) || 0);
+  const displayNum = savedNum || (existingNums.length ? Math.max(...existingNums) + 1 : 1);
   const calMap = (calEventId && typeof calEventId === 'object') ? calEventId : (calEventId ? {_: calEventId} : {});
   const defaultAdresse = (savedAdresse || document.getElementById('fAdresse')?.value || '').replace(/"/g,'&quot;');
   const container = document.getElementById('passagesContainer');
@@ -1373,8 +1376,11 @@ function addPassage(value = '', calEventId = '') {
   div.dataset.calEventId = JSON.stringify(calMap);
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
   div.innerHTML = `
-    <div style="display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:8px;align-items:center;">
-      <label style="font-size:12px;font-weight:500;color:var(--text-mid);white-space:nowrap;">${label} passage</label>
+    <div style="display:grid;grid-template-columns:68px 1fr 1fr 28px;gap:8px;align-items:center;">
+      <div style="display:flex;flex-direction:column;gap:2px;align-items:center;">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Passage</div>
+        <input type="number" id="fPassageNum${n}" value="${displayNum}" min="1" style="width:52px;padding:4px 2px;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:700;text-align:center;background:var(--bg);color:var(--text-mid);font-family:inherit;">
+      </div>
       <div>
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div>
         <input class="form-input" type="datetime-local" id="fDateDebut${n}" value="${debut}" style="width:100%;">
@@ -1736,7 +1742,7 @@ function passagesDropdown(passages) {
   const valid = passages.filter(Boolean);
   const first = fmtPassage(valid[0]);
   if (valid.length === 1) return `<span style="font-size:12px;white-space:nowrap;">${first}</span>`;
-  const opts = valid.map((p,i) => `<option>${ORDINALS[i]||i+1+'e'} : ${fmtPassage(p)}</option>`).join('');
+  const opts = valid.map((p,i) => { const num = p.num || (i+1); const lbl = ORDINALS[num-1] || num+'e'; return `<option>${lbl} passage : ${fmtPassage(p)}</option>`; }).join('');
   return `<select style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--bg);color:var(--text-mid);cursor:pointer;max-width:200px;" onclick="event.stopPropagation()">
     <option>${valid.length} passage${valid.length>1?'s':''} ▾</option>${opts}</select>`;
 }
@@ -2642,15 +2648,19 @@ let passageCountP = 0;
 function addPassageP(value='') {
   passageCountP++;
   const n = passageCountP;
-  const label = ORDINALS[n-1]||(n+'e');
-  let debut='', fin='';
-  if (value && typeof value === 'object') { debut=value.debut||''; fin=value.fin||''; }
+  let debut='', fin='', savedNum=null;
+  if (value && typeof value === 'object') { debut=value.debut||''; fin=value.fin||''; savedNum=value.num||null; }
   else if (typeof value === 'string' && value.includes('|')) { [debut,fin]=value.split('|'); }
   else { debut=value||''; }
+  const existingNums = Array.from(document.querySelectorAll('#passagesContainerP [id^="fPassageNumP"]')).map(el=>parseInt(el.value)||0);
+  const displayNum = savedNum || (existingNums.length ? Math.max(...existingNums)+1 : 1);
   const div = document.createElement('div');
   div.id = 'passageP_'+n;
-  div.style.cssText = 'display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:8px;align-items:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border);';
-  div.innerHTML = `<label style="font-size:12px;font-weight:500;color:var(--text-mid);white-space:nowrap;">${label} passage</label>
+  div.style.cssText = 'display:grid;grid-template-columns:68px 1fr 1fr 28px;gap:8px;align-items:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border);';
+  div.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;align-items:center;">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Passage</div>
+      <input type="number" id="fPassageNumP${n}" value="${displayNum}" min="1" style="width:52px;padding:4px 2px;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:700;text-align:center;background:var(--bg);color:var(--text-mid);font-family:inherit;">
+    </div>
     <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutP${n}" value="${debut}" style="width:100%;"></div>
     <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinP${n}" value="${fin}" style="width:100%;"></div>
     <button type="button" onclick="removePassageP(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;margin-top:16px;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
@@ -2658,11 +2668,12 @@ function addPassageP(value='') {
 }
 function removePassageP(n) { const el=document.getElementById('passageP_'+n); if(el) el.remove(); }
 function getPassagesFromContainerP() {
-  const passages=[]; let n=1;
-  while(document.getElementById('fDateDebutP'+n)) {
-    passages.push({debut:document.getElementById('fDateDebutP'+n).value, fin:document.getElementById('fDateFinP'+n)?.value||''});
-    n++;
-  }
+  const passages=[];
+  document.querySelectorAll('#passagesContainerP > [id^="passageP_"]').forEach(div => {
+    const n = div.id.replace('passageP_','');
+    passages.push({num:parseInt(document.getElementById('fPassageNumP'+n)?.value)||null, debut:document.getElementById('fDateDebutP'+n)?.value||'', fin:document.getElementById('fDateFinP'+n)?.value||''});
+  });
+  passages.sort((a,b)=>(a.num||0)-(b.num||0));
   return passages;
 }
 
@@ -2671,15 +2682,19 @@ let passageCountE = 0;
 function addPassageE(value='') {
   passageCountE++;
   const n = passageCountE;
-  const label = ORDINALS[n-1]||(n+'e');
-  let debut='', fin='';
-  if (value && typeof value === 'object') { debut=value.debut||''; fin=value.fin||''; }
+  let debut='', fin='', savedNum=null;
+  if (value && typeof value === 'object') { debut=value.debut||''; fin=value.fin||''; savedNum=value.num||null; }
   else if (typeof value === 'string' && value.includes('|')) { [debut,fin]=value.split('|'); }
   else { debut=value||''; }
+  const existingNums = Array.from(document.querySelectorAll('#passagesContainerE [id^="fPassageNumE"]')).map(el=>parseInt(el.value)||0);
+  const displayNum = savedNum || (existingNums.length ? Math.max(...existingNums)+1 : 1);
   const div = document.createElement('div');
   div.id = 'passageE_'+n;
-  div.style.cssText = 'display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:8px;align-items:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border);';
-  div.innerHTML = `<label style="font-size:12px;font-weight:500;color:var(--text-mid);white-space:nowrap;">${label} passage</label>
+  div.style.cssText = 'display:grid;grid-template-columns:68px 1fr 1fr 28px;gap:8px;align-items:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--border);';
+  div.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;align-items:center;">
+      <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Passage</div>
+      <input type="number" id="fPassageNumE${n}" value="${displayNum}" min="1" style="width:52px;padding:4px 2px;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:700;text-align:center;background:var(--bg);color:var(--text-mid);font-family:inherit;">
+    </div>
     <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutE${n}" value="${debut}" style="width:100%;"></div>
     <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinE${n}" value="${fin}" style="width:100%;"></div>
     <button type="button" onclick="removePassageE(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;margin-top:16px;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
@@ -2687,11 +2702,12 @@ function addPassageE(value='') {
 }
 function removePassageE(n) { const el=document.getElementById('passageE_'+n); if(el) el.remove(); }
 function getPassagesFromContainerE() {
-  const passages=[]; let n=1;
-  while(document.getElementById('fDateDebutE'+n)) {
-    passages.push({debut:document.getElementById('fDateDebutE'+n).value, fin:document.getElementById('fDateFinE'+n)?.value||''});
-    n++;
-  }
+  const passages=[];
+  document.querySelectorAll('#passagesContainerE > [id^="passageE_"]').forEach(div => {
+    const n = div.id.replace('passageE_','');
+    passages.push({num:parseInt(document.getElementById('fPassageNumE'+n)?.value)||null, debut:document.getElementById('fDateDebutE'+n)?.value||'', fin:document.getElementById('fDateFinE'+n)?.value||''});
+  });
+  passages.sort((a,b)=>(a.num||0)-(b.num||0));
   return passages;
 }
 
