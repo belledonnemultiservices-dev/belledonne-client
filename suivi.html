@@ -144,9 +144,12 @@
   .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
   .empty-state svg{width:40px;height:40px;opacity:0.3;margin-bottom:12px;}
   /* ── MODAL ── */
-  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px;}
+  /* Panneau latéral non bloquant (collé à gauche) : la page derrière reste
+     accessible pour copier-coller. pointer-events:none laisse passer les clics,
+     le .modal les récupère via pointer-events:auto. */
+  .modal-overlay{display:none;position:fixed;top:0;left:0;bottom:0;right:auto;background:transparent;z-index:300;align-items:stretch;justify-content:flex-start;overflow:visible;padding:0;pointer-events:none;}
   .modal-overlay.open{display:flex;}
-  .modal{background:var(--surface);border-radius:var(--radius);width:820px;max-width:100%;box-shadow:0 24px 60px rgba(13,27,42,0.2);margin:auto;}
+  .modal{background:var(--surface);border-radius:0 var(--radius) var(--radius) 0;width:820px;max-width:92vw;height:100vh;max-height:100vh;overflow-y:auto;box-shadow:8px 0 32px rgba(13,27,42,0.28);margin:0;pointer-events:auto;}
   .modal-header{padding:22px 28px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;border-radius:var(--radius) var(--radius) 0 0;cursor:move;user-select:none;}
   .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
   .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-mid);display:flex;align-items:center;justify-content:center;}
