@@ -1634,7 +1634,7 @@ window.addNrContact = async function() {
   const btn = document.getElementById('nrAddContactBtn');
   btn.disabled = true; btn.textContent = 'Ajout...';
   try {
-    await window._addContact({ prenom, nom, email, role: poste, tel, client });
+    await window._addContact({ prenom, nom, email, role: poste, telephone: tel, client });
     // Retire le message "aucun contact" éventuel et ajoute la ligne cochée
     const listEl = document.getElementById('nrContacts');
     if (listEl.querySelector('label') === null) listEl.innerHTML = '';
@@ -2363,7 +2363,7 @@ window.addNsContact = async function() {
   const btn = document.getElementById('nsAddContactBtn');
   btn.disabled = true; btn.textContent = 'Ajout...';
   try {
-    await window._addContact({ prenom, nom, email, role: poste, tel, client });
+    await window._addContact({ prenom, nom, email, role: poste, telephone: tel, client });
     const listEl = document.getElementById('nsBailleurContacts');
     if (listEl.querySelector('label') === null) listEl.innerHTML = '';
     listEl.insertAdjacentHTML('beforeend', _nrContactRow(email, (prenom + ' ' + nom).trim(), poste, true));
