@@ -2318,9 +2318,7 @@ Belledonne Multiservices
   document.getElementById('nsBody').value = body;
   document.getElementById('nsSuccess').style.display = 'none';
   document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button><button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
-  const sel = document.getElementById('nsSel');
-  sel.innerHTML = '<option value="">Chargement...</option>';
-  await window._loadContactsForSuivi(client, sel);
+  await window._loadNsBailleurContacts(client);
 
   // Populate locataire tab from item data
   const emailLoc = item.emailClient || '';
@@ -2331,6 +2329,49 @@ Belledonne Multiservices
 
   switchNotifTab('bailleur');
   document.getElementById('modalNotifSuivi').classList.add('open');
+};
+
+// ── DESTINATAIRES BAILLEUR (cases à cocher, multi, + nouveau contact) ──
+window._loadNsBailleurContacts = async function(client) {
+  const listEl = document.getElementById('nsBailleurContacts');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 2px;">Chargement des contacts...</div>';
+  const f = document.getElementById('nsNewContactForm'); if (f) f.style.display = 'none';
+  ['nsNewPrenom', 'nsNewNom', 'nsNewEmail', 'nsNewPoste', 'nsNewTel'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  try {
+    const contacts = await window._loadRapportContacts(client);
+    if (!contacts.length) {
+      listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 2px;">Aucun contact enregistré pour ce client. Ajoute-en un ci-dessous.</div>';
+    } else {
+      listEl.innerHTML = contacts.map(c => _nrContactRow(c.email, (c.prenom || '') + ' ' + (c.nom || ''), c.role, false)).join('');
+    }
+  } catch (e) { listEl.innerHTML = '<div style="color:#E74C3C;padding:8px;">Erreur chargement contacts</div>'; }
+};
+window.toggleNewContactNs = function() {
+  const f = document.getElementById('nsNewContactForm');
+  if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+};
+window.addNsContact = async function() {
+  const prenom = document.getElementById('nsNewPrenom').value.trim();
+  const nom = document.getElementById('nsNewNom').value.trim();
+  const email = document.getElementById('nsNewEmail').value.trim();
+  const poste = document.getElementById('nsNewPoste').value.trim();
+  const tel = document.getElementById('nsNewTel').value.trim();
+  if (!email || !/.+@.+\..+/.test(email)) { showToast('Email invalide.', true); return; }
+  if (!nom && !prenom) { showToast('Renseigne au moins un nom ou prénom.', true); return; }
+  const client = window._nsCurrentClient;
+  const btn = document.getElementById('nsAddContactBtn');
+  btn.disabled = true; btn.textContent = 'Ajout...';
+  try {
+    await window._addContact({ prenom, nom, email, role: poste, tel, client });
+    const listEl = document.getElementById('nsBailleurContacts');
+    if (listEl.querySelector('label') === null) listEl.innerHTML = '';
+    listEl.insertAdjacentHTML('beforeend', _nrContactRow(email, (prenom + ' ' + nom).trim(), poste, true));
+    ['nsNewPrenom', 'nsNewNom', 'nsNewEmail', 'nsNewPoste', 'nsNewTel'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('nsNewContactForm').style.display = 'none';
+    showToast('Contact ajouté ✅');
+  } catch (e) { showToast('Erreur ajout contact : ' + e.message, true); }
+  finally { btn.disabled = false; btn.textContent = 'Ajouter le contact'; }
 };
 
 window.openNotifSuivi = async function() {
@@ -2383,9 +2424,7 @@ Belledonne Multiservices
   document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button><button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
 
   // Load contacts for this client
-  const sel = document.getElementById('nsSel');
-  sel.innerHTML = '<option value="">Chargement...</option>';
-  await window._loadContactsForSuivi(client, sel);
+  await window._loadNsBailleurContacts(client);
 
 
   // Populate locataire tab from form fields
@@ -2444,8 +2483,7 @@ window.openRappelSms = async function(id) {
   document.getElementById('nsSuccess').style.display = 'none';
   document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button><button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
   // Load contacts for bailleur tab (needed for other tabs)
-  const sel = document.getElementById('nsSel');
-  if (sel) { sel.innerHTML = '<option value="">—</option>'; await window._loadContactsForSuivi(item.client||'', sel); }
+  await window._loadNsBailleurContacts(item.client || '');
   // Switch to rappel tab and populate
   switchNotifTab('rappel');
   document.getElementById('modalNotifSuivi').classList.add('open');
@@ -2597,8 +2635,14 @@ window.sendNotifSuivi = async function() {
   if (_currentNotifTab === 'sms') { sendSmsNotif(); return; }
   if (_currentNotifTab === 'rappel') { sendRappelSms(); return; }
   const isLoc = _currentNotifTab === 'locataire';
-  const to = isLoc ? window._nsLocataireEmail : document.getElementById('nsSel').value;
-  if (!to) { alert('Aucun destinataire. Vérifiez l\'email client dans le formulaire.'); return; }
+  // Bailleur : tous les destinataires cochés (multi). Locataire : email de la fiche.
+  const recipients = isLoc
+    ? (window._nsLocataireEmail ? [window._nsLocataireEmail] : [])
+    : Array.from(document.querySelectorAll('#nsBailleurContacts input[type=checkbox]:checked')).map(c => c.value).filter(Boolean);
+  if (!recipients.length) {
+    alert(isLoc ? 'Aucun email locataire. Vérifiez la fiche.' : 'Coche au moins un destinataire.');
+    return;
+  }
   const subjectId = isLoc ? 'nsSubjectLoc' : 'nsSubject';
   const bodyId = isLoc ? 'nsBodyLoc' : 'nsBody';
   const subject = document.getElementById(subjectId).value.trim();
@@ -2613,36 +2657,39 @@ window.sendNotifSuivi = async function() {
   }
   const btn = document.getElementById('nsBtnSend');
   btn.disabled = true; btn.textContent = 'Envoi...';
-  try {
-    const resp = await fetch(window.FUNCTION_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({to, subject, body, attachments})
-    });
-    if (resp.ok) {
-      document.getElementById('nsSuccess').style.display = 'block';
-      document.getElementById('nsSuccessMsg').textContent = 'Email envoyé à ' + to;
-      document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Fermer</button>';
-      showToast('Email envoyé !');
-      // Update badge in row and Firestore
-      const itemId = window._nsCurrentItemId;
-      if (itemId) {
-        const field = isLoc ? 'notifLocataire' : 'notifBailleur';
-        const ts = new Date().toISOString();
-        // Update local data — push to array
-        const idx = interventions.findIndex(i => i.id === itemId);
-        if (idx !== -1) {
-          const arr = toNotifArray(interventions[idx][field]);
-          arr.push(ts);
-          interventions[idx][field] = arr;
-          window.interventions = interventions;
-        }
-        if (window._updateSuiviNotifArray) window._updateSuiviNotifArray(itemId, field, ts);
-        updateNotifRow(itemId);
+  let sent = 0;
+  for (const to of recipients) {
+    try {
+      const resp = await fetch(window.FUNCTION_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({to, subject, body, attachments})
+      });
+      if (resp.ok) sent++;
+    } catch(e) { /* compté comme échec */ }
+  }
+  if (sent > 0) {
+    document.getElementById('nsSuccess').style.display = 'block';
+    document.getElementById('nsSuccessMsg').textContent = 'Email envoyé à ' + recipients.slice(0, sent).join(', ');
+    document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Fermer</button>';
+    showToast('Email envoyé à ' + sent + ' destinataire' + (sent > 1 ? 's' : '') + ' !');
+    // Update badge in row and Firestore
+    const itemId = window._nsCurrentItemId;
+    if (itemId) {
+      const field = isLoc ? 'notifLocataire' : 'notifBailleur';
+      const ts = new Date().toISOString();
+      const idx = interventions.findIndex(i => i.id === itemId);
+      if (idx !== -1) {
+        const arr = toNotifArray(interventions[idx][field]);
+        arr.push(ts);
+        interventions[idx][field] = arr;
+        window.interventions = interventions;
       }
-    } else { throw new Error('Erreur serveur'); }
-  } catch(e) {
-    alert('Erreur lors de l\'envoi : ' + e.message);
+      if (window._updateSuiviNotifArray) window._updateSuiviNotifArray(itemId, field, ts);
+      updateNotifRow(itemId);
+    }
+  } else {
+    alert('Échec de l\'envoi. Réessaie.');
     btn.disabled = false; btn.textContent = 'Envoyer';
   }
 };
@@ -3757,10 +3804,24 @@ window.resetStatusColors = function() {
       <!-- BAILLEUR PANEL -->
       <div id="nsPanelBailleur">
         <div style="margin-bottom:16px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataire bailleur</div>
-          <select class="form-select" id="nsSel" style="width:100%;">
-            <option value="">— Chargement des contacts... —</option>
-          </select>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataires bailleur <span style="font-weight:400;text-transform:none;">(coche ceux à notifier)</span></div>
+          <div id="nsBailleurContacts" style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto;"></div>
+          <button type="button" onclick="toggleNewContactNs()" style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px dashed var(--green);padding:7px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Nouveau contact
+          </button>
+          <div id="nsNewContactForm" style="display:none;margin-top:10px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+              <input class="form-input" id="nsNewPrenom" placeholder="Prénom" style="width:100%;">
+              <input class="form-input" id="nsNewNom" placeholder="Nom" style="width:100%;">
+            </div>
+            <input class="form-input" id="nsNewEmail" type="email" placeholder="Email *" style="width:100%;margin-bottom:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+              <input class="form-input" id="nsNewPoste" placeholder="Poste (ex: Gardien)" style="width:100%;">
+              <input class="form-input" id="nsNewTel" type="tel" placeholder="Téléphone (optionnel)" style="width:100%;">
+            </div>
+            <button type="button" id="nsAddContactBtn" onclick="addNsContact()" style="background:var(--green);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Ajouter le contact</button>
+          </div>
         </div>
         <div style="margin-bottom:16px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
