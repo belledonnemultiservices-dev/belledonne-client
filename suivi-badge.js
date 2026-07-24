@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const FC = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -27,8 +27,20 @@ function setup() {
     return b;
   });
 
-  onAuthStateChanged(auth, user => {
+  onAuthStateChanged(auth, async user => {
     if (!user) return;
+
+    // Le dépôt des rapports se fait désormais depuis le Suivi (par passage).
+    // On retire donc le lien "Rapports" de la sidebar côté admin uniquement.
+    // Le client (bailleur) garde son accès à la page rapports.html inchangé.
+    try {
+      const snapU = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
+      const role = snapU.empty ? 'client' : (snapU.docs[0].data().role || 'client');
+      if (role === 'admin' || role === 'administrateur') {
+        document.querySelectorAll('a.nav-item[href="rapports.html"]').forEach(el => el.style.display = 'none');
+      }
+    } catch (e) { /* en cas d'échec, on ne masque rien */ }
+
     onSnapshot(
       query(collection(db, 'suivi'), where('statut', '==', 'À valider')),
       snap => {

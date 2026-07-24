@@ -1090,6 +1090,10 @@ window.openModal = function openModal(id = null) {
     document.getElementById('fObservations').value = item.observations || '';
     const calEventIds = item.calEventIds || [];
     (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach((d, i) => addPassage(d, calEventIds[i] || ''));
+    // Charger les rapports déjà déposés pour cette intervention, puis rafraîchir les zones
+    if (item.client && item.bc) {
+      window._loadRapportsForIntervention(item.client, item.bc).then(() => refreshAllRapportZones());
+    }
     document.getElementById('fNotes').value = item.notes || '';
     // Show existing PDF links if any
     if (item.plUrl) {
@@ -1468,12 +1472,102 @@ function addPassage(value = '', calEventId = '') {
         </div>
         <div id="calBtns${n}" style="margin-bottom:2px;"></div>
       </div>
-    </div>`;
+    </div>
+    <div id="rapportZone${n}" style="border-top:1px dashed var(--border);padding-top:8px;margin-top:2px;"></div>`;
   container.appendChild(div);
   refreshPassageTechs(n, savedTechs);
   renderPassageCalButtons(n, calMap);
+  renderRapportZone(n);
   updateNotifyBtn();
 }
+// ── ZONE RAPPORT PAR PASSAGE ──
+window.renderRapportZone = function(n) {
+  const zone = document.getElementById('rapportZone' + n);
+  if (!zone) return;
+  const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
+  const r = window._rapportsMap[num];
+  const fileInput = `<input type="file" id="rapportFile${n}" accept=".pdf,.xlsx,.xls" style="display:none;" onchange="onRapportFile(${n})">`;
+  if (r && r.pdfUrl) {
+    zone.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Rapport</span>
+        <a href="${r.pdfUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px solid var(--green);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+          Voir le rapport
+        </a>
+        <button type="button" onclick="triggerRapportUpload(${n})" style="background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Remplacer</button>
+        <button type="button" onclick="deleteRapport(${n})" style="background:#FDECEA;color:#E74C3C;border:1px solid #FACACA;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Supprimer</button>
+      </div>${fileInput}`;
+  } else {
+    zone.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Rapport</span>
+        <button type="button" onclick="triggerRapportUpload(${n})" style="display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px dashed var(--green);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          Déposer un rapport
+        </button>
+      </div>${fileInput}`;
+  }
+};
+window.triggerRapportUpload = function(n) {
+  const client = document.getElementById('fClient')?.value;
+  const bc = document.getElementById('fBC')?.value?.trim();
+  if (!client) { showToast('Sélectionne un client avant de déposer un rapport.', true); return; }
+  if (!bc) { showToast('Renseigne le N° de BC avant de déposer un rapport.', true); return; }
+  document.getElementById('rapportFile' + n)?.click();
+};
+window.onRapportFile = async function(n) {
+  const input = document.getElementById('rapportFile' + n);
+  const file = input?.files?.[0];
+  if (!file) return;
+  const client = document.getElementById('fClient')?.value;
+  const bc = document.getElementById('fBC')?.value?.trim();
+  const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
+  const debut = document.getElementById('fDateDebut' + n)?.value || '';
+  const date = debut ? debut.split('T')[0] : (document.getElementById('fDateEmission')?.value || new Date().toISOString().split('T')[0]);
+  const site = document.getElementById('fAdresse')?.value?.trim() || '';
+  const nuisible = document.getElementById('fNature')?.value?.trim() || '';
+  const zone = document.getElementById('rapportZone' + n);
+  if (zone) zone.style.opacity = '0.5';
+  try {
+    const pdfUrl = await window._uploadRapport(file, client);
+    const data = { bc, site, client, passage: _passageNumToLabel(num), nuisible, date, pdfUrl };
+    const existing = window._rapportsMap[num];
+    if (existing && existing.id) {
+      await updateDoc(doc(db, 'rapports', existing.id), { ...data, updatedAt: new Date().toISOString() });
+      window._rapportsMap[num] = { ...existing, ...data };
+    } else {
+      const ref2 = await addDoc(collection(db, 'rapports'), { ...data, createdAt: new Date().toISOString() });
+      window._rapportsMap[num] = { id: ref2.id, ...data };
+    }
+    showToast('Rapport enregistré ✅');
+  } catch (e) { showToast('Erreur upload rapport : ' + e.message, true); }
+  finally { if (zone) zone.style.opacity = '1'; if (input) input.value = ''; renderRapportZone(n); }
+};
+window.deleteRapport = async function(n) {
+  const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
+  const r = window._rapportsMap[num];
+  if (!r || !r.id) return;
+  if (!confirm('Supprimer le rapport de ce passage ?')) return;
+  try {
+    try {
+      if (r.pdfUrl) {
+        const pathEncoded = new URL(r.pdfUrl).pathname.split('/o/')[1].split('?')[0];
+        await deleteObject(ref(storage, decodeURIComponent(pathEncoded)));
+      }
+    } catch (e) { /* la suppression du doc prime sur celle du fichier */ }
+    await deleteDoc(doc(db, 'rapports', r.id));
+    delete window._rapportsMap[num];
+    showToast('Rapport supprimé');
+  } catch (e) { showToast('Erreur : ' + e.message, true); }
+  renderRapportZone(n);
+};
+// Re-rend toutes les zones rapport (après chargement asynchrone à l'ouverture)
+window.refreshAllRapportZones = function() {
+  document.querySelectorAll('#passagesContainer > [id^="passage_"]').forEach(div => {
+    renderRapportZone(div.id.replace('passage_', ''));
+  });
+};
 function removePassage(n) {
   const el = document.getElementById('passage_' + n);
   if (el) el.remove();
@@ -1503,6 +1597,7 @@ function resetForm() {
   });
   document.getElementById('passagesContainer').innerHTML = '';
   passageCount = 0;
+  window._rapportsMap = {};
   window._existingPlUrl = null; window._existingBcUrl = null; window._existingDevisUrl = null;
   ['secAdminBody','secContactBody','secNotesBody'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
   ['chevronAdmin','chevronContact','chevronNotes'].forEach(id => { const el=document.getElementById(id); if(el) el.style.transform='rotate(-90deg)'; });
@@ -3093,6 +3188,30 @@ window._deleteSuivi = async function(id) {
     }
   } catch(e) { /* Ignore Storage errors — deletion must proceed regardless */ }
   await deleteDoc(doc(db, 'suivi', id));
+};
+
+// ── RAPPORTS D'INTERVENTION (dépôt par passage, alimente la page client rapports.html) ──
+// Le rapport est stocké dans la collection `rapports` (même format que la page dédiée),
+// indexé côté formulaire par le numéro de passage de l'intervention en cours.
+window._rapportsMap = {}; // { numPassage(int) : { id, pdfUrl, ...champs } }
+function _passageNumToLabel(num) { return num === 1 ? '1er passage' : num + 'ème passage'; }
+function _passageLabelToNum(lbl) { if (!lbl) return null; const m = String(lbl).match(/(\d+)/); return m ? parseInt(m[1]) : null; }
+window._uploadRapport = async function(file, client) {
+  const storageRef = ref(storage, `rapports/${client}/${Date.now()}_${file.name}`);
+  await uploadBytes(storageRef, file);
+  return await getDownloadURL(storageRef);
+};
+window._loadRapportsForIntervention = async function(client, bc) {
+  window._rapportsMap = {};
+  if (!client || !bc) return;
+  try {
+    const snap = await getDocs(query(collection(db, 'rapports'), where('client', '==', client), where('bc', '==', bc)));
+    snap.forEach(d => {
+      const r = { id: d.id, ...d.data() };
+      const num = _passageLabelToNum(r.passage);
+      if (num) window._rapportsMap[num] = r;
+    });
+  } catch (e) { console.warn('loadRapports', e); }
 };
 
 // ── AUTH ──
