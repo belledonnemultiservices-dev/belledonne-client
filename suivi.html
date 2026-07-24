@@ -1495,6 +1495,11 @@ window.renderRapportZone = function(n) {
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
           Voir le rapport
         </a>
+        <button type="button" onclick="openNotifRapport(${n})" style="display:inline-flex;align-items:center;gap:5px;background:var(--navy);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          Notifier
+        </button>
+        ${r.notifs ? `<span style="font-size:11px;color:var(--text-muted);">Notifié ${r.notifs}×</span>` : ''}
         <button type="button" onclick="triggerRapportUpload(${n})" style="background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Remplacer</button>
         <button type="button" onclick="deleteRapport(${n})" style="background:#FDECEA;color:#E74C3C;border:1px solid #FACACA;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Supprimer</button>
       </div>${fileInput}`;
@@ -1531,15 +1536,11 @@ window.onRapportFile = async function(n) {
   if (zone) zone.style.opacity = '0.5';
   try {
     const pdfUrl = await window._uploadRapport(file, client);
-    const data = { bc, site, client, passage: _passageNumToLabel(num), nuisible, date, pdfUrl };
+    const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
+    const data = { bc, site, client, passage: passageLabel, nuisible, date, pdfUrl };
     const existing = window._rapportsMap[num];
-    if (existing && existing.id) {
-      await updateDoc(doc(db, 'rapports', existing.id), { ...data, updatedAt: new Date().toISOString() });
-      window._rapportsMap[num] = { ...existing, ...data };
-    } else {
-      const ref2 = await addDoc(collection(db, 'rapports'), { ...data, createdAt: new Date().toISOString() });
-      window._rapportsMap[num] = { id: ref2.id, ...data };
-    }
+    const id = await window._saveRapportDoc(existing && existing.id ? existing.id : null, data);
+    window._rapportsMap[num] = { ...(existing || {}), id, ...data };
     showToast('Rapport enregistré ✅');
   } catch (e) { showToast('Erreur upload rapport : ' + e.message, true); }
   finally { if (zone) zone.style.opacity = '1'; if (input) input.value = ''; renderRapportZone(n); }
@@ -1550,17 +1551,93 @@ window.deleteRapport = async function(n) {
   if (!r || !r.id) return;
   if (!confirm('Supprimer le rapport de ce passage ?')) return;
   try {
-    try {
-      if (r.pdfUrl) {
-        const pathEncoded = new URL(r.pdfUrl).pathname.split('/o/')[1].split('?')[0];
-        await deleteObject(ref(storage, decodeURIComponent(pathEncoded)));
-      }
-    } catch (e) { /* la suppression du doc prime sur celle du fichier */ }
-    await deleteDoc(doc(db, 'rapports', r.id));
+    await window._deleteRapportDoc(r.id, r.pdfUrl);
     delete window._rapportsMap[num];
     showToast('Rapport supprimé');
   } catch (e) { showToast('Erreur : ' + e.message, true); }
   renderRapportZone(n);
+};
+// ── NOTIFICATION D'UN RAPPORT (email + PDF joint) ──
+window._notifRapportNum = null;
+window.openNotifRapport = async function(n) {
+  const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
+  const r = window._rapportsMap[num];
+  if (!r || !r.pdfUrl) { showToast('Aucun rapport à notifier sur ce passage.', true); return; }
+  const client = document.getElementById('fClient')?.value;
+  if (!client) { showToast('Client introuvable.', true); return; }
+  window._notifRapportNum = num;
+  const overlay = document.getElementById('modalNotifRapport');
+  const listEl = document.getElementById('nrContacts');
+  listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement des contacts...</div>';
+  overlay.classList.add('open');
+  // Template + placeholders
+  const tpl = await window._loadRapportTemplate();
+  const fill = s => (s || '')
+    .replace(/{{bc}}/g, r.bc || '-').replace(/{{site}}/g, r.site || '-')
+    .replace(/{{date}}/g, r.date || '-').replace(/{{nuisible}}/g, r.nuisible || '-')
+    .replace(/{{passage}}/g, r.passage || '-').replace(/{{lien}}/g, 'https://clients-belledonne-multiservices.com');
+  document.getElementById('nrSubject').value = fill(tpl.subject || 'Rapport disponible - BC {{bc}}');
+  document.getElementById('nrBody').value = fill(tpl.body || 'Bonjour,\nVotre rapport (BC {{bc}}) est disponible.\nConsultez-le ici : {{lien}}\nCordialement,\nBelledonne Multiservices');
+  // Contacts
+  try {
+    const contacts = await window._loadRapportContacts(client);
+    if (!contacts.length) {
+      listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Aucun contact pour ce client. <a href="contacts.html" style="color:var(--green-dark);">Ajouter un contact</a></div>';
+    } else {
+      listEl.innerHTML = contacts.map(c => `
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);cursor:pointer;">
+          <input type="checkbox" value="${c.email}" checked style="width:15px;height:15px;">
+          <div><div style="font-size:13px;font-weight:600;color:var(--text);">${(c.prenom || '') + ' ' + (c.nom || '')}</div><div style="font-size:11px;color:var(--text-muted);">${c.email}</div></div>
+        </label>`).join('');
+    }
+  } catch (e) { listEl.innerHTML = '<div style="color:#E74C3C;padding:12px;">Erreur chargement contacts</div>'; }
+};
+window.closeNotifRapport = function() {
+  document.getElementById('modalNotifRapport').classList.remove('open');
+  window._notifRapportNum = null;
+};
+window.sendNotifRapport = async function() {
+  const num = window._notifRapportNum;
+  const r = window._rapportsMap[num];
+  if (!r) return;
+  const subject = document.getElementById('nrSubject').value.trim();
+  const body = document.getElementById('nrBody').value.trim();
+  if (!subject || !body) { showToast('Objet et message requis.', true); return; }
+  const recipients = Array.from(document.querySelectorAll('#nrContacts input[type=checkbox]:checked')).map(c => c.value).filter(Boolean);
+  if (!recipients.length) { showToast('Sélectionne au moins un destinataire.', true); return; }
+  // Nom de fichier avec la bonne extension
+  let ext = 'pdf';
+  try { const m = decodeURIComponent(r.pdfUrl).match(/\.(pdf|xlsx|xls|docx?)(\?|$)/i); if (m) ext = m[1].toLowerCase(); } catch (e) {}
+  const filename = 'rapport_' + String(r.bc || 'fichier').replace(/[^a-zA-Z0-9]/g, '_') + '.' + ext;
+  const attachments = r.pdfUrl ? [{ url: r.pdfUrl, filename }] : [];
+  const btn = document.getElementById('nrBtnSend');
+  btn.disabled = true; btn.textContent = 'Envoi...';
+  let sent = 0;
+  for (const to of recipients) {
+    try {
+      const resp = await fetch(window.FUNCTION_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, subject, body, attachments }) });
+      if (resp.ok) sent++;
+    } catch (e) { /* compté comme échec */ }
+  }
+  btn.disabled = false; btn.textContent = 'Envoyer';
+  if (sent > 0) {
+    const newCount = (r.notifs || 0) + 1;
+    try { await window._bumpRapportNotif(r.id, newCount); } catch (e) {}
+    r.notifs = newCount;
+    showToast('Email envoyé à ' + sent + ' destinataire' + (sent > 1 ? 's' : '') + ' ✅');
+    closeNotifRapport();
+    renderRapportZoneByNum(num);
+  } else {
+    showToast('Échec de l\'envoi. Réessaie.', true);
+  }
+};
+// Re-rend la zone rapport à partir du numéro de passage (retrouve le n DOM)
+window.renderRapportZoneByNum = function(num) {
+  document.querySelectorAll('#passagesContainer > [id^="passage_"]').forEach(div => {
+    const n = div.id.replace('passage_', '');
+    const pn = parseInt(document.getElementById('fPassageNum' + n)?.value) || parseInt(n);
+    if (pn === num) renderRapportZone(n);
+  });
 };
 // Re-rend toutes les zones rapport (après chargement asynchrone à l'ouverture)
 window.refreshAllRapportZones = function() {
@@ -3213,6 +3290,42 @@ window._loadRapportsForIntervention = async function(client, bc) {
     });
   } catch (e) { console.warn('loadRapports', e); }
 };
+// Écriture d'un rapport (create ou update). Retourne l'id du doc.
+window._saveRapportDoc = async function(existingId, data) {
+  if (existingId) {
+    await updateDoc(doc(db, 'rapports', existingId), { ...data, updatedAt: new Date().toISOString() });
+    return existingId;
+  }
+  const ref2 = await addDoc(collection(db, 'rapports'), { ...data, createdAt: new Date().toISOString() });
+  return ref2.id;
+};
+// Suppression d'un rapport (doc + fichier Storage). Le doc prime sur le fichier.
+window._deleteRapportDoc = async function(id, pdfUrl) {
+  try {
+    if (pdfUrl) {
+      const pathEncoded = new URL(pdfUrl).pathname.split('/o/')[1].split('?')[0];
+      await deleteObject(ref(storage, decodeURIComponent(pathEncoded)));
+    }
+  } catch (e) { /* ignore erreur Storage */ }
+  await deleteDoc(doc(db, 'rapports', id));
+};
+// Incrémente le compteur de notifications d'un rapport
+window._bumpRapportNotif = async function(id, count) {
+  await updateDoc(doc(db, 'rapports', id), { notifs: count, lastNotif: new Date().toISOString() });
+};
+// Charge les contacts (emails) d'un client pour la notif rapport
+window._loadRapportContacts = async function(client) {
+  const snap = await getDocs(query(collection(db, 'contacts'), where('client', '==', client)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.email);
+};
+// Charge le template rapportSimple depuis config/templates
+window._loadRapportTemplate = async function() {
+  try {
+    const snap = await getDocs(collection(db, 'config'));
+    const tplDoc = snap.docs.find(d => d.id === 'templates');
+    return tplDoc ? (tplDoc.data().rapportSimple || {}) : {};
+  } catch (e) { return {}; }
+};
 
 // ── AUTH ──
 window.handleLogout = async function() { await signOut(auth); window.location.href='login.html'; };
@@ -3622,6 +3735,40 @@ window.resetStatusColors = function() {
     <div class="modal-footer" id="nsFooter">
       <button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button>
       <button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        Envoyer
+      </button>
+    </div>
+  </div>
+</div>
+<!-- MODAL NOTIFICATION RAPPORT -->
+<div class="modal-overlay" id="modalNotifRapport">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <div class="modal-title">Notifier le client — Rapport d'intervention</div>
+      <button class="modal-close" onclick="closeNotifRapport()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:22px 28px;">
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataires</div>
+        <div id="nrContacts" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;"></div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
+        <input class="form-input" id="nrSubject" style="width:100%;">
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message <span style="font-weight:400;text-transform:none;">(modifiable)</span></div>
+        <textarea class="form-textarea" id="nrBody" style="min-height:180px;width:100%;"></textarea>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:var(--green-dark);"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5S13.5 3.62 13.5 5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7.5 2.79 7.5 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+        Le rapport PDF sera joint automatiquement à l'email.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeNotifRapport()">Annuler</button>
+      <button class="btn-save" id="nrBtnSend" onclick="sendNotifRapport()">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         Envoyer
       </button>
