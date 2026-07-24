@@ -147,7 +147,7 @@
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px;}
   .modal-overlay.open{display:flex;}
   .modal{background:var(--surface);border-radius:var(--radius);width:820px;max-width:100%;box-shadow:0 24px 60px rgba(13,27,42,0.2);margin:auto;}
-  .modal-header{padding:22px 28px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;border-radius:var(--radius) var(--radius) 0 0;}
+  .modal-header{padding:22px 28px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;border-radius:var(--radius) var(--radius) 0 0;cursor:move;user-select:none;}
   .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
   .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-mid);display:flex;align-items:center;justify-content:center;}
   .modal-body{padding:24px 28px;}
@@ -1481,12 +1481,25 @@ function addPassage(value = '', calEventId = '') {
   updateNotifyBtn();
 }
 // ── ZONE RAPPORT PAR PASSAGE ──
+function fmtNotifDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const p = x => String(x).padStart(2, '0');
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' à ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
 window.renderRapportZone = function(n) {
   const zone = document.getElementById('rapportZone' + n);
   if (!zone) return;
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
   const r = window._rapportsMap[num];
   const fileInput = `<input type="file" id="rapportFile${n}" accept=".pdf,.xlsx,.xls" style="display:none;" onchange="onRapportFile(${n})">`;
+  let notifInfo = '';
+  if (r && r.notifs) {
+    const last = fmtNotifDate(r.lastNotif);
+    const hist = (r.notifHistory || []).map(h => fmtNotifDate(h.ts) + ' → ' + ((h.to || []).join(', ') || '?')).join('\n');
+    notifInfo = `<span title="${hist.replace(/"/g, '&quot;')}" style="font-size:11px;color:var(--text-muted);cursor:help;">Notifié ${r.notifs}×${last ? ' — dernier le ' + last : ''}</span>`;
+  }
   if (r && r.pdfUrl) {
     zone.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -1499,7 +1512,7 @@ window.renderRapportZone = function(n) {
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
           Notifier
         </button>
-        ${r.notifs ? `<span style="font-size:11px;color:var(--text-muted);">Notifié ${r.notifs}×</span>` : ''}
+        ${notifInfo}
         <button type="button" onclick="triggerRapportUpload(${n})" style="background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Remplacer</button>
         <button type="button" onclick="deleteRapport(${n})" style="background:#FDECEA;color:#E74C3C;border:1px solid #FACACA;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Supprimer</button>
       </div>${fileInput}`;
@@ -1566,9 +1579,13 @@ window.openNotifRapport = async function(n) {
   const client = document.getElementById('fClient')?.value;
   if (!client) { showToast('Client introuvable.', true); return; }
   window._notifRapportNum = num;
+  window._notifRapportClient = client;
   const overlay = document.getElementById('modalNotifRapport');
   const listEl = document.getElementById('nrContacts');
   listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement des contacts...</div>';
+  // Réinitialise le formulaire "nouveau contact"
+  const ncForm = document.getElementById('nrNewContactForm'); if (ncForm) ncForm.style.display = 'none';
+  ['nrNewPrenom', 'nrNewNom', 'nrNewEmail', 'nrNewPoste', 'nrNewTel'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   overlay.classList.add('open');
   // Template + placeholders
   const tpl = await window._loadRapportTemplate();
@@ -1582,15 +1599,49 @@ window.openNotifRapport = async function(n) {
   try {
     const contacts = await window._loadRapportContacts(client);
     if (!contacts.length) {
-      listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Aucun contact pour ce client. <a href="contacts.html" style="color:var(--green-dark);">Ajouter un contact</a></div>';
+      listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 2px;">Aucun contact enregistré pour ce client. Ajoute-en un ci-dessous.</div>';
     } else {
-      listEl.innerHTML = contacts.map(c => `
-        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);cursor:pointer;">
-          <input type="checkbox" value="${c.email}" checked style="width:15px;height:15px;">
-          <div><div style="font-size:13px;font-weight:600;color:var(--text);">${(c.prenom || '') + ' ' + (c.nom || '')}</div><div style="font-size:11px;color:var(--text-muted);">${c.email}</div></div>
-        </label>`).join('');
+      // Cases DÉCOCHÉES par défaut : tu coches toi-même les destinataires
+      listEl.innerHTML = contacts.map(c => _nrContactRow(c.email, (c.prenom || '') + ' ' + (c.nom || ''), c.role, false)).join('');
     }
   } catch (e) { listEl.innerHTML = '<div style="color:#E74C3C;padding:12px;">Erreur chargement contacts</div>'; }
+};
+// Construit une ligne contact (case à cocher)
+function _nrContactRow(email, name, poste, checked) {
+  return `<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);cursor:pointer;">
+    <input type="checkbox" value="${email}"${checked ? ' checked' : ''} style="width:15px;height:15px;">
+    <div><div style="font-size:13px;font-weight:600;color:var(--text);">${(name || '').trim() || email}${poste ? ' <span style=\'font-weight:400;color:var(--text-muted);\'>· ' + poste + '</span>' : ''}</div><div style="font-size:11px;color:var(--text-muted);">${email}</div></div>
+  </label>`;
+}
+// Affiche/masque le formulaire nouveau contact
+window.toggleNewContact = function() {
+  const f = document.getElementById('nrNewContactForm');
+  if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+};
+// Ajoute un nouveau contact au client courant, puis le coche pour l'envoi
+window.addNrContact = async function() {
+  const prenom = document.getElementById('nrNewPrenom').value.trim();
+  const nom = document.getElementById('nrNewNom').value.trim();
+  const email = document.getElementById('nrNewEmail').value.trim();
+  const poste = document.getElementById('nrNewPoste').value.trim();
+  const tel = document.getElementById('nrNewTel').value.trim();
+  if (!email || !/.+@.+\..+/.test(email)) { showToast('Email invalide.', true); return; }
+  if (!nom && !prenom) { showToast('Renseigne au moins un nom ou prénom.', true); return; }
+  const client = window._notifRapportClient;
+  const btn = document.getElementById('nrAddContactBtn');
+  btn.disabled = true; btn.textContent = 'Ajout...';
+  try {
+    await window._addContact({ prenom, nom, email, role: poste, tel, client });
+    // Retire le message "aucun contact" éventuel et ajoute la ligne cochée
+    const listEl = document.getElementById('nrContacts');
+    if (listEl.querySelector('label') === null) listEl.innerHTML = '';
+    listEl.insertAdjacentHTML('beforeend', _nrContactRow(email, (prenom + ' ' + nom).trim(), poste, true));
+    // Reset + masque le formulaire
+    ['nrNewPrenom', 'nrNewNom', 'nrNewEmail', 'nrNewPoste', 'nrNewTel'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('nrNewContactForm').style.display = 'none';
+    showToast('Contact ajouté ✅');
+  } catch (e) { showToast('Erreur ajout contact : ' + e.message, true); }
+  finally { btn.disabled = false; btn.textContent = 'Ajouter le contact'; }
 };
 window.closeNotifRapport = function() {
   document.getElementById('modalNotifRapport').classList.remove('open');
@@ -1622,8 +1673,11 @@ window.sendNotifRapport = async function() {
   btn.disabled = false; btn.textContent = 'Envoyer';
   if (sent > 0) {
     const newCount = (r.notifs || 0) + 1;
-    try { await window._bumpRapportNotif(r.id, newCount); } catch (e) {}
+    const entry = { ts: new Date().toISOString(), to: recipients };
+    try { await window._recordRapportNotif(r.id, newCount, entry); } catch (e) {}
     r.notifs = newCount;
+    r.lastNotif = entry.ts;
+    r.notifHistory = [...(r.notifHistory || []), entry];
     showToast('Email envoyé à ' + sent + ' destinataire' + (sent > 1 ? 's' : '') + ' ✅');
     closeNotifRapport();
     renderRapportZoneByNum(num);
@@ -1645,6 +1699,43 @@ window.refreshAllRapportZones = function() {
     renderRapportZone(div.id.replace('passage_', ''));
   });
 };
+
+// ── FENÊTRES DÉPLAÇABLES (drag par la barre de titre) ──
+(function() {
+  let drag = null;
+  document.addEventListener('mousedown', e => {
+    const header = e.target.closest('.modal-header');
+    if (!header) return;
+    // Ne pas démarrer le drag depuis un bouton/champ (ex: la croix de fermeture)
+    if (e.target.closest('button, input, select, textarea, a')) return;
+    const modal = header.closest('.modal');
+    if (!modal) return;
+    const cur = modal._dragOffset || { x: 0, y: 0 };
+    drag = { modal, startX: e.clientX, startY: e.clientY, baseX: cur.x, baseY: cur.y };
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!drag) return;
+    const dx = drag.baseX + (e.clientX - drag.startX);
+    const dy = drag.baseY + (e.clientY - drag.startY);
+    drag.modal._dragOffset = { x: dx, y: dy };
+    drag.modal.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+  });
+  document.addEventListener('mouseup', () => { drag = null; });
+  // Recentrer chaque fenêtre à sa réouverture
+  function initReset() {
+    document.querySelectorAll('.modal-overlay').forEach(ov => {
+      new MutationObserver(() => {
+        if (ov.classList.contains('open')) {
+          const m = ov.querySelector('.modal');
+          if (m) { m.style.transform = ''; m._dragOffset = { x: 0, y: 0 }; }
+        }
+      }).observe(ov, { attributes: true, attributeFilter: ['class'] });
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initReset);
+  else initReset();
+})();
 function removePassage(n) {
   const el = document.getElementById('passage_' + n);
   if (el) el.remove();
@@ -3309,9 +3400,14 @@ window._deleteRapportDoc = async function(id, pdfUrl) {
   } catch (e) { /* ignore erreur Storage */ }
   await deleteDoc(doc(db, 'rapports', id));
 };
-// Incrémente le compteur de notifications d'un rapport
-window._bumpRapportNotif = async function(id, count) {
-  await updateDoc(doc(db, 'rapports', id), { notifs: count, lastNotif: new Date().toISOString() });
+// Enregistre un envoi de notification : compteur + dernier envoi + historique complet
+window._recordRapportNotif = async function(id, count, entry) {
+  await updateDoc(doc(db, 'rapports', id), { notifs: count, lastNotif: entry.ts, notifHistory: arrayUnion(entry) });
+};
+// Ajoute un contact pour un client. Retourne l'id créé.
+window._addContact = async function(data) {
+  const ref2 = await addDoc(collection(db, 'contacts'), { ...data, createdAt: new Date().toISOString() });
+  return ref2.id;
 };
 // Charge les contacts (emails) d'un client pour la notif rapport
 window._loadRapportContacts = async function(client) {
@@ -3750,8 +3846,24 @@ window.resetStatusColors = function() {
     </div>
     <div class="modal-body" style="padding:22px 28px;">
       <div style="margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataires</div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataires <span style="font-weight:400;text-transform:none;">(coche ceux à notifier)</span></div>
         <div id="nrContacts" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;"></div>
+        <button type="button" onclick="toggleNewContact()" style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px dashed var(--green);padding:7px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Nouveau contact
+        </button>
+        <div id="nrNewContactForm" style="display:none;margin-top:10px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <input class="form-input" id="nrNewPrenom" placeholder="Prénom" style="width:100%;">
+            <input class="form-input" id="nrNewNom" placeholder="Nom" style="width:100%;">
+          </div>
+          <input class="form-input" id="nrNewEmail" type="email" placeholder="Email *" style="width:100%;margin-bottom:8px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <input class="form-input" id="nrNewPoste" placeholder="Poste (ex: Gardien)" style="width:100%;">
+            <input class="form-input" id="nrNewTel" type="tel" placeholder="Téléphone (optionnel)" style="width:100%;">
+          </div>
+          <button type="button" id="nrAddContactBtn" onclick="addNrContact()" style="background:var(--green);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Ajouter le contact</button>
+        </div>
       </div>
       <div style="margin-bottom:16px;">
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
