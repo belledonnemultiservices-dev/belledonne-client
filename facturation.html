@@ -659,9 +659,9 @@ async function loadFactComposition(item) {
   sel.value = (item.factEntiteIdx !== undefined && item.factEntiteIdx !== null && item.factEntiteIdx !== '') ? String(item.factEntiteIdx) : (_factEntites.length ? '0' : 'manuel');
   // Lignes
   if (Array.isArray(item.factLignes) && item.factLignes.length) {
-    window._factLignes = item.factLignes.map(l => ({ designation: l.designation || '', qte: Number(l.qte) || 1, pu: Number(l.pu) || 0, tva: (l.tva !== undefined ? Number(l.tva) : 20) }));
+    window._factLignes = item.factLignes.map(l => ({ designation: l.designation || '', qte: Number(l.qte) || 1, pu: Number(l.pu) || 0, tva: (l.tva !== undefined ? Number(l.tva) : 10) }));
   } else {
-    window._factLignes = [{ designation: '', qte: 1, pu: 0, tva: 20 }];
+    window._factLignes = [{ designation: '', qte: 1, pu: 0, tva: 10 }];
   }
   renderFactLignes();
 }
@@ -688,7 +688,7 @@ window.factLigneChg = function(i, field, value) {
   if (field === 'designation') {
     l.designation = value;
     const match = _factBpu.find(p => (p.designation || '') === value);
-    if (match) { l.pu = Number(match.prix) || 0; l.tva = (match.tva !== undefined ? Number(match.tva) : 20); renderFactLignes(); return; }
+    if (match) { l.pu = Number(match.prix) || 0; l.tva = (match.tva !== undefined ? Number(match.tva) : 10); renderFactLignes(); return; }
     recomputeFactTotals(); return;
   }
   l[field] = value;
@@ -706,10 +706,10 @@ function recomputeFactTotals() {
   const m = document.getElementById('fMontant'); if (m) m.value = ht.toFixed(2);
 }
 
-window.addFactLigne = function() { window._factLignes.push({ designation: '', qte: 1, pu: 0, tva: 20 }); renderFactLignes(); };
+window.addFactLigne = function() { window._factLignes.push({ designation: '', qte: 1, pu: 0, tva: 10 }); renderFactLignes(); };
 window.removeFactLigne = function(i) {
   window._factLignes.splice(i, 1);
-  if (!window._factLignes.length) window._factLignes.push({ designation: '', qte: 1, pu: 0, tva: 20 });
+  if (!window._factLignes.length) window._factLignes.push({ designation: '', qte: 1, pu: 0, tva: 10 });
   renderFactLignes();
 };
 
