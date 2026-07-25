@@ -810,6 +810,7 @@ window.genererFactureAxonaut = async function() {
   if (!client.nom) { msg.style.color = 'var(--red)'; msg.textContent = 'Renseigne le nom du client.'; return; }
   const lignes = (window._factLignes || []).filter(l => (l.designation || '').trim() && Number(l.pu) > 0);
   if (!lignes.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Ajoute au moins une ligne (désignation + prix).'; return; }
+  if ((item.axonautId || item.factureUrl) && !confirm('Une facture existe déjà pour cette ligne (' + (item.numFacture || '') + ').\nEn créer une nouvelle dans Axonaut ?')) return;
   const btn = document.getElementById('btnGenAxonaut'); btn.disabled = true;
   msg.style.color = 'var(--text-muted)'; msg.textContent = 'Génération de la facture dans Axonaut...';
   try {
