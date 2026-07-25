@@ -128,6 +128,33 @@ exports.setUserClaims = functions
     }
   });
 
+// ── REINITIALISER LE MOT DE PASSE D'UN COMPTE (Firebase Auth) ─────
+// Change le vrai mot de passe Auth (les mots de passe ne sont plus stockés
+// en clair dans Firestore). Admin only.
+exports.resetUserPassword = functions
+  .region("europe-west1")
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { uid, password } = req.body || {};
+    if (!uid || !password || password.length < 8) {
+      res.status(400).json({ error: "uid et mot de passe (min. 8 caractères) requis" });
+      return;
+    }
+    try {
+      await admin.auth().updateUser(uid, { password });
+      res.status(200).json({ success: true });
+    } catch(err) {
+      console.error("resetUserPassword:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
 // ── ENVOYER NOTIFICATION EMAIL ────────────────────────────────────
 function downloadFile(url) {
   return new Promise((resolve, reject) => {
