@@ -109,7 +109,7 @@
     <div class="page-header">
       <div>
         <div class="page-title">Services & consommation</div>
-        <div class="page-sub">Suivi des services externes payants (crédits SMS, coût Claude)</div>
+        <div class="page-sub">Suivi des services externes payants (crédits SMS)</div>
       </div>
       <button class="btn-primary" id="btnRefresh" onclick="loadUsage()">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
@@ -136,7 +136,6 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 function renderCards(data){
   const cards = document.getElementById('cards');
   const ovh = data.ovh || {};
-  const claude = data.claude || {};
 
   // Carte SMS OVH
   let smsInner;
@@ -151,16 +150,6 @@ function renderCards(data){
   const rechargeLink = `<a href="https://www.ovh.com/manager/#/sms/" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:14px;font-size:12px;font-weight:600;color:var(--green-dark);text-decoration:none;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>Recharger sur OVH</a>`;
   smsInner += rechargeLink;
 
-  // Carte Claude
-  let claudeInner;
-  if (claude.error) {
-    claudeInner = `<div class="svc-metric muted">—</div><div class="svc-err">${claude.error}</div>` +
-      `<div class="svc-note">Nécessite une clé Admin Anthropic (org). Le solde de crédits restant n'est pas exposé par l'API Anthropic ; ce panneau affiche le <b>coût du mois en cours</b>.</div>`;
-  } else {
-    claudeInner = `<div class="svc-metric">$${(claude.costUsd ?? 0).toFixed(2)}</div><div class="svc-unit">coût du mois en cours (USD)</div>` +
-      `<div class="svc-note">Anthropic n'expose pas de "solde restant" par API. Vérifie ton solde de crédits prépayés dans la console Anthropic.</div>`;
-  }
-
   cards.innerHTML =
     `<div class="svc-card">
       <div class="svc-head">
@@ -168,13 +157,6 @@ function renderCards(data){
         <div><div class="svc-title">SMS — OVH</div><div class="svc-sub">Compte sms-su78206-1</div></div>
       </div>
       ${smsInner}
-    </div>
-    <div class="svc-card">
-      <div class="svc-head">
-        <div class="svc-ico" style="background:rgba(245,166,35,0.12);color:var(--amber);"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
-        <div><div class="svc-title">Claude — Anthropic</div><div class="svc-sub">Extraction des BC (import email)</div></div>
-      </div>
-      ${claudeInner}
     </div>`;
 
   document.getElementById('checkedAt').textContent = data.checkedAt ? ('Dernière vérification : ' + new Date(data.checkedAt).toLocaleString('fr-FR')) : '';
