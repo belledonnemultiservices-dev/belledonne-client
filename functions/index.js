@@ -314,9 +314,11 @@ exports.createAxonautInvoice = functions
         quantity: Number(l.qte) || 1,
         tax_rate: Number(l.tva) || 0,
       }));
+      const rawDate = date || new Date().toISOString().slice(0, 10);
+      const rfcDate = /T/.test(rawDate) ? rawDate : (rawDate + "T12:00:00+00:00");
       const docBody = {
         company_id: company.id,
-        date: date || new Date().toISOString().slice(0, 10),
+        date: rfcDate,
         products,
       };
       if (objet) docBody.title = objet;
