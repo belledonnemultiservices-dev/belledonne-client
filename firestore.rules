@@ -54,6 +54,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Facturation : BPU et entités clients, réservés aux admins ──
+    match /bpu/{doc}                 { allow read, write: if isAdmin(); }
+    match /facturation-clients/{doc} { allow read, write: if isAdmin(); }
+
     // ── Données client : lecture seule sur SES documents, admin plein accès ──
     match /rapports/{doc}  { allow read: if isAdmin() || ownsClient(resource.data.get('client', '')); allow write: if isAdmin(); }
     match /garanties/{doc} { allow read: if isAdmin() || ownsClient(resource.data.get('client', '')); allow write: if isAdmin(); }

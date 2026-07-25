@@ -646,7 +646,7 @@ window._factLignes = [];
 
 async function loadFactComposition(item) {
   document.getElementById('axonautMsg').textContent = '';
-  document.getElementById('fObjet').value = item.factObjet || ('Traitement 3D' + (item.bc ? ' - BC ' + item.bc : ''));
+  document.getElementById('fObjet').value = item.factObjet || ('Facture' + (item.bc ? ' - BC ' + item.bc : ''));
   // BPU du client -> datalist des désignations
   _factBpu = (window._loadBpu ? await window._loadBpu(item.client) : []) || [];
   document.getElementById('bpuDatalist').innerHTML = _factBpu.map(p => '<option value="' + (p.designation || '').replace(/"/g, '&quot;') + '"></option>').join('');
