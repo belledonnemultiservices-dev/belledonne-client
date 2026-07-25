@@ -21,6 +21,7 @@ const OVH_CONSUMER_KEY = defineSecret("OVH_CONSUMER_KEY");
 const OVH_SMS_ACCOUNT = defineSecret("OVH_SMS_ACCOUNT");
 const GCAL_SA = defineSecret("GCAL_SA"); // service account complet en JSON
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+const AXONAUT_API_KEY = defineSecret("AXONAUT_API_KEY");
 
 // Transporter Gmail créé à l'exécution (les secrets ne sont dispo qu'au runtime).
 function makeTransporter() {
@@ -191,6 +192,38 @@ exports.impersonateClient = functions
       console.error("impersonateClient:", err);
       res.status(500).json({ error: err.message });
     }
+  });
+
+// ── SONDE AXONAUT (lecture seule) : découvrir les champs + récupération PDF ──
+function axonautGet(key, path) {
+  return new Promise((resolve) => {
+    https.get({ hostname: "axonaut.com", path, headers: { userApiKey: key, Accept: "application/json" } }, (r) => {
+      let d = ""; r.on("data", c => d += c);
+      r.on("end", () => resolve({ status: r.statusCode, headers: r.headers, body: d }));
+    }).on("error", e => resolve({ status: 0, error: e.message }));
+  });
+}
+exports.axonautProbe = functions
+  .region("europe-west1")
+  .runWith({ secrets: [AXONAUT_API_KEY] })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+    const key = AXONAUT_API_KEY.value();
+    const companies = await axonautGet(key, "/api/v2/companies?per_page=1");
+    const invoices = await axonautGet(key, "/api/v2/invoices?per_page=1");
+    // Logs détaillés pour analyse (les corps sont volumineux)
+    console.log("AXONAUT companies status:", companies.status, "body:", (companies.body || companies.error || "").slice(0, 2000));
+    console.log("AXONAUT invoices status:", invoices.status, "body:", (invoices.body || invoices.error || "").slice(0, 3000));
+    res.status(200).json({
+      companiesStatus: companies.status,
+      invoicesStatus: invoices.status,
+      companiesSample: (companies.body || companies.error || "").slice(0, 1500),
+      invoicesSample: (invoices.body || invoices.error || "").slice(0, 2500),
+    });
   });
 
 // ── ENVOYER NOTIFICATION EMAIL ────────────────────────────────────

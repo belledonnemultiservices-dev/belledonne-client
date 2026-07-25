@@ -716,7 +716,13 @@ window.removeFactLigne = function(i) {
 window.genererFactureAxonaut = async function() {
   const msg = document.getElementById('axonautMsg');
   msg.style.color = 'var(--text-muted)';
-  msg.textContent = 'Intégration API Axonaut en cours de construction (étape suivante).';
+  msg.textContent = 'Test connexion Axonaut...';
+  try {
+    const r = await window._callFn('axonautProbe', {});
+    msg.style.color = (r.companiesStatus === 200 && r.invoicesStatus === 200) ? 'var(--green-dark)' : 'var(--red)';
+    msg.textContent = 'Axonaut → companies: ' + r.companiesStatus + ', invoices: ' + r.invoicesStatus + (r.companiesStatus === 200 ? ' (clé OK)' : ' (vérifier la clé)');
+    console.log('AXONAUT PROBE', r);
+  } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }
 };
 
 function factureFileChosen() {
