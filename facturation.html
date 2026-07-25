@@ -820,6 +820,16 @@ window.genererFactureAxonaut = async function() {
       date: document.getElementById('fDateFacture').value || undefined,
       mode: 'facture'
     });
+    // Report du PDF + n° facture sur la ligne
+    const totalHT = (window._factLignes || []).reduce((s, l) => s + (Number(l.qte) || 0) * (Number(l.pu) || 0), 0);
+    const changes = { statut: 'Facturé', numFacture: r.number || '', factureUrl: r.pdfUrl || '', axonautId: r.id || '', montantHT: totalHT };
+    try {
+      await window._updateFacture(editFactId, changes);
+      const idx = factures.findIndex(f => f.id === editFactId);
+      if (idx !== -1) Object.assign(factures[idx], changes);
+      document.getElementById('fStatut').value = 'Facturé';
+      document.getElementById('fNumFacture').value = r.number || '';
+    } catch(e) { console.error('report ligne:', e); }
     msg.style.color = 'var(--green-dark)';
     msg.innerHTML = 'Facture créée ✓ ' + (r.number || '') + (r.pdfUrl ? ' — <a href="' + r.pdfUrl + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
   } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }

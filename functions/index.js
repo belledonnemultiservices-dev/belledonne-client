@@ -321,7 +321,7 @@ exports.createAxonautInvoice = functions
         date: rfcDate,
         products,
       };
-      if (objet) docBody.title = objet;
+      if (objet) { docBody.title = objet; docBody.comments = "Objet : " + objet; }
       if (bc) docBody.order_number = String(bc);
       const path = (mode === "devis") ? "/api/v2/quotations" : "/api/v2/invoices";
       console.log("AXONAUT create body:", JSON.stringify(docBody));
