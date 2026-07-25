@@ -145,9 +145,11 @@ function renderCards(data){
   } else {
     const c = Number(ovh.creditsLeft);
     const low = !isNaN(c) && c < SMS_SEUIL;
-    smsInner = `<div class="svc-metric">${isNaN(c)?'—':c}</div><div class="svc-unit">crédits SMS restants</div>` +
+    smsInner = `<div class="svc-metric">${isNaN(c)?'—':c}</div><div class="svc-unit">crédits SMS restants <span class="muted">(1 crédit ≈ 1 SMS de 160 caractères)</span></div>` +
       (low ? `<div class="badge-warn">⚠ Bientôt épuisé, pense à recharger</div>` : `<div class="badge-ok">Niveau OK</div>`);
   }
+  const rechargeLink = `<a href="https://www.ovh.com/manager/#/sms/" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:14px;font-size:12px;font-weight:600;color:var(--green-dark);text-decoration:none;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>Recharger sur OVH</a>`;
+  smsInner += rechargeLink;
 
   // Carte Claude
   let claudeInner;
