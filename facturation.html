@@ -363,6 +363,7 @@
           <button type="button" class="btn-save" id="btnGenAxonaut" onclick="genererFactureAxonaut()" style="background:var(--navy);">
             Générer la facture (Axonaut) → PDF
           </button>
+          <button type="button" onclick="resetFactLigne()" style="height:32px;padding:0 12px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-mid);">Réinitialiser la facturation</button>
           <span id="axonautMsg" style="font-size:12px;color:var(--text-muted);"></span>
         </div>
       </div>
@@ -801,6 +802,21 @@ window.removeFactLigne = function(i) {
   window._factLignes.splice(i, 1);
   if (!window._factLignes.length) window._factLignes.push({ designation: '', qte: 1, pu: 0, tva: 10 });
   renderFactLignes();
+};
+
+window.resetFactLigne = async function() {
+  if (!editFactId) return;
+  if (!confirm('Réinitialiser la facturation de cette ligne ?\nLe n° de facture, le PDF et le lien Axonaut seront retirés, la ligne repasse en "À facturer". La composition (objet/lignes/client) est conservée.')) return;
+  const changes = { statut: 'À facturer', numFacture: '', factureUrl: '', axonautId: '' };
+  try {
+    await window._updateFacture(editFactId, changes);
+    const idx = factures.findIndex(f => f.id === editFactId);
+    if (idx !== -1) Object.assign(factures[idx], changes);
+    document.getElementById('fStatut').value = 'À facturer';
+    document.getElementById('fNumFacture').value = '';
+    document.getElementById('axonautMsg').style.color = 'var(--text-muted)';
+    document.getElementById('axonautMsg').textContent = 'Facturation réinitialisée. Tu peux régénérer.';
+  } catch(e) { alert('Erreur : ' + e.message); }
 };
 
 window.genererFactureAxonaut = async function() {

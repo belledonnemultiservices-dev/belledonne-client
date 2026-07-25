@@ -321,8 +321,9 @@ exports.createAxonautInvoice = functions
         date: rfcDate,
         products,
       };
+      // Le BC est porté par l'objet (title/comments), pas par order_number
+      // (order_number impose l'unicité chez Axonaut -> 409 sur régénération).
       if (objet) { docBody.title = objet; docBody.comments = "Objet : " + objet; }
-      if (bc) docBody.order_number = String(bc);
       const path = (mode === "devis") ? "/api/v2/quotations" : "/api/v2/invoices";
       console.log("AXONAUT create body:", JSON.stringify(docBody));
       const cr = await axonautPost(key, path, docBody);
