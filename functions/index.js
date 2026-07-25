@@ -195,9 +195,10 @@ exports.impersonateClient = functions
   });
 
 // ── SONDE AXONAUT (lecture seule) : découvrir les champs + récupération PDF ──
-function axonautGet(key, path) {
+function axonautGet(key, path, extraHeaders) {
   return new Promise((resolve) => {
-    https.get({ hostname: "axonaut.com", path, headers: { userApiKey: key, Accept: "application/json" } }, (r) => {
+    const headers = Object.assign({ userApiKey: key, Accept: "application/json" }, extraHeaders || {});
+    https.get({ hostname: "axonaut.com", path, headers }, (r) => {
       let d = ""; r.on("data", c => d += c);
       r.on("end", () => resolve({ status: r.statusCode, headers: r.headers, body: d }));
     }).on("error", e => resolve({ status: 0, error: e.message }));
@@ -213,17 +214,135 @@ exports.axonautProbe = functions
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
     const key = AXONAUT_API_KEY.value();
-    const companies = await axonautGet(key, "/api/v2/companies?per_page=1");
-    const invoices = await axonautGet(key, "/api/v2/invoices?per_page=1");
-    // Logs détaillés pour analyse (les corps sont volumineux)
-    console.log("AXONAUT companies status:", companies.status, "body:", (companies.body || companies.error || "").slice(0, 2000));
-    console.log("AXONAUT invoices status:", invoices.status, "body:", (invoices.body || invoices.error || "").slice(0, 3000));
+    // Scanner les fiches clients pour trouver ACTIS (le filtre ?name= n'est pas fiable)
+    const found = [];
+    for (let page = 1; page <= 4; page++) {
+      const r = await axonautGet(key, "/api/v2/companies", { page: String(page) });
+      if (r.status !== 200) break;
+      let arr = [];
+      try { arr = JSON.parse(r.body); } catch(e) { break; }
+      if (!Array.isArray(arr) || !arr.length) break;
+      arr.forEach(co => { if (/actis/i.test(co.name || "")) found.push({ id: co.id, name: co.name, siret: co.siret, tva: co.intracommunity_number, ville: co.address_city }); });
+      if (arr.length < 500) break;
+    }
+    console.log("AXONAUT fiches ACTIS trouvees:", JSON.stringify(found));
+    // Première page de factures : structure d'une facture
+    const invoices = await axonautGet(key, "/api/v2/invoices", { page: "1" });
+    let invoicesStatus = invoices.status;
+    let firstInvoice = null;
+    try { const arr = JSON.parse(invoices.body); if (Array.isArray(arr) && arr.length) firstInvoice = arr[0]; } catch(e) {}
+    console.log("AXONAUT invoices status:", invoices.status, "premiere facture:", JSON.stringify(firstInvoice).slice(0, 2500));
+    // Détail de la première facture (pour voir le champ PDF)
+    let detailStatus = null, detailBody = "";
+    if (firstInvoice && firstInvoice.id) {
+      const detail = await axonautGet(key, "/api/v2/invoices/" + firstInvoice.id, { page: "1" });
+      detailStatus = detail.status; detailBody = detail.body || "";
+      console.log("AXONAUT invoice detail status:", detail.status, "body:", detailBody.slice(0, 3000));
+    }
     res.status(200).json({
-      companiesStatus: companies.status,
-      invoicesStatus: invoices.status,
-      companiesSample: (companies.body || companies.error || "").slice(0, 1500),
-      invoicesSample: (invoices.body || invoices.error || "").slice(0, 2500),
+      actisStatus: actis.status,
+      invoicesStatus,
+      invoiceKeys: firstInvoice ? Object.keys(firstInvoice) : [],
+      detailStatus,
     });
+  });
+
+// ── AXONAUT : création facture/devis + récupération du PDF ────────
+function axonautPost(key, path, body) {
+  return new Promise((resolve) => {
+    const data = JSON.stringify(body);
+    const r = https.request({
+      hostname: "axonaut.com", path, method: "POST",
+      headers: { userApiKey: key, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data), Accept: "application/json" },
+    }, (x) => { let d = ""; x.on("data", c => d += c); x.on("end", () => resolve({ status: x.statusCode, body: d })); });
+    r.on("error", e => resolve({ status: 0, error: e.message }));
+    r.write(data); r.end();
+  });
+}
+
+// Trouve une fiche client Axonaut par SIRET (chiffres) ou nom, sinon la crée.
+async function axonautFindOrCreateCompany(key, client) {
+  const digits = (client.siret || "").replace(/\D/g, "");
+  const nomNorm = (client.nom || "").trim().toLowerCase();
+  for (let page = 1; page <= 6; page++) {
+    const r = await axonautGet(key, "/api/v2/companies", { page: String(page) });
+    if (r.status !== 200) break;
+    let arr = []; try { arr = JSON.parse(r.body); } catch(e) { break; }
+    if (!Array.isArray(arr) || !arr.length) break;
+    const hit = arr.find(co => {
+      const coSiret = (co.siret || "").replace(/\D/g, "");
+      if (digits && coSiret && coSiret === digits) return true;
+      return nomNorm && (co.name || "").trim().toLowerCase() === nomNorm;
+    });
+    if (hit) return { id: hit.id, created: false };
+    if (arr.length < 500) break;
+  }
+  // Création
+  const payload = {
+    name: client.nom, is_customer: true, isB2C: client.type === "particulier",
+    address_street: client.adresse || "", address_zip_code: client.cp || "",
+    address_city: client.ville || "", address_country: "France",
+  };
+  if (client.siret) payload.siret = client.siret;
+  if (client.tva) payload.intracommunity_number = client.tva;
+  const cr = await axonautPost(key, "/api/v2/companies", payload);
+  if (cr.status < 200 || cr.status >= 300) throw { code: 502, msg: "Création client Axonaut échouée (" + cr.status + "): " + (cr.body || "").slice(0, 200) };
+  const created = JSON.parse(cr.body);
+  return { id: created.id, created: true };
+}
+
+exports.createAxonautInvoice = functions
+  .region("europe-west1")
+  .runWith({ secrets: [AXONAUT_API_KEY] })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { client, lignes, objet, bc, date, mode } = req.body || {};
+    if (!client || !client.nom) { res.status(400).json({ error: "Client (nom) requis" }); return; }
+    if (!Array.isArray(lignes) || !lignes.length) { res.status(400).json({ error: "Au moins une ligne requise" }); return; }
+    const key = AXONAUT_API_KEY.value();
+    try {
+      const company = await axonautFindOrCreateCompany(key, client);
+      const products = lignes.map(l => ({
+        name: (l.designation || "Prestation"),
+        price: Number(l.pu) || 0,
+        quantity: Number(l.qte) || 1,
+        tax_rate: Number(l.tva) || 0,
+      }));
+      const docBody = {
+        customer_id: company.id,
+        date: date || new Date().toISOString().slice(0, 10),
+        products,
+      };
+      if (objet) docBody.title = objet;
+      if (bc) docBody.order_number = String(bc);
+      const path = (mode === "facture") ? "/api/v2/invoices" : "/api/v2/quotations";
+      const cr = await axonautPost(key, path, docBody);
+      console.log("AXONAUT create", mode, "status", cr.status, "resp:", (cr.body || cr.error || "").slice(0, 1500));
+      if (cr.status < 200 || cr.status >= 300) {
+        res.status(502).json({ error: "Axonaut (" + cr.status + "): " + (cr.body || "").slice(0, 300) });
+        return;
+      }
+      const out = JSON.parse(cr.body);
+      res.status(200).json({
+        mode: mode || "devis",
+        companyId: company.id,
+        companyCreated: company.created,
+        id: out.id,
+        number: out.number || null,
+        pdfUrl: out.public_path || null,
+        portalUrl: out.customer_portal_url || null,
+        totalHT: out.pre_tax_amount, totalTTC: out.total,
+      });
+    } catch(err) {
+      console.error("createAxonautInvoice:", err);
+      res.status(err.code || 500).json({ error: err.msg || err.message });
+    }
   });
 
 // ── ENVOYER NOTIFICATION EMAIL ────────────────────────────────────

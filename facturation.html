@@ -299,8 +299,46 @@
             <input class="form-input" id="fObjet" placeholder="ex: Traitement 3D - BC 321314">
           </div>
           <div class="form-group form-full">
-            <label class="form-label">Client / entité (adresse, SIRET, TVA)</label>
-            <select class="form-select" id="fEntite"></select>
+            <label class="form-label">Client / entité enregistrée</label>
+            <select class="form-select" id="fEntite" onchange="onEntiteChange()"></select>
+          </div>
+        </div>
+        <div id="factClientManuel" class="form-grid" style="margin-top:4px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
+          <div class="form-group">
+            <label class="form-label">Type de client</label>
+            <select class="form-select" id="fcType" onchange="onFcTypeChange()">
+              <option value="bailleur">Bailleur / public (Chorus)</option>
+              <option value="entreprise">Entreprise</option>
+              <option value="particulier">Particulier</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" id="fcNomLabel">Raison sociale</label>
+            <input class="form-input" id="fcNom" placeholder="Nom du client">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Adresse</label>
+            <input class="form-input" id="fcAdresse" placeholder="N° et rue">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Code postal</label>
+            <input class="form-input" id="fcCP" placeholder="38000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ville</label>
+            <input class="form-input" id="fcVille" placeholder="Grenoble">
+          </div>
+          <div class="form-group fc-pro">
+            <label class="form-label">SIRET</label>
+            <input class="form-input" id="fcSiret" placeholder="14 chiffres">
+          </div>
+          <div class="form-group fc-pro">
+            <label class="form-label">N° TVA intracommunautaire</label>
+            <input class="form-input" id="fcTva" placeholder="FR...">
+          </div>
+          <div class="form-group fc-public">
+            <label class="form-label">Code service Chorus (public)</label>
+            <input class="form-input" id="fcChorusService" placeholder="ex: TMR / code service">
           </div>
         </div>
         <datalist id="bpuDatalist"></datalist>
@@ -657,6 +695,18 @@ async function loadFactComposition(item) {
   opts += '<option value="manuel">— Saisie manuelle / non renseigné —</option>';
   sel.innerHTML = opts;
   sel.value = (item.factEntiteIdx !== undefined && item.factEntiteIdx !== null && item.factEntiteIdx !== '') ? String(item.factEntiteIdx) : (_factEntites.length ? '0' : 'manuel');
+  // Client (saisie manuelle) : préremplissage
+  const fc = item.factClient || {};
+  document.getElementById('fcType').value = fc.type || 'bailleur';
+  document.getElementById('fcNom').value = fc.nom || item.client || '';
+  document.getElementById('fcAdresse').value = fc.adresse || '';
+  document.getElementById('fcCP').value = fc.cp || '';
+  document.getElementById('fcVille').value = fc.ville || '';
+  document.getElementById('fcSiret').value = fc.siret || '';
+  document.getElementById('fcTva').value = fc.tva || '';
+  document.getElementById('fcChorusService').value = fc.chorusService || '';
+  onFcTypeChange();
+  onEntiteChange();
   // Lignes
   if (Array.isArray(item.factLignes) && item.factLignes.length) {
     window._factLignes = item.factLignes.map(l => ({ designation: l.designation || '', qte: Number(l.qte) || 1, pu: Number(l.pu) || 0, tva: (l.tva !== undefined ? Number(l.tva) : 10) }));
@@ -706,6 +756,46 @@ function recomputeFactTotals() {
   const m = document.getElementById('fMontant'); if (m) m.value = ht.toFixed(2);
 }
 
+window.onEntiteChange = function() {
+  const v = document.getElementById('fEntite').value;
+  const manual = document.getElementById('factClientManuel');
+  if (v === 'manuel') { manual.style.display = ''; return; }
+  manual.style.display = 'none';
+  const e = _factEntites[Number(v)];
+  if (e) {
+    document.getElementById('fcType').value = e.type || 'bailleur';
+    document.getElementById('fcNom').value = e.nom || e.raisonSociale || '';
+    document.getElementById('fcAdresse').value = e.adresse || '';
+    document.getElementById('fcCP').value = e.cp || '';
+    document.getElementById('fcVille').value = e.ville || '';
+    document.getElementById('fcSiret').value = e.siret || '';
+    document.getElementById('fcTva').value = e.tva || '';
+    document.getElementById('fcChorusService').value = e.chorusService || '';
+    onFcTypeChange();
+  }
+};
+
+window.onFcTypeChange = function() {
+  const t = document.getElementById('fcType').value;
+  const pro = (t === 'entreprise' || t === 'bailleur');
+  document.querySelectorAll('.fc-pro').forEach(el => el.style.display = pro ? '' : 'none');
+  document.querySelectorAll('.fc-public').forEach(el => el.style.display = (t === 'bailleur') ? '' : 'none');
+  document.getElementById('fcNomLabel').textContent = (t === 'particulier') ? 'Nom et prénom' : 'Raison sociale';
+};
+
+function getFactClient() {
+  return {
+    type: document.getElementById('fcType').value,
+    nom: document.getElementById('fcNom').value.trim(),
+    adresse: document.getElementById('fcAdresse').value.trim(),
+    cp: document.getElementById('fcCP').value.trim(),
+    ville: document.getElementById('fcVille').value.trim(),
+    siret: document.getElementById('fcSiret').value.trim(),
+    tva: document.getElementById('fcTva').value.trim(),
+    chorusService: document.getElementById('fcChorusService').value.trim(),
+  };
+}
+
 window.addFactLigne = function() { window._factLignes.push({ designation: '', qte: 1, pu: 0, tva: 10 }); renderFactLignes(); };
 window.removeFactLigne = function(i) {
   window._factLignes.splice(i, 1);
@@ -715,14 +805,25 @@ window.removeFactLigne = function(i) {
 
 window.genererFactureAxonaut = async function() {
   const msg = document.getElementById('axonautMsg');
-  msg.style.color = 'var(--text-muted)';
-  msg.textContent = 'Test connexion Axonaut...';
+  const item = factures.find(f => f.id === editFactId) || {};
+  const client = getFactClient();
+  if (!client.nom) { msg.style.color = 'var(--red)'; msg.textContent = 'Renseigne le nom du client.'; return; }
+  const lignes = (window._factLignes || []).filter(l => (l.designation || '').trim() && Number(l.pu) > 0);
+  if (!lignes.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Ajoute au moins une ligne (désignation + prix).'; return; }
+  const btn = document.getElementById('btnGenAxonaut'); btn.disabled = true;
+  msg.style.color = 'var(--text-muted)'; msg.textContent = 'Génération dans Axonaut (devis test)...';
   try {
-    const r = await window._callFn('axonautProbe', {});
-    msg.style.color = (r.companiesStatus === 200 && r.invoicesStatus === 200) ? 'var(--green-dark)' : 'var(--red)';
-    msg.textContent = 'Axonaut → companies: ' + r.companiesStatus + ', invoices: ' + r.invoicesStatus + (r.companiesStatus === 200 ? ' (clé OK)' : ' (vérifier la clé)');
-    console.log('AXONAUT PROBE', r);
+    const r = await window._callFn('createAxonautInvoice', {
+      client, lignes,
+      objet: document.getElementById('fObjet').value.trim(),
+      bc: item.bc || '',
+      date: document.getElementById('fDateFacture').value || undefined,
+      mode: 'devis'
+    });
+    msg.style.color = 'var(--green-dark)';
+    msg.innerHTML = 'Devis test créé ✓ ' + (r.number || '') + (r.pdfUrl ? ' — <a href="' + r.pdfUrl + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
   } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }
+  finally { btn.disabled = false; }
 };
 
 function factureFileChosen() {
@@ -851,6 +952,7 @@ async function saveFact() {
     // Composition de la facture (objet, entité, lignes) — conservée sur le dossier
     changes.factObjet = document.getElementById('fObjet').value.trim();
     changes.factEntiteIdx = document.getElementById('fEntite').value;
+    changes.factClient = getFactClient();
     changes.factLignes = (window._factLignes || [])
       .filter(l => (l.designation || '').trim() || Number(l.pu) > 0)
       .map(l => ({ designation: (l.designation || '').trim(), qte: Number(l.qte) || 0, pu: Number(l.pu) || 0, tva: Number(l.tva) || 0 }));
