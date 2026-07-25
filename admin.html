@@ -284,7 +284,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, onSnapshot, query, where, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -478,6 +478,7 @@ function loadAccounts() {
           <div class="acc-id">${a.client || (a.role === 'admin' ? 'Administrateur' : '')}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
+          ${a.role === 'client' && a.uid ? `<button onclick="impersonate('${a.uid}','${a.identifiant}')" style="height:28px;padding:0 10px;border:1px solid var(--green);background:var(--green-pale);border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--green-dark);" title="Se connecter en tant que ce client (mode assistance)">Se connecter en tant que</button>` : ''}
           <button onclick="openChangePwd('${a.docId}','${a.uid}','${a.identifiant}')" style="height:28px;padding:0 10px;border:1px solid var(--border);background:transparent;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--text-mid);">Réinitialiser le mot de passe</button>
         </div>
         <div class="acc-actions">
@@ -486,6 +487,16 @@ function loadAccounts() {
       </div>`).join('');
   }, (e) => console.error('loadAccounts error:', e));
 }
+
+// Mode assistance : se connecter en tant que le client (remplace la session admin).
+window.impersonate = async function(uid, identifiant) {
+  if (!confirm('Se connecter en tant que "' + identifiant + '" ?\n\nTu verras son espace exactement comme lui. Ta session admin sera remplacée : pour revenir, clique "Quitter le mode assistance" puis reconnecte-toi.')) return;
+  try {
+    const { token } = await callFn("impersonateClient", { uid });
+    await signInWithCustomToken(auth, token);
+    window.location.href = "dashboard.html";
+  } catch(e) { alert("Erreur : " + e.message); }
+};
 
 window.deleteAccount = async function(docId, identifiant, uid) {
   if (!confirm("Supprimer le compte \"" + identifiant + "\" ?")) return;

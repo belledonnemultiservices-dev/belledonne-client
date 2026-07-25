@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const FC = {
@@ -77,6 +77,29 @@ function setup() {
   });
 }
 
+// ── Bandeau "Mode assistance" (impersonation) : affiché sur toute page si la
+//    session courante a été ouverte par un admin via "Se connecter en tant que". ──
+function assistBanner() {
+  onAuthStateChanged(auth, async user => {
+    if (!user) return;
+    let claims = {};
+    try { claims = (await user.getIdTokenResult()).claims || {}; } catch(e) { return; }
+    if (!claims.impersonatedBy) return;
+    if (document.getElementById('assist-banner')) return;
+    const bar = document.createElement('div');
+    bar.id = 'assist-banner';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#B91C1C;color:#fff;font-family:sans-serif;font-size:13px;font-weight:600;padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+    bar.innerHTML = 'Mode assistance : connecté en tant que ' + (user.email || 'client') +
+      ' <button id="assist-exit" style="background:#fff;color:#B91C1C;border:none;border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer;font-size:12px;">Quitter le mode assistance</button>';
+    document.body.appendChild(bar);
+    document.body.style.paddingTop = (document.body.style.paddingTop ? '' : '40px');
+    document.getElementById('assist-exit').addEventListener('click', async () => {
+      await signOut(auth);
+      window.location.href = 'login.html';
+    });
+  });
+}
+
 document.readyState === 'loading'
-  ? document.addEventListener('DOMContentLoaded', setup)
-  : setup();
+  ? document.addEventListener('DOMContentLoaded', () => { setup(); assistBanner(); })
+  : (setup(), assistBanner());
