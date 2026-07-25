@@ -4,6 +4,8 @@ const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const https = require("https");
 const http = require("http");
+const { ImapFlow } = require("imapflow");
+const { simpleParser } = require("mailparser");
 
 admin.initializeApp();
 
@@ -355,27 +357,15 @@ const EXTRACTION_TOOL = {
   },
 };
 
-async function getOrCreateLabel(gmail, labelName) {
-  const res = await gmail.users.labels.list({ userId: "me" });
-  const existing = (res.data.labels || []).find(l => l.name === labelName);
-  if (existing) return existing.id;
-  const created = await gmail.users.labels.create({
-    userId: "me",
-    requestBody: { name: labelName, labelListVisibility: "labelShow", messageListVisibility: "show" },
-  });
-  return created.data.id;
-}
-
-function flattenParts(payload, acc = []) {
-  if (!payload) return acc;
-  acc.push(payload);
-  if (payload.parts) payload.parts.forEach(p => flattenParts(p, acc));
-  return acc;
+// Crée un dossier/label IMAP s'il n'existe pas (Gmail expose ses labels comme dossiers IMAP).
+async function ensureMailbox(client, path) {
+  if (!path) return;
+  try { await client.mailboxCreate(path); } catch(e) { /* existe déjà */ }
 }
 
 async function parsePdfWithClaude(anthropic, pdfBase64, filename, systemPrompt) {
   const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 2048,
     system: systemPrompt,
     tools: [EXTRACTION_TOOL],
@@ -406,7 +396,7 @@ async function parseDocWithClaude(anthropic, docBuffer, filename, systemPrompt) 
     throw new Error(`Fichier DOC vide ou illisible: ${filename}`);
   }
   const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 2048,
     system: systemPrompt,
     tools: [EXTRACTION_TOOL],
@@ -421,10 +411,10 @@ async function parseDocWithClaude(anthropic, docBuffer, filename, systemPrompt) 
   return toolUse.input.data || {};
 }
 
-async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteId, labelArchiveId, source, sourceId) {
-  const email = await gmail.users.messages.get({ userId: "me", id: messageId, format: "full" });
-  const headers = email.data.payload.headers || [];
-  const subject = (headers.find(h => h.name === "Subject") || {}).value || "";
+// Traite un email déjà téléchargé et parsé (via IMAP + mailparser).
+// Retourne { ok:true, finalBc } si un document a été importé, { skipped:true } sinon.
+async function processParsedEmail(anthropic, db, parsed, source, sourceId) {
+  const subject = parsed.subject || "";
 
   let docNumber = "";
   if (source.subjectNumberRegex) {
@@ -435,52 +425,45 @@ async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteI
       console.warn(`Source ${sourceId}: regex invalide "${source.subjectNumberRegex}"`);
     }
   }
-  console.log(`Email ${messageId}: sujet="${subject}", N°="${docNumber}"`);
+  console.log(`Email: sujet="${subject}", N°="${docNumber}"`);
 
-  const allParts = flattenParts(email.data.payload);
+  const atts = parsed.attachments || [];
+  const isPdf = a => a.contentType === "application/pdf" || (a.filename || "").toUpperCase().endsWith(".PDF");
+  const isDoc = a => {
+    const f = (a.filename || "").toUpperCase();
+    return a.contentType === "application/msword" ||
+           a.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+           f.endsWith(".DOC") || f.endsWith(".DOCX");
+  };
+  const pdfAtt = atts.find(isPdf);
+  const docAtt = !pdfAtt && atts.find(isDoc);
+  const attach = pdfAtt || docAtt;
 
-  const pdfPart = allParts.find(p =>
-    (p.mimeType === "application/pdf" || (p.filename && p.filename.toUpperCase().endsWith(".PDF"))) &&
-    p.body && p.body.attachmentId
-  );
-  const docPart = !pdfPart && allParts.find(p => {
-    const fname = (p.filename || "").toUpperCase();
-    return (p.mimeType === "application/msword" ||
-            p.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-            fname.endsWith(".DOC") || fname.endsWith(".DOCX")) &&
-           p.body && p.body.attachmentId;
-  });
-  const attachPart = pdfPart || docPart;
-
-  const labelIds = [labelTraiteId];
-  if (labelArchiveId) labelIds.push(labelArchiveId);
-
-  if (!attachPart) {
-    console.log(`Email ${messageId}: aucune pièce jointe PDF/DOC — email ignoré (probablement hors-sujet)`);
-    return;
+  if (!attach) {
+    console.log(`Email "${subject}": aucune pièce jointe PDF/DOC — ignoré (probablement hors-sujet)`);
+    return { skipped: true };
   }
 
-  console.log(`Email ${messageId}: pièce jointe "${attachPart.filename}" — téléchargement...`);
-  const att = await gmail.users.messages.attachments.get({ userId: "me", messageId, id: attachPart.body.attachmentId });
-  const fileBase64 = att.data.data.replace(/-/g, "+").replace(/_/g, "/");
-  const fileBuffer = Buffer.from(fileBase64, "base64");
+  const fileBuffer = attach.content; // Buffer fourni par mailparser
+  const fileBase64 = fileBuffer.toString("base64");
+  const filename = attach.filename || (pdfAtt ? "document.pdf" : "document.doc");
 
-  console.log(`Email ${messageId}: extraction Claude...`);
+  console.log(`Email: pièce jointe "${filename}" — extraction Claude...`);
   let extractedData;
-  if (pdfPart) {
-    extractedData = await parsePdfWithClaude(anthropic, fileBase64, attachPart.filename || "document.pdf", source.claudeSystemPrompt || "");
+  if (pdfAtt) {
+    extractedData = await parsePdfWithClaude(anthropic, fileBase64, filename, source.claudeSystemPrompt || "");
   } else {
-    extractedData = await parseDocWithClaude(anthropic, fileBuffer, attachPart.filename || "document.doc", source.claudeSystemPrompt || "");
+    extractedData = await parseDocWithClaude(anthropic, fileBuffer, filename, source.claudeSystemPrompt || "");
   }
 
-  console.log(`Email ${messageId}: upload Storage...`);
+  console.log(`Email: upload Storage...`);
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
   const storageFolder = source.pdfType === "PL" ? "suivi/pl" : "suivi/bc";
-  const storagePath = `${storageFolder}/${Date.now()}_${(attachPart.filename || "doc").replace(/\s/g, "_")}`;
+  const storagePath = `${storageFolder}/${Date.now()}_${filename.replace(/\s/g, "_")}`;
   const downloadToken = crypto.randomUUID();
   try {
     await bucket.file(storagePath).save(fileBuffer, {
-      contentType: pdfPart ? "application/pdf" : "application/octet-stream",
+      contentType: pdfAtt ? "application/pdf" : "application/octet-stream",
       metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
     });
   } catch(e) {
@@ -488,7 +471,7 @@ async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteI
   }
   const bcUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
 
-  console.log(`Email ${messageId}: écriture Firestore...`);
+  console.log(`Email: écriture Firestore...`);
   const finalBc = extractedData.bc || docNumber || "";
   try {
     const docRef = await db.collection("suivi").add({
@@ -503,39 +486,56 @@ async function processEmailGeneric(gmail, anthropic, db, messageId, labelTraiteI
       pdfType: source.pdfType || "BC",
       createdAt: new Date().toISOString(),
     });
-    console.log(`Email ${messageId}: Firestore OK doc=${docRef.id}`);
+    console.log(`Email: Firestore OK doc=${docRef.id}`);
   } catch(e) {
     throw new Error(`Firestore ERREUR: ${e.message}`);
   }
 
-  await gmail.users.messages.modify({ userId: "me", id: messageId, requestBody: { addLabelIds: labelIds, removeLabelIds: ["INBOX", "UNREAD"] } });
   console.log(`✅ ${source.pdfType || "BC"} ${finalBc || "?"} importé — ${source.clientLabel}`);
+  return { ok: true, finalBc };
 }
 
-async function processSource(gmail, anthropic, db, source, sourceRef) {
-  const labelTraiteId = await getOrCreateLabel(gmail, source.gmailLabelTraite);
-  let labelArchiveId = null;
-  if (source.gmailDossierArchive) {
-    labelArchiveId = await getOrCreateLabel(gmail, source.gmailDossierArchive);
-  }
+async function processSource(client, anthropic, db, source, sourceRef) {
+  // S'assurer que les dossiers/labels de destination existent
+  await ensureMailbox(client, source.gmailLabelTraite);
+  if (source.gmailDossierArchive) await ensureMailbox(client, source.gmailDossierArchive);
 
+  // Même logique de recherche qu'avant, via la recherche Gmail brute (X-GM-RAW) sur la boîte de réception
   const fromFilter = (source.senderEmails || []).map(e => `from:${e}`).join(" OR ");
-  let q = `(${fromFilter}) -label:${source.gmailLabelTraite}`;
+  let q = `(${fromFilter})`;
+  if (source.gmailLabelTraite) q += ` -label:"${source.gmailLabelTraite}"`;
   if (source.subjectContains) q += ` subject:"${source.subjectContains}"`;
   if (source.startDate) q += ` after:${source.startDate.replace(/-/g, "/")}`;
 
-  const searchRes = await gmail.users.messages.list({ userId: "me", q, maxResults: 20 });
-  const messages = searchRes.data.messages || [];
-  console.log(`Source ${sourceRef.id}: ${messages.length} email(s) à traiter`);
-
   let processed = 0;
-  for (const msg of messages) {
-    try {
-      await processEmailGeneric(gmail, anthropic, db, msg.id, labelTraiteId, labelArchiveId, source, sourceRef.id);
-      processed++;
-    } catch(e) {
-      console.error(`Source ${sourceRef.id} - Email ${msg.id}:`, e.message);
+  const lock = await client.getMailboxLock("INBOX");
+  try {
+    let uids = await client.search({ gmailRaw: q }, { uid: true });
+    uids = (uids || []).slice(0, 20);
+    console.log(`Source ${sourceRef.id}: ${uids.length} email(s) à traiter`);
+
+    for (const uid of uids) {
+      try {
+        const msg = await client.fetchOne(uid, { source: true }, { uid: true });
+        if (!msg || !msg.source) { console.warn(`uid ${uid}: source vide`); continue; }
+        const parsed = await simpleParser(msg.source);
+        const result = await processParsedEmail(anthropic, db, parsed, source, sourceRef.id);
+        if (result && result.ok) {
+          // Marquer lu, poser le label "traité" (sort de la boîte de réception) et archiver
+          await client.messageFlagsAdd(uid, ["\\Seen"], { uid: true });
+          if (source.gmailDossierArchive) {
+            try { await client.messageCopy(uid, source.gmailDossierArchive, { uid: true }); }
+            catch(e) { console.warn(`Archive copy échouée (uid ${uid}):`, e.message); }
+          }
+          await client.messageMove(uid, source.gmailLabelTraite, { uid: true });
+          processed++;
+        }
+      } catch(e) {
+        console.error(`Source ${sourceRef.id} - uid ${uid}:`, e.message);
+      }
     }
+  } finally {
+    lock.release();
   }
 
   await sourceRef.update({
@@ -554,15 +554,7 @@ exports.processIncomingBC = functions
   .onRun(async () => {
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
-    const { google } = require("googleapis");
     const Anthropic = require("@anthropic-ai/sdk");
-
-    const oAuth2Client = new google.auth.OAuth2(
-      functions.config().gmail.oauth_client_id,
-      functions.config().gmail.oauth_client_secret
-    );
-    oAuth2Client.setCredentials({ refresh_token: functions.config().gmail.oauth_refresh_token });
-    const gmail = google.gmail({ version: "v1", auth: oAuth2Client });
     const anthropic = new Anthropic({ apiKey: functions.config().anthropic.api_key });
 
     let sourcesSnap;
@@ -578,25 +570,44 @@ exports.processIncomingBC = functions
       return;
     }
 
+    // Connexion Gmail via IMAP + mot de passe d'application (ne périme jamais,
+    // contrairement au refresh token OAuth qui expirait tous les 7 jours).
+    const client = new ImapFlow({
+      host: "imap.gmail.com",
+      port: 993,
+      secure: true,
+      auth: { user: gmailUser, pass: gmailPass },
+      logger: false,
+    });
+    try {
+      await client.connect();
+    } catch(e) {
+      console.error("Connexion IMAP échouée:", e.message);
+      return;
+    }
+
     const now = new Date();
+    try {
+      for (const sourceDoc of sourcesSnap.docs) {
+        const source = sourceDoc.data();
 
-    for (const sourceDoc of sourcesSnap.docs) {
-      const source = sourceDoc.data();
+        // Pour les fréquences > 15 min, vérifier si assez de temps s'est écoulé
+        if (source.lastRun && (source.checkFrequencyMinutes || 15) > 15) {
+          const minutesSinceLast = (now - new Date(source.lastRun)) / 60000;
+          if (minutesSinceLast < source.checkFrequencyMinutes) {
+            console.log(`Source ${sourceDoc.id}: skip (${Math.round(minutesSinceLast)}min / ${source.checkFrequencyMinutes}min requis)`);
+            continue;
+          }
+        }
 
-      // Pour les fréquences > 15 min, vérifier si assez de temps s'est écoulé
-      if (source.lastRun && (source.checkFrequencyMinutes || 15) > 15) {
-        const minutesSinceLast = (now - new Date(source.lastRun)) / 60000;
-        if (minutesSinceLast < source.checkFrequencyMinutes) {
-          console.log(`Source ${sourceDoc.id}: skip (${Math.round(minutesSinceLast)}min / ${source.checkFrequencyMinutes}min requis)`);
-          continue;
+        try {
+          const processed = await processSource(client, anthropic, db, source, sourceDoc.ref);
+          console.log(`Source ${sourceDoc.id}: ${processed} document(s) importé(s).`);
+        } catch(e) {
+          console.error(`Source ${sourceDoc.id}: erreur:`, e.message);
         }
       }
-
-      try {
-        const processed = await processSource(gmail, anthropic, db, source, sourceDoc.ref);
-        console.log(`Source ${sourceDoc.id}: ${processed} document(s) importé(s).`);
-      } catch(e) {
-        console.error(`Source ${sourceDoc.id}: erreur:`, e.message);
-      }
+    } finally {
+      try { await client.logout(); } catch(e) { /* ignore */ }
     }
   });
