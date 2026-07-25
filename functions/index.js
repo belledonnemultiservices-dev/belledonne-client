@@ -17,14 +17,43 @@ const transporter = nodemailer.createTransport({
   auth: { user: gmailUser, pass: gmailPass },
 });
 
+// ── SÉCURITÉ : exiger un jeton Firebase valide + rôle admin ───────
+// Lève { code, msg } si le jeton est absent/invalide ou si l'utilisateur
+// n'est pas administrateur. Protège les fonctions HTTP (sinon ouvertes à tous).
+async function verifyAdmin(req) {
+  const authz = req.get("Authorization") || req.headers.authorization || "";
+  const m = authz.match(/^Bearer\s+(.+)$/i);
+  if (!m) throw { code: 401, msg: "Authentification requise" };
+  let decoded;
+  try {
+    decoded = await admin.auth().verifyIdToken(m[1]);
+  } catch(e) {
+    throw { code: 401, msg: "Jeton invalide ou expiré" };
+  }
+  const { getFirestore } = require("firebase-admin/firestore");
+  const db = getFirestore(admin.app(), "belledonne-client");
+  let role = null;
+  try {
+    const snap = await db.collection("users").where("uid", "==", decoded.uid).limit(1).get();
+    if (!snap.empty) role = snap.docs[0].data().role || null;
+  } catch(e) {
+    throw { code: 500, msg: "Erreur vérification du rôle" };
+  }
+  if (role !== "admin" && role !== "administrateur") {
+    throw { code: 403, msg: "Accès réservé aux administrateurs" };
+  }
+  return decoded;
+}
+
 // ── SUPPRIMER UTILISATEUR FIREBASE AUTH ───────────────────────────
 exports.deleteAuthUser = functions
   .region("europe-west1")
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
     const { uid } = req.body;
     if (!uid) { res.status(400).json({ error: "uid manquant" }); return; }
@@ -61,9 +90,10 @@ exports.sendNotification = functions
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
     const { to, subject, body, attachments } = req.body;
     if (!to || !subject || !body) {
@@ -108,9 +138,10 @@ exports.sendSMS = functions
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
     const { to, message } = req.body;
     if (!to || !message) {
@@ -195,9 +226,10 @@ exports.addToCalendar = functions
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
     const { technicienEmail, passages, nature, nomClient, adresse, bc, observations, interventionId, operation, calEventId, colorId } = req.body;
 
