@@ -1191,7 +1191,7 @@ function updateNotifyBtn() {
 
 async function _calendarRequest(payload) {
   const resp = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    method: 'POST', headers: await window._authHeaders(), body: JSON.stringify(payload)
   });
   return resp.json();
 }
@@ -1681,7 +1681,7 @@ window.sendNotifRapport = async function() {
   let sent = 0;
   for (const to of recipients) {
     try {
-      const resp = await fetch(window.FUNCTION_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, subject, body, attachments }) });
+      const resp = await fetch(window.FUNCTION_URL, { method: 'POST', headers: await window._authHeaders(), body: JSON.stringify({ to, subject, body, attachments }) });
       if (resp.ok) sent++;
     } catch (e) { /* compté comme échec */ }
   }
@@ -2542,7 +2542,7 @@ async function sendSmsNotif() {
   try {
     const resp = await fetch(window.SMS_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendSMS', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: await window._authHeaders(),
       body: JSON.stringify({to: phone, message})
     });
     const data = await resp.json();
@@ -2674,7 +2674,7 @@ window.sendNotifSuivi = async function() {
     try {
       const resp = await fetch(window.FUNCTION_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification', {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        headers: await window._authHeaders(),
         body: JSON.stringify({to, subject, body, attachments})
       });
       if (resp.ok) sent++;
@@ -2786,7 +2786,7 @@ async function sendRappelSms() {
   btn.disabled = true; btn.textContent = 'Envoi...';
   try {
     var resp = await fetch(window.SMS_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendSMS', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: await window._authHeaders(),
       body: JSON.stringify({to: phone, message: message})
     });
     var data = await resp.json();
@@ -3392,6 +3392,16 @@ const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",auth
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 const storage = getStorage(app);
+
+// En-têtes d'appel aux Cloud Functions, avec le jeton Firebase de l'admin connecté
+// (les fonctions exigent désormais un jeton valide + rôle admin).
+window._authHeaders = async function() {
+  try {
+    const u = auth.currentUser;
+    if (u) return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (await u.getIdToken()) };
+  } catch(e) { /* pas de jeton dispo */ }
+  return { 'Content-Type': 'application/json' };
+};
 
 // ── FIREBASE HELPERS ──
 window._uploadPdf = async function(file, path) {

@@ -958,7 +958,8 @@ window._doSendNotification = async function() {
   let sent=0;let errors=0;
   for(const to of recipients) {
     try {
-      const resp=await fetch(FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to,subject,body,attachments})});
+      const _hdrs=auth.currentUser?{'Content-Type':'application/json','Authorization':'Bearer '+(await auth.currentUser.getIdToken())}:{'Content-Type':'application/json'};
+      const resp=await fetch(FUNCTION_URL,{method:'POST',headers:_hdrs,body:JSON.stringify({to,subject,body,attachments})});
       if(resp.ok) sent++; else errors++;
     } catch(e){errors++;}
   }
