@@ -469,16 +469,23 @@ async function processParsedEmail(anthropic, db, parsed, source, sourceId) {
   } catch(e) {
     throw new Error(`Storage ERREUR: ${e.message}`);
   }
-  const bcUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+  const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
 
   console.log(`Email: écriture Firestore...`);
-  const finalBc = extractedData.bc || docNumber || "";
+  const isPL = source.pdfType === "PL";
+  // Pour un PL : le n° va dans le champ `pl` (extrait par Claude, ou n° du sujet en secours)
+  // et le PDF dans `plUrl`. Pour un BC : n° dans `bc`, PDF dans `bcUrl`.
+  const finalBc = isPL ? "" : (extractedData.bc || docNumber || "");
+  const finalPl = isPL ? (extractedData.pl || docNumber || "") : (extractedData.pl || "");
+  const docFields = isPL ? { plUrl: fileUrl } : { bcUrl: fileUrl };
+  const numRef = isPL ? finalPl : finalBc;
   try {
     const docRef = await db.collection("suivi").add({
       ...extractedData,
       bc: finalBc,
+      pl: finalPl,
       client: source.clientFirestore || extractedData.client || "",
-      bcUrl,
+      ...docFields,
       clientType: "contrat",
       statut: "À valider",
       source: "auto",
@@ -491,8 +498,8 @@ async function processParsedEmail(anthropic, db, parsed, source, sourceId) {
     throw new Error(`Firestore ERREUR: ${e.message}`);
   }
 
-  console.log(`✅ ${source.pdfType || "BC"} ${finalBc || "?"} importé — ${source.clientLabel}`);
-  return { ok: true, finalBc };
+  console.log(`✅ ${source.pdfType || "BC"} ${numRef || "?"} importé — ${source.clientLabel}`);
+  return { ok: true, finalBc: numRef };
 }
 
 async function processSource(client, anthropic, db, source, sourceRef) {
