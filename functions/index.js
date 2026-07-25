@@ -262,48 +262,6 @@ function ovhGetSmsCredits() {
   });
 }
 
-// Coût Claude du mois en cours via l'Admin API Anthropic (clé sk-ant-admin…).
-function anthropicMonthlyCost() {
-  return new Promise((resolve) => {
-    let adminKey;
-    try { adminKey = functions.config().anthropic.admin_key; } catch(e) { adminKey = null; }
-    if (!adminKey) { resolve({ error: "Clé Admin Anthropic non configurée" }); return; }
-    const now = new Date();
-    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-    const end = now.toISOString();
-    const path = `/v1/organizations/cost_report?starting_at=${encodeURIComponent(start)}&ending_at=${encodeURIComponent(end)}`;
-    const req = https.request({
-      hostname: "api.anthropic.com", path, method: "GET",
-      headers: { "anthropic-version": "2023-06-01", "x-api-key": adminKey },
-    }, (r) => {
-      let d = ""; r.on("data", c => d += c);
-      r.on("end", () => {
-        if (r.statusCode !== 200) {
-          let msg = "Anthropic " + r.statusCode;
-          try { msg = JSON.parse(d).error?.message || msg; } catch(e) {}
-          resolve({ error: msg });
-          return;
-        }
-        try {
-          const j = JSON.parse(d);
-          // Somme de tous les montants (chaînes décimales en cents) sur le mois
-          let cents = 0;
-          const buckets = j.data || [];
-          for (const b of buckets) {
-            for (const item of (b.results || [])) {
-              const amt = parseFloat(item.amount ?? item.cost ?? 0);
-              if (!isNaN(amt)) cents += amt;
-            }
-          }
-          resolve({ costUsd: Math.round(cents) / 100, monthStart: start });
-        } catch(e) { resolve({ error: "Réponse Anthropic illisible" }); }
-      });
-    });
-    req.on("error", e => resolve({ error: e.message }));
-    req.end();
-  });
-}
-
 exports.getServicesUsage = functions
   .region("europe-west1")
   .https.onRequest(async (req, res) => {
@@ -313,8 +271,8 @@ exports.getServicesUsage = functions
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
     try {
-      const [ovh, claude] = await Promise.all([ovhGetSmsCredits(), anthropicMonthlyCost()]);
-      res.status(200).json({ ovh, claude, checkedAt: new Date().toISOString() });
+      const ovh = await ovhGetSmsCredits();
+      res.status(200).json({ ovh, checkedAt: new Date().toISOString() });
     } catch(err) {
       res.status(500).json({ error: err.message });
     }
