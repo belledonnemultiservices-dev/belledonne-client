@@ -826,7 +826,11 @@ let _unsubGaranties = null;
 window._loadGaranties = function(clientFilter) {
   window._currentClientFilter = clientFilter;
   if (_unsubGaranties) { _applyGarantiesFilter(); return; }
-  _unsubGaranties = onSnapshot(collection(db, "garanties"), (snap) => {
+  // Client : listener filtré sur SON client (imposé par les règles). Admin : tout.
+  const ref = clientFilter
+    ? query(collection(db, "garanties"), where("client", "==", clientFilter))
+    : collection(db, "garanties");
+  _unsubGaranties = onSnapshot(ref, (snap) => {
     window._garantiesAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     _applyGarantiesFilter();
   }, (e) => console.error(e));

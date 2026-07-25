@@ -556,7 +556,11 @@ window._currentClientFilter = null;
 // ── Charger ──
 async function loadProtocoles(clientFilter) {
   try {
-    const snap = await getDocs(collection(db, "protocoles"));
+    // Client : requête filtrée sur SON client (imposé par les règles). Admin : tout.
+    const pref = clientFilter
+      ? query(collection(db, "protocoles"), where("client", "==", clientFilter))
+      : collection(db, "protocoles");
+    const snap = await getDocs(pref);
     let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     if (clientFilter) docs = docs.filter(p => p.client === clientFilter);
     docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));

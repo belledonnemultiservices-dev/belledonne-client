@@ -803,7 +803,11 @@ let _unsubAbsents = null;
 window._loadAbsents = function(clientFilter) {
   window._currentClientFilter = clientFilter;
   if (_unsubAbsents) { _applyAbsentsFilter(); return; }
-  _unsubAbsents = onSnapshot(collection(db, "absents"), (snap) => {
+  // Client : listener filtré sur SON client (imposé par les règles). Admin : tout.
+  const ref = clientFilter
+    ? query(collection(db, "absents"), where("client", "==", clientFilter))
+    : collection(db, "absents");
+  _unsubAbsents = onSnapshot(ref, (snap) => {
     window._absentsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     _applyAbsentsFilter();
   }, (e) => console.error(e));

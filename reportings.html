@@ -771,7 +771,11 @@ function applyClientFilter() {
 
 window._loadCampagnes = async function(clientFilter) {
   try {
-    const snap = await getDocs(collection(db, "campagnes"));
+    // Client (ou admin filtré) : requête filtrée. Admin "Tous" : lecture complète.
+    const cref = clientFilter
+      ? query(collection(db, "campagnes"), where("client", "==", clientFilter))
+      : collection(db, "campagnes");
+    const snap = await getDocs(cref);
     let docs = snap.docs.map(d => ({ id: d.id, ...d.data(), docs: d.data().docs || [] }));
     if (clientFilter) docs = docs.filter(c => c.client === clientFilter);
     docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));

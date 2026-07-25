@@ -343,10 +343,11 @@ async function loadClientDashboard(clientFilter) {
   const mois = getMoisStr();
   const annee = new Date().getFullYear().toString();
 
+  // Requêtes filtrées par client (cloisonnement imposé par les règles Firestore).
   const [snapR, snapG, snapA, snapConfig] = await Promise.all([
-    getDocs(collection(db, "rapports")),
-    getDocs(collection(db, "garanties")),
-    getDocs(collection(db, "absents")),
+    getDocs(query(collection(db, "rapports"), where("client", "==", clientFilter))),
+    getDocs(query(collection(db, "garanties"), where("client", "==", clientFilter))),
+    getDocs(query(collection(db, "absents"), where("client", "==", clientFilter))),
     getDocs(collection(db, "config")),
   ]);
 

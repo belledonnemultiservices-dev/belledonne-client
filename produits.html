@@ -571,7 +571,11 @@ window.deleteProduit = async function(id) {
 // Charger les produits depuis Firestore
 async function loadProduits(clientFilter) {
   try {
-    const snap = await getDocs(collection(db, "produits"));
+    // Client : requête filtrée sur SON client (imposé par les règles). Admin : tout.
+    const cref = clientFilter
+      ? query(collection(db, "produits"), where("client", "==", clientFilter))
+      : collection(db, "produits");
+    const snap = await getDocs(cref);
     let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     if (clientFilter) docs = docs.filter(p => p.client === clientFilter);
     docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
