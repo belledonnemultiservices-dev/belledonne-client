@@ -811,28 +811,32 @@ window.genererFactureAxonaut = async function() {
   const lignes = (window._factLignes || []).filter(l => (l.designation || '').trim() && Number(l.pu) > 0);
   if (!lignes.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Ajoute au moins une ligne (désignation + prix).'; return; }
   if ((item.axonautId || item.factureUrl) && !confirm('Une facture existe déjà pour cette ligne (' + (item.numFacture || '') + ').\nEn créer une nouvelle dans Axonaut ?')) return;
+  // MODE : 'devis' pour tester (supprimable), 'facture' pour la production.
+  const MODE = window._factMode || 'devis';
   const btn = document.getElementById('btnGenAxonaut'); btn.disabled = true;
-  msg.style.color = 'var(--text-muted)'; msg.textContent = 'Génération de la facture dans Axonaut...';
+  msg.style.color = 'var(--text-muted)'; msg.textContent = (MODE === 'facture' ? 'Génération de la facture' : 'Génération d\'un devis test') + ' dans Axonaut...';
   try {
     const r = await window._callFn('createAxonautInvoice', {
       client, lignes,
       objet: document.getElementById('fObjet').value.trim(),
       bc: item.bc || '',
       date: document.getElementById('fDateFacture').value || undefined,
-      mode: 'facture'
+      mode: MODE
     });
-    // Report du PDF + n° facture sur la ligne
-    const totalHT = (window._factLignes || []).reduce((s, l) => s + (Number(l.qte) || 0) * (Number(l.pu) || 0), 0);
-    const changes = { statut: 'Facturé', numFacture: r.number || '', factureUrl: r.pdfUrl || '', axonautId: r.id || '', montantHT: totalHT };
-    try {
-      await window._updateFacture(editFactId, changes);
-      const idx = factures.findIndex(f => f.id === editFactId);
-      if (idx !== -1) Object.assign(factures[idx], changes);
-      document.getElementById('fStatut').value = 'Facturé';
-      document.getElementById('fNumFacture').value = r.number || '';
-    } catch(e) { console.error('report ligne:', e); }
+    // Report sur la ligne uniquement pour une vraie facture
+    if (MODE === 'facture') {
+      const totalHT = (window._factLignes || []).reduce((s, l) => s + (Number(l.qte) || 0) * (Number(l.pu) || 0), 0);
+      const changes = { statut: 'Facturé', numFacture: r.number || '', factureUrl: r.pdfUrl || '', axonautId: r.id || '', montantHT: totalHT };
+      try {
+        await window._updateFacture(editFactId, changes);
+        const idx = factures.findIndex(f => f.id === editFactId);
+        if (idx !== -1) Object.assign(factures[idx], changes);
+        document.getElementById('fStatut').value = 'Facturé';
+        document.getElementById('fNumFacture').value = r.number || '';
+      } catch(e) { console.error('report ligne:', e); }
+    }
     msg.style.color = 'var(--green-dark)';
-    msg.innerHTML = 'Facture créée ✓ ' + (r.number || '') + (r.pdfUrl ? ' — <a href="' + r.pdfUrl + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
+    msg.innerHTML = (MODE === 'facture' ? 'Facture créée ✓ ' : 'Devis test créé ✓ ') + (r.number || '') + (r.pdfUrl ? ' — <a href="' + r.pdfUrl + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
   } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }
   finally { btn.disabled = false; }
 };
