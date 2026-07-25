@@ -175,8 +175,9 @@ exports.sendSMS = functions
     const urlPath    = "/1.0/sms/" + smsAccount + "/jobs";
     const fullUrl    = "https://eu.api.ovh.com" + urlPath;
     const body       = JSON.stringify({ message: cleanMessage, receivers: [phone], senderForResponse: true, priority: "high" });
-    const bodyHash   = crypto.createHash("sha1").update(body).digest("hex");
-    const sigStr     = [appSecret, consumerKey, "POST", fullUrl, bodyHash, timestamp].join("+");
+    // Signature OVH : SHA1 de "AS+CK+METHOD+URL+BODY+TIMESTAMP" avec le corps BRUT
+    // (et non son hash — c'était le bug qui provoquait "Invalid signature").
+    const sigStr     = [appSecret, consumerKey, "POST", fullUrl, body, timestamp].join("+");
     const signature  = "$1$" + crypto.createHash("sha1").update(sigStr).digest("hex");
 
     try {
