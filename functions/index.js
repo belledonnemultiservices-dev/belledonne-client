@@ -321,7 +321,8 @@ exports.createAxonautInvoice = functions
       };
       if (objet) docBody.title = objet;
       if (bc) docBody.order_number = String(bc);
-      const path = (mode === "facture") ? "/api/v2/invoices" : "/api/v2/quotations";
+      const path = (mode === "devis") ? "/api/v2/quotations" : "/api/v2/invoices";
+      console.log("AXONAUT create body:", JSON.stringify(docBody));
       const cr = await axonautPost(key, path, docBody);
       console.log("AXONAUT create", mode, "status", cr.status, "resp:", (cr.body || cr.error || "").slice(0, 1500));
       if (cr.status < 200 || cr.status >= 300) {

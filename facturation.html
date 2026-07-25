@@ -811,17 +811,17 @@ window.genererFactureAxonaut = async function() {
   const lignes = (window._factLignes || []).filter(l => (l.designation || '').trim() && Number(l.pu) > 0);
   if (!lignes.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Ajoute au moins une ligne (désignation + prix).'; return; }
   const btn = document.getElementById('btnGenAxonaut'); btn.disabled = true;
-  msg.style.color = 'var(--text-muted)'; msg.textContent = 'Génération dans Axonaut (devis test)...';
+  msg.style.color = 'var(--text-muted)'; msg.textContent = 'Génération de la facture dans Axonaut...';
   try {
     const r = await window._callFn('createAxonautInvoice', {
       client, lignes,
       objet: document.getElementById('fObjet').value.trim(),
       bc: item.bc || '',
       date: document.getElementById('fDateFacture').value || undefined,
-      mode: 'devis'
+      mode: 'facture'
     });
     msg.style.color = 'var(--green-dark)';
-    msg.innerHTML = 'Devis test créé ✓ ' + (r.number || '') + (r.pdfUrl ? ' — <a href="' + r.pdfUrl + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
+    msg.innerHTML = 'Facture créée ✓ ' + (r.number || '') + (r.pdfUrl ? ' — <a href="' + r.pdfUrl + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
   } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }
   finally { btn.disabled = false; }
 };
