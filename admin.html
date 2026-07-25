@@ -77,15 +77,17 @@
 
   /* LISTE COMPTES */
   .accounts-list{padding:0;}
-  .account-row{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--border);transition:background 0.1s;}
+  .account-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--border);transition:background 0.1s;}
   .account-row:last-child{border-bottom:none;}
   .account-row:hover{background:var(--bg);}
   .acc-avatar{width:36px;height:36px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--green);flex-shrink:0;}
-  .acc-info{flex:1;min-width:0;}
-  .acc-name{font-size:13px;font-weight:500;color:var(--text);}
-  .acc-id{font-size:11px;color:var(--text-muted);margin-top:1px;}
+  .acc-info{flex:1 1 140px;min-width:0;}
+  .acc-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .acc-id{font-size:11px;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .acc-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto;}
+  .acc-btn{height:28px;padding:0 10px;border:1px solid var(--border);background:transparent;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--text-mid);white-space:nowrap;}
+  .acc-btn.assist{border-color:var(--green);background:var(--green-pale);color:var(--green-dark);font-weight:600;}
   .acc-client{font-size:11px;font-weight:500;background:#EBF0F5;color:var(--navy);padding:2px 8px;border-radius:10px;}
-  .acc-actions{display:flex;gap:6px;}
   .btn-reset{font-size:11px;font-weight:500;color:var(--amber);background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.2);padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .btn-delete{font-size:11px;font-weight:500;color:var(--red);background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.15);padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;}
   .empty-accounts{padding:32px;text-align:center;color:var(--text-muted);font-size:13px;}
@@ -477,11 +479,9 @@ function loadAccounts() {
           <div class="acc-name">${a.identifiant}</div>
           <div class="acc-id">${a.client || (a.role === 'admin' ? 'Administrateur' : '')}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          ${a.role === 'client' && a.uid ? `<button onclick="impersonate('${a.uid}','${a.identifiant}')" style="height:28px;padding:0 10px;border:1px solid var(--green);background:var(--green-pale);border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--green-dark);" title="Se connecter en tant que ce client (mode assistance)">Se connecter en tant que</button>` : ''}
-          <button onclick="openChangePwd('${a.docId}','${a.uid}','${a.identifiant}')" style="height:28px;padding:0 10px;border:1px solid var(--border);background:transparent;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--text-mid);">Réinitialiser le mot de passe</button>
-        </div>
         <div class="acc-actions">
+          ${a.role === 'client' && a.uid ? `<button class="acc-btn assist" onclick="impersonate('${a.uid}','${a.identifiant}')" title="Se connecter en tant que ce client (mode assistance)">Mode assistance</button>` : ''}
+          <button class="acc-btn" onclick="openChangePwd('${a.docId}','${a.uid}','${a.identifiant}')" title="Réinitialiser le mot de passe">Mot de passe</button>
           <button class="btn-delete" onclick="deleteAccount('${a.docId}','${a.identifiant}','${a.uid}')">Supprimer</button>
         </div>
       </div>`).join('');
