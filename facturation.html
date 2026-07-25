@@ -368,49 +368,6 @@
         </div>
       </div>
 
-      <div class="form-section">
-        <div class="form-section-title">Détails de la facture</div>
-        <div class="form-grid">
-          <div class="form-group form-full">
-            <label class="form-label">Statut</label>
-            <select class="form-select" id="fStatut">
-              <option value="À facturer">À facturer</option>
-              <option value="Facturé">Facturé</option>
-              <option value="Envoyé client">Envoyé client</option>
-              <option value="Déposé Chorus">Déposé Chorus</option>
-              <option value="Payé">Payé</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Montant HT (€)</label>
-            <input class="form-input" id="fMontant" type="number" step="0.01" min="0" placeholder="0.00">
-          </div>
-          <div class="form-group">
-            <label class="form-label">N° Facture Henrri</label>
-            <input class="form-input" id="fNumFacture" placeholder="ex: 26-05-1756">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Date de facturation</label>
-            <input class="form-input" type="date" id="fDateFacture">
-          </div>
-          <div class="form-group">
-            <label class="form-label">PDF Facture Henrri</label>
-            <div>
-              <input type="file" id="fileFacture" accept=".pdf" style="display:none" onchange="factureFileChosen()">
-              <div class="drop-zone" id="dropFacture" ondragover="factDragOver(event)" ondragleave="factDragLeave()" ondrop="factDropFile(event)" onclick="document.getElementById('fileFacture').click()">
-                <div class="drop-zone-text">Glisser le PDF ou cliquer</div>
-                <button type="button" class="drop-zone-btn" onclick="event.stopPropagation();document.getElementById('fileFacture').click()">
-                  <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
-                  Choisir
-                </button>
-                <div class="drop-zone-chosen" id="chosenFacture"></div>
-              </div>
-              <div id="existingFactureLink" style="display:none;margin-top:6px;"></div>
-              <div id="extractMsg" style="display:none;margin-top:8px;font-size:12px;font-weight:500;"></div>
-            </div>
-          </div>
-        </div>
-      </div>
 
     </div>
     <div class="modal-footer">
@@ -646,24 +603,6 @@ function openModalFact(id) {
   document.getElementById('fInfoClient').textContent = item.client || '—';
   document.getElementById('fInfoBC').textContent = item.bc || '—';
   document.getElementById('fInfoNature').textContent = item.nature || '—';
-  document.getElementById('fStatut').value = item.statut || 'À facturer';
-  document.getElementById('fMontant').value = item.montantHT || '';
-  document.getElementById('fNumFacture').value = item.numFacture || '';
-  document.getElementById('fDateFacture').value = item.dateFacture || '';
-
-  const chosen = document.getElementById('chosenFacture');
-  chosen.textContent = ''; chosen.style.display = 'none';
-  document.getElementById('fileFacture').value = '';
-  const extractMsg = document.getElementById('extractMsg');
-  if (extractMsg) { extractMsg.style.display = 'none'; extractMsg.textContent = ''; }
-
-  const existLink = document.getElementById('existingFactureLink');
-  if (item.factureUrl) {
-    existLink.innerHTML = '<a href="' + item.factureUrl + '" target="_blank" class="pdf-link"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Facture existante</a>';
-    existLink.style.display = '';
-  } else {
-    existLink.style.display = 'none';
-  }
 
   const btn = document.getElementById('btnSaveFact');
   if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
@@ -705,7 +644,7 @@ async function loadFactComposition(item) {
   document.getElementById('fcVille').value = fc.ville || '';
   document.getElementById('fcSiret').value = fc.siret || '';
   document.getElementById('fcTva').value = fc.tva || '';
-  document.getElementById('fcChorusService').value = fc.chorusService || '';
+  document.getElementById('fcChorusService').value = fc.chorusService || item.chorus || '';
   onFcTypeChange();
   onEntiteChange();
   // Lignes
@@ -812,8 +751,7 @@ window.resetFactLigne = async function() {
     await window._updateFacture(editFactId, changes);
     const idx = factures.findIndex(f => f.id === editFactId);
     if (idx !== -1) Object.assign(factures[idx], changes);
-    document.getElementById('fStatut').value = 'À facturer';
-    document.getElementById('fNumFacture').value = '';
+    applyFilters();
     document.getElementById('axonautMsg').style.color = 'var(--text-muted)';
     document.getElementById('axonautMsg').textContent = 'Facturation réinitialisée. Tu peux régénérer.';
   } catch(e) { alert('Erreur : ' + e.message); }
@@ -836,19 +774,19 @@ window.genererFactureAxonaut = async function() {
       client, lignes,
       objet: document.getElementById('fObjet').value.trim(),
       bc: item.bc || '',
-      date: document.getElementById('fDateFacture').value || undefined,
+      date: undefined,
       mode: MODE
     });
     // Report sur la ligne uniquement pour une vraie facture
     if (MODE === 'facture') {
       const totalHT = (window._factLignes || []).reduce((s, l) => s + (Number(l.qte) || 0) * (Number(l.pu) || 0), 0);
-      const changes = { statut: 'Facturé', numFacture: r.number || '', factureUrl: r.pdfUrl || '', axonautId: r.id || '', montantHT: totalHT };
+      const today = new Date().toISOString().slice(0, 10);
+      const changes = { statut: 'Facturé', numFacture: r.number || '', factureUrl: r.pdfUrl || '', axonautId: r.id || '', montantHT: totalHT, dateFacture: today };
       try {
         await window._updateFacture(editFactId, changes);
         const idx = factures.findIndex(f => f.id === editFactId);
         if (idx !== -1) Object.assign(factures[idx], changes);
-        document.getElementById('fStatut').value = 'Facturé';
-        document.getElementById('fNumFacture').value = r.number || '';
+        applyFilters();
       } catch(e) { console.error('report ligne:', e); }
     }
     msg.style.color = 'var(--green-dark)';
@@ -963,39 +901,27 @@ function factDropFile(e) {
 
 async function saveFact() {
   if (!editFactId) return;
-  const statut = document.getElementById('fStatut').value;
-  const montant = document.getElementById('fMontant').value;
-  const numFacture = document.getElementById('fNumFacture').value.trim();
-  if (statut !== 'À facturer' && (!montant || !numFacture)) {
-    alert('Montant HT et N° Facture sont requis pour ce statut.');
-    return;
-  }
-
   const btn = document.getElementById('btnSaveFact');
   if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement...'; }
 
   try {
-    const changes = { statut };
-    if (montant) changes.montantHT = parseFloat(montant);
-    if (numFacture) changes.numFacture = numFacture;
-    const dateVal = document.getElementById('fDateFacture').value;
-    if (dateVal) changes.dateFacture = dateVal;
-    // Composition de la facture (objet, entité, lignes) — conservée sur le dossier
-    changes.factObjet = document.getElementById('fObjet').value.trim();
-    changes.factEntiteIdx = document.getElementById('fEntite').value;
-    changes.factClient = getFactClient();
-    changes.factLignes = (window._factLignes || [])
-      .filter(l => (l.designation || '').trim() || Number(l.pu) > 0)
-      .map(l => ({ designation: (l.designation || '').trim(), qte: Number(l.qte) || 0, pu: Number(l.pu) || 0, tva: Number(l.tva) || 0 }));
-    if (factFilePdfBlob) {
-      changes.factureUrl = await window._uploadFacturePdf(factFilePdfBlob, 'facturation/' + editFactId + '_facture.pdf');
-    }
+    // Sauvegarde de la composition (objet, entité, client, lignes) + montant HT calculé.
+    const totalHT = (window._factLignes || []).reduce((s, l) => s + (Number(l.qte) || 0) * (Number(l.pu) || 0), 0);
+    const changes = {
+      factObjet: document.getElementById('fObjet').value.trim(),
+      factEntiteIdx: document.getElementById('fEntite').value,
+      factClient: getFactClient(),
+      factLignes: (window._factLignes || [])
+        .filter(l => (l.designation || '').trim() || Number(l.pu) > 0)
+        .map(l => ({ designation: (l.designation || '').trim(), qte: Number(l.qte) || 0, pu: Number(l.pu) || 0, tva: Number(l.tva) || 0 })),
+      montantHT: totalHT,
+    };
     await window._updateFacture(editFactId, changes);
     const idx = factures.findIndex(f => f.id === editFactId);
     if (idx !== -1) { Object.assign(factures[idx], changes); }
     closeModalFact();
     applyFilters();
-    showToast('Facture enregistrée.');
+    showToast('Composition enregistrée.');
   } catch(e) {
     alert('Erreur : ' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
