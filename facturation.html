@@ -827,8 +827,8 @@ window.genererFactureAxonaut = async function() {
   const lignes = (window._factLignes || []).filter(l => (l.designation || '').trim() && Number(l.pu) > 0);
   if (!lignes.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Ajoute au moins une ligne (désignation + prix).'; return; }
   if ((item.axonautId || item.factureUrl) && !confirm('Une facture existe déjà pour cette ligne (' + (item.numFacture || '') + ').\nEn créer une nouvelle dans Axonaut ?')) return;
-  // MODE : 'devis' pour tester (supprimable), 'facture' pour la production.
-  const MODE = window._factMode || 'devis';
+  // MODE : 'facture' en production. (window._factMode='devis' en console pour un test.)
+  const MODE = window._factMode || 'facture';
   const btn = document.getElementById('btnGenAxonaut'); btn.disabled = true;
   msg.style.color = 'var(--text-muted)'; msg.textContent = (MODE === 'facture' ? 'Génération de la facture' : 'Génération d\'un devis test') + ' dans Axonaut...';
   try {
