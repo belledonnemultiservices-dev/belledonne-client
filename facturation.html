@@ -292,6 +292,44 @@
       </div>
 
       <div class="form-section">
+        <div class="form-section-title">Composition de la facture</div>
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">Objet de la facture</label>
+            <input class="form-input" id="fObjet" placeholder="ex: Traitement 3D - BC 321314">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Client / entité (adresse, SIRET, TVA)</label>
+            <select class="form-select" id="fEntite"></select>
+          </div>
+        </div>
+        <datalist id="bpuDatalist"></datalist>
+        <div id="factLignesHead" style="display:none;font-size:11px;color:var(--text-muted);font-weight:600;padding:0 4px 4px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="flex:1;">Désignation</span>
+            <span style="width:56px;text-align:center;">Qté</span>
+            <span style="width:80px;text-align:center;">PU HT</span>
+            <span style="width:60px;text-align:center;">TVA %</span>
+            <span style="width:80px;text-align:right;">Total HT</span>
+            <span style="width:26px;"></span>
+          </div>
+        </div>
+        <div id="factLignes"></div>
+        <button type="button" class="drop-zone-btn" onclick="addFactLigne()" style="margin-top:8px;">+ Ajouter une ligne</button>
+        <div style="margin-top:14px;text-align:right;font-size:13px;line-height:1.8;">
+          <div>Total HT : <b id="fTotalHT">0.00 €</b></div>
+          <div>TVA : <b id="fTotalTVA">0.00 €</b></div>
+          <div style="font-size:15px;color:var(--navy);">Total TTC : <b id="fTotalTTC">0.00 €</b></div>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button type="button" class="btn-save" id="btnGenAxonaut" onclick="genererFactureAxonaut()" style="background:var(--navy);">
+            Générer la facture (Axonaut) → PDF
+          </button>
+          <span id="axonautMsg" style="font-size:12px;color:var(--text-muted);"></span>
+        </div>
+      </div>
+
+      <div class="form-section">
         <div class="form-section-title">Détails de la facture</div>
         <div class="form-grid">
           <div class="form-group form-full">
@@ -591,6 +629,7 @@ function openModalFact(id) {
   const btn = document.getElementById('btnSaveFact');
   if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
 
+  loadFactComposition(item);
   document.getElementById('modalFact').classList.add('open');
 }
 
@@ -599,6 +638,86 @@ function closeModalFact() {
   editFactId = null;
   factFilePdfBlob = null;
 }
+
+// ── Composition de la facture (objet, entité, lignes BPU, totaux) ──
+let _factBpu = [];
+let _factEntites = [];
+window._factLignes = [];
+
+async function loadFactComposition(item) {
+  document.getElementById('axonautMsg').textContent = '';
+  document.getElementById('fObjet').value = item.factObjet || ('Traitement 3D' + (item.bc ? ' - BC ' + item.bc : ''));
+  // BPU du client -> datalist des désignations
+  _factBpu = (window._loadBpu ? await window._loadBpu(item.client) : []) || [];
+  document.getElementById('bpuDatalist').innerHTML = _factBpu.map(p => '<option value="' + (p.designation || '').replace(/"/g, '&quot;') + '"></option>').join('');
+  // Entités du client (adresse / SIRET / TVA)
+  _factEntites = (window._loadFactClient ? await window._loadFactClient(item.client) : []) || [];
+  const sel = document.getElementById('fEntite');
+  let opts = _factEntites.map((e, i) => '<option value="' + i + '">' + (e.libelle || e.raisonSociale || ('Entité ' + (i + 1))) + (e.siret ? ' - SIRET ' + e.siret : '') + '</option>').join('');
+  opts += '<option value="manuel">— Saisie manuelle / non renseigné —</option>';
+  sel.innerHTML = opts;
+  sel.value = (item.factEntiteIdx !== undefined && item.factEntiteIdx !== null && item.factEntiteIdx !== '') ? String(item.factEntiteIdx) : (_factEntites.length ? '0' : 'manuel');
+  // Lignes
+  if (Array.isArray(item.factLignes) && item.factLignes.length) {
+    window._factLignes = item.factLignes.map(l => ({ designation: l.designation || '', qte: Number(l.qte) || 1, pu: Number(l.pu) || 0, tva: (l.tva !== undefined ? Number(l.tva) : 20) }));
+  } else {
+    window._factLignes = [{ designation: '', qte: 1, pu: 0, tva: 20 }];
+  }
+  renderFactLignes();
+}
+
+function renderFactLignes() {
+  document.getElementById('factLignesHead').style.display = window._factLignes.length ? '' : 'none';
+  document.getElementById('factLignes').innerHTML = window._factLignes.map((l, i) => {
+    const total = ((Number(l.qte) || 0) * (Number(l.pu) || 0)).toFixed(2);
+    const d = (l.designation || '').replace(/"/g, '&quot;');
+    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'
+      + '<input class="form-input" list="bpuDatalist" style="flex:1;" value="' + d + '" oninput="factLigneChg(' + i + ",'designation',this.value)\" placeholder=\"Désignation\">"
+      + '<input class="form-input" type="number" min="0" step="1" style="width:56px;text-align:center;" value="' + l.qte + '" oninput="factLigneChg(' + i + ",'qte',this.value)\">"
+      + '<input class="form-input" type="number" min="0" step="0.01" style="width:80px;text-align:center;" value="' + l.pu + '" oninput="factLigneChg(' + i + ",'pu',this.value)\">"
+      + '<input class="form-input" type="number" min="0" step="1" style="width:60px;text-align:center;" value="' + l.tva + '" oninput="factLigneChg(' + i + ",'tva',this.value)\">"
+      + '<span style="width:80px;text-align:right;font-family:monospace;font-size:12px;">' + total + ' €</span>'
+      + '<button type="button" onclick="removeFactLigne(' + i + ')" title="Supprimer la ligne" style="width:26px;height:32px;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;color:var(--red);font-size:16px;line-height:1;">×</button>'
+      + '</div>';
+  }).join('');
+  recomputeFactTotals();
+}
+
+window.factLigneChg = function(i, field, value) {
+  const l = window._factLignes[i]; if (!l) return;
+  if (field === 'designation') {
+    l.designation = value;
+    const match = _factBpu.find(p => (p.designation || '') === value);
+    if (match) { l.pu = Number(match.prix) || 0; l.tva = (match.tva !== undefined ? Number(match.tva) : 20); renderFactLignes(); return; }
+    recomputeFactTotals(); return;
+  }
+  l[field] = value;
+  const rows = document.getElementById('factLignes').children;
+  if (rows[i]) { const span = rows[i].querySelector('span'); if (span) span.textContent = ((Number(l.qte) || 0) * (Number(l.pu) || 0)).toFixed(2) + ' €'; }
+  recomputeFactTotals();
+};
+
+function recomputeFactTotals() {
+  let ht = 0, tva = 0;
+  window._factLignes.forEach(l => { const lineHT = (Number(l.qte) || 0) * (Number(l.pu) || 0); ht += lineHT; tva += lineHT * ((Number(l.tva) || 0) / 100); });
+  document.getElementById('fTotalHT').textContent = ht.toFixed(2) + ' €';
+  document.getElementById('fTotalTVA').textContent = tva.toFixed(2) + ' €';
+  document.getElementById('fTotalTTC').textContent = (ht + tva).toFixed(2) + ' €';
+  const m = document.getElementById('fMontant'); if (m) m.value = ht.toFixed(2);
+}
+
+window.addFactLigne = function() { window._factLignes.push({ designation: '', qte: 1, pu: 0, tva: 20 }); renderFactLignes(); };
+window.removeFactLigne = function(i) {
+  window._factLignes.splice(i, 1);
+  if (!window._factLignes.length) window._factLignes.push({ designation: '', qte: 1, pu: 0, tva: 20 });
+  renderFactLignes();
+};
+
+window.genererFactureAxonaut = async function() {
+  const msg = document.getElementById('axonautMsg');
+  msg.style.color = 'var(--text-muted)';
+  msg.textContent = 'Intégration API Axonaut en cours de construction (étape suivante).';
+};
 
 function factureFileChosen() {
   const input = document.getElementById('fileFacture');
@@ -723,6 +842,12 @@ async function saveFact() {
     if (numFacture) changes.numFacture = numFacture;
     const dateVal = document.getElementById('fDateFacture').value;
     if (dateVal) changes.dateFacture = dateVal;
+    // Composition de la facture (objet, entité, lignes) — conservée sur le dossier
+    changes.factObjet = document.getElementById('fObjet').value.trim();
+    changes.factEntiteIdx = document.getElementById('fEntite').value;
+    changes.factLignes = (window._factLignes || [])
+      .filter(l => (l.designation || '').trim() || Number(l.pu) > 0)
+      .map(l => ({ designation: (l.designation || '').trim(), qte: Number(l.qte) || 0, pu: Number(l.pu) || 0, tva: Number(l.tva) || 0 }));
     if (factFilePdfBlob) {
       changes.factureUrl = await window._uploadFacturePdf(factFilePdfBlob, 'facturation/' + editFactId + '_facture.pdf');
     }
@@ -795,7 +920,7 @@ document.getElementById('modalFact').addEventListener('click', e => {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
@@ -818,6 +943,23 @@ window._uploadFacturePdf = async function(file, path) {
   const storageRef = ref(storage, path);
   await uploadBytes(storageRef, file);
   return await getDownloadURL(storageRef);
+};
+// Composition de facture : lecture BPU + entités client, et appel Cloud Function.
+window._loadBpu = async function(client) {
+  try { const s = await getDoc(doc(db, 'bpu', client)); return s.exists() ? (s.data().prestations || []) : []; }
+  catch(e) { console.warn('loadBpu:', e); return []; }
+};
+window._loadFactClient = async function(client) {
+  try { const s = await getDoc(doc(db, 'facturation-clients', client)); return s.exists() ? (s.data().entites || []) : []; }
+  catch(e) { console.warn('loadFactClient:', e); return []; }
+};
+window._callFn = async function(name, body) {
+  const idt = await auth.currentUser.getIdToken();
+  const r = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/' + name, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idt }, body: JSON.stringify(body || {})
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({ error: 'HTTP ' + r.status })); throw new Error(e.error || ('HTTP ' + r.status)); }
+  return r.json();
 };
 
 onAuthStateChanged(auth, async (user) => {
