@@ -43,6 +43,12 @@ async function verifyAdmin(req) {
   } catch(e) {
     throw { code: 401, msg: "Jeton invalide ou expiré" };
   }
+  // Compte maître (gère les comptes via admin.html) : toujours admin, même
+  // sans doc dans `users`. Cohérent avec le verrou de admin.html.
+  if (decoded.email === "belledonne.multiservices@gmail.com") return decoded;
+  // Custom claim role posé par setUserClaims (source de vérité pour les règles).
+  if (decoded.role === "admin" || decoded.role === "administrateur") return decoded;
+  // Repli : lecture du rôle dans la collection `users` (comptes pas encore backfillés).
   const { getFirestore } = require("firebase-admin/firestore");
   const db = getFirestore(admin.app(), "belledonne-client");
   let role = null;
@@ -77,6 +83,47 @@ exports.deleteAuthUser = functions
       res.status(200).json({ success: true });
     } catch(err) {
       console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+// ── POSER LES CUSTOM CLAIMS (role + client) SUR UN COMPTE ─────────
+// Source de vérité pour les règles Firestore/Storage. Appelé par admin.html
+// à la création d'un compte, + mode backfill pour (re)synchroniser tous les
+// comptes existants depuis la collection `users`.
+exports.setUserClaims = functions
+  .region("europe-west1")
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { uid, role, client, backfill } = req.body || {};
+    try {
+      if (backfill) {
+        const { getFirestore } = require("firebase-admin/firestore");
+        const db = getFirestore(admin.app(), "belledonne-client");
+        const snap = await db.collection("users").get();
+        let updated = 0; const errors = [];
+        for (const d of snap.docs) {
+          const u = d.data();
+          if (!u.uid) continue;
+          try {
+            await admin.auth().setCustomUserClaims(u.uid, { role: u.role || null, client: u.client || null });
+            updated++;
+          } catch(e) { errors.push({ uid: u.uid, identifiant: u.identifiant || null, error: e.message }); }
+        }
+        res.status(200).json({ success: true, updated, errors });
+        return;
+      }
+      if (!uid) { res.status(400).json({ error: "uid requis" }); return; }
+      await admin.auth().setCustomUserClaims(uid, { role: role || null, client: client || null });
+      res.status(200).json({ success: true });
+    } catch(err) {
+      console.error("setUserClaims:", err);
       res.status(500).json({ error: err.message });
     }
   });

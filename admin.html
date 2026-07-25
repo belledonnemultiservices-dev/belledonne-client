@@ -147,6 +147,12 @@
   <div class="content">
     <div class="page-title">Gestion des comptes clients</div>
     <div class="page-sub">Créez et gérez les accès de vos clients.</div>
+    <div style="margin:8px 0 4px;">
+      <button id="btnSyncClaims" onclick="syncClaims()" style="font-size:12px;padding:6px 12px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:600;">
+        Synchroniser les accès (droits de sécurité)
+      </button>
+      <span id="syncClaimsMsg" style="font-size:12px;color:var(--text-muted);margin-left:8px;"></span>
+    </div>
 
     <!-- STATS -->
     <div class="stats-row">
@@ -303,6 +309,31 @@ onAuthStateChanged(auth, async (user) => {
   loadClientsIntoSelect();
 });
 
+// Appel authentifié d'une Cloud Function sécurisée (jeton du compte maître).
+const FN_BASE = "https://europe-west1-belledonne-client.cloudfunctions.net";
+async function callFn(name, body) {
+  const idt = await auth.currentUser.getIdToken();
+  const r = await fetch(FN_BASE + "/" + name, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + idt },
+    body: JSON.stringify(body || {})
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({ error: "HTTP " + r.status })); throw new Error(e.error || ("HTTP " + r.status)); }
+  return r.json();
+}
+
+// Backfill : (re)pose les custom claims role+client sur tous les comptes.
+window.syncClaims = async function() {
+  const btn = document.getElementById('btnSyncClaims');
+  const msg = document.getElementById('syncClaimsMsg');
+  btn.disabled = true; msg.textContent = 'Synchronisation...';
+  try {
+    const r = await callFn("setUserClaims", { backfill: true });
+    msg.textContent = r.updated + ' compte(s) synchronisé(s)' + (r.errors && r.errors.length ? ' — ' + r.errors.length + ' erreur(s)' : '') + '. Les comptes doivent se reconnecter pour appliquer.';
+  } catch(e) { msg.textContent = 'Erreur : ' + e.message; }
+  finally { btn.disabled = false; }
+};
+
 async function loadClientsIntoSelect() {
   const snap = await getDocs(query(collection(db, 'users'), where('role','==','client')));
   const sel = document.getElementById('inClient');
@@ -420,6 +451,9 @@ window.createAccount = async function() {
       password: password,
       createdAt: new Date().toISOString()
     });
+    // Pose les custom claims (role+client) : source de vérité des règles de sécurité.
+    try { await callFn("setUserClaims", { uid: cred.user.uid, role, client }); }
+    catch(e) { console.error("setUserClaims (création):", e.message); }
     document.getElementById('alertSuccessMsg').textContent = 'Compte "' + identifiant + '" créé (' + (role === 'admin' ? 'Administrateur' : client) + ') !';
     document.getElementById('alertSuccess').classList.add('show');
     ['inClient','inIdentifiant','inPassword','inClientNew'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
