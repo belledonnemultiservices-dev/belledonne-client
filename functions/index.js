@@ -1,4 +1,5 @@
 const functions = require("firebase-functions");
+const { defineSecret } = require("firebase-functions/params");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
@@ -9,13 +10,25 @@ const { simpleParser } = require("mailparser");
 
 admin.initializeApp();
 
-const gmailUser = functions.config().gmail.user;
-const gmailPass = functions.config().gmail.pass;
+// ── SECRETS (Secret Manager, via firebase functions:secrets:set) ──
+// Remplace l'ancien functions.config() déprécié. Chaque fonction déclare
+// les secrets qu'elle consomme via .runWith({ secrets: [...] }).
+const GMAIL_USER = defineSecret("GMAIL_USER");
+const GMAIL_PASS = defineSecret("GMAIL_PASS");
+const OVH_APP_KEY = defineSecret("OVH_APP_KEY");
+const OVH_APP_SECRET = defineSecret("OVH_APP_SECRET");
+const OVH_CONSUMER_KEY = defineSecret("OVH_CONSUMER_KEY");
+const OVH_SMS_ACCOUNT = defineSecret("OVH_SMS_ACCOUNT");
+const GCAL_SA = defineSecret("GCAL_SA"); // service account complet en JSON
+const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: { user: gmailUser, pass: gmailPass },
-});
+// Transporter Gmail créé à l'exécution (les secrets ne sont dispo qu'au runtime).
+function makeTransporter() {
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: GMAIL_USER.value(), pass: GMAIL_PASS.value() },
+  });
+}
 
 // ── SÉCURITÉ : exiger un jeton Firebase valide + rôle admin ───────
 // Lève { code, msg } si le jeton est absent/invalide ou si l'utilisateur
@@ -86,7 +99,7 @@ function downloadFile(url) {
 
 exports.sendNotification = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 120, memory: "512MB" })
+  .runWith({ timeoutSeconds: 120, memory: "512MB", secrets: [GMAIL_USER, GMAIL_PASS] })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -118,8 +131,8 @@ exports.sendNotification = functions
         }
       }
 
-      await transporter.sendMail({
-        from: '"Belledonne Multiservices" <' + gmailUser + '>',
+      await makeTransporter().sendMail({
+        from: '"Belledonne Multiservices" <' + GMAIL_USER.value() + '>',
         to, subject, text: body,
         attachments: mailAttachments
       });
@@ -135,6 +148,7 @@ exports.sendNotification = functions
 // ── ENVOYER SMS VIA OVH ──────────────────────────────────────────
 exports.sendSMS = functions
   .region("europe-west1")
+  .runWith({ secrets: [OVH_APP_KEY, OVH_APP_SECRET, OVH_CONSUMER_KEY, OVH_SMS_ACCOUNT] })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -159,10 +173,10 @@ exports.sendSMS = functions
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .replace(/[^\x00-\x7F]/g, "");
 
-    const appKey      = functions.config().ovh.app_key;
-    const appSecret   = functions.config().ovh.app_secret;
-    const consumerKey = functions.config().ovh.consumer_key;
-    const smsAccount  = functions.config().ovh.sms_account;
+    const appKey      = OVH_APP_KEY.value();
+    const appSecret   = OVH_APP_SECRET.value();
+    const consumerKey = OVH_CONSUMER_KEY.value();
+    const smsAccount  = OVH_SMS_ACCOUNT.value();
 
     // Get OVH server time first to avoid clock skew
     const timeRes = await new Promise((resolve, reject) => {
@@ -221,15 +235,15 @@ exports.sendSMS = functions
     }
   });
 
-// ── CONSO SERVICES EXTERNES (crédits SMS OVH + coût Claude du mois) ──
+// ── CONSO SERVICES EXTERNES (crédits SMS OVH) ──
 // Requête signée OVH GET (corps vide) pour lire les crédits SMS restants.
 function ovhGetSmsCredits() {
   return new Promise((resolve) => {
     try {
-      const appKey      = functions.config().ovh.app_key;
-      const appSecret   = functions.config().ovh.app_secret;
-      const consumerKey = functions.config().ovh.consumer_key;
-      const smsAccount  = functions.config().ovh.sms_account;
+      const appKey      = OVH_APP_KEY.value();
+      const appSecret   = OVH_APP_SECRET.value();
+      const consumerKey = OVH_CONSUMER_KEY.value();
+      const smsAccount  = OVH_SMS_ACCOUNT.value();
       https.get("https://eu.api.ovh.com/1.0/auth/time", (r) => {
         let t = ""; r.on("data", c => t += c); r.on("end", () => {
           const timestamp = t.toString();
@@ -264,6 +278,7 @@ function ovhGetSmsCredits() {
 
 exports.getServicesUsage = functions
   .region("europe-west1")
+  .runWith({ secrets: [OVH_APP_KEY, OVH_APP_SECRET, OVH_CONSUMER_KEY, OVH_SMS_ACCOUNT] })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -281,6 +296,7 @@ exports.getServicesUsage = functions
 // ── AJOUTER PASSAGES AU GOOGLE CALENDAR DU TECHNICIEN ────────────
 exports.addToCalendar = functions
   .region("europe-west1")
+  .runWith({ secrets: [GCAL_SA] })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -299,7 +315,7 @@ exports.addToCalendar = functions
       if (!calEventId) { res.status(400).json({ error: "calEventId requis pour delete" }); return; }
       try {
         const { google } = require("googleapis");
-        const serviceAccountKey = { type:"service_account", project_id:functions.config().gcal.project_id, private_key_id:functions.config().gcal.private_key_id, private_key:functions.config().gcal.private_key.replace(/\\n/g,"\n"), client_email:functions.config().gcal.client_email, client_id:functions.config().gcal.client_id, token_uri:"https://oauth2.googleapis.com/token" };
+        const serviceAccountKey = JSON.parse(GCAL_SA.value());
         const auth = new google.auth.GoogleAuth({ credentials:serviceAccountKey, scopes:["https://www.googleapis.com/auth/calendar"] });
         const calendar = google.calendar({ version:"v3", auth });
         await calendar.events.delete({ calendarId: technicienEmail, eventId: calEventId });
@@ -323,15 +339,7 @@ exports.addToCalendar = functions
       const { google } = require("googleapis");
 
       // Authentification via Service Account avec délégation sur le calendrier du technicien
-      const serviceAccountKey = {
-        type: "service_account",
-        project_id: functions.config().gcal.project_id,
-        private_key_id: functions.config().gcal.private_key_id,
-        private_key: functions.config().gcal.private_key.replace(/\\n/g, "\n"),
-        client_email: functions.config().gcal.client_email,
-        client_id: functions.config().gcal.client_id,
-        token_uri: "https://oauth2.googleapis.com/token",
-      };
+      const serviceAccountKey = JSON.parse(GCAL_SA.value());
 
       const auth = new google.auth.GoogleAuth({
         credentials: serviceAccountKey,
@@ -645,14 +653,14 @@ async function processSource(client, anthropic, db, source, sourceRef) {
 
 exports.processIncomingBC = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 300, memory: "1GB" })
+  .runWith({ timeoutSeconds: 300, memory: "1GB", secrets: [GMAIL_USER, GMAIL_PASS, ANTHROPIC_API_KEY] })
   .pubsub.schedule("every 15 minutes")
   .timeZone("Europe/Paris")
   .onRun(async () => {
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
     const Anthropic = require("@anthropic-ai/sdk");
-    const anthropic = new Anthropic({ apiKey: functions.config().anthropic.api_key });
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() });
 
     let sourcesSnap;
     try {
@@ -673,7 +681,7 @@ exports.processIncomingBC = functions
       host: "imap.gmail.com",
       port: 993,
       secure: true,
-      auth: { user: gmailUser, pass: gmailPass },
+      auth: { user: GMAIL_USER.value(), pass: GMAIL_PASS.value() },
       logger: false,
     });
     try {
