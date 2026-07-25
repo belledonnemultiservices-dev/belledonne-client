@@ -315,7 +315,7 @@ exports.createAxonautInvoice = functions
         tax_rate: Number(l.tva) || 0,
       }));
       const docBody = {
-        customer_id: company.id,
+        company_id: company.id,
         date: date || new Date().toISOString().slice(0, 10),
         products,
       };
