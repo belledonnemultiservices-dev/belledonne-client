@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// Règles Storage - bucket belledonne-client.firebasestorage.app
+// Fichiers rangés par nom de client (rapports/{client}/..., etc.).
+// Écriture réservée aux admins (les clients sont en lecture seule).
+// NB: les URLs de téléchargement Firebase avec jeton (?token=) contournent ces
+// règles ; le durcissement protège surtout les accès directs à l'API et l'écriture.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'belledonne.multiservices@gmail.com' ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.role == 'administrateur'
+      );
+    }
+
+    function ownsClient(c) {
+      return request.auth != null && c != null && c != '' && c == request.auth.token.get('client', '');
+    }
+
+    // Fichiers cloisonnés par nom de client
+    match /rapports/{client}/{file=**}   { allow read: if isAdmin() || ownsClient(client); allow write: if isAdmin(); }
+    match /garanties/{client}/{file=**}  { allow read: if isAdmin() || ownsClient(client); allow write: if isAdmin(); }
+    match /absents/{client}/{file=**}    { allow read: if isAdmin() || ownsClient(client); allow write: if isAdmin(); }
+    match /protocoles/{client}/{file=**} { allow read: if isAdmin() || ownsClient(client); allow write: if isAdmin(); }
+    match /produits/{client}/{file=**}   { allow read: if isAdmin() || ownsClient(client); allow write: if isAdmin(); }
+
+    // campagnes : rangées par ID de campagne (non cloisonnables par nom).
+    // Lecture par tout utilisateur connecté, écriture admin.
+    match /campagnes/{cid}/{file=**}     { allow read: if request.auth != null; allow write: if isAdmin(); }
+
+    // facturation : documents internes, admin only
+    match /facturation/{file=**}         { allow read, write: if isAdmin(); }
+
+    // Tout le reste : refusé
+    match /{path=**}                     { allow read, write: if false; }
+  }
+}

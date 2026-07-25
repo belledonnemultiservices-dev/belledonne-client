@@ -33,10 +33,18 @@ function setup() {
     // Le dépôt des rapports se fait désormais depuis le Suivi (par passage).
     // On retire donc le lien "Rapports" de la sidebar côté admin uniquement.
     // Le client (bailleur) garde son accès à la page rapports.html inchangé.
+    let isAdmin = false;
     try {
-      const snapU = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
-      const role = snapU.empty ? 'client' : (snapU.docs[0].data().role || 'client');
-      if (role === 'admin' || role === 'administrateur') {
+      // Rôle depuis le custom claim (source de vérité), repli sur la collection users.
+      const tok = await user.getIdTokenResult();
+      let role = tok.claims && tok.claims.role ? tok.claims.role : null;
+      if (user.email === 'belledonne.multiservices@gmail.com') role = 'admin';
+      if (!role) {
+        const snapU = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
+        role = snapU.empty ? 'client' : (snapU.docs[0].data().role || 'client');
+      }
+      isAdmin = (role === 'admin' || role === 'administrateur');
+      if (isAdmin) {
         document.querySelectorAll('a.nav-item[href="rapports.html"]').forEach(el => el.style.display = 'none');
         // Injecter le lien "Services & conso" dans la sidebar admin (si absent)
         if (!document.querySelector('a.nav-item[href="services.html"]')) {
@@ -53,6 +61,8 @@ function setup() {
       }
     } catch (e) { /* en cas d'échec, on ne masque rien */ }
 
+    // Badge "À valider" : réservé aux admins (collection suivi cloisonnée admin-only).
+    if (!isAdmin) return;
     onSnapshot(
       query(collection(db, 'suivi'), where('statut', '==', 'À valider')),
       snap => {

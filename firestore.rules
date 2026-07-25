@@ -1,0 +1,75 @@
+rules_version = '2';
+
+// Règles Firestore - base "belledonne-client"
+// Cloisonnement par client via custom claims (role, client) posés par la
+// Cloud Function setUserClaims. Le compte maître est toujours admin via son email.
+// Les Cloud Functions utilisent l'Admin SDK et contournent ces règles.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'belledonne.multiservices@gmail.com' ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.role == 'administrateur'
+      );
+    }
+
+    // Client (nom) rattaché au compte via le custom claim.
+    function myClient() {
+      return isSignedIn() ? request.auth.token.get('client', '') : '';
+    }
+
+    function ownsClient(c) {
+      return isSignedIn() && c != null && c != '' && c == myClient();
+    }
+
+    // Documents partagés à tous les clients (produits / protocoles).
+    function isShared(c) {
+      return c == null || c == '' || c == '__tous__';
+    }
+
+    // ── users : chacun lit son propre doc, l'admin gère tout, écriture admin only ──
+    match /users/{docId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // ── Collections strictement internes (jamais vues par un client) ──
+    match /suivi/{doc}         { allow read, write: if isAdmin(); }
+    match /facturation/{doc}   { allow read, write: if isAdmin(); }
+    match /contacts/{doc}      { allow read, write: if isAdmin(); }
+    match /techniciens/{doc}   { allow read, write: if isAdmin(); }
+    match /email-sources/{doc} { allow read, write: if isAdmin(); }
+
+    // ── config : lecture par tout utilisateur connecté (couleurs, coordonnées,
+    //    templates), écriture admin only ──
+    match /config/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Données client : lecture seule sur SES documents, admin plein accès ──
+    match /rapports/{doc}  { allow read: if isAdmin() || ownsClient(resource.data.get('client', '')); allow write: if isAdmin(); }
+    match /garanties/{doc} { allow read: if isAdmin() || ownsClient(resource.data.get('client', '')); allow write: if isAdmin(); }
+    match /absents/{doc}   { allow read: if isAdmin() || ownsClient(resource.data.get('client', '')); allow write: if isAdmin(); }
+    match /campagnes/{doc} { allow read: if isAdmin() || ownsClient(resource.data.get('client', '')); allow write: if isAdmin(); }
+
+    // produits / protocoles : SES documents + documents partagés (client vide / __tous__)
+    match /produits/{doc} {
+      allow read: if isAdmin() || ownsClient(resource.data.get('client', '')) || isShared(resource.data.get('client', ''));
+      allow write: if isAdmin();
+    }
+    match /protocoles/{doc} {
+      allow read: if isAdmin() || ownsClient(resource.data.get('client', '')) || isShared(resource.data.get('client', ''));
+      allow write: if isAdmin();
+    }
+
+    // Tout le reste : refusé par défaut (aucune règle = accès refusé).
+  }
+}
