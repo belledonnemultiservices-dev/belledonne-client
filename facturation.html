@@ -704,18 +704,22 @@ async function loadFactComposition(item) {
 }
 
 function renderFactLignes() {
-  document.getElementById('factLignesHead').style.display = window._factLignes.length ? '' : 'none';
+  document.getElementById('factLignesHead').style.display = 'none';
   document.getElementById('factLignes').innerHTML = window._factLignes.map((l, i) => {
     const total = ((Number(l.qte) || 0) * (Number(l.pu) || 0)).toFixed(2);
     const d = (l.designation || '').replace(/"/g, '&quot;');
-    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'
-      + '<input class="form-input" list="bpuDatalist" style="flex:1;" value="' + d + '" oninput="factLigneChg(' + i + ",'designation',this.value)\" placeholder=\"Désignation\">"
+    return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px;background:#fff;">'
+      + '<input class="form-input" list="bpuDatalist" style="width:100%;margin-bottom:6px;" value="' + d + '" title="' + d + '" oninput="factLigneChg(' + i + ",'designation',this.value)\" placeholder=\"Désignation\">"
+      + '<div style="display:flex;gap:8px;align-items:center;">'
+      + '<span style="font-size:11px;color:var(--text-muted);">Qté</span>'
       + '<input class="form-input" type="number" min="0" step="1" style="width:56px;text-align:center;" value="' + l.qte + '" oninput="factLigneChg(' + i + ",'qte',this.value)\">"
+      + '<span style="font-size:11px;color:var(--text-muted);">PU HT</span>'
       + '<input class="form-input" type="number" min="0" step="0.01" style="width:80px;text-align:center;" value="' + l.pu + '" oninput="factLigneChg(' + i + ",'pu',this.value)\">"
-      + '<input class="form-input" type="number" min="0" step="1" style="width:60px;text-align:center;" value="' + l.tva + '" oninput="factLigneChg(' + i + ",'tva',this.value)\">"
-      + '<span style="width:80px;text-align:right;font-family:monospace;font-size:12px;">' + total + ' €</span>'
+      + '<span style="font-size:11px;color:var(--text-muted);">TVA %</span>'
+      + '<input class="form-input" type="number" min="0" step="1" style="width:56px;text-align:center;" value="' + l.tva + '" oninput="factLigneChg(' + i + ",'tva',this.value)\">"
+      + '<b class="ligne-total" style="margin-left:auto;font-family:monospace;font-size:13px;">' + total + ' €</b>'
       + '<button type="button" onclick="removeFactLigne(' + i + ')" title="Supprimer la ligne" style="width:26px;height:32px;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;color:var(--red);font-size:16px;line-height:1;">×</button>'
-      + '</div>';
+      + '</div></div>';
   }).join('');
   recomputeFactTotals();
 }
@@ -730,7 +734,7 @@ window.factLigneChg = function(i, field, value) {
   }
   l[field] = value;
   const rows = document.getElementById('factLignes').children;
-  if (rows[i]) { const span = rows[i].querySelector('span'); if (span) span.textContent = ((Number(l.qte) || 0) * (Number(l.pu) || 0)).toFixed(2) + ' €'; }
+  if (rows[i]) { const t = rows[i].querySelector('.ligne-total'); if (t) t.textContent = ((Number(l.qte) || 0) * (Number(l.pu) || 0)).toFixed(2) + ' €'; }
   recomputeFactTotals();
 };
 
