@@ -237,7 +237,8 @@
         <option value="Payé">Payé</option>
       </select>
       <span class="results-count" id="resultsCount"></span>
-      <button onclick="openConfigFact()" style="margin-left:auto;height:36px;padding:0 14px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-mid);display:inline-flex;align-items:center;gap:6px;">
+      <button onclick="nouvelleFacture()" style="margin-left:auto;height:36px;padding:0 14px;border:none;background:var(--navy);color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">+ Nouvelle facture</button>
+      <button onclick="openConfigFact()" style="height:36px;padding:0 14px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-mid);display:inline-flex;align-items:center;gap:6px;">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
         Paramètres facturation (BPU & clients)
       </button>
@@ -413,6 +414,47 @@
         </div>
       </div>
 
+      <div class="form-section">
+        <div class="form-section-title">Ou : facture faite ailleurs (saisie manuelle)</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Utilise cette partie si tu as déjà créé la facture (Axonaut ou autre) : renseigne les infos et joins le PDF, sans passer par le bouton "Générer".</div>
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">Statut</label>
+            <select class="form-select" id="fStatut">
+              <option value="À facturer">À facturer</option>
+              <option value="Facturé">Facturé</option>
+              <option value="Envoyé client">Envoyé client</option>
+              <option value="Déposé Chorus">Déposé Chorus</option>
+              <option value="Payé">Payé</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Montant HT (€)</label>
+            <input class="form-input" id="fMontant" type="number" step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">N° Facture</label>
+            <input class="form-input" id="fNumFacture" placeholder="ex: 26_07_1896">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date de facturation</label>
+            <input class="form-input" type="date" id="fDateFacture">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">PDF de la facture</label>
+            <div>
+              <input type="file" id="fileFacture" accept=".pdf" style="display:none" onchange="factureFileChosen()">
+              <div class="drop-zone" id="dropFacture" ondragover="factDragOver(event)" ondragleave="factDragLeave()" ondrop="factDropFile(event)" onclick="document.getElementById('fileFacture').click()">
+                <div class="drop-zone-text">Glisser le PDF ou cliquer</div>
+                <button type="button" class="drop-zone-btn" onclick="event.stopPropagation();document.getElementById('fileFacture').click()">Choisir</button>
+                <div class="drop-zone-chosen" id="chosenFacture"></div>
+              </div>
+              <div id="existingFactureLink" style="display:none;margin-top:6px;"></div>
+              <div id="extractMsg" style="display:none;margin-top:8px;font-size:12px;font-weight:500;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
     </div>
     <div class="modal-footer">
@@ -648,6 +690,20 @@ function openModalFact(id) {
   document.getElementById('fInfoClient').textContent = item.client || '—';
   document.getElementById('fInfoBC').textContent = item.bc || '—';
   document.getElementById('fInfoNature').textContent = item.nature || '—';
+  document.getElementById('fStatut').value = item.statut || 'À facturer';
+  document.getElementById('fMontant').value = item.montantHT || '';
+  document.getElementById('fNumFacture').value = item.numFacture || '';
+  document.getElementById('fDateFacture').value = item.dateFacture || '';
+  const chosen = document.getElementById('chosenFacture');
+  chosen.textContent = ''; chosen.style.display = 'none';
+  document.getElementById('fileFacture').value = '';
+  const extractMsg = document.getElementById('extractMsg');
+  if (extractMsg) { extractMsg.style.display = 'none'; extractMsg.textContent = ''; }
+  const existLink = document.getElementById('existingFactureLink');
+  if (item.factureUrl) {
+    existLink.innerHTML = '<a href="' + item.factureUrl + '" target="_blank" class="pdf-link">Facture actuelle (PDF)</a>';
+    existLink.style.display = '';
+  } else { existLink.style.display = 'none'; }
 
   const btn = document.getElementById('btnSaveFact');
   if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
@@ -845,6 +901,16 @@ window.genererFactureAxonaut = async function() {
     msg.innerHTML = (MODE === 'facture' ? 'Facture créée ✓ ' : 'Devis test créé ✓ ') + (r.number || '') + (r.pdfUrl ? ' — <a href="' + r.pdfUrl + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
   } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }
   finally { btn.disabled = false; }
+};
+
+// Créer une nouvelle ligne de facturation vierge (facture faite ailleurs)
+window.nouvelleFacture = async function() {
+  const data = { client: '', statut: 'À facturer', source: 'manuel', createdAt: new Date().toISOString() };
+  try {
+    const id = await window._addFacture(data);
+    if (!factures.find(f => f.id === id)) factures.push({ id, ...data });
+    openModalFact(id);
+  } catch(e) { alert('Erreur : ' + e.message); }
 };
 
 // ══════════ PARAMÈTRES FACTURATION (BPU + entités clients) ══════════
@@ -1051,8 +1117,7 @@ async function saveFact() {
   if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement...'; }
 
   try {
-    // Sauvegarde de la composition (objet, entité, client, lignes) + montant HT calculé.
-    const totalHT = (window._factLignes || []).reduce((s, l) => s + (Number(l.qte) || 0) * (Number(l.pu) || 0), 0);
+    // Composition (objet, entité, client, lignes)
     const changes = {
       factObjet: document.getElementById('fObjet').value.trim(),
       factEntiteIdx: document.getElementById('fEntite').value,
@@ -1060,8 +1125,20 @@ async function saveFact() {
       factLignes: (window._factLignes || [])
         .filter(l => (l.designation || '').trim() || Number(l.pu) > 0)
         .map(l => ({ designation: (l.designation || '').trim(), qte: Number(l.qte) || 0, pu: Number(l.pu) || 0, tva: Number(l.tva) || 0 })),
-      montantHT: totalHT,
     };
+    // Saisie manuelle (facture faite ailleurs) : statut, montant, n°, date, PDF
+    changes.statut = document.getElementById('fStatut').value;
+    const montant = document.getElementById('fMontant').value;
+    changes.montantHT = montant ? parseFloat(montant) : 0;
+    changes.numFacture = document.getElementById('fNumFacture').value.trim();
+    const dateVal = document.getElementById('fDateFacture').value;
+    if (dateVal) changes.dateFacture = dateVal;
+    // Nouvelle facture manuelle sans client : on renseigne le client depuis la saisie
+    const cur = factures.find(f => f.id === editFactId) || {};
+    if (!cur.client) changes.client = getFactClient().nom || '';
+    if (factFilePdfBlob) {
+      changes.factureUrl = await window._uploadFacturePdf(factFilePdfBlob, 'facturation/' + editFactId + '_facture.pdf');
+    }
     await window._updateFacture(editFactId, changes);
     const idx = factures.findIndex(f => f.id === editFactId);
     if (idx !== -1) { Object.assign(factures[idx], changes); }
@@ -1163,6 +1240,10 @@ window._loadBpu = async function(client) {
 window._loadFactClient = async function(client) {
   try { const s = await getDoc(doc(db, 'facturation-clients', client)); return s.exists() ? (s.data().entites || []) : []; }
   catch(e) { console.warn('loadFactClient:', e); return []; }
+};
+window._addFacture = async function(data) {
+  const ref = await addDoc(collection(db, 'facturation'), data);
+  return ref.id;
 };
 window._saveBpu = async function(client, prestations) {
   await setDoc(doc(db, 'bpu', client), { client, prestations, updatedAt: new Date().toISOString() }, { merge: true });
