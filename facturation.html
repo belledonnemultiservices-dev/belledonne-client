@@ -744,10 +744,11 @@ function recomputeFactTotals() {
 }
 
 window.onEntiteChange = function() {
+  // Les champs client restent toujours visibles et modifiables ;
+  // choisir une entité enregistrée les préremplit (modifiables ensuite).
+  document.getElementById('factClientManuel').style.display = '';
   const v = document.getElementById('fEntite').value;
-  const manual = document.getElementById('factClientManuel');
-  if (v === 'manuel') { manual.style.display = ''; return; }
-  manual.style.display = 'none';
+  if (v === 'manuel') return;
   const e = _factEntites[Number(v)];
   if (e) {
     document.getElementById('fcType').value = e.type || 'bailleur';
