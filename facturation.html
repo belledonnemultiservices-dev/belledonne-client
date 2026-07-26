@@ -1014,7 +1014,6 @@ function factureFileChosen() {
   const chosen = document.getElementById('chosenFacture');
   chosen.textContent = '✓ ' + input.files[0].name;
   chosen.style.display = 'block';
-  extractFromFacturePdf(input.files[0]);
 }
 
 function loadPdfJs() {
