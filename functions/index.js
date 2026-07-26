@@ -332,7 +332,14 @@ exports.createAxonautInvoice = functions
         res.status(502).json({ error: "Axonaut (" + cr.status + "): " + (cr.body || "").slice(0, 300) });
         return;
       }
-      const out = JSON.parse(cr.body);
+      let out = JSON.parse(cr.body);
+      // Certaines créations ne renvoient pas immédiatement le numéro / le PDF :
+      // on relit la facture pour être sûr de les récupérer.
+      if (out.id && (!out.number || !out.public_path)) {
+        const detailPath = (mode === "devis") ? "/api/v2/quotations/" : "/api/v2/invoices/";
+        const det = await axonautGet(key, detailPath + out.id, { page: "1" });
+        if (det.status === 200) { try { out = JSON.parse(det.body); } catch(e) {} }
+      }
       res.status(200).json({
         mode: mode || "devis",
         companyId: company.id,
