@@ -35,6 +35,9 @@ service firebase.storage {
     // facturation : documents internes, admin only
     match /facturation/{file=**}         { allow read, write: if isAdmin(); }
 
+    // suivi : BC / PL / devis (documents internes), admin only
+    match /suivi/{file=**}               { allow read, write: if isAdmin(); }
+
     // Tout le reste : refusé
     match /{path=**}                     { allow read, write: if false; }
   }
