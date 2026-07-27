@@ -324,6 +324,12 @@
         <option value="Terminé">Terminé</option>
         <option value="Annulé">Annulé</option>
       </select>
+      <select class="filter-select" id="filterAssigne" onchange="filterTable()">
+        <option value="">Tous les techniciens</option>
+      </select>
+      <select class="filter-select" id="filterNature" onchange="filterTable()">
+        <option value="">Toutes les natures</option>
+      </select>
       <select class="filter-select" id="filterAnnee" onchange="filterTable()">
         <option value="">Toutes les années</option>
       </select>
@@ -2893,6 +2899,26 @@ window.populateFilterDropdowns = function populateFilterDropdowns() {
     clientSel.appendChild(opt);
   });
   
+  // Repopulate techniciens assignés : depuis les fiches techniciens + les assignations existantes
+  var assigneSel = document.getElementById('filterAssigne');
+  if (assigneSel) {
+    var currentAssigne = assigneSel.value;
+    var fromTechs = (window._techniciens || []).map(function(t){return t.nomComplet || t.nom || t.id;}).filter(Boolean);
+    var fromInterv = interventions.reduce(function(acc, i){ return acc.concat(i.assignes || (i.assigne ? [i.assigne] : [])); }, []);
+    var assignes = [...new Set(fromTechs.concat(fromInterv).filter(Boolean))].sort();
+    assigneSel.innerHTML = '<option value="">Tous les techniciens</option>';
+    assignes.forEach(function(a){ var o=document.createElement('option'); o.value=a; o.textContent=a; if(a===currentAssigne)o.selected=true; assigneSel.appendChild(o); });
+  }
+
+  // Repopulate natures de mission : depuis les données
+  var natureSel = document.getElementById('filterNature');
+  if (natureSel) {
+    var currentNature = natureSel.value;
+    var natures = [...new Set(interventions.map(function(i){return (i.nature||'').trim();}).filter(Boolean))].sort();
+    natureSel.innerHTML = '<option value="">Toutes les natures</option>';
+    natures.forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; if(n===currentNature)o.selected=true; natureSel.appendChild(o); });
+  }
+
   // Repopulate years: always include current year, next year, + years from data
   yearSel.innerHTML = '<option value="">Toutes les années</option>';
   var thisYear = new Date().getFullYear();
@@ -2916,21 +2942,26 @@ function filterTable() {
   var statut = (document.getElementById('filterStatut')?.value)||'';
   var clientFilter = activeTab === 'contrat' ? ((document.getElementById('filterClient')?.value)||'') : '';
   var annee = (document.getElementById('filterAnnee')?.value)||'';
+  var assigneFilter = (document.getElementById('filterAssigne')?.value)||'';
+  var natureFilter = (document.getElementById('filterNature')?.value)||'';
   var dateDe = (document.getElementById('filterDateDe')?.value)||'';
   var dateA = (document.getElementById('filterDateA')?.value)||'';
   var allData = window.interventions || [];
   var data = allData.filter(function(i){ return (i.clientType||'contrat') === activeTab; });
   var filtered = data.filter(function(i) {
-    var allAssignes = (i.assignes||[]).concat(i.assigne||[]).join(' ');
+    var assignesArr = (i.assignes||[]).concat(i.assigne?[i.assigne]:[]);
+    var allAssignes = assignesArr.join(' ');
     var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,allAssignes,i.siret].some(function(v){return (v||'').toLowerCase().includes(q);});
     var ms = !statut || i.statut === statut;
     var mc = !clientFilter || i.client === clientFilter;
+    var mas = !assigneFilter || assignesArr.indexOf(assigneFilter) !== -1;
+    var mn = !natureFilter || (i.nature||'') === natureFilter;
     var dateRef = i.dateEmission || '';
     var allDates = [dateRef, (i.createdAt||'').substring(0,10)].filter(Boolean);
     var ma = !annee || allDates.some(function(d){return d && d.startsWith(annee);});
     var mde = !dateDe || (dateRef && dateRef >= dateDe);
     var mda = !dateA || (dateRef && dateRef <= dateA);
-    return mq && ms && mc && ma && mde && mda;
+    return mq && ms && mc && mas && mn && ma && mde && mda;
   });
   filtered.sort(function(a, b) {
     var da = a.dateEmission || (a.createdAt || '').substring(0, 10) || '';
