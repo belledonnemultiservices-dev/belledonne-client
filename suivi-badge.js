@@ -27,6 +27,11 @@ function setup() {
     return b;
   });
 
+  // Liens strictement internes : masqués par défaut, réaffichés seulement pour l'admin.
+  // Ils ne doivent JAMAIS apparaître (même vides) côté client.
+  const internalLinks = document.querySelectorAll('a[href="suivi.html"], a[href="facturation.html"]');
+  internalLinks.forEach(el => { el.style.display = 'none'; });
+
   onAuthStateChanged(auth, async user => {
     if (!user) return;
 
@@ -45,6 +50,8 @@ function setup() {
       }
       isAdmin = (role === 'admin' || role === 'administrateur');
       if (isAdmin) {
+        // Admin : on réaffiche les liens internes masqués par défaut.
+        internalLinks.forEach(el => { el.style.display = ''; });
         document.querySelectorAll('a.nav-item[href="rapports.html"]').forEach(el => el.style.display = 'none');
         // Injecter le lien "Services & conso" dans la sidebar admin (si absent)
         if (!document.querySelector('a.nav-item[href="services.html"]')) {
