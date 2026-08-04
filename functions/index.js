@@ -1071,3 +1071,69 @@ exports.kizeoListFields = functions
       exports,
     });
   });
+
+// ── GÉNÉRER UN RAPPORT PRÉ-REMPLI (push vers le mobile du technicien) ──
+// Entrée : { suiviId, numPassage, kizeoFormDocId, recipientUserId }.
+// Écrit un ref_interne unique "{suiviId}::{numPassage}" (lien de rattachement)
+// + pré-remplit référence/passage/client/adresse/date selon le mapping.
+exports.pushKizeoForm = functions
+  .region("europe-west1")
+  .runWith({ secrets: [KIZEO_API_TOKEN] })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { suiviId, numPassage, kizeoFormDocId, recipientUserId } = req.body || {};
+    if (!suiviId || !numPassage || !kizeoFormDocId) { res.status(400).json({ error: "suiviId, numPassage et kizeoFormDocId requis" }); return; }
+    const recipient = parseInt(recipientUserId, 10);
+    if (!recipient) { res.status(400).json({ error: "Technicien Kizeo (recipientUserId) manquant ou invalide" }); return; }
+
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+
+    // Config du formulaire
+    const formSnap = await db.collection("kizeo-forms").doc(String(kizeoFormDocId)).get();
+    if (!formSnap.exists) { res.status(404).json({ error: "Formulaire Kizeo introuvable" }); return; }
+    const form = formSnap.data();
+    const mapping = form.mapping || {};
+    if (!form.formId) { res.status(400).json({ error: "formId manquant dans la config" }); return; }
+    if (!mapping.refInterne) { res.status(400).json({ error: "Champ Référence interne non associé dans la config" }); return; }
+
+    // Doc suivi (source de vérité)
+    const sSnap = await db.collection("suivi").doc(String(suiviId)).get();
+    if (!sSnap.exists) { res.status(404).json({ error: "Intervention introuvable" }); return; }
+    const s = sSnap.data();
+    const passages = Array.isArray(s.passages) ? s.passages : [];
+    const passage = passages.find(p => String(p.num) === String(numPassage)) || {};
+    const dateVal = (passage.debut ? String(passage.debut).split("T")[0] : (s.dateEmission || ""));
+    const reference = s.bc || s.pl || s.devis || "";
+
+    // Construction des champs à pousser (uniquement les champs mappés)
+    const appValues = {
+      refInterne: `${suiviId}::${numPassage}`,
+      reference: reference,
+      passage: String(numPassage),
+      client: s.client || "",
+      adresse: s.adresse || passage.adresse || "",
+      date: dateVal,
+    };
+    const fields = {};
+    Object.keys(appValues).forEach(key => {
+      const fid = mapping[key];
+      if (fid) fields[fid] = { value: appValues[key] };
+    });
+
+    const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", "/forms/" + encodeURIComponent(form.formId) + "/push", {
+      recipient_user_id: recipient,
+      fields,
+    });
+    if (r.status < 200 || r.status >= 300) {
+      res.status(502).json({ error: "Kizeo a refusé le push (" + r.status + ")", detail: (r.body || r.error || "").slice(0, 300) });
+      return;
+    }
+    console.log("Kizeo push OK:", suiviId, "passage", numPassage, "-> user", recipient);
+    res.status(200).json({ success: true, refInterne: appValues.refInterne });
+  });

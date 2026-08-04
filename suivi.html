@@ -1521,8 +1521,9 @@ window.renderRapportZone = function(n) {
     const hist = (r.notifHistory || []).map(h => fmtNotifDate(h.ts) + ' → ' + ((h.to || []).join(', ') || '?')).join('\n');
     notifInfo = `<span title="${hist.replace(/"/g, '&quot;')}" style="font-size:11px;color:var(--text-muted);cursor:help;">Notifié ${r.notifs}×${last ? ' — dernier le ' + last : ''}</span>`;
   }
+  const kizeoCtrl = buildKizeoControl(n);
   if (r && r.pdfUrl) {
-    zone.innerHTML = `
+    zone.innerHTML = kizeoCtrl + `
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Rapport</span>
         <a href="${r.pdfUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px solid var(--green);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">
@@ -1538,7 +1539,7 @@ window.renderRapportZone = function(n) {
         <button type="button" onclick="deleteRapport(${n})" style="background:#FDECEA;color:#E74C3C;border:1px solid #FACACA;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Supprimer</button>
       </div>${fileInput}`;
   } else {
-    zone.innerHTML = `
+    zone.innerHTML = kizeoCtrl + `
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Rapport</span>
         <button type="button" onclick="triggerRapportUpload(${n})" style="display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px dashed var(--green);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
@@ -1546,6 +1547,53 @@ window.renderRapportZone = function(n) {
           Déposer un rapport
         </button>
       </div>${fileInput}`;
+  }
+};
+// Contrôle "Générer le rapport Kizeo" pour un passage donné.
+function buildKizeoControl(n) {
+  const forms = window._kizeoForms || [];
+  if (!forms.length) return '';
+  // Techniciens du passage ayant un ID Kizeo
+  const passageTechs = (typeof getPassageTechsFromDOM === 'function' ? getPassageTechsFromDOM(n) : []) || [];
+  const techMatches = passageTechs
+    .map(nom => (window._techniciens || []).find(t => t.nomComplet === nom || t.nom === nom))
+    .filter(t => t && t.kizeoUserId);
+  const wrap = (inner) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
+      <span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport terrain</span>${inner}</div>`;
+  if (!editId) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Enregistrez l'intervention pour pouvoir générer le rapport.</span>`);
+  if (!techMatches.length) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Assignez un technicien ayant un ID Kizeo (fiche Techniciens) sur ce passage.</span>`);
+  const formOpts = forms.map(f => `<option value="${f.id}">${(f.nom||'Formulaire').replace(/"/g,'&quot;')}</option>`).join('');
+  const techOpts = techMatches.map(t => `<option value="${t.kizeoUserId}">${(t.nomComplet||t.nom).replace(/"/g,'&quot;')}</option>`).join('');
+  return wrap(`
+      <select id="kzForm${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:200px;">${formOpts}</select>
+      <select id="kzTech${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:170px;">${techOpts}</select>
+      <button type="button" onclick="genererRapportKizeo(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M4 4h16v2H4zm0 14h16v2H4zm7-7h9v2h-9zm0-4h9v2h-9zm0 8h9v2h-9zM4 8l3 3-3 3z"/></svg>
+        Générer le rapport
+      </button>`);
+}
+window.genererRapportKizeo = async function(n) {
+  const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
+  const kizeoFormDocId = document.getElementById('kzForm' + n)?.value;
+  const recipientUserId = document.getElementById('kzTech' + n)?.value;
+  if (!editId) { showToast("Enregistre l'intervention d'abord.", true); return; }
+  if (!kizeoFormDocId) { showToast('Choisis un formulaire Kizeo.', true); return; }
+  if (!recipientUserId) { showToast('Choisis un technicien.', true); return; }
+  const btn = document.querySelector('#rapportZone' + n + ' button[onclick^="genererRapportKizeo"]');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  try {
+    const resp = await fetch("https://europe-west1-belledonne-client.cloudfunctions.net/pushKizeoForm", {
+      method: 'POST',
+      headers: await window._authHeaders(),
+      body: JSON.stringify({ suiviId: editId, numPassage: num, kizeoFormDocId, recipientUserId }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+    showToast('Rapport envoyé sur le mobile du technicien ✅');
+  } catch(e) {
+    showToast('Erreur Kizeo : ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   }
 };
 window.triggerRapportUpload = function(n) {
@@ -3568,6 +3616,9 @@ onAuthStateChanged(auth, async (user) => {
   // Load techniciens
   await loadTechniciens();
 
+  // Load formulaires Kizeo actifs (pour la génération de rapport pré-rempli)
+  try { await loadKizeoForms(); } catch(e) { console.warn('loadKizeoForms:', e); }
+
   // Load suiviRdv template
   try {
     const snapCfg = await getDocs(collection(db, 'config'));
@@ -3676,6 +3727,12 @@ async function loadTechniciens() {
   populateTechChips();
 }
 window._loadTechniciens = loadTechniciens;
+
+async function loadKizeoForms() {
+  const snap = await getDocs(collection(db, 'kizeo-forms'));
+  window._kizeoForms = snap.docs.map(d=>({id:d.id,...d.data()})).filter(f => f.actif !== false);
+}
+window._loadKizeoForms = loadKizeoForms;
 
 // ── COULEURS STATUTS ──────────────────────────────────────────────
 const STATUS_COLOR_CONFIG = [
