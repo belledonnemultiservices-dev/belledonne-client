@@ -216,17 +216,22 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Référence interne * (identifiant du passage)</label>
+        <label class="form-label">Référence interne * (lien fiable)</label>
         <select class="form-select map-select" id="mapRefInterne"></select>
-        <div class="form-hint">Champ Kizeo dédié où l'app écrit l'identifiant du passage (à ajouter dans le formulaire Kizeo, ex: <code>ref_interne</code>).</div>
+        <div class="form-hint">Champ dédié à ajouter dans le formulaire Kizeo (ex: <code>ref_interne</code>, masquable). L'app y écrit un identifiant unique du passage : le technicien n'y touche pas, c'est lui qui garantit le bon rattachement.</div>
+      </div>
+      <div class="section-sep">Pré-remplissage (confort, optionnel)</div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:16px"><label class="form-label">Référence (N° BC/PL/devis)</label><select class="form-select map-select" id="mapReference"></select></div>
+        <div class="form-group" style="margin-bottom:16px"><label class="form-label">N° passage</label><select class="form-select map-select" id="mapPassage"></select></div>
       </div>
       <div class="form-row">
         <div class="form-group" style="margin-bottom:16px"><label class="form-label">Client</label><select class="form-select map-select" id="mapClient"></select></div>
-        <div class="form-group" style="margin-bottom:16px"><label class="form-label">N° BC</label><select class="form-select map-select" id="mapBc"></select></div>
+        <div class="form-group" style="margin-bottom:16px"><label class="form-label">Adresse</label><select class="form-select map-select" id="mapAdresse"></select></div>
       </div>
-      <div class="form-row">
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">Adresse</label><select class="form-select map-select" id="mapAdresse"></select></div>
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">Date</label><select class="form-select map-select" id="mapDate"></select></div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Date</label>
+        <select class="form-select map-select" id="mapDate"></select>
       </div>
     </div>
     <div class="modal-footer">
@@ -260,8 +265,8 @@ const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 const FN_LIST_FIELDS = "https://europe-west1-belledonne-client.cloudfunctions.net/kizeoListFields";
 
-const MAP_KEYS = ["refInterne", "client", "bc", "adresse", "date"];
-const MAP_EL = { refInterne: "mapRefInterne", client: "mapClient", bc: "mapBc", adresse: "mapAdresse", date: "mapDate" };
+const MAP_KEYS = ["refInterne", "reference", "passage", "client", "adresse", "date"];
+const MAP_EL = { refInterne: "mapRefInterne", reference: "mapReference", passage: "mapPassage", client: "mapClient", adresse: "mapAdresse", date: "mapDate" };
 let _user = null;
 let loadedFields = [];   // [{id, libelle, type}]
 let unsub = null;
@@ -300,7 +305,7 @@ function render(forms) {
       : `<span class="badge-type badge-pdf">PDF</span>`;
     const mapOk = mappingComplete(m)
       ? `<span class="ok">Configuré</span>`
-      : `<span class="ko">Référence interne manquante</span>`;
+      : `<span class="ko">Référence interne à associer</span>`;
     return `<div class="source-card">
       <div class="source-card-header">
         <div class="source-card-info">
@@ -321,9 +326,9 @@ function render(forms) {
       </div>
       <div class="source-stats">
         <div class="stat-line"><span class="stat-lbl">Mapping</span><span class="stat-val">${mapOk}</span></div>
-        <div class="stat-line"><span class="stat-lbl">Réf. interne</span><span class="stat-val">${m.refInterne || "—"}</span></div>
-        <div class="stat-line"><span class="stat-lbl">Client / BC</span><span class="stat-val">${m.client || "—"} / ${m.bc || "—"}</span></div>
-        <div class="stat-line"><span class="stat-lbl">Adresse / Date</span><span class="stat-val">${m.adresse || "—"} / ${m.date || "—"}</span></div>
+        <div class="stat-line"><span class="stat-lbl">Réf. interne (lien)</span><span class="stat-val">${m.refInterne || "—"}</span></div>
+        <div class="stat-line"><span class="stat-lbl">Référence / Passage</span><span class="stat-val">${m.reference || "—"} / ${m.passage || "—"}</span></div>
+        <div class="stat-line"><span class="stat-lbl">Client / Adresse</span><span class="stat-val">${m.client || "—"} / ${m.adresse || "—"}</span></div>
       </div>
     </div>`;
   }).join("");

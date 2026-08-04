@@ -36,7 +36,7 @@ Filet de sécurité : **pull programmé** (CF `kizeoPull`, toutes les 15 min) qu
 
 ## 2. Prérequis de configuration Kizeo (côté Yacine)
 
-1. **Champ `ref_interne`** ajouté dans chaque formulaire de rapport (champ texte, peut être masqué). Portera l'identifiant du passage : `{suiviId}::{numPassage}`.
+1. **Champ `ref_interne`** à ajouter une fois dans chaque formulaire de rapport (texte, masquable). L'app y écrit un identifiant **unique** du passage `{suiviId}::{numPassage}`. C'est lui qui fait le lien fiable (le technicien n'y touche pas). Les champs Référence/N° passage existants restent pré-remplis pour l'affichage seulement.
 2. **Correspondance techniciens** : récupérer le `user_id` Kizeo de chaque technicien et le stocker dans sa fiche (collection `techniciens`, champ `kizeoUserId`).
 3. **`formId`** des formulaires de rapport (via `GET /forms`).
 4. **Webhook** configuré dans l'interface Kizeo : déclencheur *Recording*, URL = endpoint de `kizeoWebhook`, header personnalisé `X-Kizeo-Secret: <secret>`.
@@ -65,7 +65,8 @@ Base API Kizeo : `https://forms.kizeo.com/rest/v3/`. Auth : header `Authorizatio
   // provenance Kizeo
   kizeoDataId      : "987654",              // _id de la soumission Kizeo (clé stable)
   kizeoFormId      : "123456",
-  refInterne       : "abc123::2",           // {suiviId}::{numPassage}
+  refInterne       : "abc123::2",           // lien : {suiviId}::{numPassage} lu dans ref_interne
+  reference        : "320995",              // N° BC/PL/devis (affichage)
   arriveeAt        : "2026-08-04T14:32:00Z",// date/heure d'arrivée (= tri de la page)
   technicien       : "Nom technicien",      // depuis _recipient_name
   origine          : "webhook" | "pull",
@@ -90,7 +91,7 @@ Base API Kizeo : `https://forms.kizeo.com/rest/v3/`. Auth : header `Authorizatio
 ```
 
 - **Tri de la page** = `arriveeAt` (les uns à la suite des autres par date/heure d'arrivée).
-- `refInterne` non résolu (technicien a lancé un formulaire hors app) → `suiviId=null`, ligne affichée en "à rattacher manuellement".
+- `ref_interne` absent/illisible (formulaire lancé hors app) → `suiviId=null`, ligne affichée en "à rattacher manuellement".
 
 ### 4.2 Collection `rapports` (existante, inchangée)
 
@@ -115,10 +116,11 @@ Les formulaires Kizeo ne sont **jamais en dur dans le code** : ils sont gérés 
   typeSortie : "pdf" | "excel",
   // mapping : donnée de l'app  ->  field_id du champ Kizeo (chargé via l'API)
   mapping    : {
-    refInterne : "ref_interne",
+    refInterne : "ref_interne",  // OBLIGATOIRE — lien unique
+    reference  : "num_bc",       // optionnel (pré-remplissage/affichage)
+    passage    : "num_passage",  // optionnel
     client     : "client",
     adresse    : "adresse",
-    bc         : "num_bc",
     date       : "date_intervention"
   },
   createdAt, updatedAt
@@ -143,8 +145,7 @@ Traitement :
 1. Lit la config `kizeo-forms/{kizeoFormDocId}` → `formId` + `mapping`.
 2. Lit le doc `suivi/{suiviId}` → client, bc, adresse, date du passage, technicien assigné au passage.
 3. Résout `kizeoUserId` du technicien (fiche `techniciens`). Erreur explicite si absent.
-4. Construit `fields` dynamiquement à partir du `mapping` (donnée app → field_id), avec
-   `mapping.refInterne` = `"<suiviId>::<numPassage>"`.
+4. Construit `fields` à partir du `mapping` : `refInterne` = `"<suiviId>::<numPassage>"` (obligatoire), + reference/passage/client/adresse/date si mappés (pré-remplissage).
 5. `POST /forms/{formId}/push` avec `{ recipient_user_id, fields }`.
 6. Retour : ok / message d'erreur affiché dans le modal.
 
@@ -152,8 +153,8 @@ Traitement :
 
 1. Vérifie `X-Kizeo-Secret === KIZEO_WEBHOOK_SECRET` → sinon 401.
 2. Lit `eventType` (traite `finished`/recording) + `form_id` + `id` (dataId).
-3. `GET /forms/{formId}/data/{dataId}` → récupère les champs, dont `ref_interne` et `_recipient_name`.
-4. Parse `ref_interne` → `suiviId`, `numPassage`. Résout client/bc via `suivi/{suiviId}`.
+3. `GET /forms/{formId}/data/{dataId}` → lit le champ `ref_interne` (via `mapping.refInterne`) + `_recipient_name`.
+4. Parse `ref_interne` → `suiviId`, `numPassage`. Résout `client` via `suivi/{suiviId}`. Illisible/absent → `suiviId=null` (rattachement manuel).
 5. Télécharge le fichier :
    - PDF : `GET /forms/{formId}/data/{dataId}/pdf`
    - Excel : `GET /forms/{formId}/exports` puis `GET /forms/{formId}/data/{dataId}/exports/{exportId}`
@@ -178,7 +179,7 @@ Traitement :
 Même esprit que `imports.html` (config `email-sources`).
 - CRUD sur `kizeo-forms` : ajouter/modifier/supprimer, toggle actif.
 - Saisie du `formId` + nom + type de sortie (PDF/Excel) + `exportId`.
-- Bouton **"Charger les champs"** → appelle `kizeoListFields` → affiche les champs du formulaire → mapping via menus déroulants (refInterne, client, adresse, bc, date).
+- Bouton **"Charger les champs"** → appelle `kizeoListFields` → affiche les champs du formulaire → mapping via menus déroulants (reference et passage obligatoires, client/adresse/date optionnels).
 - Lien sidebar admin only.
 
 ## 6. Page admin "Réception rapports" (nouveau fichier `reception.html`)
@@ -211,7 +212,7 @@ Dans le modal d'une intervention (par passage), on ajoute :
 
 ## 8. Découpage de développement proposé
 
-1. **Socle & config** : secrets, client API Kizeo côté Functions, `kizeoListFields`, configurateur `kizeo-config.html` + collection `kizeo-forms`, champ `kizeoUserId` sur les techniciens. Actions Kizeo côté Yacine : ajouter le champ `ref_interne` dans chaque formulaire, récupérer les `user_id` techniciens.
+1. **Socle & config** : secrets, client API Kizeo côté Functions, `kizeoListFields`, configurateur `kizeo-config.html` + collection `kizeo-forms`, champ `kizeoUserId` sur les techniciens. Actions Kizeo côté Yacine : récupérer les `user_id` techniciens (aucun nouveau champ de formulaire à créer).
 2. **Aller** : `pushKizeoForm` + menu déroulant + bouton dans le modal Suivi. Test : push reçu sur le mobile technicien.
 3. **Retour** : `kizeoWebhook` + collection `reception-rapports` + `kizeoPull`. Test : soumission → doc créé + fichier en Storage.
 4. **Page** `reception.html` : liste + ouverture PDF + envoi client + archivage dans `rapports`.

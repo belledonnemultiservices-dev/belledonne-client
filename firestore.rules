@@ -46,7 +46,7 @@ service cloud.firestore {
     match /contacts/{doc}      { allow read, write: if isAdmin(); }
     match /techniciens/{doc}   { allow read, write: if isAdmin(); }
     match /email-sources/{doc} { allow read, write: if isAdmin(); }
-    match /kizeo-forms/{doc}       { allow read, write: if isAdmin(); }
+    match /kizeo-forms/{doc}        { allow read, write: if isAdmin(); }
     match /reception-rapports/{doc} { allow read, write: if isAdmin(); }
 
     // ── config : lecture par tout utilisateur connecté (couleurs, coordonnées,
