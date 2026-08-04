@@ -4,3 +4,4 @@ functions/.DS_Store
 functions/node_modules/
 functions/package-lock.json
 *.pdf
+refresh_token.js

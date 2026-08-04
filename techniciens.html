@@ -175,6 +175,11 @@
         </div>
       </div>
       <div class="form-group">
+        <label class="form-label">ID utilisateur Kizeo <span style="font-weight:400;color:var(--text-muted);">— optionnel</span></label>
+        <input class="form-input" id="fKizeoUserId" placeholder="ex: 45678">
+        <span style="font-size:12px;color:var(--text-muted);">Nécessaire pour lui envoyer un rapport pré-rempli depuis le Suivi.</span>
+      </div>
+      <div class="form-group">
         <label class="form-label">Couleur du badge</label>
         <div class="color-row">
           <input type="color" class="color-pick" id="fColor" value="#2ECC8F" oninput="updateColorPreview()">
@@ -254,12 +259,13 @@ function openModal(id = null) {
     document.getElementById('fNom').value = t.nom || '';
     document.getElementById('fTel').value = t.tel || '';
     document.getElementById('fEmail').value = t.email || '';
+    document.getElementById('fKizeoUserId').value = t.kizeoUserId || '';
     document.getElementById('fColor').value = t.color || '#2ECC8F';
     document.getElementById('fCalColorId').value = t.calendarColorId || '';
     updateColorPreview();
     buildCalColorPicker(t.calendarColorId || '');
   } else {
-    ['fPrenom','fNom','fTel','fEmail'].forEach(id => document.getElementById(id).value = '');
+    ['fPrenom','fNom','fTel','fEmail','fKizeoUserId'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('fColor').value = '#2ECC8F';
     document.getElementById('fCalColorId').value = '';
     updateColorPreview();
@@ -282,6 +288,7 @@ async function saveTechnicien() {
     nomComplet: prenom + ' ' + nom,
     tel: document.getElementById('fTel').value.trim(),
     email: document.getElementById('fEmail').value.trim(),
+    kizeoUserId: document.getElementById('fKizeoUserId').value.trim(),
     color: document.getElementById('fColor').value,
     calendarColorId: document.getElementById('fCalColorId').value || null,
     updatedAt: new Date().toISOString()

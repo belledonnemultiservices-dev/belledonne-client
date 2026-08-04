@@ -38,6 +38,9 @@ service firebase.storage {
     // suivi : BC / PL / devis (documents internes), admin only
     match /suivi/{file=**}               { allow read, write: if isAdmin(); }
 
+    // reception : rapports Kizeo bruts en attente de traitement, admin only
+    match /reception/{file=**}           { allow read, write: if isAdmin(); }
+
     // Tout le reste : refusé
     match /{path=**}                     { allow read, write: if false; }
   }

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Formulaires Kizeo — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#0D1B2A;--green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;--amber:#F5A623;--red:#E74C3C;--text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;--border:rgba(13,27,42,0.09);--surface:#fff;--bg:#F2F5F8;--sidebar-w:240px;--radius:14px;--radius-sm:8px;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+  .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-mark{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-icon svg{width:18px;height:18px;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
+  .admin-badge{margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);padding:8px 12px;display:flex;align-items:center;gap:8px;}
+  .admin-badge svg{width:14px;height:14px;color:var(--amber);flex-shrink:0;}
+  .admin-badge span{font-size:11px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:0.06em;}
+  .sidebar-nav{padding:20px 12px;flex:1;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;}
+  .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--navy);}
+  .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .footer-role{font-size:10px;color:var(--amber);}
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .btn-logout{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--red);background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.15);padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .content{padding:32px;flex:1;}
+  .page-header-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;}
+  .page-sub{font-size:13px;color:var(--text-muted);}
+  .btn-add{display:flex;align-items:center;gap:8px;height:40px;padding:0 18px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;white-space:nowrap;}
+  .btn-add:hover{background:var(--green-dark);color:#fff;}
+  .sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:20px;}
+  .source-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;animation:fadeUp 0.3s ease both;}
+  .source-card-header{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:14px;}
+  .source-card-info{flex:1;min-width:0;}
+  .source-card-top{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  .source-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;}
+  .badge-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:2px 8px;border-radius:6px;}
+  .badge-pdf{background:#EBF0F5;color:var(--navy);}
+  .badge-excel{background:rgba(46,204,143,0.12);color:var(--green-dark);}
+  .source-freq{font-size:12px;color:var(--text-muted);margin-bottom:4px;font-family:monospace;}
+  .source-card-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;}
+  .toggle-wrap{display:flex;align-items:center;gap:8px;}
+  .toggle-label{font-size:12px;font-weight:500;}
+  .toggle-track{position:relative;width:40px;height:22px;cursor:pointer;}
+  .toggle-track input{opacity:0;position:absolute;width:0;height:0;}
+  .toggle-bg{position:absolute;inset:0;background:#ccc;border-radius:11px;transition:background 0.2s;}
+  .toggle-thumb{position:absolute;top:2px;left:2px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);}
+  .toggle-track input:checked~.toggle-bg{background:var(--green);}
+  .toggle-track input:checked~.toggle-thumb{transform:translateX(18px);}
+  .btn-edit{height:30px;padding:0 12px;border:1px solid var(--border);background:transparent;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--text-mid);cursor:pointer;}
+  .btn-edit:hover{background:var(--bg);}
+  .btn-del{height:30px;padding:0 12px;border:1px solid rgba(231,76,60,0.15);background:rgba(231,76,60,0.06);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--red);cursor:pointer;}
+  .source-stats{padding:0 20px 16px;}
+  .stat-line{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+  .stat-line:last-child{border-bottom:none;}
+  .stat-lbl{font-size:12px;color:var(--text-muted);}
+  .stat-val{font-size:12px;font-weight:500;color:var(--text);}
+  .ok{color:var(--green-dark);} .ko{color:var(--red);}
+  .empty-state{text-align:center;padding:60px 32px;color:var(--text-muted);font-size:13px;}
+  .empty-state svg{width:40px;height:40px;color:var(--border);margin-bottom:12px;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal{background:#fff;border-radius:var(--radius);width:640px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(13,27,42,0.2);}
+  .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+  .btn-close{width:30px;height:30px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;line-height:1;}
+  .modal-body{padding:20px 24px;}
+  .modal-footer{padding:12px 24px 20px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .form-group{margin-bottom:16px;}
+  .form-label{font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;}
+  .form-hint{font-size:11px;color:var(--text-muted);margin-top:4px;}
+  .form-input,.form-select{width:100%;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--bg);outline:none;transition:border-color 0.15s;}
+  .form-input:focus,.form-select:focus{border-color:var(--green);background:#fff;}
+  .form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%238FA4B8'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+  .radio-group{display:flex;gap:10px;}
+  .radio-opt{flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px;transition:border-color 0.15s;}
+  .radio-opt input{accent-color:var(--green);}
+  .radio-opt.sel-pdf{border-color:var(--navy);background:#EBF0F5;}
+  .radio-opt.sel-excel{border-color:var(--green);background:var(--green-pale);}
+  .btn-load{height:40px;padding:0 16px;background:var(--navy);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:#fff;cursor:pointer;white-space:nowrap;}
+  .btn-load:hover{background:#1a3350;}
+  .btn-load:disabled{opacity:0.6;cursor:default;}
+  .load-status{font-size:11px;margin-top:6px;}
+  .btn-save{height:40px;padding:0 22px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;}
+  .btn-save:hover{background:var(--green-dark);color:#fff;}
+  .btn-cancel{height:40px;padding:0 16px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  .section-sep{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin:20px 0 14px;display:flex;align-items:center;gap:10px;}
+  .section-sep::after{content:'';flex:1;height:1px;background:var(--border);}
+  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);transform:translateY(80px);opacity:0;transition:all 0.3s ease;z-index:999;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast svg{width:16px;height:16px;color:var(--green);}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+    </div>
+  </div>
+  <div class="admin-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Espace Admin</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
+    <a class="nav-item" href="facturation.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg><span>Facturation</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
+    <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
+    <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+    <a class="nav-item" href="admin.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+    <a class="nav-item" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+    <a class="nav-item" href="techniciens.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Techniciens</span></a>
+    <a class="nav-item" href="imports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import email</span></a>
+    <a class="nav-item active" href="kizeo-config.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg><span>Formulaires Kizeo</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar">BM</div>
+      <div><div class="footer-name">Belledonne Multiservices</div><div class="footer-role">Administrateur</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Admin</span><span>›</span><span>Formulaires Kizeo</span></div>
+    <button class="btn-logout" onclick="handleLogout()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Déconnexion
+    </button>
+  </header>
+
+  <div class="content">
+    <div class="page-header-row">
+      <div>
+        <div class="page-title">Formulaires Kizeo</div>
+        <div class="page-sub">Enregistrez vos formulaires de rapport et associez leurs champs. Aucun code, tout est configurable ici.</div>
+      </div>
+      <button class="btn-add" onclick="openModal()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Ajouter un formulaire
+      </button>
+    </div>
+
+    <div class="sources-grid" id="grid">
+      <div class="empty-state"><div>Chargement...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modalOverlay" class="modal-overlay" style="display:none" onclick="handleOverlayClick(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Ajouter un formulaire</div>
+      <button class="btn-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editDocId">
+
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Nom affiché *</label>
+          <input class="form-input" type="text" id="fNom" placeholder="ex: Rapport dératisation">
+          <div class="form-hint">Affiché dans le menu du Suivi.</div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">ID du formulaire Kizeo *</label>
+          <div style="display:flex;gap:8px;">
+            <input class="form-input" type="text" id="fFormId" placeholder="ex: 123456" style="flex:1">
+            <button class="btn-load" id="btnLoad" onclick="loadFields()">Charger les champs</button>
+          </div>
+          <div class="load-status" id="loadStatus"></div>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top:16px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Type de sortie *</label>
+          <div class="radio-group">
+            <label class="radio-opt" id="radioPdf" onclick="selectType('pdf')"><input type="radio" name="typeSortie" value="pdf" checked> PDF</label>
+            <label class="radio-opt" id="radioExcel" onclick="selectType('excel')"><input type="radio" name="typeSortie" value="excel"> Excel</label>
+          </div>
+        </div>
+        <div class="form-group" id="exportIdGroup" style="margin-bottom:0;display:none">
+          <label class="form-label">ID d'export Excel</label>
+          <input class="form-input" type="text" id="fExportId" placeholder="ex: 789">
+          <div class="form-hint">L'export Kizeo qui génère l'Excel.</div>
+        </div>
+      </div>
+
+      <div class="section-sep">Association des champs</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+        Cliquez sur <strong>Charger les champs</strong> ci-dessus, puis reliez chaque donnée de l'app au champ Kizeo correspondant.
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Référence interne * (identifiant du passage)</label>
+        <select class="form-select map-select" id="mapRefInterne"></select>
+        <div class="form-hint">Champ Kizeo dédié où l'app écrit l'identifiant du passage (à ajouter dans le formulaire Kizeo, ex: <code>ref_interne</code>).</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:16px"><label class="form-label">Client</label><select class="form-select map-select" id="mapClient"></select></div>
+        <div class="form-group" style="margin-bottom:16px"><label class="form-label">N° BC</label><select class="form-select map-select" id="mapBc"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Adresse</label><select class="form-select map-select" id="mapAdresse"></select></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Date</label><select class="form-select map-select" id="mapDate"></select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-save" id="saveBtn" onclick="saveForm()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
+  authDomain: "belledonne-client.firebaseapp.com",
+  projectId: "belledonne-client",
+  storageBucket: "belledonne-client.firebasestorage.app",
+  messagingSenderId: "737384028313",
+  appId: "1:737384028313:web:700aee1467ac27d0c58008"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+const FN_LIST_FIELDS = "https://europe-west1-belledonne-client.cloudfunctions.net/kizeoListFields";
+
+const MAP_KEYS = ["refInterne", "client", "bc", "adresse", "date"];
+const MAP_EL = { refInterne: "mapRefInterne", client: "mapClient", bc: "mapBc", adresse: "mapAdresse", date: "mapDate" };
+let _user = null;
+let loadedFields = [];   // [{id, libelle, type}]
+let unsub = null;
+
+onAuthStateChanged(auth, (user) => {
+  if (!user) { window.location.href = "login.html"; return; }
+  if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
+  _user = user;
+  loadForms();
+});
+
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
+
+function loadForms() {
+  if (unsub) unsub();
+  unsub = onSnapshot(collection(db, "kizeo-forms"), (snap) => {
+    render(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+function mappingComplete(m) { return m && m.refInterne; }
+
+function render(forms) {
+  const grid = document.getElementById("grid");
+  if (!forms.length) {
+    grid.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+      <div>Aucun formulaire configuré. Cliquez sur <strong>Ajouter un formulaire</strong>.</div>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = forms.map(f => {
+    const m = f.mapping || {};
+    const badge = f.typeSortie === "excel"
+      ? `<span class="badge-type badge-excel">Excel</span>`
+      : `<span class="badge-type badge-pdf">PDF</span>`;
+    const mapOk = mappingComplete(m)
+      ? `<span class="ok">Configuré</span>`
+      : `<span class="ko">Référence interne manquante</span>`;
+    return `<div class="source-card">
+      <div class="source-card-header">
+        <div class="source-card-info">
+          <div class="source-card-top"><div class="source-name">${f.nom || "—"}</div>${badge}</div>
+          <div class="source-freq">formId ${f.formId || "—"}</div>
+        </div>
+        <div class="source-card-actions">
+          <div class="toggle-wrap">
+            <label class="toggle-track">
+              <input type="checkbox" ${f.actif !== false ? "checked" : ""} onchange="toggleForm('${f.id}', this.checked)">
+              <span class="toggle-bg"></span><span class="toggle-thumb"></span>
+            </label>
+            <span class="toggle-label" style="color:${f.actif !== false ? 'var(--green)' : 'var(--text-muted)'};">${f.actif !== false ? "Actif" : "Inactif"}</span>
+          </div>
+          <button class="btn-edit" onclick="openModal('${f.id}')">Modifier</button>
+          <button class="btn-del" onclick="deleteForm('${f.id}', '${(f.nom||"").replace(/'/g,"\\'")}')">Supprimer</button>
+        </div>
+      </div>
+      <div class="source-stats">
+        <div class="stat-line"><span class="stat-lbl">Mapping</span><span class="stat-val">${mapOk}</span></div>
+        <div class="stat-line"><span class="stat-lbl">Réf. interne</span><span class="stat-val">${m.refInterne || "—"}</span></div>
+        <div class="stat-line"><span class="stat-lbl">Client / BC</span><span class="stat-val">${m.client || "—"} / ${m.bc || "—"}</span></div>
+        <div class="stat-line"><span class="stat-lbl">Adresse / Date</span><span class="stat-val">${m.adresse || "—"} / ${m.date || "—"}</span></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+window.toggleForm = async function(id, actif) {
+  try { await updateDoc(doc(db, "kizeo-forms", id), { actif, updatedAt: new Date().toISOString() }); showToast(actif ? "Formulaire activé" : "Formulaire désactivé"); }
+  catch(e) { showToast("Erreur : " + e.message); }
+};
+
+window.deleteForm = async function(id, nom) {
+  if (!confirm(`Supprimer le formulaire "${nom}" ?`)) return;
+  try { await deleteDoc(doc(db, "kizeo-forms", id)); showToast("Formulaire supprimé"); }
+  catch(e) { showToast("Erreur : " + e.message); }
+};
+
+// ── Menus de mapping ──
+// Remplit chaque select avec les champs chargés. `current` = mapping enregistré,
+// affiché même si les champs ne sont pas (encore) rechargés.
+function populateMapSelects(current) {
+  current = current || {};
+  MAP_KEYS.forEach(key => {
+    const sel = document.getElementById(MAP_EL[key]);
+    const saved = current[key] || "";
+    let opts = '<option value="">— non associé —</option>';
+    const ids = new Set(loadedFields.map(f => f.id));
+    loadedFields.forEach(f => {
+      opts += `<option value="${f.id}">${f.libelle} (${f.id})</option>`;
+    });
+    // si une valeur enregistrée n'est pas dans les champs chargés, on la garde
+    if (saved && !ids.has(saved)) opts += `<option value="${saved}">${saved} (enregistré)</option>`;
+    sel.innerHTML = opts;
+    sel.value = saved;
+  });
+}
+
+window.loadFields = async function() {
+  const formId = document.getElementById("fFormId").value.trim();
+  const status = document.getElementById("loadStatus");
+  if (!formId) { status.innerHTML = '<span class="ko">Renseignez d\'abord l\'ID du formulaire.</span>'; return; }
+  const btn = document.getElementById("btnLoad");
+  btn.disabled = true; status.innerHTML = "Chargement des champs...";
+  try {
+    const idt = await _user.getIdToken();
+    const resp = await fetch(FN_LIST_FIELDS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + idt },
+      body: JSON.stringify({ formId }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    loadedFields = data.fields || [];
+    // conserver le mapping courant affiché
+    const current = {};
+    MAP_KEYS.forEach(k => { current[k] = document.getElementById(MAP_EL[k]).value || ""; });
+    populateMapSelects(current);
+    status.innerHTML = `<span class="ok">${loadedFields.length} champ(s) chargé(s)${data.nom ? " · " + data.nom : ""}</span>`;
+  } catch(e) {
+    status.innerHTML = `<span class="ko">Erreur : ${e.message}</span>`;
+  } finally { btn.disabled = false; }
+};
+
+// ── MODAL ──
+window.openModal = async function(docId) {
+  document.getElementById("editDocId").value = docId || "";
+  document.getElementById("modalTitle").textContent = docId ? "Modifier le formulaire" : "Ajouter un formulaire";
+  document.getElementById("loadStatus").innerHTML = "";
+  loadedFields = [];
+  let current = {};
+  if (docId) {
+    const snap = await getDoc(doc(db, "kizeo-forms", docId));
+    if (!snap.exists()) return;
+    const f = snap.data();
+    document.getElementById("fNom").value = f.nom || "";
+    document.getElementById("fFormId").value = f.formId || "";
+    document.getElementById("fExportId").value = f.exportId || "";
+    selectType(f.typeSortie || "pdf");
+    current = f.mapping || {};
+  } else {
+    document.getElementById("fNom").value = "";
+    document.getElementById("fFormId").value = "";
+    document.getElementById("fExportId").value = "";
+    selectType("pdf");
+  }
+  populateMapSelects(current);
+  document.getElementById("modalOverlay").style.display = "flex";
+};
+
+window.closeModal = function() { document.getElementById("modalOverlay").style.display = "none"; };
+window.handleOverlayClick = function(e) { if (e.target === document.getElementById("modalOverlay")) closeModal(); };
+
+window.selectType = function(type) {
+  document.querySelectorAll("input[name='typeSortie']").forEach(r => r.checked = (r.value === type));
+  document.getElementById("radioPdf").className = "radio-opt" + (type === "pdf" ? " sel-pdf" : "");
+  document.getElementById("radioExcel").className = "radio-opt" + (type === "excel" ? " sel-excel" : "");
+  document.getElementById("exportIdGroup").style.display = type === "excel" ? "block" : "none";
+};
+
+window.saveForm = async function() {
+  const docId = document.getElementById("editDocId").value;
+  const nom = document.getElementById("fNom").value.trim();
+  const formId = document.getElementById("fFormId").value.trim();
+  const typeSortie = document.querySelector("input[name='typeSortie']:checked").value;
+  const exportId = document.getElementById("fExportId").value.trim();
+  const mapping = {};
+  MAP_KEYS.forEach(k => { mapping[k] = document.getElementById(MAP_EL[k]).value || ""; });
+
+  if (!nom) { showToast("Nom requis"); return; }
+  if (!formId) { showToast("ID de formulaire requis"); return; }
+  if (!mapping.refInterne) { showToast("Le champ Référence interne doit être associé"); return; }
+  if (typeSortie === "excel" && !exportId) { showToast("ID d'export Excel requis pour un formulaire Excel"); return; }
+
+  const data = { nom, formId, typeSortie, exportId, mapping, updatedAt: new Date().toISOString() };
+  const btn = document.getElementById("saveBtn");
+  btn.disabled = true; btn.textContent = "Enregistrement...";
+  try {
+    if (docId) { await updateDoc(doc(db, "kizeo-forms", docId), data); showToast("Formulaire mis à jour"); }
+    else { await addDoc(collection(db, "kizeo-forms"), { ...data, actif: true, createdAt: new Date().toISOString() }); showToast("Formulaire ajouté"); }
+    closeModal();
+  } catch(e) { showToast("Erreur : " + e.message); }
+  finally { btn.disabled = false; btn.textContent = "Enregistrer"; }
+};
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3500);
+}
+</script>
+<script type="module" src="suivi-badge.js"></script>
+</body>
+</html>

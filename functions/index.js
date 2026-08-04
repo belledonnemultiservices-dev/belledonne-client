@@ -22,6 +22,7 @@ const OVH_SMS_ACCOUNT = defineSecret("OVH_SMS_ACCOUNT");
 const GCAL_SA = defineSecret("GCAL_SA"); // service account complet en JSON
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 const AXONAUT_API_KEY = defineSecret("AXONAUT_API_KEY");
+const KIZEO_API_TOKEN = defineSecret("KIZEO_API_TOKEN"); // token API Kizeo Forms (header Authorization, brut)
 
 // Transporter Gmail créé à l'exécution (les secrets ne sont dispo qu'au runtime).
 function makeTransporter() {
@@ -990,4 +991,71 @@ exports.processIncomingBC = functions
     } finally {
       try { await client.logout(); } catch(e) { /* ignore */ }
     }
+  });
+
+// ══════════════════════════════════════════════════════════════════
+//  KIZEO FORMS — rapports d'intervention
+//  API v3, base https://forms.kizeo.com/rest/v3/
+//  Auth : header Authorization = token brut (pas de préfixe Bearer).
+// ══════════════════════════════════════════════════════════════════
+
+// Requête générique vers l'API Kizeo. Retourne { status, body(text) }.
+// `binary=true` retourne body en Buffer (pour récupérer PDF/Excel).
+function kizeoRequest(token, method, path, jsonBody, binary) {
+  return new Promise((resolve) => {
+    const data = jsonBody ? JSON.stringify(jsonBody) : null;
+    const headers = { Authorization: token, Accept: "application/json" };
+    if (data) { headers["Content-Type"] = "application/json"; headers["Content-Length"] = Buffer.byteLength(data); }
+    const r = https.request({ hostname: "forms.kizeo.com", path: "/rest/v3" + path, method, headers }, (x) => {
+      const chunks = [];
+      x.on("data", c => chunks.push(c));
+      x.on("end", () => {
+        const buf = Buffer.concat(chunks);
+        resolve({ status: x.statusCode, body: binary ? buf : buf.toString("utf8") });
+      });
+    });
+    r.on("error", e => resolve({ status: 0, error: e.message }));
+    if (data) r.write(data);
+    r.end();
+  });
+}
+
+// ── LISTER LES CHAMPS D'UN FORMULAIRE (pour le configurateur) ─────
+// Entrée : { formId }. Retourne la liste { id (field_id), libelle, type }
+// pour permettre le mapping en menus déroulants côté configurateur.
+exports.kizeoListFields = functions
+  .region("europe-west1")
+  .runWith({ secrets: [KIZEO_API_TOKEN] })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const formId = (req.body && req.body.formId ? String(req.body.formId) : "").trim();
+    if (!formId) { res.status(400).json({ error: "formId manquant" }); return; }
+
+    const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "GET", "/forms/" + encodeURIComponent(formId));
+    if (r.status !== 200) {
+      res.status(502).json({ error: "Kizeo a répondu " + r.status, detail: (r.body || r.error || "").slice(0, 300) });
+      return;
+    }
+    let form;
+    try { form = JSON.parse(r.body); } catch(e) { res.status(502).json({ error: "Réponse Kizeo illisible" }); return; }
+
+    // La définition d'un formulaire expose ses champs sous form.fields (objet indexé par field_id).
+    const def = (form && (form.form || form)) || {};
+    const rawFields = def.fields || {};
+    const fields = [];
+    Object.keys(rawFields).forEach(fid => {
+      const f = rawFields[fid] || {};
+      fields.push({ id: fid, libelle: f.caption || f.label || fid, type: f.type || "" });
+    });
+
+    res.status(200).json({
+      formId,
+      nom: def.name || def.class || "",
+      fields,
+    });
   });
