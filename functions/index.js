@@ -1087,8 +1087,10 @@ exports.kizeoListUsers = functions
     const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "GET", "/users");
     if (r.status !== 200) { res.status(502).json({ error: "Kizeo a répondu " + r.status, detail: (r.body || r.error || "").slice(0, 300) }); return; }
     let parsed; try { parsed = JSON.parse(r.body); } catch(e) { res.status(502).json({ error: "Réponse Kizeo illisible" }); return; }
-    const arr = parsed.users || parsed.data || (Array.isArray(parsed) ? parsed : []);
-    const users = (arr || []).map(u => ({
+    let arr = parsed.users || parsed.data || parsed;
+    if (arr && !Array.isArray(arr) && typeof arr === "object") arr = Object.values(arr);
+    if (!Array.isArray(arr)) arr = [];
+    const users = arr.map(u => ({
       id: String(u.id),
       prenom: u.first_name || u.firstName || u.prenom || "",
       nom: u.last_name || u.lastName || u.nom || "",
