@@ -1072,6 +1072,31 @@ exports.kizeoListFields = functions
     });
   });
 
+// ── LISTER LES UTILISATEURS KIZEO (pour choisir le destinataire) ──
+// Retourne [{ id, prenom, nom, login }] pour alimenter un menu dans la fiche technicien.
+exports.kizeoListUsers = functions
+  .region("europe-west1")
+  .runWith({ secrets: [KIZEO_API_TOKEN] })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "GET", "/users");
+    if (r.status !== 200) { res.status(502).json({ error: "Kizeo a répondu " + r.status, detail: (r.body || r.error || "").slice(0, 300) }); return; }
+    let parsed; try { parsed = JSON.parse(r.body); } catch(e) { res.status(502).json({ error: "Réponse Kizeo illisible" }); return; }
+    const arr = parsed.users || parsed.data || (Array.isArray(parsed) ? parsed : []);
+    const users = (arr || []).map(u => ({
+      id: String(u.id),
+      prenom: u.first_name || u.firstName || u.prenom || "",
+      nom: u.last_name || u.lastName || u.nom || "",
+      login: u.user_name || u.login || u.email || u.name || "",
+    }));
+    res.status(200).json({ users });
+  });
+
 // ── GÉNÉRER UN RAPPORT PRÉ-REMPLI (push vers le mobile du technicien) ──
 // Entrée : { suiviId, numPassage, kizeoFormDocId, recipientUserId }.
 // Écrit un ref_interne unique "{suiviId}::{numPassage}" (lien de rattachement)
