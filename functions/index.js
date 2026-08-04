@@ -1053,9 +1053,21 @@ exports.kizeoListFields = functions
       fields.push({ id: fid, libelle: f.caption || f.label || fid, type: f.type || "" });
     });
 
+    // Liste des exports Word/Excel configurés sur le formulaire (pour choisir l'exportId).
+    let exports = [];
+    const ex = await kizeoRequest(KIZEO_API_TOKEN.value(), "GET", "/forms/" + encodeURIComponent(formId) + "/exports");
+    if (ex.status === 200) {
+      try {
+        const parsed = JSON.parse(ex.body);
+        const arr = parsed.exports || parsed.data || (Array.isArray(parsed) ? parsed : []);
+        exports = (arr || []).map(e => ({ id: String(e.id), nom: e.name || e.label || ("Export " + e.id), type: e.type || "" }));
+      } catch(e) { /* liste d'exports non critique */ }
+    }
+
     res.status(200).json({
       formId,
       nom: def.name || def.class || "",
       fields,
+      exports,
     });
   });
