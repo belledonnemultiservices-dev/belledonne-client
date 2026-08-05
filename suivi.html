@@ -1271,6 +1271,8 @@ function refreshPassageTechs(n, selectedArr) {
       this.classList.toggle('selected', isNow);
       if (isNow) { this.style.background = color; this.style.borderColor = color; this.style.color = isLightColor(color)?'#0D1B2A':'#fff'; }
       else { this.style.background=''; this.style.borderColor=''; this.style.color=''; }
+      // Rafraîchir le contrôle "Rapport terrain" (dépend des techniciens du passage)
+      try { renderRapportZone(n); } catch(e) {}
     };
     container.appendChild(btn);
   });
@@ -1564,9 +1566,14 @@ function buildKizeoControl(n) {
   if (!techMatches.length) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Assignez un technicien ayant un ID Kizeo (fiche Techniciens) sur ce passage.</span>`);
   const formOpts = forms.map(f => `<option value="${f.id}">${(f.nom||'Formulaire').replace(/"/g,'&quot;')}</option>`).join('');
   const techOpts = techMatches.map(t => `<option value="${t.kizeoUserId}">${(t.nomComplet||t.nom).replace(/"/g,'&quot;')}</option>`).join('');
+  const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
+  const bc = (document.getElementById('fBC')?.value || document.getElementById('fPL')?.value || '').trim();
+  const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
+  const defLabel = ((bc ? bc + ' - ' : '') + passageLabel).replace(/"/g,'&quot;');
   return wrap(`
-      <select id="kzForm${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:200px;">${formOpts}</select>
-      <select id="kzTech${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:170px;">${techOpts}</select>
+      <select id="kzForm${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:180px;">${formOpts}</select>
+      <select id="kzTech${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:150px;">${techOpts}</select>
+      <input id="kzLabel${n}" class="form-input" value="${defLabel}" placeholder="Nom du rapport" title="Nom affiché sur le mobile" style="font-size:12px;height:32px;padding:0 8px;max-width:200px;">
       <button type="button" onclick="genererRapportKizeo(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M4 4h16v2H4zm0 14h16v2H4zm7-7h9v2h-9zm0-4h9v2h-9zm0 8h9v2h-9zM4 8l3 3-3 3z"/></svg>
         Générer le rapport
@@ -1576,6 +1583,7 @@ window.genererRapportKizeo = async function(n) {
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
   const kizeoFormDocId = document.getElementById('kzForm' + n)?.value;
   const recipientUserId = document.getElementById('kzTech' + n)?.value;
+  const libelle = (document.getElementById('kzLabel' + n)?.value || '').trim();
   if (!editId) { showToast("Enregistre l'intervention d'abord.", true); return; }
   if (!kizeoFormDocId) { showToast('Choisis un formulaire Kizeo.', true); return; }
   if (!recipientUserId) { showToast('Choisis un technicien.', true); return; }
@@ -1585,7 +1593,7 @@ window.genererRapportKizeo = async function(n) {
     const resp = await fetch("https://europe-west1-belledonne-client.cloudfunctions.net/pushKizeoForm", {
       method: 'POST',
       headers: await window._authHeaders(),
-      body: JSON.stringify({ suiviId: editId, numPassage: num, kizeoFormDocId, recipientUserId }),
+      body: JSON.stringify({ suiviId: editId, numPassage: num, kizeoFormDocId, recipientUserId, libelle }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));

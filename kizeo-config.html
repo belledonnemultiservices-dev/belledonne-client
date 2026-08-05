@@ -221,6 +221,11 @@
         <div class="form-hint">Champ dédié à ajouter dans le formulaire Kizeo (ex: <code>ref_interne</code>, masquable). L'app y écrit un identifiant unique du passage : le technicien n'y touche pas, c'est lui qui garantit le bon rattachement.</div>
       </div>
       <div class="section-sep">Pré-remplissage (confort, optionnel)</div>
+      <div class="form-group">
+        <label class="form-label">Libellé du rapport (nom affiché sur le mobile)</label>
+        <select class="form-select map-select" id="mapLibelle"></select>
+        <div class="form-hint">Champ Kizeo qui reçoit le nom du rapport (ex: BC + n° passage). Pour que Kizeo l'affiche comme titre, règle "libellé de la donnée" du formulaire sur ce champ.</div>
+      </div>
       <div class="form-row">
         <div class="form-group" style="margin-bottom:16px"><label class="form-label">Référence (N° BC/PL/devis)</label><select class="form-select map-select" id="mapReference"></select></div>
         <div class="form-group" style="margin-bottom:16px"><label class="form-label">N° passage</label><select class="form-select map-select" id="mapPassage"></select></div>
@@ -265,8 +270,8 @@ const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 const FN_LIST_FIELDS = "https://europe-west1-belledonne-client.cloudfunctions.net/kizeoListFields";
 
-const MAP_KEYS = ["refInterne", "reference", "passage", "client", "adresse", "date"];
-const MAP_EL = { refInterne: "mapRefInterne", reference: "mapReference", passage: "mapPassage", client: "mapClient", adresse: "mapAdresse", date: "mapDate" };
+const MAP_KEYS = ["refInterne", "libelle", "reference", "passage", "client", "adresse", "date"];
+const MAP_EL = { refInterne: "mapRefInterne", libelle: "mapLibelle", reference: "mapReference", passage: "mapPassage", client: "mapClient", adresse: "mapAdresse", date: "mapDate" };
 let _user = null;
 let loadedFields = [];   // [{id, libelle, type}]
 let loadedExports = [];  // [{id, nom, type}]

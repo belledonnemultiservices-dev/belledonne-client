@@ -1115,7 +1115,7 @@ exports.pushKizeoForm = functions
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { suiviId, numPassage, kizeoFormDocId, recipientUserId } = req.body || {};
+    const { suiviId, numPassage, kizeoFormDocId, recipientUserId, libelle } = req.body || {};
     if (!suiviId || !numPassage || !kizeoFormDocId) { res.status(400).json({ error: "suiviId, numPassage et kizeoFormDocId requis" }); return; }
     const recipient = parseInt(recipientUserId, 10);
     if (!recipient) { res.status(400).json({ error: "Technicien Kizeo (recipientUserId) manquant ou invalide" }); return; }
@@ -1141,8 +1141,10 @@ exports.pushKizeoForm = functions
     const reference = s.bc || s.pl || s.devis || "";
 
     // Construction des champs à pousser (uniquement les champs mappés)
+    const passageLabel = String(numPassage) === "1" ? "1er passage" : numPassage + "ème passage";
     const appValues = {
       refInterne: `${suiviId}::${numPassage}`,
+      libelle: (libelle && String(libelle).trim()) || ((reference ? reference + " - " : "") + passageLabel),
       reference: reference,
       passage: String(numPassage),
       client: s.client || "",
