@@ -1223,6 +1223,14 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     }
   }
 
+  // Soumission non déclenchée depuis l'app (ref_interne absent/illisible ou intervention
+  // introuvable) : on l'ignore plutôt que de l'afficher "à rattacher". Seuls les rapports
+  // générés via le bouton "Générer le rapport Kizeo" du Suivi doivent apparaître ici.
+  if (!suiviId) {
+    console.log(`Kizeo: soumission ${dataId} ignorée (ref_interne absent ou intervention introuvable, hors app)`);
+    return;
+  }
+
   // Téléchargement du fichier (PDF ou Excel selon la config du formulaire)
   const typeSortie = formConf.typeSortie === "excel" ? "excel" : "pdf";
   let fileBuffer, ext, contentType;
@@ -1359,7 +1367,7 @@ exports.kizeoPull = functions
         catch(e) { console.error(`kizeoPull: soumission ${dataId} échouée:`, e.message); }
       }
       try {
-        await kizeoRequest(token, "POST", `/forms/${encodeURIComponent(form.formId)}/markasreadbyaction/${action}`, { ids });
+        await kizeoRequest(token, "POST", `/forms/${encodeURIComponent(form.formId)}/markasreadbyaction/${action}`, { data_ids: ids });
       } catch(e) {
         console.error(`kizeoPull: marquage lu échoué pour ${form.formId}:`, e.message);
       }
