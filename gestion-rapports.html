@@ -47,8 +47,8 @@
   .results-count{font-size:12px;color:var(--text-muted);white-space:nowrap;}
 
   .list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .list-head{display:grid;grid-template-columns:0.9fr 0.9fr 0.7fr 0.9fr 1.2fr 0.6fr 1.2fr 460px;gap:10px;padding:11px 18px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);}
-  .row{display:grid;grid-template-columns:0.9fr 0.9fr 0.7fr 0.9fr 1.2fr 0.6fr 1.2fr 460px;gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--border);}
+  .list-head{display:grid;grid-template-columns:0.8fr 0.8fr 0.7fr 0.9fr 1.1fr 0.6fr 1.1fr 560px;gap:10px;padding:11px 18px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);}
+  .row{display:grid;grid-template-columns:0.8fr 0.8fr 0.7fr 0.9fr 1.1fr 0.6fr 1.1fr 560px;gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--border);}
   .row:last-child{border-bottom:none;}
   .row:hover{background:var(--bg);}
   .cell-muted{color:var(--text-muted);}
@@ -66,7 +66,7 @@
   .bc-chip{display:inline-flex;font-size:12px;font-weight:600;color:var(--navy);background:#EBF0F5;padding:2px 9px;border-radius:12px;}
   .passage-chip{display:inline-flex;font-size:11px;font-weight:600;color:#1A5F8A;background:#EBF0F5;padding:2px 9px;border-radius:12px;white-space:nowrap;}
   .rattach-warn{display:inline-flex;font-size:11px;font-weight:600;color:var(--red);background:rgba(231,76,60,0.08);padding:2px 9px;border-radius:12px;white-space:nowrap;}
-  .actions{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;justify-content:flex-end;}
+  .actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
   .btn-a{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;border:none;white-space:nowrap;text-decoration:none;}
   .btn-open{color:var(--navy);background:#EBF0F5;}
   .btn-open:hover{background:#DCE5EE;}
@@ -336,11 +336,16 @@ function render() {
   const rows = list.map(r => {
     const pending = r.statut === "en-attente";
     const retard = isOverdue(r);
+    const canResend = !!(r.suiviId && r.numPassage && r.kizeoFormDocId && r.recipientUserId);
+    const resendBtn = canResend
+      ? `<button class="btn-a btn-replace" onclick="renvoyer('${r.id}')" title="Renvoie un nouveau formulaire au technicien, pré-rempli avec ses réponses précédentes">Renvoyer</button>`
+      : `<button class="btn-a btn-replace" disabled title="Rapport ancien : repasser par le Suivi pour renvoyer">Renvoyer</button>`;
     const actions = pending
-      ? `<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Annuler</button>`
+      ? `${resendBtn}<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Annuler</button>`
       : `
         <a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>
         <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
+        ${resendBtn}
         ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
         ${r.statut !== "envoye" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
         ${r.statut === "a-traiter" ? `<button class="btn-a btn-archiver" onclick="archiver('${r.id}')">Archiver</button>` : ""}
@@ -396,6 +401,27 @@ document.getElementById("replaceInput").addEventListener("change", async (e) => 
   } catch(err) { alert("Erreur : " + err.message); }
   _replaceId = null;
 });
+
+// ── RENVOYER (nouveau push Kizeo, pré-rempli avec les réponses précédentes) ──
+window.renvoyer = async function(id) {
+  const r = allDocs.find(x => x.id === id);
+  if (!r || !r.suiviId || !r.numPassage || !r.kizeoFormDocId || !r.recipientUserId) {
+    alert("Informations insuffisantes pour renvoyer directement : ouvre l'intervention dans le Suivi.");
+    return;
+  }
+  if (!confirm("Renvoyer un nouveau rapport au technicien pour ce passage ? Ses réponses précédentes (hors photos) seront reprises, il n'aura qu'à corriger.")) return;
+  try {
+    const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+    const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
+    const resp = await fetch("https://europe-west1-belledonne-client.cloudfunctions.net/pushKizeoForm", {
+      method: "POST", headers,
+      body: JSON.stringify({ suiviId: r.suiviId, numPassage: r.numPassage, kizeoFormDocId: r.kizeoFormDocId, recipientUserId: r.recipientUserId }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    showToast("Rapport renvoyé" + (data.renvois > 0 ? " (renvoi " + data.renvois + ")" : ""));
+  } catch(e) { alert("Erreur : " + e.message); }
+};
 
 // ── ARCHIVER SANS ENVOI ──
 window.archiver = async function(id) {

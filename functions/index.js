@@ -1140,22 +1140,54 @@ exports.pushKizeoForm = functions
     const passage = passages.find(p => String(p.num) === String(numPassage)) || {};
     const dateVal = (passage.debut ? String(passage.debut).split("T")[0] : (s.dateEmission || ""));
     const reference = s.bc || s.pl || s.devis || "";
+    const refInterne = `${suiviId}::${numPassage}`;
+
+    // Ligne existante pour ce passage (même en attente, déjà reçue, envoyée...) :
+    // détermine si c'est un premier envoi ou un renvoi (compteur + suffixe libellé),
+    // et sert de base pour reprendre les réponses déjà saisies par le technicien.
+    const existingSnap = await db.collection("reception-rapports").where("refInterne", "==", refInterne).limit(1).get();
+    const existingDoc = existingSnap.empty ? null : existingSnap.docs[0];
+    const existingData = existingDoc ? existingDoc.data() : null;
+    const renvois = existingData ? (existingData.renvois || 0) + 1 : 0;
 
     // Construction des champs à pousser (uniquement les champs mappés)
     const passageLabel = String(numPassage) === "1" ? "1er passage" : numPassage + "ème passage";
+    let baseLibelle = (libelle && String(libelle).trim()) || ((reference ? reference + " - " : "") + passageLabel);
+    if (renvois > 0) baseLibelle += ` (${renvois})`;
     const appValues = {
-      refInterne: `${suiviId}::${numPassage}`,
-      libelle: (libelle && String(libelle).trim()) || ((reference ? reference + " - " : "") + passageLabel),
+      refInterne,
+      libelle: baseLibelle,
       reference: reference,
       passage: String(numPassage),
       client: s.client || "",
       adresse: s.adresse || passage.adresse || "",
       date: dateVal,
     };
+
+    // Renvoi après une soumission déjà reçue : on reprend ses réponses (texte, listes,
+    // dates...) pour que le technicien n'ait qu'à corriger, pas tout ressaisir.
+    // Les photos/signatures ne se pré-remplissent pas via l'API Kizeo (limite connue).
     const fields = {};
+    if (existingData && existingData.kizeoDataId) {
+      try {
+        const prev = await kizeoRequest(KIZEO_API_TOKEN.value(), "GET", "/forms/" + encodeURIComponent(form.formId) + "/data/" + encodeURIComponent(existingData.kizeoDataId));
+        if (prev.status === 200) {
+          const prevParsed = JSON.parse(prev.body);
+          const prevFields = (prevParsed.data || prevParsed).fields || {};
+          const SKIP_TYPES = new Set(["section", "photo", "image", "signature", "video", "audio", "drawing", "barcode", "gps"]);
+          Object.keys(prevFields).forEach(fid => {
+            const f = prevFields[fid];
+            if (!f || SKIP_TYPES.has(f.type) || f.value === undefined || f.value === "") return;
+            fields[fid] = { value: f.value };
+          });
+        }
+      } catch(e) {
+        console.error("Kizeo: reprise des réponses précédentes échouée:", e.message);
+      }
+    }
     Object.keys(appValues).forEach(key => {
       const fid = mapping[key];
-      if (fid) fields[fid] = { value: appValues[key] };
+      if (fid) fields[fid] = { value: appValues[key] }; // les champs de l'app priment sur les valeurs reprises
     });
 
     const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", "/forms/" + encodeURIComponent(form.formId) + "/push", {
@@ -1166,13 +1198,13 @@ exports.pushKizeoForm = functions
       res.status(502).json({ error: "Kizeo a refusé le push (" + r.status + ")", detail: (r.body || r.error || "").slice(0, 300) });
       return;
     }
-    console.log("Kizeo push OK:", suiviId, "passage", numPassage, "-> user", recipient);
+    console.log("Kizeo push OK:", suiviId, "passage", numPassage, "-> user", recipient, renvois > 0 ? `(renvoi ${renvois})` : "");
 
     // Ligne "en attente" dans Gestion rapports : créée (ou réutilisée si un envoi
     // précédent existait déjà pour ce passage) dès le push, avant même que le
     // technicien ait répondu. Permet de suivre qui doit encore rendre son rapport.
+    let technicien = "";
     try {
-      let technicien = "";
       const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", String(recipient)).limit(1).get();
       if (!tSnap.empty) {
         const t = tSnap.docs[0].data();
@@ -1184,12 +1216,13 @@ exports.pushKizeoForm = functions
         kizeoFormId: form.formId,
         kizeoFormDocId: String(kizeoFormDocId),
         recipientUserId: recipient,
-        refInterne: appValues.refInterne,
+        refInterne,
         reference,
         arriveeAt: now,
         pushedAt: now,
         dateFin: passage.fin || null,
         technicien,
+        renvois,
         origine: "app",
         suiviId,
         client: s.client || "",
@@ -1203,9 +1236,8 @@ exports.pushKizeoForm = functions
         statut: "en-attente",
         updatedAt: now,
       };
-      const existing = await db.collection("reception-rapports").where("refInterne", "==", appValues.refInterne).limit(1).get();
-      if (!existing.empty) {
-        await existing.docs[0].ref.update(pendingData);
+      if (existingDoc) {
+        await existingDoc.ref.update(pendingData);
       } else {
         await db.collection("reception-rapports").add({ ...pendingData, createdAt: now });
       }
@@ -1213,7 +1245,19 @@ exports.pushKizeoForm = functions
       console.error("Kizeo push : création de la ligne en attente échouée:", e.message);
     }
 
-    res.status(200).json({ success: true, refInterne: appValues.refInterne });
+    // Reflète l'envoi sur le passage du Suivi (badge "✓ Envoyé le..."), pour rester
+    // cohérent que le renvoi ait été déclenché depuis le Suivi ou depuis Gestion rapports.
+    try {
+      const nowIso = new Date().toISOString();
+      const updatedPassages = passages.map(p => String(p.num) === String(numPassage)
+        ? { ...p, kizeoPush: { at: nowIso, technicien, formNom: form.nom || "" } }
+        : p);
+      await db.collection("suivi").doc(String(suiviId)).update({ passages: updatedPassages });
+    } catch(e) {
+      console.error("Kizeo push : mise à jour du badge Suivi échouée:", e.message);
+    }
+
+    res.status(200).json({ success: true, refInterne: appValues.refInterne, renvois });
   });
 
 // ── RÉCEPTION D'UNE SOUMISSION (commun au webhook et au pull) ─────
@@ -1327,6 +1371,8 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   const docData = {
     kizeoDataId: String(dataId),
     kizeoFormId: String(formId),
+    kizeoFormDocId: formsSnap.docs[0].id,
+    recipientUserId: submissionUserId ? parseInt(submissionUserId, 10) : null,
     refInterne: refInterne || null,
     reference: reference || "",
     arriveeAt: now,

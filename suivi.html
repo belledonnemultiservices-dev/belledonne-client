@@ -1606,14 +1606,16 @@ window.genererRapportKizeo = async function(n) {
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+    // Le badge "✓ Envoyé le..." est désormais persisté côté serveur (pushKizeoForm
+    // met à jour passages[n].kizeoPush) ; on reflète juste localement pour un retour
+    // instantané, sans réécrire par-dessus.
     const formNom = document.getElementById('kzForm' + n)?.selectedOptions?.[0]?.textContent || '';
     const technicien = document.getElementById('kzTech' + n)?.selectedOptions?.[0]?.textContent || '';
     const pushInfo = { at: new Date().toISOString(), technicien, formNom };
     const div = document.getElementById('passage_' + n);
     if (div) div.dataset.kizeoPush = JSON.stringify(pushInfo);
-    if (editId) { try { await window._updateSuivi(editId, { passages: getPassagesFromDOM() }); } catch(e) { console.warn('Sauvegarde badge Kizeo échouée:', e.message); } }
     renderRapportZone(n);
-    showToast('✅ Rapport envoyé sur le mobile de ' + (technicien || 'le technicien'));
+    showToast('✅ Rapport envoyé sur le mobile de ' + (technicien || 'le technicien') + (data.renvois > 0 ? ' (renvoi ' + data.renvois + ')' : ''));
   } catch(e) {
     showToast('Erreur Kizeo : ' + e.message, true);
   } finally {
