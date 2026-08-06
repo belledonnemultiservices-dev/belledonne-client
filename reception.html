@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Réception rapports — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#0D1B2A;--green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;--amber:#F5A623;--red:#E74C3C;--text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;--border:rgba(13,27,42,0.09);--surface:#fff;--bg:#F2F5F8;--sidebar-w:240px;--radius:14px;--radius-sm:8px;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+  .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-mark{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-icon svg{width:18px;height:18px;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
+  .admin-badge{margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);padding:8px 12px;display:flex;align-items:center;gap:8px;}
+  .admin-badge svg{width:14px;height:14px;color:var(--amber);flex-shrink:0;}
+  .admin-badge span{font-size:11px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:0.06em;}
+  .sidebar-nav{padding:20px 12px;flex:1;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;}
+  .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--navy);}
+  .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .footer-role{font-size:10px;color:var(--amber);}
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .btn-logout{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--red);background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.15);padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .content{padding:32px;flex:1;}
+  .page-header-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;}
+  .page-sub{font-size:13px;color:var(--text-muted);}
+
+  .filters-bar{display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap;}
+  .search-input{flex:1;min-width:220px;height:40px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;}
+  .search-input:focus{border-color:var(--green);}
+  .filter-select{height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
+  .results-count{font-size:12px;color:var(--text-muted);white-space:nowrap;}
+
+  .list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .list-head{display:grid;grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 1fr 0.7fr 0.8fr auto;gap:10px;padding:11px 18px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);}
+  .row{display:grid;grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 1fr 0.7fr 0.8fr auto;gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--border);}
+  .row:last-child{border-bottom:none;}
+  .row:hover{background:var(--bg);}
+  .cell-muted{color:var(--text-muted);}
+  .badge-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:2px 8px;border-radius:6px;white-space:nowrap;}
+  .badge-pdf{background:#EBF0F5;color:var(--navy);}
+  .badge-excel{background:rgba(46,204,143,0.12);color:var(--green-dark);}
+  .badge-statut{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+  .st-a-traiter{background:rgba(245,166,35,0.15);color:#C27D0A;}
+  .st-envoye{background:var(--green-pale);color:var(--green-dark);}
+  .st-archive{background:#EBF0F5;color:var(--text-mid);}
+  .bc-chip{display:inline-flex;font-size:12px;font-weight:600;color:var(--navy);background:#EBF0F5;padding:2px 9px;border-radius:12px;}
+  .passage-chip{display:inline-flex;font-size:11px;font-weight:600;color:#1A5F8A;background:#EBF0F5;padding:2px 9px;border-radius:12px;white-space:nowrap;}
+  .rattach-warn{display:inline-flex;font-size:11px;font-weight:600;color:var(--red);background:rgba(231,76,60,0.08);padding:2px 9px;border-radius:12px;white-space:nowrap;}
+  .actions{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;justify-content:flex-end;}
+  .btn-a{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;border:none;white-space:nowrap;text-decoration:none;}
+  .btn-open{color:var(--navy);background:#EBF0F5;}
+  .btn-open:hover{background:#DCE5EE;}
+  .btn-replace{color:var(--text-mid);background:var(--bg);border:1px solid var(--border);}
+  .btn-replace:hover{background:#E5EAF0;}
+  .btn-rattacher{color:#C27D0A;background:rgba(245,166,35,0.12);}
+  .btn-rattacher:hover{background:rgba(245,166,35,0.2);}
+  .btn-envoyer{color:#fff;background:var(--green-dark);}
+  .btn-envoyer:hover{background:#179060;}
+  .btn-archiver{color:var(--text-mid);background:var(--bg);border:1px solid var(--border);}
+  .btn-archiver:hover{background:#E5EAF0;}
+
+  .empty-state{text-align:center;padding:60px 32px;color:var(--text-muted);font-size:13px;}
+  .empty-state svg{width:40px;height:40px;color:var(--border);margin-bottom:12px;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:#fff;border-radius:var(--radius);width:520px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(13,27,42,0.2);}
+  .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+  .btn-close{width:30px;height:30px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-muted);}
+  .modal-body{padding:20px 24px;}
+  .modal-footer{padding:12px 24px 20px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);}
+  .form-group{margin-bottom:16px;}
+  .form-label{font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;}
+  .form-input,.form-select{width:100%;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--bg);outline:none;}
+  .form-input:focus,.form-select:focus{border-color:var(--green);background:#fff;}
+  .btn-cancel{height:40px;padding:0 16px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  .btn-save{height:40px;padding:0 22px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;}
+  .btn-save:hover{background:var(--green-dark);color:#fff;}
+  .btn-save:disabled{opacity:0.6;cursor:default;}
+  .passages-list{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .passage-opt{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px;}
+  .passage-opt input{accent-color:var(--green);}
+  .rattach-result{font-size:13px;color:var(--text-mid);margin-top:8px;}
+  .mn-recap{background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--text-mid);line-height:1.7;border-left:3px solid var(--green);white-space:pre-wrap;}
+  .mn-contacts{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+  .mn-contact-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;}
+  .mn-contact-item input{accent-color:var(--green);width:15px;height:15px;flex-shrink:0;}
+  .mn-contact-name{font-size:13px;font-weight:600;color:var(--text);}
+  .mn-contact-email{font-size:11px;color:var(--text-muted);}
+  .mn-msg{width:100%;min-height:120px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);line-height:1.7;resize:vertical;outline:none;}
+  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);transform:translateY(80px);opacity:0;transition:all 0.3s ease;z-index:999;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast svg{width:16px;height:16px;color:var(--green);}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+    </div>
+  </div>
+  <div class="admin-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Espace Admin</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
+    <a class="nav-item" href="facturation.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg><span>Facturation</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
+    <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
+    <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+    <a class="nav-item" href="admin.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+    <a class="nav-item" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+    <a class="nav-item" href="techniciens.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Techniciens</span></a>
+    <a class="nav-item" href="imports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import email</span></a>
+    <a class="nav-item" href="kizeo-config.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg><span>Formulaires Kizeo</span></a>
+    <a class="nav-item active" href="reception.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Réception rapports</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar">BM</div>
+      <div><div class="footer-name">Belledonne Multiservices</div><div class="footer-role">Administrateur</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Admin</span><span>›</span><span>Réception rapports</span></div>
+    <button class="btn-logout" onclick="handleLogout()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Déconnexion
+    </button>
+  </header>
+
+  <div class="content">
+    <div class="page-header-row">
+      <div>
+        <div class="page-title">Réception rapports</div>
+        <div class="page-sub">Rapports remontés depuis Kizeo (webhook + pull de secours), à traiter puis envoyer au client.</div>
+      </div>
+    </div>
+
+    <div class="filters-bar">
+      <input class="search-input" id="searchInput" placeholder="Rechercher par client, BC, technicien...">
+      <select class="filter-select" id="filterStatut">
+        <option value="a-traiter">À traiter</option>
+        <option value="envoye">Envoyés</option>
+        <option value="archive">Archivés</option>
+        <option value="">Tous les statuts</option>
+      </select>
+      <span class="results-count" id="resultsCount">—</span>
+    </div>
+
+    <div class="list" id="list">
+      <div class="list-head">
+        <span>Arrivée</span><span>Client</span><span>BC</span><span>Passage</span><span>Technicien</span><span>Type</span><span>Statut</span><span></span>
+      </div>
+    </div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+      <p>Aucun rapport à afficher.</p>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RATTACHER -->
+<div class="modal-overlay" id="modalRattacher">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Rattacher à une intervention</div>
+      <button class="btn-close" onclick="closeRattacher()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">N° BC / PL / devis</label>
+        <div style="display:flex;gap:8px;">
+          <input class="form-input" type="text" id="rattBc" placeholder="ex: 75149" style="flex:1;">
+          <button class="btn-save" style="height:40px;" onclick="searchSuivi()">Rechercher</button>
+        </div>
+      </div>
+      <div id="rattResult"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeRattacher()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENVOI CLIENT -->
+<div class="modal-overlay" id="modalEnvoi">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Envoyer au client</div>
+      <button class="btn-close" onclick="closeEnvoi()">×</button>
+    </div>
+    <div class="modal-body" id="envoiBody">
+      <div class="mn-recap" id="envoiRecap">—</div>
+      <div class="form-group">
+        <label class="form-label">Destinataires</label>
+        <div class="mn-contacts" id="envoiContacts"><div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Objet</label>
+        <input class="form-input" type="text" id="envoiSubject">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Message</label>
+        <textarea class="mn-msg" id="envoiMsg"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeEnvoi()">Annuler</button>
+      <button class="btn-save" id="envoiBtn" onclick="doEnvoyer()">Envoyer et archiver dans Rapports</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<input type="file" id="replaceInput" style="display:none;">
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, updateDoc, deleteField, onSnapshot, getDocs, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
+  authDomain: "belledonne-client.firebaseapp.com",
+  projectId: "belledonne-client",
+  storageBucket: "belledonne-client.firebasestorage.app",
+  messagingSenderId: "737384028313",
+  appId: "1:737384028313:web:700aee1467ac27d0c58008"
+};
+const LIEN_ESPACE = "https://clients-belledonne-multiservices.com";
+const FUNCTION_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
+
+let allDocs = [];
+let unsub = null;
+
+onAuthStateChanged(auth, (user) => {
+  if (!user) { window.location.href = "login.html"; return; }
+  if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
+  loadList();
+});
+
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
+
+function loadList() {
+  if (unsub) unsub();
+  unsub = onSnapshot(collection(db, "reception-rapports"), (snap) => {
+    allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    allDocs.sort((a, b) => (b.arriveeAt || "").localeCompare(a.arriveeAt || ""));
+    render();
+  }, (e) => console.error("reception-rapports:", e));
+}
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+  catch(e) { return iso; }
+}
+
+function render() {
+  const q = (document.getElementById("searchInput").value || "").toLowerCase();
+  const st = document.getElementById("filterStatut").value;
+  const list = allDocs.filter(r => {
+    const ms = !st || r.statut === st;
+    const mq = !q || (r.client||"").toLowerCase().includes(q) || (r.bc||"").toLowerCase().includes(q) || (r.technicien||"").toLowerCase().includes(q) || (r.reference||"").toLowerCase().includes(q);
+    return ms && mq;
+  });
+  document.getElementById("resultsCount").textContent = list.length + " rapport" + (list.length !== 1 ? "s" : "");
+  const container = document.getElementById("list");
+  const empty = document.getElementById("emptyState");
+  const head = container.querySelector(".list-head");
+  container.innerHTML = "";
+  if (head) container.appendChild(head);
+  if (!list.length) { empty.style.display = "block"; return; }
+  empty.style.display = "none";
+
+  const STATUT_LABEL = { "a-traiter": "À traiter", "envoye": "Envoyé", "archive": "Archivé" };
+  const STATUT_CLASS = { "a-traiter": "st-a-traiter", "envoye": "st-envoye", "archive": "st-archive" };
+
+  const rows = list.map(r => `
+    <div class="row" id="rrow-${r.id}">
+      <div>${fmtDate(r.arriveeAt)}</div>
+      <div>${r.client || `<span class="rattach-warn">Non rattaché</span>`}</div>
+      <div>${r.bc || r.reference ? `<span class="bc-chip">${r.bc || r.reference}</span>` : `<span class="cell-muted">—</span>`}</div>
+      <div>${r.passageLabel ? `<span class="passage-chip">${r.passageLabel}</span>` : `<span class="cell-muted">—</span>`}</div>
+      <div class="cell-muted">${r.technicien || "—"}</div>
+      <div><span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span></div>
+      <div><span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span></div>
+      <div class="actions">
+        <a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>
+        <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
+        ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
+        ${r.statut !== "envoye" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
+        ${r.statut === "a-traiter" ? `<button class="btn-a btn-archiver" onclick="archiver('${r.id}')">Archiver</button>` : ""}
+      </div>
+    </div>`).join("");
+  container.insertAdjacentHTML("beforeend", rows);
+}
+
+document.getElementById("searchInput").addEventListener("input", render);
+document.getElementById("filterStatut").addEventListener("change", render);
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3500);
+}
+
+// ── REMPLACER LE FICHIER ──
+let _replaceId = null;
+window.openReplace = function(id) {
+  _replaceId = id;
+  document.getElementById("replaceInput").click();
+};
+document.getElementById("replaceInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file || !_replaceId) return;
+  const r = allDocs.find(x => x.id === _replaceId);
+  if (!r) return;
+  try {
+    const folder = r.client || "_inconnu";
+    const storageRef = ref(storage, `reception/${folder}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`);
+    const snap = await uploadBytesResumable(storageRef, file);
+    const fileUrl = await getDownloadURL(snap.ref);
+    await updateDoc(doc(db, "reception-rapports", _replaceId), { fileUrl, updatedAt: new Date().toISOString() });
+    showToast("Fichier remplacé");
+  } catch(err) { alert("Erreur : " + err.message); }
+  _replaceId = null;
+});
+
+// ── ARCHIVER SANS ENVOI ──
+window.archiver = async function(id) {
+  if (!confirm("Archiver ce rapport sans l'envoyer au client ?")) return;
+  try {
+    await updateDoc(doc(db, "reception-rapports", id), { statut: "archive", updatedAt: new Date().toISOString() });
+    showToast("Rapport archivé");
+  } catch(e) { alert("Erreur : " + e.message); }
+};
+
+// ── RATTACHER ──
+let _rattacherId = null;
+window.openRattacher = function(id) {
+  _rattacherId = id;
+  document.getElementById("rattBc").value = "";
+  document.getElementById("rattResult").innerHTML = "";
+  document.getElementById("modalRattacher").classList.add("open");
+};
+window.closeRattacher = function() {
+  document.getElementById("modalRattacher").classList.remove("open");
+  _rattacherId = null;
+};
+window.searchSuivi = async function() {
+  const val = document.getElementById("rattBc").value.trim();
+  const resDiv = document.getElementById("rattResult");
+  if (!val) { resDiv.innerHTML = '<div class="rattach-result">Renseignez un numéro.</div>'; return; }
+  resDiv.innerHTML = '<div class="rattach-result">Recherche...</div>';
+  try {
+    let found = null;
+    for (const field of ["bc", "pl", "devis"]) {
+      const snap = await getDocs(query(collection(db, "suivi"), where(field, "==", val)));
+      if (!snap.empty) { found = { id: snap.docs[0].id, ...snap.docs[0].data() }; break; }
+    }
+    if (!found) { resDiv.innerHTML = '<div class="rattach-result">Aucune intervention trouvée pour ce numéro.</div>'; return; }
+    const passages = Array.isArray(found.passages) ? found.passages : [];
+    const ref = found.bc || found.pl || found.devis || "";
+    let html = `<div class="rattach-result"><strong>${found.client || "—"}</strong> — réf. ${ref}</div><div class="passages-list">`;
+    if (!passages.length) {
+      html += `<label class="passage-opt"><input type="radio" name="rattPassage" value="1" checked> 1er passage (aucun passage enregistré, par défaut)</label>`;
+    } else {
+      passages.forEach((p, i) => {
+        const num = p.num || (i + 1);
+        const label = String(num) === "1" ? "1er passage" : num + "ème passage";
+        html += `<label class="passage-opt"><input type="radio" name="rattPassage" value="${num}" ${i === 0 ? "checked" : ""}> ${label}${p.debut ? " — " + String(p.debut).split("T")[0] : ""}</label>`;
+      });
+    }
+    html += `</div><button class="btn-save" style="margin-top:14px;width:100%;" onclick="confirmRattacher('${found.id}', '${(found.client||"").replace(/'/g,"\\'")}', '${ref.replace(/'/g,"\\'")}')">Confirmer le rattachement</button>`;
+    resDiv.innerHTML = html;
+  } catch(e) { resDiv.innerHTML = '<div class="rattach-result">Erreur : ' + e.message + '</div>'; }
+};
+window.confirmRattacher = async function(suiviId, client, bc) {
+  const checked = document.querySelector('input[name="rattPassage"]:checked');
+  const numPassage = checked ? parseInt(checked.value, 10) : 1;
+  const passageLabel = numPassage === 1 ? "1er passage" : numPassage + "ème passage";
+  try {
+    await updateDoc(doc(db, "reception-rapports", _rattacherId), {
+      suiviId, client, bc, numPassage, passageLabel, updatedAt: new Date().toISOString(),
+    });
+    showToast("Rapport rattaché");
+    closeRattacher();
+  } catch(e) { alert("Erreur : " + e.message); }
+};
+
+// ── ENVOYER AU CLIENT ──
+let _envoiId = null;
+window.openEnvoi = async function(id) {
+  const r = allDocs.find(x => x.id === id);
+  if (!r || !r.client) return;
+  _envoiId = id;
+  document.getElementById("envoiRecap").textContent = (r.bc ? "BC " + r.bc + " — " : "") + r.client + (r.passageLabel ? " — " + r.passageLabel : "");
+  document.getElementById("envoiSubject").value = "Rapport disponible" + (r.bc ? " - BC " + r.bc : "");
+  document.getElementById("envoiMsg").value = `Bonjour,\nVotre rapport (BC ${r.bc || "-"}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
+  document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
+  document.getElementById("envoiBtn").disabled = false;
+  document.getElementById("envoiBtn").textContent = "Envoyer et archiver dans Rapports";
+  document.getElementById("modalEnvoi").classList.add("open");
+  try {
+    const snapC = await getDocs(query(collection(db, "contacts"), where("client", "==", r.client)));
+    const contacts = snapC.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!contacts.length) {
+      document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Aucun contact pour ce client. <a href="contacts.html" style="color:var(--green-dark);">Ajouter</a></div>';
+    } else {
+      document.getElementById("envoiContacts").innerHTML = contacts.map(c => `
+        <label class="mn-contact-item">
+          <input type="checkbox" value="${c.email}" checked>
+          <div><div class="mn-contact-name">${c.prenom||""} ${c.nom||""}</div><div class="mn-contact-email">${c.email||"-"}</div></div>
+        </label>`).join("");
+    }
+  } catch(e) { document.getElementById("envoiContacts").innerHTML = '<div style="color:red;padding:12px;">Erreur : ' + e.message + '</div>'; }
+};
+window.closeEnvoi = function() {
+  document.getElementById("modalEnvoi").classList.remove("open");
+  _envoiId = null;
+};
+window.doEnvoyer = async function() {
+  const r = allDocs.find(x => x.id === _envoiId);
+  if (!r) return;
+  const subject = document.getElementById("envoiSubject").value.trim();
+  const body = document.getElementById("envoiMsg").value.trim();
+  if (!subject || !body) { alert("Objet et message requis."); return; }
+  const recipients = Array.from(document.querySelectorAll("#envoiContacts input[type=checkbox]:checked")).map(c => c.value).filter(Boolean);
+  if (!recipients.length) { alert("Sélectionnez au moins un destinataire."); return; }
+  const btn = document.getElementById("envoiBtn");
+  btn.disabled = true; btn.textContent = "Envoi...";
+  const attachments = [{ url: r.fileUrl, filename: (r.bc || r.id || "rapport") + (r.type === "excel" ? ".xlsx" : ".pdf") }];
+  let sent = 0, errors = 0;
+  for (const to of recipients) {
+    try {
+      const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
+      const resp = await fetch(FUNCTION_URL, { method: "POST", headers, body: JSON.stringify({ to, subject, body, attachments }) });
+      if (resp.ok) sent++; else errors++;
+    } catch(e) { errors++; }
+  }
+  if (sent > 0) {
+    try {
+      await addDoc(collection(db, "rapports"), {
+        bc: r.bc || r.reference || "",
+        client: r.client,
+        passage: r.passageLabel || "",
+        site: "",
+        nuisible: "",
+        date: new Date().toISOString().split("T")[0],
+        pdfUrl: r.fileUrl,
+        createdAt: new Date().toISOString(),
+      });
+      await updateDoc(doc(db, "reception-rapports", r.id), { statut: "envoye", updatedAt: new Date().toISOString() });
+      showToast(sent + " email(s) envoyé(s), rapport archivé dans Rapports.");
+      closeEnvoi();
+    } catch(e) { alert("Envoi fait mais erreur d'archivage : " + e.message); }
+  } else {
+    alert("Aucun email envoyé (" + errors + " erreur(s)).");
+    btn.disabled = false; btn.textContent = "Envoyer et archiver dans Rapports";
+  }
+};
+</script>
+<script type="module" src="suivi-badge.js"></script>
+</body>
+</html>

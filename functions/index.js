@@ -23,6 +23,7 @@ const GCAL_SA = defineSecret("GCAL_SA"); // service account complet en JSON
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 const AXONAUT_API_KEY = defineSecret("AXONAUT_API_KEY");
 const KIZEO_API_TOKEN = defineSecret("KIZEO_API_TOKEN"); // token API Kizeo Forms (header Authorization, brut)
+const KIZEO_WEBHOOK_SECRET = defineSecret("KIZEO_WEBHOOK_SECRET"); // secret vérifié en header du webhook Kizeo
 
 // Transporter Gmail créé à l'exécution (les secrets ne sont dispo qu'au runtime).
 function makeTransporter() {
@@ -1167,4 +1168,200 @@ exports.pushKizeoForm = functions
     }
     console.log("Kizeo push OK:", suiviId, "passage", numPassage, "-> user", recipient);
     res.status(200).json({ success: true, refInterne: appValues.refInterne });
+  });
+
+// ── RÉCEPTION D'UNE SOUMISSION (commun au webhook et au pull) ─────
+// Lit la soumission Kizeo, résout le rattachement via ref_interne, télécharge
+// le fichier (PDF ou Excel selon la config du formulaire), le dépose dans
+// Storage et écrit/met à jour le doc `reception-rapports`. Idempotent sur
+// kizeoDataId (un renvoi de webhook ou un second pull mettent à jour, pas dupliquent).
+async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
+  const formsSnap = await db.collection("kizeo-forms").where("formId", "==", String(formId)).limit(1).get();
+  if (formsSnap.empty) {
+    console.warn(`Kizeo: formulaire ${formId} non configuré dans kizeo-forms, soumission ${dataId} ignorée`);
+    return;
+  }
+  const formConf = formsSnap.docs[0].data();
+  const mapping = formConf.mapping || {};
+
+  const r = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}`);
+  if (r.status !== 200) {
+    console.error(`Kizeo: lecture soumission ${dataId} échouée (${r.status})`);
+    return;
+  }
+  let parsed;
+  try { parsed = JSON.parse(r.body); } catch(e) { console.error(`Kizeo: réponse illisible pour ${dataId}`); return; }
+  const submission = parsed.data || parsed;
+  const fields = submission.fields || {};
+  const getField = (fid) => {
+    if (!fid) return "";
+    const raw = fields[fid];
+    if (raw && typeof raw === "object") return raw.value !== undefined ? raw.value : "";
+    return raw || "";
+  };
+
+  const refInterne = mapping.refInterne ? String(getField(mapping.refInterne) || "").trim() : "";
+  const technicien = submission._recipient_name || submission.recipient_name || "";
+  const reference = mapping.reference ? String(getField(mapping.reference) || "") : "";
+
+  let suiviId = null, client = "", bc = "", numPassage = null, passageLabel = "";
+  const m = refInterne.match(/^(.+)::(\d+)$/);
+  if (m) {
+    const candidateSuiviId = m[1];
+    numPassage = parseInt(m[2], 10);
+    passageLabel = numPassage === 1 ? "1er passage" : numPassage + "ème passage";
+    try {
+      const sSnap = await db.collection("suivi").doc(candidateSuiviId).get();
+      if (sSnap.exists) {
+        suiviId = candidateSuiviId;
+        const s = sSnap.data();
+        client = s.client || "";
+        bc = s.bc || s.pl || s.devis || "";
+      }
+    } catch(e) {
+      console.error("Kizeo: résolution suivi échouée:", e.message);
+    }
+  }
+
+  // Téléchargement du fichier (PDF ou Excel selon la config du formulaire)
+  const typeSortie = formConf.typeSortie === "excel" ? "excel" : "pdf";
+  let fileBuffer, ext, contentType;
+  if (typeSortie === "excel") {
+    if (!formConf.exportId) { console.error(`Kizeo: exportId manquant pour le formulaire ${formId}`); return; }
+    const ex = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/exports/${encodeURIComponent(formConf.exportId)}`, null, true);
+    if (ex.status !== 200) { console.error(`Kizeo: export Excel échoué (${ex.status}) pour ${dataId}`); return; }
+    fileBuffer = ex.body; ext = "xlsx";
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  } else {
+    const pdf = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
+    if (pdf.status !== 200) { console.error(`Kizeo: téléchargement PDF échoué (${pdf.status}) pour ${dataId}`); return; }
+    fileBuffer = pdf.body; ext = "pdf"; contentType = "application/pdf";
+  }
+
+  const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+  const folder = client || "_inconnu";
+  const nomBase = `${reference || dataId}_${passageLabel || "rapport"}`.replace(/\s+/g, "_");
+  const storagePath = `reception/${folder}/${Date.now()}_${nomBase}.${ext}`;
+  const downloadToken = crypto.randomUUID();
+  try {
+    await bucket.file(storagePath).save(fileBuffer, {
+      contentType,
+      metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
+    });
+  } catch(e) {
+    console.error(`Kizeo: upload Storage échoué pour ${dataId}:`, e.message);
+    return;
+  }
+  const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+
+  const now = new Date().toISOString();
+  const docData = {
+    kizeoDataId: String(dataId),
+    kizeoFormId: String(formId),
+    refInterne: refInterne || null,
+    reference: reference || "",
+    arriveeAt: now,
+    technicien,
+    origine,
+    suiviId,
+    client,
+    bc,
+    numPassage,
+    passageLabel,
+    type: typeSortie,
+    fileUrl,
+    gsheetId: null,
+    gsheetUrl: null,
+    statut: "a-traiter",
+    updatedAt: now,
+  };
+
+  const existing = await db.collection("reception-rapports").where("kizeoDataId", "==", String(dataId)).limit(1).get();
+  if (!existing.empty) {
+    await existing.docs[0].ref.update(docData);
+    console.log(`Kizeo: soumission ${dataId} mise à jour (reception-rapports/${existing.docs[0].id})`);
+  } else {
+    docData.createdAt = now;
+    const ref = await db.collection("reception-rapports").add(docData);
+    console.log(`Kizeo: soumission ${dataId} reçue -> reception-rapports/${ref.id}`);
+  }
+}
+
+// ── WEBHOOK KIZEO (public, sécurisé par secret partagé en header) ─
+// Déclencheur "Recording" configuré côté Kizeo. Kizeo n'offre pas de
+// signature HMAC native : la protection repose uniquement sur ce secret,
+// à faire tourner (KIZEO_WEBHOOK_SECRET) s'il est un jour compromis.
+exports.kizeoWebhook = functions
+  .region("europe-west1")
+  .runWith({ secrets: [KIZEO_API_TOKEN, KIZEO_WEBHOOK_SECRET] })
+  .https.onRequest(async (req, res) => {
+    if (req.get("X-Kizeo-Secret") !== KIZEO_WEBHOOK_SECRET.value()) {
+      res.status(401).json({ error: "Non autorisé" });
+      return;
+    }
+    const body = req.body || {};
+    // Format réel observé : { id: "<dataId>", eventType: "finished", data: { form_id: "...", fields: {...}, ... } }
+    const formId = (body.data && body.data.form_id) || body.form_id || body.formId || (body.form && body.form.id);
+    const dataId = body.id || body.data_id || body.dataId;
+    if (!formId || !dataId) {
+      console.warn("Kizeo webhook: payload incomplet:", JSON.stringify(body).slice(0, 300));
+      res.status(200).json({ ok: true }); // accuser réception (éviter les retries en boucle sur un format non géré)
+      return;
+    }
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+    try {
+      await receiveKizeoSubmission(db, KIZEO_API_TOKEN.value(), formId, dataId, "webhook");
+    } catch(e) {
+      console.error("Kizeo webhook:", e.message);
+    }
+    res.status(200).json({ ok: true });
+  });
+
+// ── PULL KIZEO (planifié, filet de sécurité si un webhook se perd) ─
+// Parcourt les formulaires actifs, récupère leurs soumissions non lues sur
+// le canal "espace-client" et les marque lues une fois traitées.
+exports.kizeoPull = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300, secrets: [KIZEO_API_TOKEN] })
+  .pubsub.schedule("every 15 minutes")
+  .timeZone("Europe/Paris")
+  .onRun(async () => {
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+    const token = KIZEO_API_TOKEN.value();
+    const action = "espace-client";
+
+    let formsSnap;
+    try {
+      formsSnap = await db.collection("kizeo-forms").where("actif", "==", true).get();
+    } catch(e) {
+      console.error("kizeoPull: lecture kizeo-forms échouée:", e.message);
+      return;
+    }
+
+    for (const doc of formsSnap.docs) {
+      const form = doc.data();
+      if (!form.formId) continue;
+      const r = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(form.formId)}/data/unread/${action}/50`);
+      if (r.status !== 200) {
+        if (r.status !== 404) console.error(`kizeoPull: formulaire ${form.formId} -> ${r.status}`);
+        continue;
+      }
+      let parsed;
+      try { parsed = JSON.parse(r.body); } catch(e) { continue; }
+      const list = parsed.data || parsed.list || (Array.isArray(parsed) ? parsed : []);
+      const ids = (list || []).map(d => d.id || d._id).filter(Boolean);
+      if (!ids.length) continue;
+      console.log(`kizeoPull: ${ids.length} soumission(s) non lue(s) pour ${form.formId}`);
+      for (const dataId of ids) {
+        try { await receiveKizeoSubmission(db, token, form.formId, dataId, "pull"); }
+        catch(e) { console.error(`kizeoPull: soumission ${dataId} échouée:`, e.message); }
+      }
+      try {
+        await kizeoRequest(token, "POST", `/forms/${encodeURIComponent(form.formId)}/markasreadbyaction/${action}`, { ids });
+      } catch(e) {
+        console.error(`kizeoPull: marquage lu échoué pour ${form.formId}:`, e.message);
+      }
+    }
   });

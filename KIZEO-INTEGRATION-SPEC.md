@@ -212,9 +212,12 @@ Dans le modal d'une intervention (par passage), on ajoute :
 
 ## 8. Découpage de développement proposé
 
-1. **Socle & config** : secrets, client API Kizeo côté Functions, `kizeoListFields`, configurateur `kizeo-config.html` + collection `kizeo-forms`, champ `kizeoUserId` sur les techniciens. Actions Kizeo côté Yacine : récupérer les `user_id` techniciens (aucun nouveau champ de formulaire à créer).
-2. **Aller** : `pushKizeoForm` + menu déroulant + bouton dans le modal Suivi. Test : push reçu sur le mobile technicien.
-3. **Retour** : `kizeoWebhook` + collection `reception-rapports` + `kizeoPull`. Test : soumission → doc créé + fichier en Storage.
+1. **[Fait]** **Socle & config** : secrets, client API Kizeo côté Functions, `kizeoListFields`, configurateur `kizeo-config.html` + collection `kizeo-forms`, champ `kizeoUserId` sur les techniciens. Actions Kizeo côté Yacine : récupérer les `user_id` techniciens (aucun nouveau champ de formulaire à créer).
+2. **[Fait]** **Aller** : `pushKizeoForm` + menu déroulant + bouton dans le modal Suivi. Test : push reçu sur le mobile technicien.
+3. **[Fait, validé 2026-08-06]** **Retour** : `kizeoWebhook` + collection `reception-rapports` + `kizeoPull`. Test bout en bout OK : soumission mobile → doc `reception-rapports` créé (suiviId/client/bc/passage résolus) + fichier en Storage.
+   - **Format réel du payload webhook Kizeo** (différent de ce qu'anticipait la spec) : `{ id: "<dataId>", eventType: "finished", data: { form_id: "...", fields: {...}, recipient_user_id, ... } }`. Le `dataId` est à la racine, le `formId` est dans `data.form_id`. Code corrigé en conséquence.
+   - `technicien` (`_recipient_name`) revient vide dans la réponse `GET /forms/{formId}/data/{dataId}` — à creuser si besoin plus tard (non bloquant).
+   - Webhook configuré côté Kizeo : déclencheur "Enregistrement", méthode POST, header `X-Kizeo-Secret`.
 4. **Page** `reception.html` : liste + ouverture PDF + envoi client + archivage dans `rapports`.
 5. **Excel/Drive** : `excelToSheet` / `sheetToStorage` + API Drive.
 6. **Finitions** : rattachement manuel, filtres, statuts, idempotence, gestion d'erreurs.
