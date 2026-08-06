@@ -256,7 +256,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, getDocs, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, updateDoc, deleteDoc, onSnapshot, getDocs, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -444,6 +444,18 @@ window.supprimerReception = async function(id) {
       try { await deleteObject(ref(storage, r.fileUrl)); } catch(se) { console.warn("Storage:", se); }
     }
     await deleteDoc(doc(db, "reception-rapports", id));
+    // Ligne en attente annulée : le bouton du Suivi doit redevenir "Générer le
+    // rapport" (sinon il resterait affiché "Renvoyer" pour un envoi qui n'existe plus ici).
+    if (r && r.statut === "en-attente" && r.suiviId && r.numPassage) {
+      try {
+        const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+        if (sSnap.exists()) {
+          const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
+          const updated = passages.map(p => String(p.num) === String(r.numPassage) ? { ...p, kizeoPush: null } : p);
+          await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
+        }
+      } catch(e) { console.warn("Réinitialisation du badge Suivi échouée:", e.message); }
+    }
     showToast("Rapport supprimé");
   } catch(e) { alert("Erreur : " + e.message); }
 };
