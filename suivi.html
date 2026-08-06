@@ -1523,16 +1523,9 @@ window.renderRapportZone = function(n) {
   const zone = document.getElementById('rapportZone' + n);
   if (!zone) return;
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
-  const r = window._rapportsMap[num];
-  const fileInput = `<input type="file" id="rapportFile${n}" accept=".pdf,.xlsx,.xls" style="display:none;" onchange="onRapportFile(${n})">`;
-  let notifInfo = '';
-  if (r && r.notifs) {
-    const last = fmtNotifDate(r.lastNotif);
-    const hist = (r.notifHistory || []).map(h => fmtNotifDate(h.ts) + ' → ' + ((h.to || []).join(', ') || '?')).join('\n');
-    notifInfo = `<span title="${hist.replace(/"/g, '&quot;')}" style="font-size:11px;color:var(--text-muted);cursor:help;">Notifié ${r.notifs}×${last ? ' — dernier le ' + last : ''}</span>`;
-  }
   const kizeoCtrl = buildKizeoControl(n);
   // Rapport reçu de Kizeo et archivé en interne (pas forcément encore envoyé au client).
+  // Dépôt manuel retiré : le flux Kizeo (Rapport terrain) + Gestion rapports couvre tout le cycle.
   let receptionBlock = '';
   const rec = (window._receptionMap || {})[num];
   if (rec && (rec.statut === 'archive' || rec.statut === 'envoye')) {
@@ -1540,38 +1533,13 @@ window.renderRapportZone = function(n) {
       ? `<span style="font-size:11px;color:var(--green-dark);font-weight:600;">✓ Notifié le ${fmtNotifDate(rec.notifiedAt)} au client</span>`
       : `<span style="font-size:11px;color:var(--text-muted);">Archivé en interne — pas encore envoyé au client (voir Gestion rapports)</span>`;
     receptionBlock = `
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
         <span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport archivé</span>
         <a href="${rec.fileUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Voir le fichier</a>
         ${notifText}
       </div>`;
   }
-  if (r && r.pdfUrl) {
-    zone.innerHTML = receptionBlock + kizeoCtrl + `
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Rapport</span>
-        <a href="${r.pdfUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px solid var(--green);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">
-          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
-          Voir le rapport
-        </a>
-        <button type="button" onclick="openNotifRapport(${n})" style="display:inline-flex;align-items:center;gap:5px;background:var(--navy);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
-          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-          Notifier
-        </button>
-        ${notifInfo}
-        <button type="button" onclick="triggerRapportUpload(${n})" style="background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Remplacer</button>
-        <button type="button" onclick="deleteRapport(${n})" style="background:#FDECEA;color:#E74C3C;border:1px solid #FACACA;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Supprimer</button>
-      </div>${fileInput}`;
-  } else {
-    zone.innerHTML = receptionBlock + kizeoCtrl + `
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Rapport</span>
-        <button type="button" onclick="triggerRapportUpload(${n})" style="display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px dashed var(--green);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
-          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-          Déposer un rapport
-        </button>
-      </div>${fileInput}`;
-  }
+  zone.innerHTML = kizeoCtrl + receptionBlock;
 };
 // Contrôle "Générer le rapport Kizeo" pour un passage donné.
 function buildKizeoControl(n) {
