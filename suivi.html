@@ -1596,6 +1596,13 @@ window.genererRapportKizeo = async function(n) {
   if (!editId) { showToast("Enregistre l'intervention d'abord.", true); return; }
   if (!kizeoFormDocId) { showToast('Choisis un formulaire Kizeo.', true); return; }
   if (!recipientUserId) { showToast('Choisis un technicien.', true); return; }
+  let existingPush = null;
+  try { existingPush = JSON.parse(document.getElementById('passage_' + n)?.dataset.kizeoPush || 'null'); } catch(e) { existingPush = null; }
+  if (existingPush) {
+    if (!confirm("Renvoyer un nouveau rapport au technicien pour ce passage ?\n\nSupprimer l'ancien rapport non répondu depuis l'interface Kizeo (https://forms.kizeo.com/data/history/).")) return;
+  } else {
+    if (!confirm("Êtes-vous sûr d'avoir bien rempli les champs avant de générer le rapport ?")) return;
+  }
   const btn = document.querySelector('#rapportZone' + n + ' button[onclick^="genererRapportKizeo"]');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
   try {
