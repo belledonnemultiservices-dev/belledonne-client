@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Réception rapports — Belledonne Multiservices</title>
+<title>Gestion rapports — Belledonne Multiservices</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root{--navy:#0D1B2A;--green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;--amber:#F5A623;--red:#E74C3C;--text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;--border:rgba(13,27,42,0.09);--surface:#fff;--bg:#F2F5F8;--sidebar-w:240px;--radius:14px;--radius-sm:8px;}
@@ -56,9 +56,13 @@
   .badge-pdf{background:#EBF0F5;color:var(--navy);}
   .badge-excel{background:rgba(46,204,143,0.12);color:var(--green-dark);}
   .badge-statut{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+  .st-en-attente{background:#EEF2FF;color:#4338CA;}
   .st-a-traiter{background:rgba(245,166,35,0.15);color:#C27D0A;}
   .st-envoye{background:var(--green-pale);color:var(--green-dark);}
   .st-archive{background:#EBF0F5;color:var(--text-mid);}
+  .badge-retard{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#fff;background:var(--red);padding:2px 8px;border-radius:10px;white-space:nowrap;margin-left:6px;}
+  .btn-annuler{color:var(--red);background:rgba(231,76,60,0.06);border:1px solid rgba(231,76,60,0.15);}
+  .btn-annuler:hover{background:rgba(231,76,60,0.12);}
   .bc-chip{display:inline-flex;font-size:12px;font-weight:600;color:var(--navy);background:#EBF0F5;padding:2px 9px;border-radius:12px;}
   .passage-chip{display:inline-flex;font-size:11px;font-weight:600;color:#1A5F8A;background:#EBF0F5;padding:2px 9px;border-radius:12px;white-space:nowrap;}
   .rattach-warn{display:inline-flex;font-size:11px;font-weight:600;color:var(--red);background:rgba(231,76,60,0.08);padding:2px 9px;border-radius:12px;white-space:nowrap;}
@@ -138,7 +142,7 @@
     <a class="nav-item" href="techniciens.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Techniciens</span></a>
     <a class="nav-item" href="imports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import email</span></a>
     <a class="nav-item" href="kizeo-config.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg><span>Formulaires Kizeo</span></a>
-    <a class="nav-item active" href="reception.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Réception rapports</span></a>
+    <a class="nav-item active" href="gestion-rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Gestion rapports</span></a>
   </nav>
   <div class="sidebar-footer">
     <div class="footer-user">
@@ -150,7 +154,7 @@
 
 <div class="main">
   <header class="topbar">
-    <div class="breadcrumb"><span>Admin</span><span>›</span><span>Réception rapports</span></div>
+    <div class="breadcrumb"><span>Admin</span><span>›</span><span>Gestion rapports</span></div>
     <button class="btn-logout" onclick="handleLogout()">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
       Déconnexion
@@ -160,14 +164,16 @@
   <div class="content">
     <div class="page-header-row">
       <div>
-        <div class="page-title">Réception rapports</div>
-        <div class="page-sub">Rapports remontés depuis Kizeo (webhook + pull de secours), à traiter puis envoyer au client.</div>
+        <div class="page-title">Gestion rapports</div>
+        <div class="page-sub">Suivi des rapports demandés aux techniciens : en attente, reçus, envoyés au client.</div>
       </div>
     </div>
 
     <div class="filters-bar">
       <input class="search-input" id="searchInput" placeholder="Rechercher par client, BC, technicien...">
       <select class="filter-select" id="filterStatut">
+        <option value="actifs">En cours (en attente + à traiter)</option>
+        <option value="en-attente">En attente technicien</option>
         <option value="a-traiter">À traiter</option>
         <option value="envoye">Envoyés</option>
         <option value="archive">Archivés</option>
@@ -178,7 +184,7 @@
 
     <div class="list" id="list">
       <div class="list-head">
-        <span>Arrivée</span><span>Client</span><span>BC</span><span>Passage</span><span>Technicien</span><span>Type</span><span>Statut</span><span></span>
+        <span>Date</span><span>Client</span><span>BC</span><span>Passage</span><span>Technicien</span><span>Type</span><span>Statut</span><span></span>
       </div>
     </div>
     <div class="empty-state" id="emptyState" style="display:none;">
@@ -295,11 +301,23 @@ function fmtDate(iso) {
   catch(e) { return iso; }
 }
 
+// Retard = ligne encore "en attente" plus de 24h après la fin prévue du passage.
+function isOverdue(r) {
+  if (r.statut !== "en-attente" || !r.dateFin) return false;
+  const finMs = new Date(r.dateFin).getTime();
+  if (isNaN(finMs)) return false;
+  return Date.now() > finMs + 24 * 3600 * 1000;
+}
+function hoursLate(r) {
+  const finMs = new Date(r.dateFin).getTime();
+  return Math.max(0, Math.floor((Date.now() - finMs) / 3600000));
+}
+
 function render() {
   const q = (document.getElementById("searchInput").value || "").toLowerCase();
   const st = document.getElementById("filterStatut").value;
   const list = allDocs.filter(r => {
-    const ms = !st || r.statut === st;
+    const ms = !st || (st === "actifs" ? (r.statut === "en-attente" || r.statut === "a-traiter") : r.statut === st);
     const mq = !q || (r.client||"").toLowerCase().includes(q) || (r.bc||"").toLowerCase().includes(q) || (r.technicien||"").toLowerCase().includes(q) || (r.reference||"").toLowerCase().includes(q);
     return ms && mq;
   });
@@ -312,29 +330,36 @@ function render() {
   if (!list.length) { empty.style.display = "block"; return; }
   empty.style.display = "none";
 
-  const STATUT_LABEL = { "a-traiter": "À traiter", "envoye": "Envoyé", "archive": "Archivé" };
-  const STATUT_CLASS = { "a-traiter": "st-a-traiter", "envoye": "st-envoye", "archive": "st-archive" };
+  const STATUT_LABEL = { "en-attente": "En attente", "a-traiter": "À traiter", "envoye": "Envoyé", "archive": "Archivé" };
+  const STATUT_CLASS = { "en-attente": "st-en-attente", "a-traiter": "st-a-traiter", "envoye": "st-envoye", "archive": "st-archive" };
 
-  const rows = list.map(r => `
+  const rows = list.map(r => {
+    const pending = r.statut === "en-attente";
+    const retard = isOverdue(r);
+    const actions = pending
+      ? `<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Annuler</button>`
+      : `
+        <a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>
+        <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
+        ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
+        ${r.statut !== "envoye" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
+        ${r.statut === "a-traiter" ? `<button class="btn-a btn-archiver" onclick="archiver('${r.id}')">Archiver</button>` : ""}
+        <button class="btn-a btn-archiver" style="color:var(--red);" onclick="supprimerReception('${r.id}')">Supprimer</button>`;
+    return `
     <div class="row" id="rrow-${r.id}">
       <div>${fmtDate(r.arriveeAt)}</div>
       <div>${r.client || `<span class="rattach-warn">Non rattaché</span>`}</div>
       <div>${r.bc || r.reference ? `<span class="bc-chip">${r.bc || r.reference}</span>` : `<span class="cell-muted">—</span>`}</div>
       <div>${r.passageLabel ? `<span class="passage-chip">${r.passageLabel}</span>` : `<span class="cell-muted">—</span>`}</div>
       <div class="cell-muted">${r.technicien || "—"}</div>
-      <div><span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span></div>
-      <div><span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span></div>
-      <div class="actions">
-        <a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>
-        <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
-        ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
-        ${r.statut !== "envoye" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
-        ${r.statut === "a-traiter" ? `<button class="btn-a btn-archiver" onclick="archiver('${r.id}')">Archiver</button>` : ""}
-        <button class="btn-a btn-archiver" style="color:var(--red);" onclick="supprimerReception('${r.id}')">Supprimer</button>
-      </div>
-    </div>`).join("");
+      <div>${pending ? "" : `<span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>`}</div>
+      <div><span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span>${retard ? `<span class="badge-retard">⚠ Non reçu +${hoursLate(r)}h</span>` : ""}</div>
+      <div class="actions">${actions}</div>
+    </div>`;
+  }).join("");
   container.insertAdjacentHTML("beforeend", rows);
 }
+setInterval(render, 60000); // rafraîchit le badge de retard sans recharger la page
 
 document.getElementById("searchInput").addEventListener("input", render);
 document.getElementById("filterStatut").addEventListener("change", render);
@@ -378,10 +403,13 @@ window.archiver = async function(id) {
   } catch(e) { alert("Erreur : " + e.message); }
 };
 
-// ── SUPPRIMER (erreur d'envoi, doublon...) ──
+// ── SUPPRIMER / ANNULER (erreur d'envoi, doublon, demande annulée...) ──
 window.supprimerReception = async function(id) {
   const r = allDocs.find(x => x.id === id);
-  if (!confirm("Supprimer définitivement ce rapport reçu ? Le fichier ne sera plus accessible.")) return;
+  const msg = r && r.statut === "en-attente"
+    ? "Annuler cette demande de rapport ? La ligne sera supprimée (le technicien pourra quand même valider le formulaire déjà reçu sur son mobile, mais ça ne créera plus rien ici)."
+    : "Supprimer définitivement ce rapport reçu ? Le fichier ne sera plus accessible.";
+  if (!confirm(msg)) return;
   try {
     if (r && r.fileUrl) {
       try { await deleteObject(ref(storage, r.fileUrl)); } catch(se) { console.warn("Storage:", se); }

@@ -77,15 +77,15 @@ function setup() {
             anchorK.parentNode.insertBefore(a, anchorK.nextSibling);
           }
         }
-        // Injecter le lien "Réception rapports" (boîte de réception Kizeo) dans la sidebar admin (si absent)
-        if (!document.querySelector('a.nav-item[href="reception.html"]')) {
+        // Injecter le lien "Gestion rapports" (suivi des demandes + réception Kizeo) dans la sidebar admin (si absent)
+        if (!document.querySelector('a.nav-item[href="gestion-rapports.html"]')) {
           const anchorR = document.querySelector('a.nav-item[href="kizeo-config.html"]') ||
                           document.querySelector('a.nav-item[href="imports.html"]');
           if (anchorR && anchorR.parentNode) {
             const a = document.createElement('a');
             a.className = 'nav-item';
-            a.href = 'reception.html';
-            a.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Réception rapports</span>';
+            a.href = 'gestion-rapports.html';
+            a.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Gestion rapports</span>';
             anchorR.parentNode.insertBefore(a, anchorR.nextSibling);
           }
         }

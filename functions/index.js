@@ -1167,6 +1167,52 @@ exports.pushKizeoForm = functions
       return;
     }
     console.log("Kizeo push OK:", suiviId, "passage", numPassage, "-> user", recipient);
+
+    // Ligne "en attente" dans Gestion rapports : créée (ou réutilisée si un envoi
+    // précédent existait déjà pour ce passage) dès le push, avant même que le
+    // technicien ait répondu. Permet de suivre qui doit encore rendre son rapport.
+    try {
+      let technicien = "";
+      const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", String(recipient)).limit(1).get();
+      if (!tSnap.empty) {
+        const t = tSnap.docs[0].data();
+        technicien = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+      }
+      const now = new Date().toISOString();
+      const pendingData = {
+        kizeoDataId: null,
+        kizeoFormId: form.formId,
+        kizeoFormDocId: String(kizeoFormDocId),
+        recipientUserId: recipient,
+        refInterne: appValues.refInterne,
+        reference,
+        arriveeAt: now,
+        pushedAt: now,
+        dateFin: passage.fin || null,
+        technicien,
+        origine: "app",
+        suiviId,
+        client: s.client || "",
+        bc: reference,
+        numPassage: parseInt(numPassage, 10),
+        passageLabel,
+        type: form.typeSortie === "excel" ? "excel" : "pdf",
+        fileUrl: null,
+        gsheetId: null,
+        gsheetUrl: null,
+        statut: "en-attente",
+        updatedAt: now,
+      };
+      const existing = await db.collection("reception-rapports").where("refInterne", "==", appValues.refInterne).limit(1).get();
+      if (!existing.empty) {
+        await existing.docs[0].ref.update(pendingData);
+      } else {
+        await db.collection("reception-rapports").add({ ...pendingData, createdAt: now });
+      }
+    } catch(e) {
+      console.error("Kizeo push : création de la ligne en attente échouée:", e.message);
+    }
+
     res.status(200).json({ success: true, refInterne: appValues.refInterne });
   });
 
@@ -1299,7 +1345,14 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     updatedAt: now,
   };
 
-  const existing = await db.collection("reception-rapports").where("kizeoDataId", "==", String(dataId)).limit(1).get();
+  // 1) Déjà reçue avant (renvoi de webhook, second pull) : on retrouve la ligne par kizeoDataId.
+  // 2) Sinon, ligne "en attente" créée au push (via ref_interne) : on la transforme en place.
+  // 3) Sinon (ligne supprimée entre-temps, ou soumission jamais suivie côté app) : on en crée une,
+  //    pour ne jamais perdre un rapport reçu.
+  let existing = await db.collection("reception-rapports").where("kizeoDataId", "==", String(dataId)).limit(1).get();
+  if (existing.empty && refInterne) {
+    existing = await db.collection("reception-rapports").where("refInterne", "==", refInterne).where("statut", "==", "en-attente").limit(1).get();
+  }
   if (!existing.empty) {
     await existing.docs[0].ref.update(docData);
     console.log(`Kizeo: soumission ${dataId} mise à jour (reception-rapports/${existing.docs[0].id})`);
