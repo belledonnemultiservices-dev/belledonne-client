@@ -409,9 +409,12 @@ window.renvoyer = async function(id) {
     alert("Informations insuffisantes pour renvoyer directement : ouvre l'intervention dans le Suivi.");
     return;
   }
-  const msg = r.kizeoDataId
+  let msg = r.kizeoDataId
     ? "Renvoyer un nouveau rapport au technicien pour ce passage ? Ses réponses précédentes (hors photos) seront reprises, il n'aura qu'à corriger."
     : "Renvoyer une nouvelle demande de rapport à ce technicien pour ce passage ?";
+  if (r.statut === "en-attente") {
+    msg += "\n\nPense à lui dire de supprimer l'ancien formulaire non répondu dans son appli Kizeo, sinon il en aura deux en attente.";
+  }
   if (!confirm(msg)) return;
   try {
     const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
