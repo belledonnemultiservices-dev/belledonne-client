@@ -409,7 +409,10 @@ window.renvoyer = async function(id) {
     alert("Informations insuffisantes pour renvoyer directement : ouvre l'intervention dans le Suivi.");
     return;
   }
-  if (!confirm("Renvoyer un nouveau rapport au technicien pour ce passage ? Ses réponses précédentes (hors photos) seront reprises, il n'aura qu'à corriger.")) return;
+  const msg = r.kizeoDataId
+    ? "Renvoyer un nouveau rapport au technicien pour ce passage ? Ses réponses précédentes (hors photos) seront reprises, il n'aura qu'à corriger."
+    : "Renvoyer une nouvelle demande de rapport à ce technicien pour ce passage ?";
+  if (!confirm(msg)) return;
   try {
     const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
     const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
