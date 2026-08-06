@@ -1111,9 +1111,12 @@ window.openModal = function openModal(id = null) {
     document.getElementById('fObservations').value = item.observations || '';
     const calEventIds = item.calEventIds || [];
     (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach((d, i) => addPassage(d, calEventIds[i] || ''));
-    // Charger les rapports déjà déposés pour cette intervention, puis rafraîchir les zones
+    // Charger les rapports déjà déposés + les rapports Kizeo archivés en interne, puis rafraîchir les zones
     if (item.client && item.bc) {
       window._loadRapportsForIntervention(item.client, item.bc).then(() => refreshAllRapportZones());
+    }
+    if (editId) {
+      window._loadReceptionForIntervention(editId).then(() => refreshAllRapportZones());
     }
     document.getElementById('fNotes').value = item.notes || '';
     // Show existing PDF links if any
@@ -1529,8 +1532,22 @@ window.renderRapportZone = function(n) {
     notifInfo = `<span title="${hist.replace(/"/g, '&quot;')}" style="font-size:11px;color:var(--text-muted);cursor:help;">Notifié ${r.notifs}×${last ? ' — dernier le ' + last : ''}</span>`;
   }
   const kizeoCtrl = buildKizeoControl(n);
+  // Rapport reçu de Kizeo et archivé en interne (pas forcément encore envoyé au client).
+  let receptionBlock = '';
+  const rec = (window._receptionMap || {})[num];
+  if (rec && (rec.statut === 'archive' || rec.statut === 'envoye')) {
+    const notifText = rec.statut === 'envoye' && rec.notifiedAt
+      ? `<span style="font-size:11px;color:var(--green-dark);font-weight:600;">✓ Notifié le ${fmtNotifDate(rec.notifiedAt)} au client</span>`
+      : `<span style="font-size:11px;color:var(--text-muted);">Archivé en interne — pas encore envoyé au client (voir Gestion rapports)</span>`;
+    receptionBlock = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
+        <span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport archivé</span>
+        <a href="${rec.fileUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Voir le fichier</a>
+        ${notifText}
+      </div>`;
+  }
   if (r && r.pdfUrl) {
-    zone.innerHTML = kizeoCtrl + `
+    zone.innerHTML = receptionBlock + kizeoCtrl + `
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Rapport</span>
         <a href="${r.pdfUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px solid var(--green);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">
@@ -1546,7 +1563,7 @@ window.renderRapportZone = function(n) {
         <button type="button" onclick="deleteRapport(${n})" style="background:#FDECEA;color:#E74C3C;border:1px solid #FACACA;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Supprimer</button>
       </div>${fileInput}`;
   } else {
-    zone.innerHTML = kizeoCtrl + `
+    zone.innerHTML = receptionBlock + kizeoCtrl + `
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Rapport</span>
         <button type="button" onclick="triggerRapportUpload(${n})" style="display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px dashed var(--green);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
@@ -3553,6 +3570,19 @@ window._uploadRapport = async function(file, client) {
   const storageRef = ref(storage, `rapports/${client}/${Date.now()}_${file.name}`);
   await uploadBytes(storageRef, file);
   return await getDownloadURL(storageRef);
+};
+// Rapports Kizeo archivés en interne (collection reception-rapports, gérée depuis Gestion rapports).
+window._receptionMap = {}; // { numPassage(int) : { fileUrl, statut, notifiedAt, ... } }
+window._loadReceptionForIntervention = async function(suiviId) {
+  window._receptionMap = {};
+  if (!suiviId) return;
+  try {
+    const snap = await getDocs(query(collection(db, 'reception-rapports'), where('suiviId', '==', suiviId)));
+    snap.forEach(d => {
+      const r = d.data();
+      if (r.numPassage) window._receptionMap[r.numPassage] = r;
+    });
+  } catch(e) { console.warn('loadReception', e); }
 };
 window._loadRapportsForIntervention = async function(client, bc) {
   window._rapportsMap = {};

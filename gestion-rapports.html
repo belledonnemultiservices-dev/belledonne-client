@@ -234,14 +234,18 @@
         <label class="form-label">Objet</label>
         <input class="form-input" type="text" id="envoiSubject">
       </div>
-      <div class="form-group" style="margin-bottom:0;">
+      <div class="form-group" style="margin-bottom:14px;">
         <label class="form-label">Message</label>
         <textarea class="mn-msg" id="envoiMsg"></textarea>
       </div>
+      <label class="mn-contact-item" style="margin-bottom:0;">
+        <input type="checkbox" id="envoiAjouterEspace" checked>
+        <div><div class="mn-contact-name">Ajouter dans l'espace client</div><div class="mn-contact-email">Visible dans "Rapports d'intervention" côté client. Si décoché, seul l'email est envoyé.</div></div>
+      </label>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeEnvoi()">Annuler</button>
-      <button class="btn-save" id="envoiBtn" onclick="doEnvoyer()">Envoyer et archiver dans Rapports</button>
+      <button class="btn-save" id="envoiBtn" onclick="doEnvoyer()">Envoyer au client</button>
     </div>
   </div>
 </div>
@@ -347,7 +351,7 @@ function render() {
         <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
         ${resendBtn}
         ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
-        ${r.statut !== "envoye" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
+        ${r.statut === "archive" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
         ${r.statut === "a-traiter" ? `<button class="btn-a btn-archiver" onclick="archiver('${r.id}')">Archiver</button>` : ""}
         <button class="btn-a btn-archiver" style="color:var(--red);" onclick="supprimerReception('${r.id}')">Supprimer</button>`;
     return `
@@ -427,11 +431,16 @@ window.renvoyer = async function(id) {
   } catch(e) { alert("Erreur : " + e.message); }
 };
 
-// ── ARCHIVER SANS ENVOI ──
+// ── ARCHIVER (stockage interne, visible dans le Suivi, pas encore envoyé au client) ──
 window.archiver = async function(id) {
-  if (!confirm("Archiver ce rapport sans l'envoyer au client ?")) return;
+  const r = allDocs.find(x => x.id === id);
+  if (!confirm("Archiver ce rapport en interne ? Il restera consultable dans le Suivi de l'intervention, et l'intervention passera au statut \"Terminé\".")) return;
   try {
     await updateDoc(doc(db, "reception-rapports", id), { statut: "archive", updatedAt: new Date().toISOString() });
+    if (r && r.suiviId) {
+      try { await updateDoc(doc(db, "suivi", r.suiviId), { statut: "Terminé" }); }
+      catch(e) { console.warn("Mise à jour statut Suivi échouée:", e.message); }
+    }
     showToast("Rapport archivé");
   } catch(e) { alert("Erreur : " + e.message); }
 };
@@ -528,7 +537,8 @@ window.openEnvoi = async function(id) {
   document.getElementById("envoiMsg").value = `Bonjour,\nVotre rapport (BC ${r.bc || "-"}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
   document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
   document.getElementById("envoiBtn").disabled = false;
-  document.getElementById("envoiBtn").textContent = "Envoyer et archiver dans Rapports";
+  document.getElementById("envoiBtn").textContent = "Envoyer au client";
+  document.getElementById("envoiAjouterEspace").checked = true;
   document.getElementById("modalEnvoi").classList.add("open");
   try {
     const snapC = await getDocs(query(collection(db, "contacts"), where("client", "==", r.client)));
@@ -569,24 +579,30 @@ window.doEnvoyer = async function() {
     } catch(e) { errors++; }
   }
   if (sent > 0) {
+    const ajouterEspace = document.getElementById("envoiAjouterEspace").checked;
+    const now = new Date().toISOString();
     try {
-      await addDoc(collection(db, "rapports"), {
-        bc: r.bc || r.reference || "",
-        client: r.client,
-        passage: r.passageLabel || "",
-        site: "",
-        nuisible: "",
-        date: new Date().toISOString().split("T")[0],
-        pdfUrl: r.fileUrl,
-        createdAt: new Date().toISOString(),
+      if (ajouterEspace) {
+        await addDoc(collection(db, "rapports"), {
+          bc: r.bc || r.reference || "",
+          client: r.client,
+          passage: r.passageLabel || "",
+          site: "",
+          nuisible: "",
+          date: now.split("T")[0],
+          pdfUrl: r.fileUrl,
+          createdAt: now,
+        });
+      }
+      await updateDoc(doc(db, "reception-rapports", r.id), {
+        statut: "envoye", updatedAt: now, notifiedAt: now, notifiedTo: recipients, ajouteEspaceClient: ajouterEspace,
       });
-      await updateDoc(doc(db, "reception-rapports", r.id), { statut: "envoye", updatedAt: new Date().toISOString() });
-      showToast(sent + " email(s) envoyé(s), rapport archivé dans Rapports.");
+      showToast(sent + " email(s) envoyé(s)" + (ajouterEspace ? ", ajouté à l'espace client." : "."));
       closeEnvoi();
-    } catch(e) { alert("Envoi fait mais erreur d'archivage : " + e.message); }
+    } catch(e) { alert("Envoi fait mais erreur d'enregistrement : " + e.message); }
   } else {
     alert("Aucun email envoyé (" + errors + " erreur(s)).");
-    btn.disabled = false; btn.textContent = "Envoyer et archiver dans Rapports";
+    btn.disabled = false; btn.textContent = "Envoyer au client";
   }
 };
 </script>
