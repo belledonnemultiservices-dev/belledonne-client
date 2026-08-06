@@ -78,9 +78,9 @@ function setup() {
           }
         }
         // Injecter le lien "Gestion rapports" (suivi des demandes + réception Kizeo) dans la sidebar admin (si absent)
+        // Juste sous "Suivi interventions".
         if (!document.querySelector('a.nav-item[href="gestion-rapports.html"]')) {
-          const anchorR = document.querySelector('a.nav-item[href="kizeo-config.html"]') ||
-                          document.querySelector('a.nav-item[href="imports.html"]');
+          const anchorR = document.querySelector('a.nav-item[href="suivi.html"]');
           if (anchorR && anchorR.parentNode) {
             const a = document.createElement('a');
             a.className = 'nav-item';
