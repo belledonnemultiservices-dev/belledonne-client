@@ -47,8 +47,8 @@
   .results-count{font-size:12px;color:var(--text-muted);white-space:nowrap;}
 
   .list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .list-head{display:grid;grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 1fr 0.7fr 0.7fr 460px;gap:10px;padding:11px 18px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);}
-  .row{display:grid;grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 1fr 0.7fr 0.7fr 460px;gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--border);}
+  .list-head{display:grid;grid-template-columns:1fr 1fr 0.8fr 0.9fr 1fr 0.6fr 1.2fr 460px;gap:10px;padding:11px 18px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);}
+  .row{display:grid;grid-template-columns:1fr 1fr 0.8fr 0.9fr 1fr 0.6fr 1.2fr 460px;gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--border);}
   .row:last-child{border-bottom:none;}
   .row:hover{background:var(--bg);}
   .cell-muted{color:var(--text-muted);}
@@ -60,7 +60,7 @@
   .st-a-traiter{background:rgba(245,166,35,0.15);color:#C27D0A;}
   .st-envoye{background:var(--green-pale);color:var(--green-dark);}
   .st-archive{background:#EBF0F5;color:var(--text-mid);}
-  .badge-retard{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#fff;background:var(--red);padding:2px 8px;border-radius:10px;white-space:nowrap;margin-left:6px;}
+  .badge-retard{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#fff;background:var(--red);padding:2px 8px;border-radius:10px;white-space:nowrap;}
   .btn-annuler{color:var(--red);background:rgba(231,76,60,0.06);border:1px solid rgba(231,76,60,0.15);}
   .btn-annuler:hover{background:rgba(231,76,60,0.12);}
   .bc-chip{display:inline-flex;font-size:12px;font-weight:600;color:var(--navy);background:#EBF0F5;padding:2px 9px;border-radius:12px;}
@@ -351,9 +351,12 @@ function render() {
       <div>${r.client || `<span class="rattach-warn">Non rattaché</span>`}</div>
       <div>${r.bc || r.reference ? `<span class="bc-chip">${r.bc || r.reference}</span>` : `<span class="cell-muted">—</span>`}</div>
       <div>${r.passageLabel ? `<span class="passage-chip">${r.passageLabel}</span>` : `<span class="cell-muted">—</span>`}</div>
-      <div class="cell-muted">${r.technicien || "—"}</div>
+      <div class="cell-muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${(r.technicien||"").replace(/"/g,"&quot;")}">${r.technicien || "—"}</div>
       <div>${pending ? "" : `<span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>`}</div>
-      <div><span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span>${retard ? `<span class="badge-retard">⚠ Non reçu +${hoursLate(r)}h</span>` : ""}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
+        <span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span>
+        ${retard ? `<span class="badge-retard">⚠ Non reçu +${hoursLate(r)}h</span>` : ""}
+      </div>
       <div class="actions">${actions}</div>
     </div>`;
   }).join("");
