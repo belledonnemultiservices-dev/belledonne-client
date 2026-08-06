@@ -229,6 +229,10 @@
       <div class="form-group">
         <label class="form-label">Destinataires</label>
         <div class="mn-contacts" id="envoiContacts"><div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div></div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input class="form-input" type="email" id="envoiEmailManuel" placeholder="Ajouter une adresse email..." style="flex:1;height:38px;">
+          <button type="button" class="btn-cancel" style="height:38px;" onclick="ajouterEmailManuel()">Ajouter</button>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Objet</label>
@@ -238,7 +242,7 @@
         <label class="form-label">Message</label>
         <textarea class="mn-msg" id="envoiMsg"></textarea>
       </div>
-      <label class="mn-contact-item" style="margin-bottom:0;">
+      <label class="mn-contact-item" id="envoiAjouterEspaceWrap" style="margin-bottom:0;">
         <input type="checkbox" id="envoiAjouterEspace" checked>
         <div><div class="mn-contact-name">Ajouter dans l'espace client</div><div class="mn-contact-email">Visible dans "Rapports d'intervention" côté client. Si décoché, seul l'email est envoyé.</div></div>
       </label>
@@ -538,8 +542,19 @@ window.openEnvoi = async function(id) {
   document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
   document.getElementById("envoiBtn").disabled = false;
   document.getElementById("envoiBtn").textContent = "Envoyer au client";
-  document.getElementById("envoiAjouterEspace").checked = true;
+  document.getElementById("envoiEmailManuel").value = "";
   document.getElementById("modalEnvoi").classList.add("open");
+  // La case "Ajouter dans l'espace client" n'a de sens que si ce client a un compte
+  // (espace client actif) ; sinon on la masque et on ne coche rien par défaut.
+  try {
+    const snapU = await getDocs(query(collection(db, "users"), where("role", "==", "client"), where("client", "==", r.client)));
+    const hasEspaceClient = !snapU.empty;
+    document.getElementById("envoiAjouterEspaceWrap").style.display = hasEspaceClient ? "" : "none";
+    document.getElementById("envoiAjouterEspace").checked = hasEspaceClient;
+  } catch(e) {
+    document.getElementById("envoiAjouterEspaceWrap").style.display = "none";
+    document.getElementById("envoiAjouterEspace").checked = false;
+  }
   try {
     const snapC = await getDocs(query(collection(db, "contacts"), where("client", "==", r.client)));
     const contacts = snapC.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -548,11 +563,26 @@ window.openEnvoi = async function(id) {
     } else {
       document.getElementById("envoiContacts").innerHTML = contacts.map(c => `
         <label class="mn-contact-item">
-          <input type="checkbox" value="${c.email}" checked>
+          <input type="checkbox" value="${c.email}">
           <div><div class="mn-contact-name">${c.prenom||""} ${c.nom||""}</div><div class="mn-contact-email">${c.email||"-"}</div></div>
         </label>`).join("");
     }
   } catch(e) { document.getElementById("envoiContacts").innerHTML = '<div style="color:red;padding:12px;">Erreur : ' + e.message + '</div>'; }
+};
+window.ajouterEmailManuel = function() {
+  const input = document.getElementById("envoiEmailManuel");
+  const email = input.value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert("Adresse email invalide."); return; }
+  const container = document.getElementById("envoiContacts");
+  if (container.querySelector(`input[value="${email}"]`)) { input.value = ""; return; }
+  const emptyMsg = container.querySelector(".mn-contact-item") ? null : container.firstElementChild;
+  if (emptyMsg && emptyMsg.tagName === "DIV" && !container.querySelector(".mn-contact-item")) container.innerHTML = "";
+  container.insertAdjacentHTML("beforeend", `
+    <label class="mn-contact-item">
+      <input type="checkbox" value="${email}" checked>
+      <div><div class="mn-contact-name">Adresse ajoutée manuellement</div><div class="mn-contact-email">${email}</div></div>
+    </label>`);
+  input.value = "";
 };
 window.closeEnvoi = function() {
   document.getElementById("modalEnvoi").classList.remove("open");
