@@ -1201,8 +1201,23 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   };
 
   const refInterne = mapping.refInterne ? String(getField(mapping.refInterne) || "").trim() : "";
-  const technicien = submission._recipient_name || submission.recipient_name || "";
   const reference = mapping.reference ? String(getField(mapping.reference) || "") : "";
+
+  // Le nom du technicien ne revient pas dans la réponse Kizeo (_recipient_name absent) :
+  // on le résout via recipient_user_id -> techniciens.kizeoUserId.
+  let technicien = submission._recipient_name || submission.recipient_name || "";
+  const recipientUserId = submission.recipient_user_id || submission.recipientUserId || null;
+  if (!technicien && recipientUserId) {
+    try {
+      const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", String(recipientUserId)).limit(1).get();
+      if (!tSnap.empty) {
+        const t = tSnap.docs[0].data();
+        technicien = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+      }
+    } catch(e) {
+      console.error("Kizeo: résolution technicien échouée:", e.message);
+    }
+  }
 
   let suiviId = null, client = "", bc = "", numPassage = null, passageLabel = "";
   const m = refInterne.match(/^(.+)::(\d+)$/);
