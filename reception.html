@@ -47,8 +47,8 @@
   .results-count{font-size:12px;color:var(--text-muted);white-space:nowrap;}
 
   .list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .list-head{display:grid;grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 1fr 0.7fr 0.8fr 360px;gap:10px;padding:11px 18px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);}
-  .row{display:grid;grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 1fr 0.7fr 0.8fr 360px;gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--border);}
+  .list-head{display:grid;grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 1fr 0.7fr 0.7fr 460px;gap:10px;padding:11px 18px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);}
+  .row{display:grid;grid-template-columns:1.1fr 1fr 0.8fr 0.9fr 1fr 0.7fr 0.7fr 460px;gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid var(--border);}
   .row:last-child{border-bottom:none;}
   .row:hover{background:var(--bg);}
   .cell-muted{color:var(--text-muted);}
@@ -250,8 +250,8 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, doc, updateDoc, deleteField, onSnapshot, getDocs, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getFirestore, collection, doc, updateDoc, deleteDoc, onSnapshot, getDocs, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -330,6 +330,7 @@ function render() {
         ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
         ${r.statut !== "envoye" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
         ${r.statut === "a-traiter" ? `<button class="btn-a btn-archiver" onclick="archiver('${r.id}')">Archiver</button>` : ""}
+        <button class="btn-a btn-archiver" style="color:var(--red);" onclick="supprimerReception('${r.id}')">Supprimer</button>
       </div>
     </div>`).join("");
   container.insertAdjacentHTML("beforeend", rows);
@@ -374,6 +375,19 @@ window.archiver = async function(id) {
   try {
     await updateDoc(doc(db, "reception-rapports", id), { statut: "archive", updatedAt: new Date().toISOString() });
     showToast("Rapport archivé");
+  } catch(e) { alert("Erreur : " + e.message); }
+};
+
+// ── SUPPRIMER (erreur d'envoi, doublon...) ──
+window.supprimerReception = async function(id) {
+  const r = allDocs.find(x => x.id === id);
+  if (!confirm("Supprimer définitivement ce rapport reçu ? Le fichier ne sera plus accessible.")) return;
+  try {
+    if (r && r.fileUrl) {
+      try { await deleteObject(ref(storage, r.fileUrl)); } catch(se) { console.warn("Storage:", se); }
+    }
+    await deleteDoc(doc(db, "reception-rapports", id));
+    showToast("Rapport supprimé");
   } catch(e) { alert("Erreur : " + e.message); }
 };
 

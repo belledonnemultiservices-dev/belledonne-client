@@ -1304,6 +1304,8 @@ function getPassagesFromDOM() {
   const passages = [];
   document.querySelectorAll('#passagesContainer > [id^="passage_"]').forEach(div => {
     const n = div.id.replace('passage_', '');
+    let kizeoPush = null;
+    try { kizeoPush = JSON.parse(div.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }
     passages.push({
       num: parseInt(document.getElementById('fPassageNum' + n)?.value) || null,
       debut: document.getElementById('fDateDebut' + n)?.value || '',
@@ -1312,6 +1314,7 @@ function getPassagesFromDOM() {
       desc: document.getElementById('fDesc' + n)?.value || '',
       adresse: document.getElementById('fAdresseCal' + n)?.value || '',
       techs: getPassageTechsFromDOM(n),
+      kizeoPush,
     });
   });
   passages.sort((a, b) => (a.num || 0) - (b.num || 0));
@@ -1431,7 +1434,7 @@ function renderPassageCalButtons(n, calEventMap) {
 function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
-  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null;
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null;
   if (value && typeof value === 'object') {
     debut = value.debut || '';
     fin = value.fin || '';
@@ -1440,6 +1443,7 @@ function addPassage(value = '', calEventId = '') {
     savedAdresse = value.adresse || '';
     savedTechs = Array.isArray(value.techs) ? value.techs : (value.tech ? [value.tech] : []);
     savedNum = value.num || null;
+    savedKizeoPush = value.kizeoPush || null;
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   }
@@ -1451,6 +1455,7 @@ function addPassage(value = '', calEventId = '') {
   const div = document.createElement('div');
   div.id = 'passage_' + n;
   div.dataset.calEventId = JSON.stringify(calMap);
+  div.dataset.kizeoPush = JSON.stringify(savedKizeoPush);
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
   div.innerHTML = `
     <div style="display:grid;grid-template-columns:68px 1fr 1fr 28px;gap:8px;align-items:center;">
@@ -1570,14 +1575,18 @@ function buildKizeoControl(n) {
   const bc = (document.getElementById('fBC')?.value || document.getElementById('fPL')?.value || '').trim();
   const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
   const defLabel = ((bc ? bc + ' - ' : '') + passageLabel).replace(/"/g,'&quot;');
+  let kizeoPush = null;
+  try { kizeoPush = JSON.parse(document.getElementById('passage_' + n)?.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }
+  const pushBadge = kizeoPush ? `<span id="kzPushBadge${n}" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);padding:4px 10px;border-radius:20px;white-space:nowrap;" title="${(kizeoPush.formNom||'').replace(/"/g,'&quot;')}">✓ Envoyé le ${fmtNotifDate(kizeoPush.at)} à ${(kizeoPush.technicien||'').replace(/"/g,'&quot;')}</span>` : `<span id="kzPushBadge${n}"></span>`;
   return wrap(`
       <select id="kzForm${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:180px;">${formOpts}</select>
       <select id="kzTech${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:150px;">${techOpts}</select>
       <input id="kzLabel${n}" class="form-input" value="${defLabel}" placeholder="Nom du rapport" title="Nom affiché sur le mobile" style="font-size:12px;height:32px;padding:0 8px;max-width:200px;">
       <button type="button" onclick="genererRapportKizeo(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M4 4h16v2H4zm0 14h16v2H4zm7-7h9v2h-9zm0-4h9v2h-9zm0 8h9v2h-9zM4 8l3 3-3 3z"/></svg>
-        Générer le rapport
-      </button>`);
+        ${kizeoPush ? 'Renvoyer le rapport' : 'Générer le rapport'}
+      </button>
+      ${pushBadge}`);
 }
 window.genererRapportKizeo = async function(n) {
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
@@ -1597,11 +1606,19 @@ window.genererRapportKizeo = async function(n) {
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
-    showToast('Rapport envoyé sur le mobile du technicien ✅');
+    const formNom = document.getElementById('kzForm' + n)?.selectedOptions?.[0]?.textContent || '';
+    const technicien = document.getElementById('kzTech' + n)?.selectedOptions?.[0]?.textContent || '';
+    const pushInfo = { at: new Date().toISOString(), technicien, formNom };
+    const div = document.getElementById('passage_' + n);
+    if (div) div.dataset.kizeoPush = JSON.stringify(pushInfo);
+    if (editId) { try { await window._updateSuivi(editId, { passages: getPassagesFromDOM() }); } catch(e) { console.warn('Sauvegarde badge Kizeo échouée:', e.message); } }
+    renderRapportZone(n);
+    showToast('✅ Rapport envoyé sur le mobile de ' + (technicien || 'le technicien'));
   } catch(e) {
     showToast('Erreur Kizeo : ' + e.message, true);
   } finally {
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    const btn2 = document.querySelector('#rapportZone' + n + ' button[onclick^="genererRapportKizeo"]');
+    if (btn2) { btn2.disabled = false; btn2.style.opacity = '1'; }
   }
 };
 window.triggerRapportUpload = function(n) {
