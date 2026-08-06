@@ -154,7 +154,7 @@ Traitement :
 1. Vérifie `X-Kizeo-Secret === KIZEO_WEBHOOK_SECRET` → sinon 401.
 2. Lit `eventType` (traite `finished`/recording) + `form_id` + `id` (dataId).
 3. `GET /forms/{formId}/data/{dataId}` → lit le champ `ref_interne` (via `mapping.refInterne`) + `_recipient_name`.
-4. Parse `ref_interne` → `suiviId`, `numPassage`. Résout `client` via `suivi/{suiviId}`. Illisible/absent → `suiviId=null` (rattachement manuel).
+4. Parse `ref_interne` → `suiviId`, `numPassage`. Résout `client` via `suivi/{suiviId}`. **Illisible/absent/intervention introuvable → soumission ignorée** (décision du 2026-08-06 : seuls les rapports générés depuis le bouton "Générer le rapport Kizeo" du Suivi doivent apparaître dans la boîte de réception, pas les remplissages manuels du même formulaire dans Kizeo).
 5. Télécharge le fichier :
    - PDF : `GET /forms/{formId}/data/{dataId}/pdf`
    - Excel : `GET /forms/{formId}/exports` puis `GET /forms/{formId}/data/{dataId}/exports/{exportId}`
