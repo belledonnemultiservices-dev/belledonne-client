@@ -413,7 +413,7 @@ window.renvoyer = async function(id) {
     ? "Renvoyer un nouveau rapport au technicien pour ce passage ? Ses réponses précédentes (hors photos) seront reprises, il n'aura qu'à corriger."
     : "Renvoyer une nouvelle demande de rapport à ce technicien pour ce passage ?";
   if (r.statut === "en-attente") {
-    msg += "\n\nSupprimer l'ancien rapport non répondu depuis l'interface Kizeo (https://forms.kizeo.com/data/history/), sinon le technicien en aura deux en attente.";
+    msg += "\n\nSupprimer l'ancien rapport non répondu depuis l'interface Kizeo (https://forms.kizeo.com/data/history/).";
   }
   if (!confirm(msg)) return;
   try {
