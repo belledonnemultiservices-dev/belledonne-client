@@ -309,12 +309,12 @@ function fmtDate(iso) {
   catch(e) { return iso; }
 }
 
-// Retard = ligne encore "en attente" plus de 24h après la fin prévue du passage.
+// Retard = ligne encore "en attente" plus de 1h après la fin prévue du passage.
 function isOverdue(r) {
   if (r.statut !== "en-attente" || !r.dateFin) return false;
   const finMs = new Date(r.dateFin).getTime();
   if (isNaN(finMs)) return false;
-  return Date.now() > finMs + 24 * 3600 * 1000;
+  return Date.now() > finMs + 1 * 3600 * 1000;
 }
 function hoursLate(r) {
   const finMs = new Date(r.dateFin).getTime();
