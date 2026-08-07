@@ -624,32 +624,40 @@ const GOOGLE_OAUTH_CLIENT_ID = "737384028313-i55qgvillm637km35d3l41cv8g1v33q5.ap
 let _googleTokenClient = null;
 let _googleAccessToken = null;
 
-function getGoogleAccessToken() {
-  return new Promise((resolve, reject) => {
-    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
-      reject(new Error("Google Identity Services non chargé, réessayez dans quelques secondes."));
-      return;
-    }
-    if (!_googleTokenClient) {
-      _googleTokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_OAUTH_CLIENT_ID,
-        scope: "https://www.googleapis.com/auth/drive.file",
-        callback: (resp) => {
-          if (resp.error) { reject(new Error(resp.error)); return; }
-          _googleAccessToken = resp.access_token;
-          resolve(_googleAccessToken);
-        },
-      });
-    } else {
-      _googleTokenClient.callback = (resp) => {
-        if (resp.error) { reject(new Error(resp.error)); return; }
-        _googleAccessToken = resp.access_token;
-        resolve(_googleAccessToken);
-      };
-    }
-    // prompt:'' tente un renouvellement silencieux si déjà autorisé, sinon Google affiche le sélecteur de compte.
-    _googleTokenClient.requestAccessToken({ prompt: _googleAccessToken ? "" : "consent" });
+function ensureGoogleTokenClient() {
+  if (_googleTokenClient) return _googleTokenClient;
+  _googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_OAUTH_CLIENT_ID,
+    scope: "https://www.googleapis.com/auth/drive.file",
+    callback: () => {}, // remplacé à chaque appel de requestToken()
   });
+  return _googleTokenClient;
+}
+
+function requestToken(prompt) {
+  return new Promise((resolve, reject) => {
+    const client = ensureGoogleTokenClient();
+    client.callback = (resp) => {
+      if (resp.error) { reject(new Error(resp.error)); return; }
+      _googleAccessToken = resp.access_token;
+      resolve(_googleAccessToken);
+    };
+    client.requestAccessToken({ prompt });
+  });
+}
+
+// Tente d'abord un renouvellement silencieux (aucune interaction si déjà autorisé
+// précédemment sur ce compte Google) ; ne redemande le consentement complet que
+// si le silencieux échoue (première fois, session expirée, etc.).
+async function getGoogleAccessToken() {
+  if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+    throw new Error("Google Identity Services non chargé, réessayez dans quelques secondes.");
+  }
+  try {
+    return await requestToken("");
+  } catch(e) {
+    return await requestToken("consent");
+  }
 }
 
 let _editDocId = null;
