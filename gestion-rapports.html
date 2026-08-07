@@ -113,6 +113,7 @@
   .toast.show{transform:translateY(0);opacity:1;}
   .toast svg{width:16px;height:16px;color:var(--green);}
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -616,6 +617,41 @@ window.closeEnvoi = function() {
 };
 
 // ── Édition en ligne du rapport Excel (Google Sheets temporaire) ──
+// Le fichier Drive temporaire est créé dans le VRAI Drive de l'admin connecté
+// (le compte de service n'a pas de quota Drive) : on demande un jeton OAuth
+// Google côté navigateur via Google Identity Services.
+const GOOGLE_OAUTH_CLIENT_ID = "737384028313-i55qgvillm637km35d3l41cv8g1v33q5.apps.googleusercontent.com";
+let _googleTokenClient = null;
+let _googleAccessToken = null;
+
+function getGoogleAccessToken() {
+  return new Promise((resolve, reject) => {
+    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+      reject(new Error("Google Identity Services non chargé, réessayez dans quelques secondes."));
+      return;
+    }
+    if (!_googleTokenClient) {
+      _googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_OAUTH_CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/drive.file",
+        callback: (resp) => {
+          if (resp.error) { reject(new Error(resp.error)); return; }
+          _googleAccessToken = resp.access_token;
+          resolve(_googleAccessToken);
+        },
+      });
+    } else {
+      _googleTokenClient.callback = (resp) => {
+        if (resp.error) { reject(new Error(resp.error)); return; }
+        _googleAccessToken = resp.access_token;
+        resolve(_googleAccessToken);
+      };
+    }
+    // prompt:'' tente un renouvellement silencieux si déjà autorisé, sinon Google affiche le sélecteur de compte.
+    _googleTokenClient.requestAccessToken({ prompt: _googleAccessToken ? "" : "consent" });
+  });
+}
+
 let _editDocId = null;
 let _editFileId = null;
 
@@ -623,14 +659,17 @@ window.openEditReport = async function(id) {
   _editDocId = id;
   _editFileId = null;
   document.getElementById("editLoading").style.display = "";
+  document.getElementById("editLoading").textContent = "Connexion à votre compte Google...";
   document.getElementById("editFrameWrap").style.display = "none";
   document.getElementById("editSaveBtn").disabled = true;
   document.getElementById("modalEdit").classList.add("open");
   try {
+    const accessToken = await getGoogleAccessToken();
+    document.getElementById("editLoading").textContent = "Préparation du document...";
     const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
     const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
     const resp = await fetch("https://europe-west1-belledonne-client.cloudfunctions.net/openReportForEdit", {
-      method: "POST", headers, body: JSON.stringify({ docId: id })
+      method: "POST", headers, body: JSON.stringify({ docId: id, accessToken })
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || "Erreur préparation du document");
@@ -651,12 +690,13 @@ window.closeEditReport = async function(save) {
   document.getElementById("editIframe").src = "about:blank";
   _editDocId = null; _editFileId = null;
   if (!fileId) return;
-  const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-  const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
-  const endpoint = save ? "saveReportEdit" : "discardReportEdit";
   try {
+    const accessToken = await getGoogleAccessToken();
+    const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+    const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
+    const endpoint = save ? "saveReportEdit" : "discardReportEdit";
     const resp = await fetch(`https://europe-west1-belledonne-client.cloudfunctions.net/${endpoint}`, {
-      method: "POST", headers, body: JSON.stringify({ docId, fileId })
+      method: "POST", headers, body: JSON.stringify({ docId, fileId, accessToken })
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || "Erreur");

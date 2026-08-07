@@ -1497,10 +1497,13 @@ function parseFileUrl(fileUrl) {
   return { storagePath: decodeURIComponent(m[1]), token: m[2] };
 }
 
-async function driveClientFor(scopes) {
+// Le compte de service n'a pas de quota Drive propre (compte Gmail perso, pas
+// Workspace) : on utilise à la place le jeton OAuth du compte Google réel de
+// l'admin (obtenu côté navigateur), pour que le fichier soit créé dans SON Drive.
+function driveClientForToken(accessToken) {
   const { google } = require("googleapis");
-  const serviceAccountKey = JSON.parse(GCAL_SA.value());
-  const auth = new google.auth.GoogleAuth({ credentials: serviceAccountKey, scopes });
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: accessToken });
   return google.drive({ version: "v3", auth });
 }
 
@@ -1517,7 +1520,7 @@ async function adminEmails(db) {
 // avec les comptes admin, et renvoie l'URL d'édition à ouvrir dans le modal.
 exports.openReportForEdit = functions
   .region("europe-west1")
-  .runWith({ secrets: [GCAL_SA], timeoutSeconds: 60 })
+  .runWith({ timeoutSeconds: 60 })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -1526,8 +1529,9 @@ exports.openReportForEdit = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { docId } = req.body;
+    const { docId, accessToken } = req.body;
     if (!docId) { res.status(400).json({ error: "docId requis" }); return; }
+    if (!accessToken) { res.status(400).json({ error: "accessToken Google requis (reconnexion Google nécessaire)" }); return; }
 
     try {
       const { getFirestore } = require("firebase-admin/firestore");
@@ -1542,7 +1546,7 @@ exports.openReportForEdit = functions
       const bucket = admin.storage().bucket();
       const [fileBuffer] = await bucket.file(storagePath).download();
 
-      const drive = await driveClientFor(["https://www.googleapis.com/auth/drive"]);
+      const drive = driveClientForToken(accessToken);
       const { Readable } = require("stream");
       const created = await drive.files.create({
         requestBody: { name: `EDIT_${docId}_${Date.now()}`, mimeType: "application/vnd.google-apps.spreadsheet" },
@@ -1577,7 +1581,7 @@ exports.openReportForEdit = functions
 // fichier Drive temporaire.
 exports.saveReportEdit = functions
   .region("europe-west1")
-  .runWith({ secrets: [GCAL_SA], timeoutSeconds: 60 })
+  .runWith({ timeoutSeconds: 60 })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -1586,8 +1590,9 @@ exports.saveReportEdit = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { docId, fileId } = req.body;
+    const { docId, fileId, accessToken } = req.body;
     if (!docId || !fileId) { res.status(400).json({ error: "docId et fileId requis" }); return; }
+    if (!accessToken) { res.status(400).json({ error: "accessToken Google requis (reconnexion Google nécessaire)" }); return; }
 
     try {
       const { getFirestore } = require("firebase-admin/firestore");
@@ -1598,7 +1603,7 @@ exports.saveReportEdit = functions
       const r = snap.data();
       const { storagePath, token } = parseFileUrl(r.fileUrl);
 
-      const drive = await driveClientFor(["https://www.googleapis.com/auth/drive"]);
+      const drive = driveClientForToken(accessToken);
       const exported = await drive.files.export(
         { fileId, mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
         { responseType: "arraybuffer" }
@@ -1623,7 +1628,7 @@ exports.saveReportEdit = functions
 // Modal fermé sans enregistrer : on nettoie le Google Sheet temporaire.
 exports.discardReportEdit = functions
   .region("europe-west1")
-  .runWith({ secrets: [GCAL_SA], timeoutSeconds: 30 })
+  .runWith({ timeoutSeconds: 30 })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -1632,11 +1637,12 @@ exports.discardReportEdit = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { docId, fileId } = req.body;
+    const { docId, fileId, accessToken } = req.body;
     if (!fileId) { res.status(400).json({ error: "fileId requis" }); return; }
+    if (!accessToken) { res.status(400).json({ error: "accessToken Google requis" }); return; }
 
     try {
-      const drive = await driveClientFor(["https://www.googleapis.com/auth/drive"]);
+      const drive = driveClientForToken(accessToken);
       await drive.files.delete({ fileId }).catch(e => {
         if (e.code !== 404) console.error("discardReportEdit: suppression Drive échouée:", e.message);
       });
