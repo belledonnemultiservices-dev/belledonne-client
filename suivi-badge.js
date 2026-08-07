@@ -27,6 +27,14 @@ function setup() {
     return b;
   });
 
+  // Badges "Gestion rapports" : jaune = lignes à traiter, rouge = lignes en retard (+1h sans rapport).
+  // Le lien peut être injecté plus bas dans ce même setup() ; on cherchera à nouveau juste avant de les brancher.
+  function makeReportBadge(bg) {
+    const b = document.createElement('span');
+    b.style.cssText = `display:none;margin-left:6px;min-width:16px;height:16px;padding:0 5px;border-radius:9px;background:${bg};color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;`;
+    return b;
+  }
+
   // Liens strictement internes : masqués par défaut, réaffichés seulement pour l'admin.
   // Ils ne doivent JAMAIS apparaître (même vides) côté client.
   const internalLinks = document.querySelectorAll('a[href="suivi.html"], a[href="facturation.html"]');
@@ -104,6 +112,49 @@ function setup() {
         });
       },
       err => console.error('suivi-badge:', err)
+    );
+
+    // Badges "Gestion rapports" : jaune (à traiter) + rouge (en retard, +1h sans rapport).
+    const reportLinks = document.querySelectorAll('a.nav-item[href="gestion-rapports.html"]');
+    const reportBadgesJaune = Array.from(reportLinks).map(link => {
+      const b = makeReportBadge('#F5A623');
+      link.appendChild(b);
+      return b;
+    });
+    const reportBadgesRouge = Array.from(reportLinks).map(link => {
+      const b = makeReportBadge('#E74C3C');
+      link.appendChild(b);
+      return b;
+    });
+
+    onSnapshot(
+      query(collection(db, 'reception-rapports'), where('statut', '==', 'a-traiter')),
+      snap => {
+        const n = snap.size;
+        reportBadgesJaune.forEach(b => {
+          b.textContent = n;
+          b.style.display = n ? '' : 'none';
+        });
+      },
+      err => console.error('suivi-badge (a-traiter):', err)
+    );
+
+    onSnapshot(
+      query(collection(db, 'reception-rapports'), where('statut', '==', 'en-attente')),
+      snap => {
+        const now = Date.now();
+        const n = snap.docs.filter(d => {
+          const dateFin = d.data().dateFin;
+          if (!dateFin) return false;
+          const finMs = new Date(dateFin).getTime();
+          return !isNaN(finMs) && now > finMs + 3600 * 1000;
+        }).length;
+        reportBadgesRouge.forEach(b => {
+          b.textContent = n;
+          b.style.display = n ? '' : 'none';
+        });
+      },
+      err => console.error('suivi-badge (en-retard):', err)
     );
   });
 }
