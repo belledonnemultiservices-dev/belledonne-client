@@ -1353,7 +1353,10 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
 
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
   const folder = client || "_inconnu";
-  const nomBase = `${reference || dataId}_${passageLabel || "rapport"}`.replace(/\s+/g, "_");
+  // Nom du fichier = Nom du rapport Kizeo _ N° BC/PL/Devis _ passage_N
+  const rapportNom = (formConf.nom || "Rapport").trim();
+  const bcRef = bc || reference || dataId || "sans-bc";
+  const nomBase = `${rapportNom}_${bcRef}_passage_${numPassage}`.replace(/\s+/g, "_");
   const storagePath = `reception/${folder}/${Date.now()}_${nomBase}.${ext}`;
   const downloadToken = crypto.randomUUID();
   try {
