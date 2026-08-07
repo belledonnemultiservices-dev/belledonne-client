@@ -642,7 +642,10 @@ function requestToken(prompt) {
       _googleAccessToken = resp.access_token;
       resolve(_googleAccessToken);
     };
-    client.requestAccessToken({ prompt });
+    // hint = email du compte admin connecté à l'app : évite le sélecteur de compte
+    // quand plusieurs comptes Google sont ouverts dans le même navigateur.
+    const hint = auth.currentUser ? auth.currentUser.email : undefined;
+    client.requestAccessToken(hint ? { prompt, hint } : { prompt });
   });
 }
 
