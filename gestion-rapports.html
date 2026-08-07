@@ -172,7 +172,7 @@
     <div class="filters-bar">
       <input class="search-input" id="searchInput" placeholder="Rechercher par client, BC, technicien...">
       <select class="filter-select" id="filterStatut">
-        <option value="actifs">En cours (en attente + à traiter)</option>
+        <option value="en-retard">⚠ Non reçu (+1h)</option>
         <option value="en-attente">En attente technicien</option>
         <option value="a-traiter">À traiter</option>
         <option value="envoye">Envoyés</option>
@@ -325,7 +325,7 @@ function render() {
   const q = (document.getElementById("searchInput").value || "").toLowerCase();
   const st = document.getElementById("filterStatut").value;
   const list = allDocs.filter(r => {
-    const ms = !st || (st === "actifs" ? (r.statut === "en-attente" || r.statut === "a-traiter") : r.statut === st);
+    const ms = !st || (st === "en-retard" ? isOverdue(r) : r.statut === st);
     const mq = !q || (r.client||"").toLowerCase().includes(q) || (r.bc||"").toLowerCase().includes(q) || (r.technicien||"").toLowerCase().includes(q) || (r.reference||"").toLowerCase().includes(q);
     return ms && mq;
   });
