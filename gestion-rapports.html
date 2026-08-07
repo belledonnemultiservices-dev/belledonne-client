@@ -255,6 +255,30 @@
   </div>
 </div>
 
+<!-- MODAL ÉDITION RAPPORT EXCEL -->
+<div class="modal-overlay" id="modalEdit">
+  <div class="modal" style="width:min(1100px,95vw);height:85vh;display:flex;flex-direction:column;">
+    <div class="modal-header">
+      <div class="modal-title">Édition du rapport</div>
+      <button class="btn-close" onclick="closeEditReport(false)">×</button>
+    </div>
+    <div class="modal-body" style="flex:1;display:flex;flex-direction:column;padding:0;overflow:hidden;">
+      <div id="editLoading" style="padding:40px;text-align:center;color:var(--text-muted);">Préparation du document...</div>
+      <div id="editFrameWrap" style="display:none;flex:1;flex-direction:column;">
+        <div style="padding:8px 24px;font-size:12px;color:var(--text-muted);border-bottom:1px solid var(--border);">
+          Si l'aperçu ci-dessous reste vide (Google bloque parfois l'édition en cadre intégré), utilisez
+          <a id="editNewTabLink" href="#" target="_blank" style="color:var(--green-dark);font-weight:600;">Ouvrir dans un nouvel onglet</a>, modifiez, puis revenez ici cliquer sur "Enregistrer".
+        </div>
+        <iframe id="editIframe" style="flex:1;border:0;width:100%;"></iframe>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeEditReport(false)">Annuler</button>
+      <button class="btn-save" id="editSaveBtn" onclick="closeEditReport(true)" disabled>Enregistrer et remplacer</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
   <span id="toastMsg"></span>
@@ -353,6 +377,7 @@ function render() {
       ? `${resendBtn}<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Annuler</button>`
       : `
         <a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>
+        ${r.type === "excel" ? `<button class="btn-a btn-replace" onclick="openEditReport('${r.id}')">Éditer</button>` : ""}
         <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
         ${resendBtn}
         ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
@@ -588,6 +613,57 @@ window.ajouterEmailManuel = function() {
 window.closeEnvoi = function() {
   document.getElementById("modalEnvoi").classList.remove("open");
   _envoiId = null;
+};
+
+// ── Édition en ligne du rapport Excel (Google Sheets temporaire) ──
+let _editDocId = null;
+let _editFileId = null;
+
+window.openEditReport = async function(id) {
+  _editDocId = id;
+  _editFileId = null;
+  document.getElementById("editLoading").style.display = "";
+  document.getElementById("editFrameWrap").style.display = "none";
+  document.getElementById("editSaveBtn").disabled = true;
+  document.getElementById("modalEdit").classList.add("open");
+  try {
+    const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+    const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
+    const resp = await fetch("https://europe-west1-belledonne-client.cloudfunctions.net/openReportForEdit", {
+      method: "POST", headers, body: JSON.stringify({ docId: id })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Erreur préparation du document");
+    _editFileId = data.fileId;
+    document.getElementById("editIframe").src = data.editUrl;
+    document.getElementById("editNewTabLink").href = data.editUrl;
+    document.getElementById("editLoading").style.display = "none";
+    document.getElementById("editFrameWrap").style.display = "flex";
+    document.getElementById("editSaveBtn").disabled = false;
+  } catch(e) {
+    document.getElementById("editLoading").textContent = "Erreur : " + e.message;
+  }
+};
+
+window.closeEditReport = async function(save) {
+  const docId = _editDocId, fileId = _editFileId;
+  document.getElementById("modalEdit").classList.remove("open");
+  document.getElementById("editIframe").src = "about:blank";
+  _editDocId = null; _editFileId = null;
+  if (!fileId) return;
+  const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
+  const endpoint = save ? "saveReportEdit" : "discardReportEdit";
+  try {
+    const resp = await fetch(`https://europe-west1-belledonne-client.cloudfunctions.net/${endpoint}`, {
+      method: "POST", headers, body: JSON.stringify({ docId, fileId })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Erreur");
+    if (save) showToast("Rapport mis à jour");
+  } catch(e) {
+    alert((save ? "Échec de l'enregistrement : " : "Échec du nettoyage : ") + e.message);
+  }
 };
 window.doEnvoyer = async function() {
   const r = allDocs.find(x => x.id === _envoiId);
