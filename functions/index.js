@@ -1780,18 +1780,23 @@ exports.generateGarantieRapportsParClient = functions
         }
 
         const mergedBytes = await merged.save();
-        const storagePath = `garanties-agreges/${semaineId}/${client.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+        const clientSafe = client.replace(/[^a-zA-Z0-9_-]/g, "_");
+        const nomFichier = `Garantie_${clientSafe}_${semaine.dateDebut}_au_${semaine.dateFin}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, "_");
+        const storagePath = `garanties-agreges/${semaineId}/${nomFichier}`;
         const downloadToken = crypto.randomUUID();
         await bucket.file(storagePath).save(Buffer.from(mergedBytes), {
           contentType: "application/pdf",
-          metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
+          metadata: {
+            contentDisposition: `inline; filename="${nomFichier}"`,
+            metadata: { firebaseStorageDownloadTokens: downloadToken },
+          },
         });
         const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
 
         const now = new Date().toISOString();
-        const aggDocId = `${semaineId}__${client.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+        const aggDocId = `${semaineId}__${clientSafe}`;
         await db.collection("garanties-rapports-agreges").doc(aggDocId).set({
-          semaineId, client, fileUrl, storagePath,
+          semaineId, client, fileUrl, storagePath, nomFichier,
           nbRapports: rapportsClient.length,
           periode,
           generatedAt: now, updatedAt: now,

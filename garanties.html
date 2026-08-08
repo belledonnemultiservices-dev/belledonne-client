@@ -601,7 +601,6 @@ window.openRapportsModal = function(semaineId) {
   document.getElementById("rTitle").textContent = "Rapports — Semaine du " + (s ? fmtDate(s.dateDebut) + " au " + fmtDate(s.dateFin) : "—");
   document.getElementById("rFilterStatut").value = "a-traiter";
   renderRapportsList();
-  renderRapportsAgreges();
   document.getElementById("modalRapports").classList.add("open");
 };
 window.closeRapportsModal = function() {
@@ -626,6 +625,7 @@ window.renderRapportsList = function() {
   btnGen.style.display = st === "a-traiter" ? "" : "none";
   btnGen.disabled = enAttenteCount > 0 || aTraiterCount === 0;
   btnGen.title = enAttenteCount > 0 ? "Des rapports sont encore en attente de réception" : (aTraiterCount === 0 ? "Aucun rapport à traiter" : "");
+  renderRapportsAgreges();
 
   document.getElementById("rCount").textContent = list.length + " rapport" + (list.length !== 1 ? "s" : "");
   const STATUT_LABEL = { "en-attente": "En attente", "a-traiter": "À traiter", "archive": "Archivé" };
@@ -657,9 +657,13 @@ window.deleteRapport = async function(id) {
 };
 
 window.renderRapportsAgreges = function() {
-  const list = rapportsAgreges.filter(a => a.semaineId === _currentRapportsSemaineId);
   const section = document.getElementById("rapportsAgregesSection");
   const el = document.getElementById("rapportsAgregesList");
+  const st = document.getElementById("rFilterStatut").value;
+  // Les rapports agrégés (générés, donc déjà archivés) n'ont de sens que sur le
+  // filtre "Archivés" : sur les autres filtres, rien n'est encore agrégé.
+  if (st !== "archive") { section.style.display = "none"; el.innerHTML = ""; return; }
+  const list = rapportsAgreges.filter(a => a.semaineId === _currentRapportsSemaineId);
   if (!list.length) { section.style.display = "none"; el.innerHTML = ""; return; }
   section.style.display = "";
   el.innerHTML = list.map(a => `
@@ -669,7 +673,7 @@ window.renderRapportsAgreges = function() {
         <div class="rap-sub">${a.nbRapports} rapport(s) fusionné(s) · généré le ${fmtDateTime(a.generatedAt)}${a.notifiedAt ? ` · envoyé au client le ${fmtDateTime(a.notifiedAt)}` : ""}</div>
       </div>
       <div class="rap-actions">
-        <a class="btn-a btn-open" href="${a.fileUrl}" target="_blank" rel="noopener">Télécharger</a>
+        <a class="btn-a btn-open" href="${a.fileUrl}" download="${a.nomFichier || ""}" target="_blank" rel="noopener">Télécharger</a>
         <button class="btn-a btn-envoyer" onclick="openEnvoiAgrege('${a.id}')">Envoyer au client</button>
       </div>
     </div>`).join("");
@@ -740,7 +744,7 @@ window.doEnvoyerAgrege = async function() {
   if (!recipients.length) { alert("Sélectionnez au moins un destinataire."); return; }
   const btn = document.getElementById("envoiAgBtn");
   btn.disabled = true; btn.textContent = "Envoi...";
-  const attachments = [{ url: a.fileUrl, filename: `Garantie_${a.client}_${a.periode}`.replace(/\s+/g, "_") + ".pdf" }];
+  const attachments = [{ url: a.fileUrl, filename: a.nomFichier || `Garantie_${a.client}.pdf` }];
   let sent = 0, errors = 0;
   for (const to of recipients) {
     try {
