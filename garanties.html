@@ -673,13 +673,7 @@ function renderBlocs() {
       </div>
 
       <div class="lignes-list" data-bloc-id="${b.id}">
-        ${lignes.map((l, i) => {
-          const rapportsLigne = rapports.filter(r => r.blocId === b.id && r.ligneId === l.id);
-          const pendingLigne = rapportsLigne.find(r => r.statut === "en-attente");
-          const dejaEnvoye = !!l.kizeoPushedAt;
-          const statutBadge = pendingLigne ? `<span class="ligne-pushed" title="En attente de réception du rapport">⏳ En attente</span>` : "";
-          const kizeoBtn = `<button class="btn-icon" onclick="sendLigneKizeo('${b.id}','${l.id}')" title="${dejaEnvoye ? "Renvoyer le rapport Kizeo" : "Envoyer le rapport Kizeo"}">${dejaEnvoye ? "Renvoyer" : "Envoyer"}</button>`;
-          return `
+        ${lignes.map((l, i) => `
         <div class="ligne-row" draggable="true" data-bloc-id="${b.id}" data-idx="${i}">
           <span class="ligne-handle">⠿</span>
           <div class="ligne-num">${i + 1}</div>
@@ -687,14 +681,12 @@ function renderBlocs() {
             <div class="ligne-nom">${l.nom || "—"} <span style="font-weight:400;color:var(--text-muted);">(${l.client || "—"})</span></div>
             <div class="ligne-adresse">${l.adresse || ""}${l.etage ? ", ét. " + l.etage : ""}${l.numeroLogement ? ", log. " + l.numeroLogement : ""} — ${l.codePostal || ""} ${l.ville || ""}</div>
           </div>
-          ${statutBadge}
-          ${kizeoBtn}
+          ${l.kizeoPushedAt ? `<span class="ligne-pushed">✓ Kizeo</span>` : ""}
           <div class="ligne-actions">
             <button class="btn-icon" onclick="openLigneModal('${b.id}','${l.id}')" title="Modifier"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
             <button class="btn-icon danger" onclick="deleteLigne('${b.id}','${l.id}')" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
           </div>
-        </div>`;
-        }).join("")}
+        </div>`).join("")}
       </div>
       <button class="btn-secondary" onclick="openLigneModal('${b.id}', null)">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -723,11 +715,15 @@ function renderBlocs() {
         </button>
         ${b.calEventId ? `<button class="btn-secondary" style="background:rgba(231,76,60,0.08);color:var(--red);" onclick="deleteFromAgenda('${b.id}')">Supprimer de l'agenda</button>` : ""}
         <button class="btn-secondary" ${!hasTech ? "disabled" : ""} onclick="openAgendaPanel('${b.id}')">Voir l'agenda</button>
+        <button class="btn-secondary" ${!hasTech || !hasLignes ? "disabled" : ""} onclick="doPushKizeo('${b.id}')">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          ${b.kizeoSentAt ? "Régénérer les rapports Kizeo" : "Générer les rapports Kizeo"}
+        </button>
         <button class="btn-secondary" onclick="toggleBlocStatut('${b.id}')">${b.statut === "terminee" ? "Rouvrir" : "Marquer terminé"}</button>
       </div>
       <div class="bloc-meta">
         ${b.calSentAt ? `<span>📅 Agenda mis à jour le ${fmtDateTime(b.calSentAt)}</span>` : ""}
-        ${b.kizeoSentAt ? `<span>✓ Dernier envoi Kizeo le ${fmtDateTime(b.kizeoSentAt)} · utilisez le bouton "Envoyer" sur chaque locataire</span>` : ""}
+        ${b.kizeoSentAt ? `<span>✓ Rapports Kizeo générés le ${fmtDateTime(b.kizeoSentAt)}</span>` : ""}
       </div>
     </div>`;
   }).join("");
@@ -1054,25 +1050,24 @@ window.deleteFromAgenda = async function(blocId) {
   }
 };
 
-// ── Push Kizeo (un locataire à la fois, verrouillé côté serveur) ──
-window.sendLigneKizeo = async function(blocId, ligneId) {
+// ── Push Kizeo ──
+window.doPushKizeo = async function(blocId) {
   const b = getBloc(blocId);
-  const l = (b.lignes || []).find(x => x.id === ligneId);
-  const msg = l && l.kizeoPushedAt
-    ? "Supprimer l'ancien rapport de ce locataire dans Kizeo.\n\nContinuer et renvoyer le rapport ?"
-    : `Vérifiez que le nom, l'adresse, le code postal et la ville de ${l ? l.nom : "ce locataire"} sont correctement renseignés avant l'envoi.\n\nContinuer et générer le rapport Kizeo ?`;
+  const nb = (b.lignes || []).length;
+  const msg = b.kizeoSentAt
+    ? "Supprimer les anciens rapports dans Kizeo.\n\nContinuer et régénérer les rapports du bloc ?"
+    : `Vérifiez que les ${nb} locataire(s) de ce bloc ont bien un nom, une adresse, un code postal et une ville correctement renseignés avant l'envoi.\n\nContinuer et générer les rapports Kizeo ?`;
   if (!confirm(msg)) return;
   const btn = event.currentTarget; btn.disabled = true; const orig = btn.textContent; btn.textContent = "Envoi...";
   try {
-    const resp = await fetch(FN_PUSH_KIZEO, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId, blocId, ligneId }) });
+    const resp = await fetch(FN_PUSH_KIZEO, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId, blocId }) });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || "Échec de l'envoi Kizeo");
-    showToast("Rapport envoyé");
+    showToast(`${data.pushed || 0} rapport(s) envoyé(s)` + (data.errors ? `, ${data.errors} erreur(s)` : ""));
   } catch (e) {
     alert("Erreur Kizeo : " + e.message);
-    btn.disabled = false; btn.textContent = orig;
   }
-  // Les données à jour (kizeoPushedAt, kizeoSentAt, verrou) reviennent via onSnapshot.
+  // Les données à jour (kizeoPushedAt, kizeoSentAt) reviennent via onSnapshot.
 };
 
 // ── Panneau agenda (gauche) ──

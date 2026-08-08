@@ -1561,13 +1561,11 @@ exports.kizeoPull = functions
     }
   });
 
-// Pousse le rapport Kizeo pré-rempli (nom, adresse, code postal, ville, étage)
-// d'un locataire au technicien assigné, un formulaire à la fois (mais sans
-// restriction sur le nombre de rapports en attente simultanément) : l'admin
-// peut pousser tous les rapports d'un bloc à l'avance, le technicien les
-// reçoit tous et les envoie complétés au fur et à mesure de ses interventions.
-// Le libellé visible sur l'app mobile = nom du locataire. Formulaire identifié
-// par son formId Kizeo (indépendant du système de mapping "suivi" classique).
+// ── GARANTIES : POUSSER UN RAPPORT KIZEO PAR LIGNE (bloc d'une semaine garantie) ─
+// Pousse, pour chaque locataire du bloc, un rapport Kizeo pré-rempli
+// (nom, adresse, code postal, ville, étage) au technicien assigné. Le libellé
+// visible sur l'app mobile = nom du locataire. Formulaire identifié par son
+// formId Kizeo (indépendant du système de mapping "suivi" classique).
 const GARANTIE_KIZEO_FORM_ID = "1086949"; // "Garantie blattes"
 exports.pushGarantieKizeo = functions
   .region("europe-west1")
@@ -1580,8 +1578,8 @@ exports.pushGarantieKizeo = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { semaineId, blocId, ligneId } = req.body || {};
-    if (!semaineId || !blocId || !ligneId) { res.status(400).json({ error: "semaineId, blocId et ligneId requis" }); return; }
+    const { semaineId, blocId } = req.body || {};
+    if (!semaineId || !blocId) { res.status(400).json({ error: "semaineId et blocId requis" }); return; }
 
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
@@ -1592,8 +1590,6 @@ exports.pushGarantieKizeo = functions
     const blocs = Array.isArray(semaine.blocs) ? semaine.blocs : [];
     const bloc = blocs.find(b => b.id === blocId);
     if (!bloc) { res.status(404).json({ error: "Bloc introuvable" }); return; }
-    const ligne = (bloc.lignes || []).find(l => l.id === ligneId);
-    if (!ligne) { res.status(404).json({ error: "Locataire introuvable" }); return; }
     const recipient = parseInt(bloc.technicienKizeoUserId, 10);
     if (!recipient) { res.status(400).json({ error: "Technicien Kizeo manquant (assignez un technicien avec un ID Kizeo configuré)" }); return; }
 
@@ -1604,72 +1600,79 @@ exports.pushGarantieKizeo = functions
     if (!mapping.refInterne) { res.status(400).json({ error: "Champ Référence interne non mappé pour ce formulaire" }); return; }
 
     const token = KIZEO_API_TOKEN.value();
+    const lignes = Array.isArray(bloc.lignes) ? bloc.lignes : [];
+    let pushed = 0;
+    const errorsList = [];
 
-    // Régénération (renvoi) : suffixe (1), (2)... sur le libellé pour distinguer
-    // chaque envoi et permettre de retrouver/supprimer les anciens rapports dans Kizeo.
-    const pushCount = (ligne.kizeoPushCount || 0) + 1;
+    // Régénération : suffixe (1), (2)... sur le libellé pour distinguer chaque
+    // envoi et permettre de retrouver/supprimer les anciens rapports dans Kizeo.
+    const pushCount = (bloc.kizeoPushCount || 0) + 1;
     const libelleSuffix = pushCount > 1 ? ` (${pushCount - 1})` : "";
 
-    const refInterne = `garantie::${semaineId}::${blocId}::${ligne.id}`;
-    const values = {
-      refInterne,
-      libelle: (ligne.nom || "") + libelleSuffix,
-      nom: ligne.nom || "",
-      etage: ligne.etage || "",
-      adresse: ligne.adresse || "",
-      codePostal: ligne.codePostal || "",
-      ville: ligne.ville || "",
-      passage: "1",
-    };
-    const fields = {};
-    Object.keys(values).forEach(key => {
-      const fid = mapping[key];
-      if (fid) fields[fid] = { value: values[key] };
-    });
+    for (const ligne of lignes) {
+      const refInterne = `garantie::${semaineId}::${blocId}::${ligne.id}`;
+      const values = {
+        refInterne,
+        libelle: (ligne.nom || "") + libelleSuffix,
+        nom: ligne.nom || "",
+        etage: ligne.etage || "",
+        adresse: ligne.adresse || "",
+        codePostal: ligne.codePostal || "",
+        ville: ligne.ville || "",
+        passage: "1",
+      };
+      const fields = {};
+      Object.keys(values).forEach(key => {
+        const fid = mapping[key];
+        if (fid) fields[fid] = { value: values[key] };
+      });
 
-    const r = await kizeoRequest(token, "POST", `/forms/${encodeURIComponent(GARANTIE_KIZEO_FORM_ID)}/push`, {
-      recipient_user_id: recipient,
-      fields,
-    });
-    if (r.status < 200 || r.status >= 300) {
-      res.status(502).json({ error: "Kizeo a refusé le push (" + r.status + ")", detail: (r.body || r.error || "").toString().slice(0, 200) });
-      return;
+      const r = await kizeoRequest(token, "POST", `/forms/${encodeURIComponent(GARANTIE_KIZEO_FORM_ID)}/push`, {
+        recipient_user_id: recipient,
+        fields,
+      });
+      if (r.status >= 200 && r.status < 300) {
+        pushed++;
+        const nowPush = new Date().toISOString();
+        ligne.kizeoPushedAt = nowPush;
+
+        // Ligne "en attente" dans Gestion garanties > Rapports, comme pour le
+        // circuit suivi classique : permet de suivre qui doit encore rendre
+        // son rapport, avant même que le technicien ait répondu.
+        try {
+          const pendingData = {
+            kizeoDataId: null,
+            kizeoFormId: GARANTIE_KIZEO_FORM_ID,
+            kizeoFormDocId: formsSnap.docs[0].id,
+            recipientUserId: recipient,
+            refInterne,
+            semaineId, blocId, ligneId: ligne.id,
+            nomLocataire: ligne.nom || "",
+            client: ligne.client || "",
+            technicien: bloc.technicienNom || "",
+            origine: "app",
+            statut: "en-attente",
+            arriveeAt: nowPush,
+            pushedAt: nowPush,
+            dateFin: bloc.date && bloc.heureFin ? `${bloc.date}T${bloc.heureFin}` : null,
+            type: null,
+            fileUrl: null,
+            updatedAt: nowPush,
+          };
+          const existingPending = await db.collection("garanties-rapports").where("refInterne", "==", refInterne).limit(1).get();
+          if (!existingPending.empty) await existingPending.docs[0].ref.update(pendingData);
+          else await db.collection("garanties-rapports").add(pendingData);
+        } catch(e) { console.error("pushGarantieKizeo: création ligne en attente échouée:", e.message); }
+      } else {
+        errorsList.push({ ligneId: ligne.id, nom: ligne.nom, status: r.status, detail: (r.body || r.error || "").toString().slice(0, 200) });
+      }
     }
 
-    const nowPush = new Date().toISOString();
-    ligne.kizeoPushedAt = nowPush;
-    ligne.kizeoPushCount = pushCount;
-    bloc.lignes = (bloc.lignes || []).map(l => l.id === ligneId ? ligne : l);
-    bloc.kizeoSentAt = nowPush;
-    try { await ref.update({ blocs, updatedAt: nowPush }); }
+    bloc.lignes = lignes;
+    bloc.kizeoSentAt = new Date().toISOString();
+    bloc.kizeoPushCount = pushCount;
+    try { await ref.update({ blocs, updatedAt: new Date().toISOString() }); }
     catch(e) { console.error("pushGarantieKizeo: mise à jour du bloc échouée:", e.message); }
 
-    // Ligne "en attente" dans Gestion garanties > Rapports, comme pour le
-    // circuit suivi classique : permet de suivre qui doit encore rendre son rapport.
-    try {
-      const pendingData = {
-        kizeoDataId: null,
-        kizeoFormId: GARANTIE_KIZEO_FORM_ID,
-        kizeoFormDocId: formsSnap.docs[0].id,
-        recipientUserId: recipient,
-        refInterne,
-        semaineId, blocId, ligneId,
-        nomLocataire: ligne.nom || "",
-        client: ligne.client || "",
-        technicien: bloc.technicienNom || "",
-        origine: "app",
-        statut: "en-attente",
-        arriveeAt: nowPush,
-        pushedAt: nowPush,
-        dateFin: bloc.date && bloc.heureFin ? `${bloc.date}T${bloc.heureFin}` : null,
-        type: null,
-        fileUrl: null,
-        updatedAt: nowPush,
-      };
-      const existingPending = await db.collection("garanties-rapports").where("refInterne", "==", refInterne).limit(1).get();
-      if (!existingPending.empty) await existingPending.docs[0].ref.update(pendingData);
-      else await db.collection("garanties-rapports").add(pendingData);
-    } catch(e) { console.error("pushGarantieKizeo: création ligne en attente échouée:", e.message); }
-
-    res.status(200).json({ pushed: 1 });
+    res.status(200).json({ pushed, errors: errorsList.length, errorsList });
   });
