@@ -1309,6 +1309,76 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     }
   }
 
+  // ── Circuit garantie (semaine > bloc > ligne locataire), distinct du circuit
+  // "suivi" classique ci-dessous. refInterne = garantie::semaineId::blocId::ligneId.
+  if (refInterne.startsWith("garantie::")) {
+    const parts = refInterne.split("::");
+    if (parts.length !== 4) { console.warn(`Kizeo: refInterne garantie invalide (${refInterne}), soumission ${dataId} ignorée`); return; }
+    const [, semaineId, blocId, ligneId] = parts;
+    const semaineSnap = await db.collection("garanties-semaines").doc(semaineId).get();
+    if (!semaineSnap.exists) { console.warn(`Kizeo: semaine garantie ${semaineId} introuvable, soumission ${dataId} ignorée`); return; }
+    const semaine = semaineSnap.data();
+    const blocs = Array.isArray(semaine.blocs) ? semaine.blocs : [];
+    const bloc = blocs.find(b => b.id === blocId);
+    const ligne = bloc ? (bloc.lignes || []).find(l => l.id === ligneId) : null;
+    if (!bloc || !ligne) { console.warn(`Kizeo: bloc/ligne garantie introuvable (${refInterne}), soumission ${dataId} ignorée`); return; }
+
+    const typeSortieG = formConf.typeSortie === "excel" ? "excel" : "pdf";
+    let fileBufferG, extG, contentTypeG;
+    if (typeSortieG === "excel") {
+      if (!formConf.exportId) { console.error(`Kizeo: exportId manquant pour le formulaire ${formId}`); return; }
+      const ex = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/exports/${encodeURIComponent(formConf.exportId)}`, null, true);
+      if (ex.status !== 200) { console.error(`Kizeo: export échoué (${ex.status}) pour ${dataId}`); return; }
+      fileBufferG = ex.body; extG = "xlsx"; contentTypeG = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    } else {
+      const pdf = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
+      if (pdf.status !== 200) { console.error(`Kizeo: téléchargement PDF échoué (${pdf.status}) pour ${dataId}`); return; }
+      fileBufferG = pdf.body; extG = "pdf"; contentTypeG = "application/pdf";
+    }
+
+    const bucketG = admin.storage().bucket("belledonne-client.firebasestorage.app");
+    const folderG = ligne.client || "_inconnu";
+    const nomBaseG = `Garantie_${ligne.client || "client"}_${ligne.nom || "locataire"}_${bloc.date || ""}`.replace(/\s+/g, "_");
+    const storagePathG = `garanties-reception/${folderG}/${Date.now()}_${nomBaseG}.${extG}`;
+    const downloadTokenG = crypto.randomUUID();
+    try {
+      await bucketG.file(storagePathG).save(fileBufferG, { contentType: contentTypeG, metadata: { metadata: { firebaseStorageDownloadTokens: downloadTokenG } } });
+    } catch(e) { console.error(`Kizeo: upload Storage garantie échoué pour ${dataId}:`, e.message); return; }
+    const fileUrlG = `https://firebasestorage.googleapis.com/v0/b/${bucketG.name}/o/${encodeURIComponent(storagePathG)}?alt=media&token=${downloadTokenG}`;
+
+    const nowG = new Date().toISOString();
+    const docDataG = {
+      kizeoDataId: String(dataId),
+      kizeoFormId: String(formId),
+      kizeoFormDocId: formsSnap.docs[0].id,
+      recipientUserId: submissionUserId ? parseInt(submissionUserId, 10) : null,
+      refInterne,
+      semaineId, blocId, ligneId,
+      nomLocataire: ligne.nom || "",
+      client: ligne.client || "",
+      technicien,
+      origine,
+      type: typeSortieG,
+      fileUrl: fileUrlG,
+      statut: "a-traiter",
+      arriveeAt: nowG,
+      updatedAt: nowG,
+    };
+
+    let existingG = await db.collection("garanties-rapports").where("kizeoDataId", "==", String(dataId)).limit(1).get();
+    if (existingG.empty) {
+      existingG = await db.collection("garanties-rapports").where("refInterne", "==", refInterne).where("statut", "==", "en-attente").limit(1).get();
+    }
+    if (!existingG.empty) {
+      await existingG.docs[0].ref.update(docDataG);
+      console.log(`Kizeo garantie: soumission ${dataId} mise à jour (garanties-rapports/${existingG.docs[0].id})`);
+    } else {
+      const newRef = await db.collection("garanties-rapports").add(docDataG);
+      console.log(`Kizeo garantie: soumission ${dataId} reçue -> garanties-rapports/${newRef.id}`);
+    }
+    return;
+  }
+
   let suiviId = null, client = "", bc = "", numPassage = null, passageLabel = "";
   const m = refInterne.match(/^(.+)::(\d+)$/);
   if (m) {
@@ -1563,7 +1633,36 @@ exports.pushGarantieKizeo = functions
       });
       if (r.status >= 200 && r.status < 300) {
         pushed++;
-        ligne.kizeoPushedAt = new Date().toISOString();
+        const nowPush = new Date().toISOString();
+        ligne.kizeoPushedAt = nowPush;
+
+        // Ligne "en attente" dans Gestion garanties > Rapports, comme pour le
+        // circuit suivi classique : permet de suivre qui doit encore rendre
+        // son rapport, avant même que le technicien ait répondu.
+        try {
+          const pendingData = {
+            kizeoDataId: null,
+            kizeoFormId: GARANTIE_KIZEO_FORM_ID,
+            kizeoFormDocId: formsSnap.docs[0].id,
+            recipientUserId: recipient,
+            refInterne,
+            semaineId, blocId, ligneId: ligne.id,
+            nomLocataire: ligne.nom || "",
+            client: ligne.client || "",
+            technicien: bloc.technicienNom || "",
+            origine: "app",
+            statut: "en-attente",
+            arriveeAt: nowPush,
+            pushedAt: nowPush,
+            dateFin: bloc.date && bloc.heureFin ? `${bloc.date}T${bloc.heureFin}` : null,
+            type: null,
+            fileUrl: null,
+            updatedAt: nowPush,
+          };
+          const existingPending = await db.collection("garanties-rapports").where("refInterne", "==", refInterne).limit(1).get();
+          if (!existingPending.empty) await existingPending.docs[0].ref.update(pendingData);
+          else await db.collection("garanties-rapports").add(pendingData);
+        } catch(e) { console.error("pushGarantieKizeo: création ligne en attente échouée:", e.message); }
       } else {
         errorsList.push({ ligneId: ligne.id, nom: ligne.nom, status: r.status, detail: (r.body || r.error || "").toString().slice(0, 200) });
       }
