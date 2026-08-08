@@ -234,9 +234,22 @@
         <div class="form-group" style="margin-bottom:16px"><label class="form-label">Client</label><select class="form-select map-select" id="mapClient"></select></div>
         <div class="form-group" style="margin-bottom:16px"><label class="form-label">Adresse</label><select class="form-select map-select" id="mapAdresse"></select></div>
       </div>
-      <div class="form-group" style="margin-bottom:0">
+      <div class="form-group">
         <label class="form-label">Date</label>
         <select class="form-select map-select" id="mapDate"></select>
+      </div>
+      <div class="section-sep">Champs garantie (locataire)</div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:16px"><label class="form-label">Nom (locataire)</label><select class="form-select map-select" id="mapNom"></select></div>
+        <div class="form-group" style="margin-bottom:16px"><label class="form-label">Étage</label><select class="form-select map-select" id="mapEtage"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:16px"><label class="form-label">Code postal</label><select class="form-select map-select" id="mapCodePostal"></select></div>
+        <div class="form-group" style="margin-bottom:16px"><label class="form-label">Ville</label><select class="form-select map-select" id="mapVille"></select></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">N° logement</label>
+        <select class="form-select map-select" id="mapNumeroLogement"></select>
       </div>
     </div>
     <div class="modal-footer">
@@ -270,8 +283,8 @@ const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 const FN_LIST_FIELDS = "https://europe-west1-belledonne-client.cloudfunctions.net/kizeoListFields";
 
-const MAP_KEYS = ["refInterne", "libelle", "reference", "passage", "client", "adresse", "date"];
-const MAP_EL = { refInterne: "mapRefInterne", libelle: "mapLibelle", reference: "mapReference", passage: "mapPassage", client: "mapClient", adresse: "mapAdresse", date: "mapDate" };
+const MAP_KEYS = ["refInterne", "libelle", "reference", "passage", "client", "adresse", "date", "nom", "etage", "codePostal", "ville", "numeroLogement"];
+const MAP_EL = { refInterne: "mapRefInterne", libelle: "mapLibelle", reference: "mapReference", passage: "mapPassage", client: "mapClient", adresse: "mapAdresse", date: "mapDate", nom: "mapNom", etage: "mapEtage", codePostal: "mapCodePostal", ville: "mapVille", numeroLogement: "mapNumeroLogement" };
 let _user = null;
 let loadedFields = [];   // [{id, libelle, type}]
 let loadedExports = [];  // [{id, nom, type}]
