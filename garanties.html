@@ -3,21 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Garanties — Belledonne Multiservices</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<title>Gestion garanties — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
-    --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
-    --amber:#F5A623;--red:#E74C3C;
-    --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
-    --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
-    --sidebar-w:240px;--radius:14px;--radius-sm:8px;
-  }
+  :root{--navy:#0D1B2A;--green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;--amber:#F5A623;--red:#E74C3C;--text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;--border:rgba(13,27,42,0.09);--surface:#fff;--bg:#F2F5F8;--sidebar-w:240px;--radius:14px;--radius-sm:8px;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
-
-  /* SIDEBAR */
   .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
   .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
   .logo-mark{display:flex;align-items:center;gap:10px;}
@@ -25,179 +16,98 @@
   .logo-icon svg{width:18px;height:18px;}
   .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
   .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
-  .sidebar-client{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:12px 14px;}
-  .client-label{font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;}
-  .client-name{font-size:13px;font-weight:500;color:#fff;}
-  .client-contract{font-size:11px;color:var(--green);margin-top:2px;}
+  .admin-badge{margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);padding:8px 12px;display:flex;align-items:center;gap:8px;}
+  .admin-badge svg{width:14px;height:14px;color:var(--amber);flex-shrink:0;}
+  .admin-badge span{font-size:11px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:0.06em;}
   .sidebar-nav{padding:20px 12px;flex:1;}
   .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
-  .nav-group-label:first-child{margin-top:0;}
   .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
   .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
   .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
-  .nav-badge{margin-left:auto;background:var(--amber);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;}
-  .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.8;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;}
   .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
-  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;}
-  .footer-user:hover{background:rgba(255,255,255,0.05);}
-  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--navy-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--green);flex-shrink:0;}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--navy);}
   .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
-  .footer-role{font-size:10px;color:rgba(255,255,255,0.3);}
-
-  /* MAIN */
+  .footer-role{font-size:10px;color:var(--amber);}
   .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
   .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
   .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
   .breadcrumb span:last-child{color:var(--text);font-weight:500;}
-  .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
+  .btn-logout{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--red);background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.15);padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;}
   .content{padding:32px;flex:1;}
-  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
-  .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
-  .page-sub{font-size:14px;color:var(--text-muted);}
+  .page-header-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;}
+  .page-sub{font-size:13px;color:var(--text-muted);}
+  .btn-add{display:flex;align-items:center;gap:8px;height:40px;padding:0 18px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;white-space:nowrap;}
+  .btn-add:hover{background:var(--green-dark);color:#fff;}
+  .btn-add svg{width:16px;height:16px;}
 
-  /* KPI */
-  .kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px;}
-  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;position:relative;overflow:hidden;}
-  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
-  .kpi.green::before{background:var(--green);}
-  .kpi.amber::before{background:var(--amber);}
-  .kpi.navy::before{background:var(--navy);}
-  .kpi-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px;}
-  .kpi-lbl{font-size:12px;color:var(--text-muted);}
+  .journees-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+  .j-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;cursor:pointer;transition:box-shadow 0.15s;}
+  .j-card:hover{box-shadow:0 4px 16px rgba(13,27,42,0.08);}
+  .j-date{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:2px;}
+  .j-creneau{font-size:12px;color:var(--text-muted);margin-bottom:12px;}
+  .j-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-mid);margin-bottom:6px;}
+  .j-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:3px 9px;border-radius:20px;}
+  .j-en-cours{background:rgba(245,166,35,0.15);color:#C27D0A;}
+  .j-terminee{background:var(--green-pale);color:var(--green-dark);}
+  .j-tech{display:flex;align-items:center;gap:6px;}
+  .j-tech-av{width:22px;height:22px;border-radius:50%;background:var(--navy);font-size:9px;font-weight:700;color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 
+  .empty-state{text-align:center;padding:60px 32px;color:var(--text-muted);font-size:13px;}
+  .empty-state svg{width:40px;height:40px;color:var(--border);margin-bottom:12px;}
 
-  /* BOUTON */
-  .btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;}
-  .btn-primary:hover{background:var(--navy-mid);}
-  .btn-primary svg{width:16px;height:16px;}
-
-  /* SEARCH */
-  .search-bar{display:flex;gap:12px;margin-bottom:24px;align-items:center;}
-  .search-wrap{flex:1;position:relative;max-width:420px;}
-  .search-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
-  .search-input{width:100%;height:42px;padding:0 14px 0 40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
-  .search-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
-  .search-input::placeholder{color:var(--text-muted);}
-  .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
-  .results-count{font-size:13px;color:var(--text-muted);white-space:nowrap;margin-left:auto;}
-
-  /* TABLE */
-  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-  .table-head{display:grid;grid-template-columns:28px 2.4fr 1.2fr 1fr 1fr auto;gap:8px;padding:11px 22px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;}
-  .table-row{display:grid;grid-template-columns:28px 2.4fr 1.2fr 1fr 1fr auto;gap:8px;padding:14px 22px;border-top:1px solid var(--border);align-items:center;cursor:pointer;transition:background 0.1s;}
-  .is-client .table-head{grid-template-columns:2.4fr 1.2fr 1fr 1fr auto;}
-  .is-client .table-row{grid-template-columns:2.4fr 1.2fr 1fr 1fr auto;}
-  .is-client .table-row > div:first-child,.is-client .table-head > span:first-child{display:none;}
-  .table-row:hover{background:var(--bg);}
-
-  .addr-main{font-size:13px;font-weight:500;color:var(--text);}
-  .addr-sub{font-size:11px;color:var(--text-muted);margin-top:1px;}
-  .bc-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--navy);background:#EBF0F5;padding:3px 9px;border-radius:20px;}
-  .cell-date{font-size:12px;color:var(--text-mid);}
-  .cell-tech{display:flex;align-items:center;gap:6px;}
-  .tech-av{width:24px;height:24px;border-radius:50%;background:var(--navy);font-size:9px;font-weight:600;color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .tech-nm{font-size:12px;color:var(--text-mid);}
-
-  .nuisible-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;}
-  .n-punaise{background:#FBEAF0;color:#722440;}
-  .n-rongeur{background:#FAEEDA;color:#854F0B;}
-  .n-blatte{background:#EBF0F5;color:#1A5F8A;}
-  .n-pigeon{background:#EAF3DE;color:#3B6D11;}
-
-  .btn-rapport{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background 0.15s;white-space:nowrap;}
-  .btn-rapport:hover{background:#C8F0E1;}
-  .btn-rapport svg{width:11px;height:11px;}
-  .no-rapport{font-size:11px;color:var(--text-muted);}
-
-  /* EMPTY */
-  .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
-  .empty-state svg{width:44px;height:44px;margin-bottom:12px;opacity:0.25;}
-  .empty-state p{font-size:14px;}
-
-  /* MODAL */
-  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;}
   .modal-overlay.open{display:flex;}
-  .modal{background:var(--surface);border-radius:var(--radius);width:540px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);animation:fadeUp 0.2s ease;}
-  .modal-header{padding:22px 26px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-  .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
-  .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;}
-  .modal-close:hover{background:#E5EAF0;}
-  .modal-body{padding:24px 26px;}
-  .modal-footer{padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;}
+  .modal{background:#fff;border-radius:var(--radius);width:480px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(13,27,42,0.2);}
+  .modal.wide{width:820px;}
+  .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:1;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+  .btn-close{width:30px;height:30px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-muted);}
+  .modal-body{padding:20px 24px;}
+  .modal-footer{padding:12px 24px 20px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);}
   .form-group{margin-bottom:16px;}
-  .form-label{display:block;font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;}
-  .form-input{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
-  .form-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
-  .form-select{width:100%;height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;cursor:pointer;}
-  .form-select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .form-label{font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;}
+  .form-input,.form-select{width:100%;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--bg);outline:none;}
+  .form-input:focus,.form-select:focus{border-color:var(--green);background:#fff;}
   .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  .form-textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;resize:vertical;min-height:72px;transition:border-color 0.15s;}
-  .form-textarea:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(46,204,143,0.12);}
+  .btn-cancel{height:40px;padding:0 16px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  .btn-save{height:40px;padding:0 22px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;}
+  .btn-save:hover{background:var(--green-dark);color:#fff;}
+  .btn-save:disabled{opacity:0.5;cursor:default;}
 
-  .drop-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;position:relative;}
-  .drop-zone:hover,.drop-zone.dragover{border-color:var(--green);background:var(--green-pale);}
-  .drop-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
-  .drop-text{font-size:13px;color:var(--text-mid);margin-bottom:2px;}
-  .drop-sub{font-size:11px;color:var(--text-muted);}
-  .drop-chosen{font-size:13px;color:var(--green-dark);font-weight:500;margin-top:6px;display:none;}
+  .section-sep{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin:22px 0 12px;padding-top:16px;border-top:1px solid var(--border);}
+  .section-sep:first-child{margin-top:0;padding-top:0;border-top:none;}
 
-  .btn-cancel{height:40px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
-  .btn-cancel:hover{background:var(--bg);}
-  .btn-save{height:40px;padding:0 22px;border:none;background:var(--navy);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;}
-  .btn-save:hover{background:var(--navy-mid);}
+  .lignes-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+  .ligne-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);cursor:grab;}
+  .ligne-row.dragging{opacity:0.4;}
+  .ligne-row.drag-over{border-color:var(--green);}
+  .ligne-handle{color:var(--text-muted);flex-shrink:0;font-size:14px;}
+  .ligne-num{width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .ligne-info{flex:1;min-width:0;}
+  .ligne-nom{font-size:13px;font-weight:600;color:var(--text);}
+  .ligne-adresse{font-size:11px;color:var(--text-muted);}
+  .ligne-pushed{font-size:10px;font-weight:700;color:var(--green-dark);background:var(--green-pale);padding:2px 8px;border-radius:10px;white-space:nowrap;}
+  .ligne-actions{display:flex;gap:4px;flex-shrink:0;}
+  .btn-icon{width:28px;height:28px;border:none;background:transparent;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);}
+  .btn-icon:hover{background:#E5EAF0;}
+  .btn-icon.danger:hover{background:rgba(231,76,60,0.1);color:var(--red);}
 
-  
-  /* CHECKBOX + BARRE SELECTION */
-  .notif-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#E8F9F2;color:#1DA870;padding:3px 9px;border-radius:20px;}
-  .table-row.selected,.report-row.selected{background:var(--green-pale)!important;}
-  .row-checkbox{width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0;}
-  .selection-bar{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;border-radius:12px;padding:12px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 8px 32px rgba(13,27,42,0.3);z-index:200;opacity:0;pointer-events:none;transition:opacity 0.2s;}
-  .selection-bar.visible{opacity:1;pointer-events:all;}
-  .sel-count{font-size:13px;font-weight:600;}
-  .sel-clear{font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;text-decoration:underline;}
-  .btn-notif-sel{display:flex;align-items:center;gap:7px;background:var(--green);color:var(--navy);border:none;padding:9px 18px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
-  .btn-notif-sel svg{width:13px;height:13px;flex-shrink:0;}
-  .modal-notif-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;align-items:center;justify-content:center;}
-  .modal-notif-overlay.open{display:flex;}
-  .modal-notif{background:var(--surface);border-radius:var(--radius);width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(13,27,42,0.2);}
-  .mn-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;}
-  .mn-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
-  .mn-close{width:30px;height:30px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:16px;color:var(--text-mid);}
-  .mn-body{padding:20px 24px;}
-  .mn-section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;}
-  .mn-recap{background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--text-mid);line-height:1.7;border-left:3px solid var(--green);white-space:pre-wrap;}
-  .mn-contacts{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
-  .mn-contact-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;}
-  .mn-contact-item input[type=checkbox]{accent-color:var(--green);width:15px;height:15px;flex-shrink:0;}
-  .mn-contact-name{font-size:13px;font-weight:600;color:var(--text);}
-  .mn-contact-email{font-size:11px;color:var(--text-muted);}
-  .mn-msg{width:100%;min-height:140px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);line-height:1.7;resize:vertical;outline:none;}
-  .mn-footer{padding:14px 24px 20px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--surface);}
-  .mn-btn-cancel{height:38px;padding:0 16px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
-  .mn-btn-send{height:38px;padding:0 22px;border:none;background:var(--green);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:7px;}
-  .mn-btn-send:disabled{opacity:0.5;cursor:not-allowed;}
-  .mn-success{text-align:center;padding:24px 0;display:none;}
-  /* TOAST */
-  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);z-index:300;transform:translateY(80px);opacity:0;transition:transform 0.3s ease,opacity 0.3s ease;}
+  .btn-secondary{display:flex;align-items:center;gap:7px;height:38px;padding:0 16px;background:#EBF0F5;border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer;}
+  .btn-secondary:hover{background:#DCE5EE;}
+  .btn-secondary:disabled{opacity:0.5;cursor:default;}
+  .btn-secondary svg{width:14px;height:14px;}
+  .action-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+
+  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);transform:translateY(80px);opacity:0;transition:all 0.3s ease;z-index:999;}
   .toast.show{transform:translateY(0);opacity:1;}
-  .toast svg{width:16px;height:16px;color:var(--green);flex-shrink:0;}
-
-  @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
-  .nuisible-pill{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;}
-  .n-punaise{background:#FBEAF0;color:#722440;}
-  .n-rongeur{background:#FAEEDA;color:#854F0B;}
-  .n-blatte{background:#EBF0F5;color:#1A5F8A;}
-  .n-pigeon{background:#EAF3DE;color:#3B6D11;}
-  .n-custom{background:#F1EFE8;color:#5F5E5A;}
-  .admin-badge{margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);padding:8px 12px;display:flex;align-items:center;gap:8px;}
-  .admin-badge svg{width:14px;height:14px;color:var(--amber);flex-shrink:0;}
-  .admin-badge span{font-size:11px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:0.06em;}
+  .toast svg{width:16px;height:16px;color:var(--green);}
 </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
-<!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-mark">
@@ -205,827 +115,522 @@
       <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
     </div>
   </div>
-        <div class="sidebar-client">
-    
-    <div class="client-name" id="sideClientName">—</div>
-    <div class="client-contract" id="sideClientId"></div>
-  </div>
   <div class="admin-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Espace Admin</span></div>
   <nav class="sidebar-nav">
     <div class="nav-group-label">Principal</div>
     <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
-    <a class="nav-item" id="navSuiviItem" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
+    <a class="nav-item" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
+    <a class="nav-item" href="gestion-rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Gestion rapports</span></a>
     <a class="nav-item" href="facturation.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg><span>Facturation</span></a>
     <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
     <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
-    <a class="nav-item active" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item active" href="garanties.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Gestion garanties</span></a>
     <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
     <div class="nav-group-label">Documentation</div>
     <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
     <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
-    <div id="adminNav" style="display:none;">
-      <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
-      <a class="nav-item" href="admin.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
-      <a class="nav-item" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+    <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+    <a class="nav-item" href="admin.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+    <a class="nav-item" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
     <a class="nav-item" href="techniciens.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Techniciens</span></a>
     <a class="nav-item" href="imports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import email</span></a>
-    </div>
+    <a class="nav-item" href="kizeo-config.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg><span>Formulaires Kizeo</span></a>
   </nav>
   <div class="sidebar-footer">
     <div class="footer-user">
-      <div class="f-avatar" id="sideAvatar">—</div>
-      <div><div class="footer-name" id="sideFooterName">—</div><div class="footer-role" id="sideFooterRole">Client</div></div>
+      <div class="f-avatar">BM</div>
+      <div><div class="footer-name">Belledonne Multiservices</div><div class="footer-role">Administrateur</div></div>
     </div>
-    <button onclick="handleLogout()" style="width:100%;margin-top:8px;padding:8px 12px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(231,76,60,0.15)';this.style.color='#E74C3C'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.5)'">
-      <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
-      Se déconnecter
-    </button>
   </div>
 </aside>
 
-<!-- MAIN -->
 <div class="main">
   <header class="topbar">
-    <div class="breadcrumb"><span>Espace client</span><span>›</span><span>Garanties</span></div>
-    <div class="date-chip" id="dateChip"></div>
+    <div class="breadcrumb"><span>Admin</span><span>›</span><span>Gestion garanties</span></div>
+    <button class="btn-logout" onclick="handleLogout()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Déconnexion
+    </button>
   </header>
 
   <div class="content">
-    <div class="page-header">
+    <div class="page-header-row">
       <div>
-        <div class="page-title">Interventions sous garantie</div>
-        <div class="page-sub">Passages effectués suite aux demandes de rappel des bailleurs</div>
+        <div class="page-title">Gestion garanties</div>
+        <div class="page-sub">Planification des journées de passage garantie : locataires, ordre de passage, technicien, agenda, rapports Kizeo.</div>
       </div>
-      <button class="btn-primary" id="btnAjouter" style="display:none;">
+      <button class="btn-add" onclick="openNewJournee()">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        Ajouter un passage garantie
+        Nouvelle journée
       </button>
     </div>
 
-    <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px;">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="padding:14px 18px;border-bottom:1px solid var(--border);position:relative;"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--green);"></div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:10px;">Semaine</div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;">
-            <div><div class="kpi-val" id="kpiValSemaine">0</div><div class="kpi-lbl">Cette semaine</div></div>
-            <div style="text-align:right;"><div style="font-size:22px;font-weight:700;color:var(--text-muted);" id="kpiValSemPrev">0</div><div class="kpi-lbl">Sem. dernière</div></div>
-          </div>
-        </div>
-      </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="padding:14px 18px;border-bottom:1px solid var(--border);position:relative;"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--amber);"></div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:10px;">Mois</div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;">
-            <div><div class="kpi-val" id="kpiValMois">0</div><div class="kpi-lbl">Ce mois</div></div>
-            <div style="text-align:right;"><div style="font-size:22px;font-weight:700;color:var(--text-muted);" id="kpiValMoisPrev">0</div><div class="kpi-lbl">Mois dernier</div></div>
-          </div>
-        </div>
-      </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="padding:14px 18px;border-bottom:1px solid var(--border);position:relative;"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:var(--navy);"></div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:10px;">Année</div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;">
-            <div><div class="kpi-val" id="kpiValAnnee">0</div><div class="kpi-lbl">Cette année</div></div>
-            <div style="text-align:right;"><div style="font-size:22px;font-weight:700;color:var(--text-muted);" id="kpiValAnneePrev">0</div><div class="kpi-lbl">Année dernière</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- SEARCH -->
-    <div class="search-bar">
-      <div class="search-wrap">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        <input class="search-input" type="text" id="searchInput" placeholder="Rechercher par nom ou adresse..." />
-      </div>
-      <select class="filter-select" id="filterAnnee"><option value="">Toutes les années</option></select>
-      <select class="filter-select" id="filterClient" style="display:none;"><option value="">Tous les clients</option></select>
-      <span class="results-count" id="resultsCount"></span>
-    </div>
-
-    <!-- TABLE -->
-    <div class="table-wrap is-client">
-      <div class="table-head">
-        <span></span>
-        <span>Adresse</span>
-        <span>Nom locataire</span>
-        <span>Date intervention</span>
-        <span>Type d'intervention</span>
-        <span></span>
-      </div>
-      <div id="tableBody"></div>
+    <div class="journees-grid" id="journeesGrid"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+      <p>Aucune journée garantie créée pour le moment.</p>
     </div>
   </div>
 </div>
 
-<!-- MODAL -->
-<div class="modal-overlay" id="modal">
+<!-- MODAL NOUVELLE JOURNÉE -->
+<div class="modal-overlay" id="modalJournee">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title" id="modalTitle">Ajouter un passage garantie</div>
-      <button class="modal-close" id="closeModal">✕</button>
+      <div class="modal-title">Nouvelle journée garantie</div>
+      <button class="btn-close" onclick="closeJourneeModal()">×</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Client *</label>
-        <select class="form-select" id="inClient">
-          <option value="">— Sélectionner le client —</option>
-        </select>
-        <div id="newClientWrap" style="display:none;margin-top:8px;">
-          <input class="form-input" type="text" id="inClientNew" placeholder="Nom du client..." />
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Adresse du logement *</label>
-        <input class="form-input" type="text" id="inAdresse" placeholder="ex: 8 bis Avenue Marie Reynoard 38100 Grenoble" />
+        <label class="form-label">Date *</label>
+        <input class="form-input" type="date" id="jDate">
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Nom du locataire</label>
-          <input class="form-input" type="text" id="inBC" placeholder="ex: Jean Dupont" />
+          <label class="form-label">Heure début *</label>
+          <input class="form-input" type="time" id="jHeureDebut" value="08:00">
         </div>
         <div class="form-group">
-          <label class="form-label">Date d'intervention *</label>
-          <input class="form-input" type="date" id="inDate" />
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Type d'intervention *</label>
-          <select class="form-select" id="inNuisible" onchange="handleTypeChange()">
-            <option value="">— Sélectionner —</option>
-            <option value="punaise">Punaises de lit</option>
-            <option value="rongeur">Rongeurs</option>
-            <option value="blatte">Blattes / Insectes</option>
-            <option value="pigeon">Dépigeonnage</option>
-            <option value="__autre__">+ Autre type...</option>
-          </select>
-          <div id="inNuisibleCustomWrap" style="display:none;flex-direction:row;gap:8px;margin-top:8px;">
-            <input class="form-input" type="text" id="inNuisibleCustom" placeholder="ex: Désinfection, Nettoyage..." style="flex:1;" />
-            <button type="button" onclick="addCustomType()" style="height:42px;padding:0 14px;border:none;background:var(--green);color:white;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;">Ajouter</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Rapport d'intervention PDF</label>
-        <div class="drop-zone" id="dropZone">
-          <input type="file" accept=".xlsx,.xls" id="fileInput" />
-          <div class="drop-text">Glissez le rapport Excel ici ou cliquez pour choisir</div>
-          <div class="drop-sub">Fichier PDF uniquement · Max 20 Mo</div>
-          <div class="drop-chosen" id="dropChosen"></div>
+          <label class="form-label">Heure fin *</label>
+          <input class="form-input" type="time" id="jHeureFin" value="12:00">
         </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn-cancel" id="cancelModal">Annuler</button>
-      <button class="btn-save" id="saveModal">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-        Enregistrer
-      </button>
+      <button class="btn-cancel" onclick="closeJourneeModal()">Annuler</button>
+      <button class="btn-save" onclick="saveJournee()">Créer la journée</button>
     </div>
   </div>
 </div>
 
-<div id="modalSend" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:200;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:14px;width:520px;max-width:95vw;box-shadow:0 24px 60px rgba(13,27,42,0.2);">
-    <div style="padding:22px 26px 18px;border-bottom:1px solid rgba(13,27,42,0.09);display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700;">Notifier le client</div>
-      <button style="width:32px;height:32px;border:none;background:#F2F5F8;border-radius:6px;cursor:pointer;font-size:18px;" onclick="document.getElementById('modalSend').style.display='none'">✕</button>
+<!-- MODAL DÉTAIL JOURNÉE -->
+<div class="modal-overlay" id="modalDetail">
+  <div class="modal wide">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="dTitle">Journée garantie</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="dSub"></div>
+      </div>
+      <button class="btn-close" onclick="closeDetailModal()">×</button>
     </div>
-    <div style="padding:24px 26px;">
-      <div style="background:#F2F5F8;border-radius:8px;padding:12px 16px;margin-bottom:18px;border-left:3px solid #2ECC8F;">
-        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#8FA4B8;margin-bottom:4px;">Document concerné</div>
-        <div style="font-size:13px;font-weight:500;color:#0D1B2A;" id="sendCtxVal">—</div>
-      </div>
-      <div id="sendMainContent">
-        <div style="margin-bottom:16px;">
-          <div style="font-size:12px;font-weight:500;color:#4A6078;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Destinataires</div>
-          <div style="display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;" id="sendContactsList"></div>
-          <div style="margin-top:10px;border-top:1px dashed rgba(13,27,42,0.09);padding-top:10px;">
-            <div style="font-size:11px;color:#8FA4B8;margin-bottom:6px;">Ajouter un destinataire ponctuel (non enregistré)</div>
-            <div style="display:flex;gap:8px;">
-              <input type="text" id="extraNom" placeholder="Nom (optionnel)" style="flex:1;height:36px;padding:0 12px;border:1px solid rgba(13,27,42,0.09);border-radius:8px;background:#F2F5F8;font-family:'DM Sans',sans-serif;font-size:13px;color:#0D1B2A;outline:none;" onfocus="this.style.borderColor='#2ECC8F'" onblur="this.style.borderColor=''" />
-              <input type="email" id="extraEmail" placeholder="Email *" style="flex:1.5;height:36px;padding:0 12px;border:1px solid rgba(13,27,42,0.09);border-radius:8px;background:#F2F5F8;font-family:'DM Sans',sans-serif;font-size:13px;color:#0D1B2A;outline:none;" onfocus="this.style.borderColor='#2ECC8F'" onblur="this.style.borderColor=''" />
-              <button type="button" onclick="addExtraRecipient()" style="height:36px;padding:0 14px;border:none;background:#0D1B2A;color:#fff;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">+ Ajouter</button>
-            </div>
-            <div id="extraList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
-          </div>
+    <div class="modal-body">
+      <div class="section-sep">Locataires à visiter (glisser-déposer pour réordonner)</div>
+      <div class="lignes-list" id="lignesList"></div>
+      <button class="btn-secondary" onclick="openLigneModal(null)">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Ajouter un locataire
+      </button>
+
+      <div class="section-sep">Technicien assigné</div>
+      <div class="form-row" style="align-items:end;">
+        <div class="form-group" style="margin-bottom:0;">
+          <select class="form-select" id="dTechnicien"></select>
         </div>
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <div style="font-size:12px;font-weight:500;color:#4A6078;text-transform:uppercase;letter-spacing:0.05em;">Message</div>
-            <span style="font-size:11px;color:#8FA4B8;">Modifiable avant envoi</span>
-          </div>
-          <textarea id="sendMsgPreview" style="width:100%;padding:12px 14px;border:1px solid rgba(13,27,42,0.09);border-radius:8px;background:#F2F5F8;font-family:'DM Sans',sans-serif;font-size:12px;color:#4A6078;line-height:1.7;resize:vertical;min-height:160px;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='#2ECC8F';this.style.background='#fff'" onblur="this.style.borderColor='';this.style.background='#F2F5F8'"></textarea>
-        </div>
+        <button class="btn-secondary" style="height:40px;" onclick="assignTechnicien()">Assigner</button>
       </div>
-      <div id="sendSuccessBlock" style="display:none;text-align:center;padding:16px 0;">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:44px;height:44px;color:#2ECC8F;margin-bottom:8px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-        <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px;">Email envoyé !</div>
-        <div style="font-size:13px;color:#8FA4B8;" id="sendSuccessMsg"></div>
+
+      <div class="section-sep">Actions</div>
+      <div class="action-row">
+        <button class="btn-secondary" id="btnAgenda" onclick="doAgenda()">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+          Intégrer à l'agenda Google
+        </button>
+        <button class="btn-secondary" id="btnKizeo" onclick="doPushKizeo()">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          Générer les rapports Kizeo
+        </button>
+        <button class="btn-secondary" id="btnStatut" onclick="toggleStatut()"></button>
+        <button class="btn-secondary" style="background:rgba(231,76,60,0.08);color:var(--red);" onclick="deleteJournee()">Supprimer la journée</button>
       </div>
     </div>
-    <div style="padding:16px 26px 22px;display:flex;gap:10px;justify-content:flex-end;" id="sendModalFooter"></div>
   </div>
 </div>
 
-<!-- BARRE SELECTION -->
-<div class="selection-bar" id="selectionBar">
-  <span class="sel-count" id="selCount">0 selectionne</span>
-  <span class="sel-clear" onclick="clearSelection()">Tout deselectionner</span>
-  <button class="btn-notif-sel" onclick="openNotifModal()">
-    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-    Notifier la selection
-  </button>
-</div>
-<div class="modal-notif-overlay" id="modalNotif">
-  <div class="modal-notif">
-    <div class="mn-header"><div class="mn-title" id="mnTitle">Notifier</div><button class="mn-close" onclick="closeNotifModal()">x</button></div>
-    <div class="mn-body">
-      <div id="mnMainContent">
-        <div class="mn-section-label">Selection</div>
-        <div class="mn-recap" id="mnRecap">-</div>
-        <div class="mn-section-label">Destinataires</div>
-        <div class="mn-contacts" id="mnContacts"><div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><div class="mn-section-label" style="margin-bottom:0;">Message</div></div>
-        <textarea class="mn-msg" id="mnMsg"></textarea>
-        <div class="mn-section-label" style="margin-top:12px;">Objet</div>
-        <input type="text" id="mnSubject" style="width:100%;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;margin-top:4px;">
+<!-- MODAL LIGNE LOCATAIRE -->
+<div class="modal-overlay" id="modalLigne">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="lTitle">Ajouter un locataire</div>
+      <button class="btn-close" onclick="closeLigneModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Client (bailleur) *</label>
+        <select class="form-select" id="lClient"><option value="">— Sélectionner —</option></select>
       </div>
-      <div class="mn-success" id="mnSuccess">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:40px;height:40px;color:var(--green);margin-bottom:8px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-        <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px;">Envoye !</div>
-        <div style="font-size:13px;color:var(--text-muted);" id="mnSuccessMsg"></div>
+      <div class="form-group">
+        <label class="form-label">Nom du locataire *</label>
+        <input class="form-input" type="text" id="lNom" placeholder="ex: Jean Dupont">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adresse *</label>
+        <input class="form-input" type="text" id="lAdresse" placeholder="ex: 8 bis Avenue Marie Reynoard">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Code postal *</label>
+          <input class="form-input" type="text" id="lCodePostal" placeholder="38100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ville *</label>
+          <input class="form-input" type="text" id="lVille" placeholder="Grenoble">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Étage</label>
+          <input class="form-input" type="text" id="lEtage" placeholder="ex: 3">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">N° logement</label>
+          <input class="form-input" type="text" id="lNumeroLogement" placeholder="ex: 12">
+        </div>
       </div>
     </div>
-    <div class="mn-footer" id="mnFooter">
-      <button class="mn-btn-cancel" onclick="closeNotifModal()">Annuler</button>
-      <button class="mn-btn-send" id="mnBtnSend" onclick="sendNotification()">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer
-      </button>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeLigneModal()">Annuler</button>
+      <button class="btn-save" onclick="saveLigne()">Enregistrer</button>
     </div>
   </div>
 </div>
+
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
   <span id="toastMsg"></span>
 </div>
 
-<script>
-document.getElementById('dateChip').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-
-
-const TYPE_LABELS = { punaise:'Punaises de lit', rongeur:'Rongeurs', blatte:'Blattes / Insectes', pigeon:'Dépigeonnage' };
-const TYPE_COLORS = { punaise:'n-punaise', rongeur:'n-rongeur', blatte:'n-blatte', pigeon:'n-pigeon' };
-
-function getTypeLabel(val) { return TYPE_LABELS[val] || val; }
-function getTypeColor(val) { return TYPE_COLORS[val] || 'n-custom'; }
-
-window.handleTypeChange = function() {
-  const val = document.getElementById('inNuisible').value;
-  const wrap = document.getElementById('inNuisibleCustomWrap');
-  wrap.style.display = val === '__autre__' ? 'flex' : 'none';
-  if (val === '__autre__') document.getElementById('inNuisibleCustom').focus();
-};
-
-window.addCustomType = function() {
-  const input = document.getElementById('inNuisibleCustom');
-  const label = input.value.trim();
-  if (!label) return;
-  const val = label.toLowerCase().replace(/\s+/g, '_');
-  if (!TYPE_LABELS[val]) {
-    TYPE_LABELS[val] = label;
-    const sel = document.getElementById('inNuisible');
-    const opt = document.createElement('option');
-    opt.value = val; opt.textContent = label;
-    sel.insertBefore(opt, sel.querySelector('option[value="__autre__"]'));
-    const fopt = document.createElement('option');
-    fopt.value = val; fopt.textContent = label;
-    document.getElementById('filterNuisible').appendChild(fopt);
-  }
-  document.getElementById('inNuisible').value = val;
-  document.getElementById('inNuisibleCustomWrap').style.display = 'none';
-  input.value = '';
-};
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.activeElement.id === 'inNuisibleCustom') {
-    e.preventDefault(); window.addCustomType();
-  }
-});
-
-window._isAdmin = false;
-window.garanties = [];
-let garanties = window.garanties;
-
-
-function formatDate(d) {
-  if (!d) return '—';
-  const [y,m,day] = d.split('-');
-  const mois = ['jan.','fév.','mars','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.'];
-  return `${parseInt(day)} ${mois[parseInt(m)-1]} ${y}`;
-}
-
-function initiales(nom) {
-  if (!nom) return '?';
-  return nom.split(' ').filter(Boolean).map(p => p[0].toUpperCase()).join('').slice(0,2);
-}
-
-function updateKPIs() {
-  const all = window.garanties || garanties || [];
-  const now = new Date();
-  const annee = now.getFullYear().toString();
-  const anneePrev = (now.getFullYear() - 1).toString();
-  const mois = annee + '-' + String(now.getMonth()+1).padStart(2,'0');
-  const prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevMoisStr = prevM.getFullYear() + '-' + String(prevM.getMonth()+1).padStart(2,'0');
-  const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
-  const monday = new Date(now); monday.setDate(now.getDate() - dow);
-  const mondayStr = monday.toISOString().split('T')[0];
-  const prevMonday = new Date(monday); prevMonday.setDate(monday.getDate() - 7);
-  const prevMondayStr = prevMonday.toISOString().split('T')[0];
-
-  document.getElementById('kpiValSemaine').textContent = all.filter(x => (x.date||'') >= mondayStr).length;
-  document.getElementById('kpiValSemPrev').textContent = all.filter(x => (x.date||'') >= prevMondayStr && (x.date||'') < mondayStr).length;
-  document.getElementById('kpiValMois').textContent = all.filter(x => (x.date||'').startsWith(mois)).length;
-  document.getElementById('kpiValMoisPrev').textContent = all.filter(x => (x.date||'').startsWith(prevMoisStr)).length;
-  document.getElementById('kpiValAnnee').textContent = all.filter(x => (x.date||'').startsWith(annee)).length;
-  document.getElementById('kpiValAnneePrev').textContent = all.filter(x => (x.date||'').startsWith(anneePrev)).length;
-}
-
-function renderTable(list) {
-  const body = document.getElementById('tableBody');
-  const count = document.getElementById('resultsCount');
-  count.textContent = list.length + ' résultat' + (list.length > 1 ? 's' : '');
-
-  if (list.length === 0) {
-    body.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><p>Aucun passage garantie trouvé.</p></div>`;
-    return;
-  }
-
-  body.innerHTML = list.map(g => `
-    <div class="table-row" id="row-${g.id}">
-      <div>
-        ${window._isAdmin ? `<input type="checkbox" class="row-checkbox" onchange="toggleRowGarantie('${g.id}', this.checked)" onclick="event.stopPropagation()">` : ''}
-      </div>
-      <div>
-        ${window._isAdmin && g.client ? `<span style="display:inline-block;font-size:10px;font-weight:700;background:#EBF0F5;color:#1A2E42;padding:1px 7px;border-radius:10px;margin-bottom:3px;">${g.client}</span><br>` : ""}
-        <div class="addr-main">${(g.adresse||"").split(",")[0]}</div>
-        <div class="addr-sub">${(g.adresse||"").includes(",") ? (g.adresse||"").split(",").slice(1).join(",").trim() : ""}</div>
-        ${window._isAdmin && g.notifs > 0 ? `<span class="notif-badge" style="margin-top:3px;">✓ Notifié${g.notifs > 1 ? ' ×'+g.notifs : ''}</span>` : ''}
-      </div>
-      <span style="font-size:13px;color:var(--text-mid);">${g.bc||g.nom||g.locataire||"—"}</span>
-      <span class="cell-date">${formatDate(g.date)}</span>
-      <span class="nuisible-pill ${getTypeColor(g.nuisible)}">${getTypeLabel(g.nuisible)}</span>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap;justify-content:flex-end;">
-        ${g.rapportUrl ? `<a href="${g.rapportUrl}" target="_blank" class="btn-rapport"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Télécharger</a>` : ''}
-        ${window._isAdmin ? `
-          <button onclick="openNotifForItem('${g.id}')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#fff;background:var(--green-dark);border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Notifier</button>
-          <button onclick="openEditGarantie('${g.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1A2E42;background:#EBF0F5;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Modifier</button>
-          <button onclick="deleteGarantie('${g.id}')" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#E74C3C;background:#FDECEA;border:none;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>` : ''}
-      </div>
-    </div>`).join('');
-}
-
-function filter() {
-  if (window.garanties) garanties = window.garanties;
-  const q = document.getElementById('searchInput').value.toLowerCase();
-  const y = document.getElementById('filterAnnee').value;
-  const fc = document.getElementById('filterClient') ? document.getElementById('filterClient').value : '';
-  const filtered = garanties.filter(g => {
-    const mq = !q || (g.adresse||'').toLowerCase().includes(q) || (g.bc||'').toLowerCase().includes(q);
-    const my = !y || (g.date||'').startsWith(y);
-    const mc = !fc || g.client === fc;
-    return mq && my && mc;
-  });
-  renderTable(filtered);
-}
-
-// Générer les années dynamiquement
-(function() {
-  const sel = document.getElementById('filterAnnee');
-  if (!sel) return;
-  const now = new Date().getFullYear();
-  for (let y = now + 1; y >= now; y--) {
-    const o = document.createElement('option');
-    o.value = y; o.textContent = y;
-    sel.appendChild(o);
-  }
-})();
-
-document.getElementById('searchInput').addEventListener('input', filter);
-document.getElementById('filterAnnee').addEventListener('change', filter);
-document.getElementById('filterClient').addEventListener('change', filter);
-
-// MODAL
-const modal = document.getElementById('modal');
-const fileInput = document.getElementById('fileInput');
-const dropChosen = document.getElementById('dropChosen');
-
-// ── Parser Excel garanties ──
-const TYPE_MAP_GAR = {
-  'blattes': 'blatte', 'blatte': 'blatte', 'insecte': 'blatte',
-  'punaise': 'punaise', 'punaises': 'punaise',
-  'rongeur': 'rongeur', 'rongeurs': 'rongeur',
-  'pigeon': 'pigeon', 'pigeons': 'pigeon',
-};
-function parseExcelGarantie(file) {
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const type    = ws['B5'] ? String(ws['B5'].v).trim() : '';
-      const adresse = ws['D5'] ? String(ws['D5'].v).trim() : '';
-      const nom     = ws['B6'] ? String(ws['B6'].v).trim() : '';
-      const dateVal = ws['D6'] ? ws['D6'].v : '';
-      if (adresse) { const el=document.getElementById('inAdresse'); if(el) el.value=adresse; }
-      if (nom)     { const el=document.getElementById('inBC');      if(el) el.value=nom; }
-      if (dateVal) {
-        let ds = '';
-        if (dateVal instanceof Date) ds = dateVal.toISOString().split('T')[0];
-        else if (typeof dateVal === 'string') {
-          const p = dateVal.split(' ')[0].split('/');
-          if (p.length===3) ds = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
-        }
-        if (ds) { const el=document.getElementById('inDate'); if(el) el.value=ds; }
-      }
-      if (type) { const k=type.toLowerCase(); const m=TYPE_MAP_GAR[k]; const s=document.getElementById('inNuisible'); if(s&&m) s.value=m; }
-      if (dropChosen) { dropChosen.textContent='✓ '+file.name+' — champs pré-remplis !'; dropChosen.style.display='block'; dropChosen.style.color='var(--green-dark)'; }
-    } catch(err) { console.error(err); if(dropChosen){ dropChosen.textContent='✓ '+file.name; dropChosen.style.display='block'; } }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-if (fileInput) fileInput.addEventListener('change', () => {
-  const f = fileInput.files[0]; if(!f) return;
-  parseExcelGarantie(f);
-});
-
-// ── resetModal + openEditGarantie ──
-window._editGarantieId = null;
-
-function resetModal() {
-  window._editGarantieId = null;
-  const mt = document.getElementById('modalTitle'); if(mt) mt.textContent = 'Ajouter un passage garantie';
-  const sm = document.getElementById('saveModal'); if(sm) sm.textContent = 'Enregistrer';
-  ['inAdresse','inBC','inDate'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-  const s=document.getElementById('inNuisible'); if(s) s.value='';
-  const ic=document.getElementById('inClient'); if(ic) ic.value='';
-  const ncw=document.getElementById('newClientWrap'); if(ncw) ncw.style.display='none';
-  if(fileInput) fileInput.value='';
-  if(dropChosen){ dropChosen.style.display='none'; dropChosen.textContent=''; dropChosen.style.color=''; }
-}
-
-window.openEditGarantie = function(id) {
-  const g = (window.garanties||garanties||[]).find(x => x.id === id);
-  if (!g) return;
-  window._editGarantieId = id;
-  const mt=document.getElementById('modalTitle'); if(mt) mt.textContent='Modifier la garantie';
-  const sm=document.getElementById('saveModal'); if(sm) sm.textContent='Mettre à jour';
-  const ia=document.getElementById('inAdresse'); if(ia) ia.value=g.adresse||'';
-  const ib=document.getElementById('inBC'); if(ib) ib.value=g.bc||'';
-  const id2=document.getElementById('inDate'); if(id2) id2.value=g.date||'';
-  const sn=document.getElementById('inNuisible'); if(sn) sn.value=g.nuisible||'';
-  const ic=document.getElementById('inClient'); if(ic) ic.value=g.client||'';
-  if(fileInput) fileInput.value='';
-  if(dropChosen){ if(g.rapportUrl){ dropChosen.textContent='✓ Fichier existant (remplacer si besoin)'; dropChosen.style.display='block'; } else dropChosen.style.display='none'; }
-  modal.classList.add('open');
-};
-
-document.getElementById('btnAjouter').addEventListener('click', () => { resetModal(); modal.classList.add('open'); });
-document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
-document.getElementById('cancelModal').addEventListener('click', () => modal.classList.remove('open'));
-modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
-
-window.handleClientSelect = function() {
-  document.getElementById('newClientWrap').style.display = document.getElementById('inClient').value === '__new__' ? 'block' : 'none';
-};
-
-// fileInput et dropChosen déclarés plus haut
-
-let _savingGarantie = false;
-document.getElementById('saveModal').addEventListener('click', async () => {
-  if (_savingGarantie) return;
-  const adresse = document.getElementById('inAdresse').value.trim();
-  const bc = document.getElementById('inBC').value.trim();
-  const date = document.getElementById('inDate').value;
-  const nuisible = document.getElementById('inNuisible').value;
-  let client = document.getElementById('inClient').value;
-  if (client === '__new__') client = document.getElementById('inClientNew').value.trim();
-  if (!client || !adresse || !date || !nuisible) { alert('Veuillez remplir les champs obligatoires : client, adresse, date et type.'); return; }
-
-  _savingGarantie = true;
-  const btn = document.getElementById('saveModal');
-  btn.disabled = true; btn.textContent = 'Enregistrement...';
-  try {
-    await window._saveGarantie({ adresse, bc, date, nuisible, client, file: fileInput ? fileInput.files[0] : null, editId: window._editGarantieId });
-    modal.classList.remove('open');
-    resetModal();
-    await window._loadGaranties(window._currentClientFilter);
-    showToast(window._editGarantieId ? 'Garantie mise à jour !' : 'Passage garantie ajouté — ' + adresse.substring(0,40));
-  } catch(e) { alert('Erreur : ' + e.message); }
-  btn.disabled = false; btn.textContent = window._editGarantieId ? 'Mettre à jour' : 'Enregistrer';
-  _savingGarantie = false;
-});
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  document.getElementById('toastMsg').textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3500);
-}
-
-// ── SYSTÈME SÉLECTION + NOTIFICATION ──
-window._selectedIds = window._selectedIds || new Set();
-
-function updateSelectionBar() {
-  const bar = document.getElementById('selectionBar');
-  const count = document.getElementById('selCount');
-  const n = window._selectedIds.size;
-  if (bar) bar.classList.toggle('visible', n > 0);
-  if (count) count.textContent = n + ' sélectionné' + (n > 1 ? 's' : '');
-}
-
-window.clearSelection = function() {
-  window._selectedIds = new Set();
-  document.querySelectorAll('.table-row.selected,.report-row.selected').forEach(r => r.classList.remove('selected'));
-  document.querySelectorAll('.row-checkbox:checked').forEach(cb => cb.checked = false);
-  updateSelectionBar();
-};
-
-window.toggleRowGarantie = function(id, checked) {
-  if (checked) window._selectedIds.add(id);
-  else window._selectedIds.delete(id);
-  const row = document.getElementById('row-' + id);
-  if (row) row.classList.toggle('selected', checked);
-  updateSelectionBar();
-};
-
-window.openNotifForItem = function(id) {
-  window._selectedIds = new Set([id]);
-  window.openNotifModal();
-};
-
-window.openNotifModal = function() {
-  const ids = [...window._selectedIds];
-  if (ids.length === 0) return;
-  const all = window.garanties || garanties || [];
-  const selected = ids.map(id => all.find(r => r.id === id)).filter(Boolean);
-  if (selected.length === 0) return;
-  const isMulti = selected.length > 1;
-  const client = selected[0].client;
-  const modal = document.getElementById('modalNotif');
-  if (!modal) return;
-  modal.classList.add('open');
-  const recap = document.getElementById('mnRecap');
-  if (recap) recap.textContent = isMulti
-    ? selected.map(r => (r.bc ? 'BC ' + r.bc + ' — ' : '') + (r.adresse || '') + (r.date ? ' (' + r.date + ')' : '')).join('\n')
-    : (() => { const r = selected[0]; return (r.bc ? 'BC ' + r.bc + ' — ' : '') + (r.adresse || '') + (r.date ? ' (' + r.date + ')' : ''); })();
-  const title = document.getElementById('mnTitle');
-  if (title) title.textContent = isMulti ? 'Notifier (' + selected.length + ' garanties)' : 'Notifier le client';
-  const success = document.getElementById('mnSuccess');
-  if (success) success.style.display = 'none';
-  const main = document.getElementById('mnMainContent');
-  if (main) main.style.display = '';
-  const footer = document.getElementById('mnFooter');
-  if (footer) footer.innerHTML = '<button class="mn-btn-cancel" onclick="closeNotifModal()">Annuler</button><button class="mn-btn-send" id="mnBtnSend" onclick="window._doSendNotification()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
-  if (typeof window._loadNotifData === 'function') window._loadNotifData(client, isMulti, selected);
-};
-
-window.closeNotifModal = function() {
-  const modal = document.getElementById('modalNotif');
-  if (modal) modal.classList.remove('open');
-};
-
-window.sendNotification = function() {
-  if (typeof window._doSendNotification === 'function') window._doSendNotification();
-};
-</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc, onSnapshot, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-
-const LIEN_ESPACE = "https://clients-belledonne-multiservices.com";
-const FUNCTION_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, onSnapshot, doc, getDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
-const storage = getStorage(app);
+
+const FN_AGENDA = "https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar";
+const FN_PUSH_KIZEO = "https://europe-west1-belledonne-client.cloudfunctions.net/pushGarantieKizeo";
 
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
-window._currentClientFilter = null;
 
-// ── Charger les garanties ──
-let _unsubGaranties = null;
-window._loadGaranties = function(clientFilter) {
-  window._currentClientFilter = clientFilter;
-  if (_unsubGaranties) { _applyGarantiesFilter(); return; }
-  // Client : listener filtré sur SON client (imposé par les règles). Admin : tout.
-  const ref = clientFilter
-    ? query(collection(db, "garanties"), where("client", "==", clientFilter))
-    : collection(db, "garanties");
-  _unsubGaranties = onSnapshot(ref, (snap) => {
-    window._garantiesAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    _applyGarantiesFilter();
-  }, (e) => console.error(e));
-};
-function _applyGarantiesFilter() {
-  let docs = (window._garantiesAll || []).slice();
-  if (window._currentClientFilter) docs = docs.filter(g => g.client === window._currentClientFilter);
-  docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-  window.garanties = docs;
-  if (window._isAdmin) populateClientFilter();
-  updateKPIs(window.garanties);
-  filter();
+async function authHeaders() {
+  const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  return idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
 }
 
-async function populateClientFilter() {
-  const sel = document.getElementById('filterClient');
-  if (!sel) return; sel.style.display = '';
-  const current = sel.value;
-  try {
-    const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
-    sel.innerHTML = '<option value="">Tous les clients</option>';
-    snap.docs.forEach(d => {
-      const cl = d.data().client; if (!cl) return;
-      const o = document.createElement('option'); o.value = cl; o.textContent = cl;
-      if (cl === current) o.selected = true;
-      sel.appendChild(o);
-    });
-  } catch(e) { console.error('populateClientFilter:', e); }
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3500);
 }
 
-// ── Sauvegarder (ajout ou update) ──
-window._saveGarantie = async function({ adresse, bc, date, nuisible, client, file, editId }) {
-  let rapportUrl = null;
-  if (editId) {
-    const existing = (window.garanties||[]).find(g => g.id === editId) || {};
-    rapportUrl = existing.rapportUrl || null;
-    // Si nouveau fichier, supprimer l'ancien du Storage
-    if (file && rapportUrl) {
-      try { await deleteObject(ref(storage, rapportUrl)); } catch(se) { console.warn('Storage old:', se); }
-      rapportUrl = null;
-    }
-  }
-  if (file) {
-    const storageRef = ref(storage, `garanties/${client}/${Date.now()}_${file.name}`);
-    const snap = await uploadBytesResumable(storageRef, file);
-    rapportUrl = await getDownloadURL(snap.ref);
-  }
-  const data = { adresse, bc, date, nuisible, client, rapportUrl, rapport: !!rapportUrl };
-  if (editId) {
-    await updateDoc(doc(db, "garanties", editId), { ...data, updatedAt: new Date().toISOString() });
-  } else {
-    await addDoc(collection(db, "garanties"), { ...data, notifs: 0, createdAt: new Date().toISOString() });
-  }
-};
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
-// ── Supprimer ──
-window.deleteGarantie = async function(id) {
-  if (!confirm('Supprimer cette garantie ?')) return;
-  try {
-    const g = (window.garanties||[]).find(x => x.id === id);
-    if (g && g.rapportUrl) {
-      try { await deleteObject(ref(storage, g.rapportUrl)); } catch(se) { console.warn('Storage:', se); }
-    }
-    await deleteDoc(doc(db, "garanties", String(id)));
-    window.garanties = (window.garanties||[]).filter(g => g.id !== id);
-    updateKPIs(); filter();
-    showToast('Garantie supprimée !');
-  } catch(e) { alert('Erreur : ' + e.message); }
-};
-
-// ── Charger clients ──
-async function loadClientsIntoSelect(selectId) {
-  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
-  const sel = document.getElementById(selectId);
-  if (!sel) return;
-  sel.innerHTML = '<option value="">— Sélectionner le client —</option>';
-  snap.docs.forEach(d => { const cl=d.data().client; if(!cl) return; const o=document.createElement('option'); o.value=cl; o.textContent=cl; sel.appendChild(o); });
-}
-
-
-window._loadNotifData = async function(client, isMulti, selectedItems) {
-  try {
-    const snapC = await getDocs(query(collection(db,"contacts"),where("client","==",client)));
-    const contacts = snapC.docs.map(d=>({id:d.id,...d.data()}));
-    if(contacts.length===0) {
-      document.getElementById('mnContacts').innerHTML='<div style="font-size:13px;color:var(--text-muted);padding:12px;">Aucun contact pour ce client. <a href="contacts.html" style="color:var(--green-dark);">Ajouter</a></div>';
-    } else {
-      document.getElementById('mnContacts').innerHTML=contacts.map(c=>`
-        <label class="mn-contact-item">
-          <input type="checkbox" id="mnchk-${c.id}" value="${c.email}" checked>
-          <div><div class="mn-contact-name">${c.prenom||''} ${c.nom||''}</div><div class="mn-contact-email">${c.email||'-'}</div></div>
-        </label>`).join('');
-    }
-    const snapT = await getDocs(collection(db,"config"));
-    const tplDoc = snapT.docs.find(d=>d.id==='templates');
-    const tpl = tplDoc?tplDoc.data():{};
-    const key = isMulti?'garantieMulti':'garantieSimple';
-    const tplData = tpl[key]||{};
-    if(isMulti) {
-      const liste = selectedItems.map(r=>'- ' + (r.nom||r.adresse||'-').split(',')[0] + ' - ' + (r.date||'-')).join('\n');
-      const body=(tplData.body||'Bonjour,\nLes passages garantie suivants ont ete effectues :\n{{liste}}\nConsultez votre espace client : {{lien}}\nCordialement,\nBelledonne Multiservices').replace(/{{liste}}/g,liste).replace(/{{lien}}/g,LIEN_ESPACE);
-      document.getElementById('mnMsg').value=body;
-      document.getElementById('mnSubject').value=tplData.subject||'Passages garantie effectues - recapitulatif';
-    } else {
-      const r=selectedItems[0];
-      const body=(tplData.body||'Bonjour,\nUn passage garantie a ete effectue au {{adresse}} le {{date}}.\nConsultez votre espace client : {{lien}}\nCordialement,\nBelledonne Multiservices').replace(/{{nom}}/g,r.nom||'-').replace(/{{adresse}}/g,r.adresse||'-').replace(/{{date}}/g,r.date||'-').replace(/{{nuisible}}/g,r.nuisible||'-').replace(/{{lien}}/g,LIEN_ESPACE);
-      document.getElementById('mnMsg').value=body;
-      const subj=(tplData.subject||'Passage garantie effectue - {{nom}}').replace(/{{nom}}/g,r.nom||'-');
-      document.getElementById('mnSubject').value=subj;
-    }
-    window._notifSelectedItems=selectedItems;
-  } catch(e) {
-    console.error(e);
-    document.getElementById('mnContacts').innerHTML='<div style="color:red;padding:12px;">Erreur: '+e.message+'</div>';
-  }
-};
-
-window._doSendNotification = async function() {
-  const btn=document.getElementById('mnBtnSend');
-  const subject=document.getElementById('mnSubject').value.trim();
-  const body=document.getElementById('mnMsg').value.trim();
-  if(!subject||!body){alert('Objet et message requis.');return;}
-  const checkboxes=document.querySelectorAll('#mnContacts input[type=checkbox]:checked');
-  const recipients=Array.from(checkboxes).map(c=>c.value).filter(Boolean);
-  if(recipients.length===0){alert('Selectionnez au moins un destinataire.');return;}
-  const sel=window._notifSelectedItems||[];
-  const attachments=sel.filter(r=>r.rapportUrl).map(r=>({url:r.rapportUrl,filename:'garanties_'+(r.bc||r.id||'fichier').replace(/[^a-zA-Z0-9]/g,'_')+'.xlsx'}));
-  btn.disabled=true;btn.textContent='Envoi...';
-  let sent=0;let errors=0;
-  for(const to of recipients) {
-    try {
-      const _hdrs=auth.currentUser?{'Content-Type':'application/json','Authorization':'Bearer '+(await auth.currentUser.getIdToken())}:{'Content-Type':'application/json'};
-      const resp=await fetch(FUNCTION_URL,{method:'POST',headers:_hdrs,body:JSON.stringify({to,subject,body,attachments})});
-      if(resp.ok) sent++; else errors++;
-    } catch(e){errors++;}
-  }
-  if(sent>0) {
-    for(const r of sel) {
-      try {
-        const newCount = (r.notifs||0) + 1;
-        await updateDoc(doc(db,'garanties',r.id),{notifs: newCount, lastNotif: new Date().toISOString()});
-        r.notifs = newCount;
-        const row = document.getElementById('row-'+r.id);
-        if(row) {
-          let badge = row.querySelector('.notif-badge');
-          if(!badge) {
-            badge = document.createElement('span');
-            badge.className = 'notif-badge';
-            const actionsDiv = row.querySelector('div:last-child');
-            if(actionsDiv) actionsDiv.prepend(badge);
-          }
-          badge.textContent = '✓ Notifié' + (newCount > 1 ? ' ×'+newCount : '');
-        }
-      } catch(e){ console.warn('notifs update:', e); }
-    }
-  }
-  document.getElementById('mnSuccess').style.display='block';
-  document.getElementById('mnMainContent').style.display='none';
-  document.getElementById('mnSuccessMsg').textContent=sent+' email(s) envoye(s)'+(errors>0?', '+errors+' erreur(s).':'.');
-  document.getElementById('mnFooter').innerHTML='<button class="mn-btn-cancel" onclick="closeNotifModal();clearSelection()">Fermer</button>';
-};
-
-onAuthStateChanged(auth, async function(user) {
+// ── Journées : liste ──
+let journees = [];
+onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = "login.html"; return; }
-  if (user.email === "belledonne.multiservices@gmail.com") {
-    window._isAdmin = true;
-    const name=document.getElementById("sideClientName"); if(name) name.textContent="Belledonne Multiservices";
-    const id=document.getElementById("sideClientId"); if(id) id.textContent="belledonne-admin";
-    const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent="BM";
-    const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent="Belledonne Multiservices";
-    const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Administrateur";
-    var adminNav=document.getElementById("adminNav"); if(adminNav) adminNav.style.display="block";
-    var btn=document.getElementById("btnAjouter"); if(btn) btn.style.display="";
-    const tw2=document.getElementById('tableBody'); if(tw2&&tw2.parentElement) tw2.parentElement.classList.remove('is-client');
-    loadClientsIntoSelect("inClient");
-    window._currentClientFilter = null;
-    await window._loadGaranties(null);
-  } else {
-    try {
-      const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
-      if (!snap.empty) {
-        const p = snap.docs[0].data();
-        const name=document.getElementById("sideClientName"); if(name) name.textContent=p.client||"Client";
-        const id=document.getElementById("sideClientId"); if(id) id.textContent=p.identifiant||"";
-        const avatar=document.getElementById("sideAvatar"); if(avatar) avatar.textContent=(p.client||"CL").substring(0,2).toUpperCase();
-        const fname=document.getElementById("sideFooterName"); if(fname) fname.textContent=p.client||user.email;
-        const frole=document.getElementById("sideFooterRole"); if(frole) frole.textContent="Client";
-        const navSuivi = document.getElementById('navSuiviItem'); if (navSuivi) navSuivi.style.display = 'none';
-        window._currentClientFilter = p.client;
-        await window._loadGaranties(p.client);
-        const tw=document.getElementById('tableBody'); if(tw&&tw.parentElement) tw.parentElement.classList.add('is-client');
-      }
-    } catch(e) { console.error(e); }
-  }
+  if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
+  onSnapshot(collection(db, "garanties-journees"), (snap) => {
+    journees = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    renderJournees();
+    if (_currentJourneeId) {
+      const j = journees.find(x => x.id === _currentJourneeId);
+      if (j) { _currentJournee = j; renderLignes(); refreshDetailHeader(); }
+    }
+  });
+  loadTechniciensSelect();
+  loadClientsSelect();
 });
+
+function fmtDate(d) {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
+  const mois = ["jan.", "fév.", "mars", "avr.", "mai", "juin", "juil.", "août", "sep.", "oct.", "nov.", "déc."];
+  return `${parseInt(day)} ${mois[parseInt(m) - 1]} ${y}`;
+}
+function initiales(nom) {
+  if (!nom) return "?";
+  return nom.split(" ").filter(Boolean).map(p => p[0].toUpperCase()).join("").slice(0, 2);
+}
+
+function renderJournees() {
+  const grid = document.getElementById("journeesGrid");
+  const empty = document.getElementById("emptyState");
+  if (!journees.length) { grid.innerHTML = ""; empty.style.display = ""; return; }
+  empty.style.display = "none";
+  grid.innerHTML = journees.map(j => `
+    <div class="j-card" onclick="openDetailModal('${j.id}')">
+      <div class="j-date">${fmtDate(j.date)}</div>
+      <div class="j-creneau">${j.heureDebut || "—"} - ${j.heureFin || "—"}</div>
+      <div class="j-row"><span>${(j.lignes || []).length} locataire${(j.lignes || []).length > 1 ? "s" : ""}</span><span class="j-badge ${j.statut === "terminee" ? "j-terminee" : "j-en-cours"}">${j.statut === "terminee" ? "Terminée" : "En cours"}</span></div>
+      <div class="j-row" style="margin-bottom:0;">
+        ${j.technicienNom ? `<div class="j-tech"><div class="j-tech-av">${initiales(j.technicienNom)}</div><span>${j.technicienNom}</span></div>` : `<span style="color:var(--text-muted);">Non assigné</span>`}
+      </div>
+    </div>`).join("");
+}
+
+// ── Créer une journée ──
+window.openNewJournee = function() {
+  document.getElementById("jDate").value = "";
+  document.getElementById("jHeureDebut").value = "08:00";
+  document.getElementById("jHeureFin").value = "12:00";
+  document.getElementById("modalJournee").classList.add("open");
+};
+window.closeJourneeModal = function() { document.getElementById("modalJournee").classList.remove("open"); };
+window.saveJournee = async function() {
+  const date = document.getElementById("jDate").value;
+  const heureDebut = document.getElementById("jHeureDebut").value;
+  const heureFin = document.getElementById("jHeureFin").value;
+  if (!date || !heureDebut || !heureFin) { alert("Renseignez la date et le créneau horaire."); return; }
+  const now = new Date().toISOString();
+  await addDoc(collection(db, "garanties-journees"), {
+    date, heureDebut, heureFin, statut: "en-cours",
+    technicienId: null, technicienNom: null, technicienEmail: null, technicienKizeoUserId: null,
+    calEventId: null, lignes: [], createdAt: now, updatedAt: now,
+  });
+  closeJourneeModal();
+  showToast("Journée créée");
+};
+
+// ── Détail journée ──
+let _currentJourneeId = null;
+let _currentJournee = null;
+
+window.openDetailModal = function(id) {
+  _currentJourneeId = id;
+  _currentJournee = journees.find(x => x.id === id);
+  if (!_currentJournee) return;
+  refreshDetailHeader();
+  renderLignes();
+  document.getElementById("dTechnicien").value = _currentJournee.technicienId || "";
+  document.getElementById("modalDetail").classList.add("open");
+};
+window.closeDetailModal = function() {
+  document.getElementById("modalDetail").classList.remove("open");
+  _currentJourneeId = null; _currentJournee = null;
+};
+
+function refreshDetailHeader() {
+  if (!_currentJournee) return;
+  document.getElementById("dTitle").textContent = "Journée du " + fmtDate(_currentJournee.date);
+  document.getElementById("dSub").textContent = `${_currentJournee.heureDebut || "—"} - ${_currentJournee.heureFin || "—"} · ${_currentJournee.technicienNom ? "Assignée à " + _currentJournee.technicienNom : "Non assignée"}`;
+  const btnStatut = document.getElementById("btnStatut");
+  btnStatut.textContent = _currentJournee.statut === "terminee" ? "Rouvrir la journée" : "Marquer terminée";
+  const hasLignes = (_currentJournee.lignes || []).length > 0;
+  const hasTech = !!_currentJournee.technicienId;
+  document.getElementById("btnAgenda").disabled = !hasTech || !hasLignes;
+  document.getElementById("btnKizeo").disabled = !hasTech || !hasLignes;
+}
+
+async function persistJournee(patch) {
+  const now = new Date().toISOString();
+  await updateDoc(doc(db, "garanties-journees", _currentJourneeId), { ...patch, updatedAt: now });
+}
+
+// ── Lignes : rendu + drag-and-drop ──
+let _dragSrcIndex = null;
+
+function renderLignes() {
+  const list = document.getElementById("lignesList");
+  const lignes = (_currentJournee && _currentJournee.lignes) || [];
+  if (!lignes.length) { list.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:10px 0;">Aucun locataire ajouté.</div>`; return; }
+  list.innerHTML = lignes.map((l, i) => `
+    <div class="ligne-row" draggable="true" data-idx="${i}">
+      <span class="ligne-handle">⠿</span>
+      <div class="ligne-num">${i + 1}</div>
+      <div class="ligne-info">
+        <div class="ligne-nom">${l.nom || "—"} <span style="font-weight:400;color:var(--text-muted);">(${l.client || "—"})</span></div>
+        <div class="ligne-adresse">${l.adresse || ""}${l.etage ? ", étage " + l.etage : ""}${l.numeroLogement ? ", log. " + l.numeroLogement : ""} — ${l.codePostal || ""} ${l.ville || ""}</div>
+      </div>
+      ${l.kizeoPushedAt ? `<span class="ligne-pushed">✓ Envoyé Kizeo</span>` : ""}
+      <div class="ligne-actions">
+        <button class="btn-icon" onclick="openLigneModal('${l.id}')" title="Modifier"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+        <button class="btn-icon danger" onclick="deleteLigne('${l.id}')" title="Supprimer"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+      </div>
+    </div>`).join("");
+
+  list.querySelectorAll(".ligne-row").forEach(row => {
+    row.addEventListener("dragstart", () => { _dragSrcIndex = parseInt(row.dataset.idx, 10); row.classList.add("dragging"); });
+    row.addEventListener("dragend", () => { row.classList.remove("dragging"); list.querySelectorAll(".ligne-row").forEach(r => r.classList.remove("drag-over")); });
+    row.addEventListener("dragover", (e) => { e.preventDefault(); row.classList.add("drag-over"); });
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+    row.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      row.classList.remove("drag-over");
+      const targetIdx = parseInt(row.dataset.idx, 10);
+      if (_dragSrcIndex === null || _dragSrcIndex === targetIdx) return;
+      const lignes = [..._currentJournee.lignes];
+      const [moved] = lignes.splice(_dragSrcIndex, 1);
+      lignes.splice(targetIdx, 0, moved);
+      _currentJournee.lignes = lignes;
+      renderLignes();
+      await persistJournee({ lignes });
+    });
+  });
+}
+
+// ── Modal ligne (ajout/édition) ──
+let _editLigneId = null;
+window.openLigneModal = function(ligneId) {
+  _editLigneId = ligneId;
+  const l = ligneId ? (_currentJournee.lignes || []).find(x => x.id === ligneId) : null;
+  document.getElementById("lTitle").textContent = ligneId ? "Modifier le locataire" : "Ajouter un locataire";
+  document.getElementById("lClient").value = l ? (l.client || "") : "";
+  document.getElementById("lNom").value = l ? (l.nom || "") : "";
+  document.getElementById("lAdresse").value = l ? (l.adresse || "") : "";
+  document.getElementById("lCodePostal").value = l ? (l.codePostal || "") : "";
+  document.getElementById("lVille").value = l ? (l.ville || "") : "";
+  document.getElementById("lEtage").value = l ? (l.etage || "") : "";
+  document.getElementById("lNumeroLogement").value = l ? (l.numeroLogement || "") : "";
+  document.getElementById("modalLigne").classList.add("open");
+};
+window.closeLigneModal = function() { document.getElementById("modalLigne").classList.remove("open"); _editLigneId = null; };
+
+window.saveLigne = async function() {
+  const client = document.getElementById("lClient").value;
+  const nom = document.getElementById("lNom").value.trim();
+  const adresse = document.getElementById("lAdresse").value.trim();
+  const codePostal = document.getElementById("lCodePostal").value.trim();
+  const ville = document.getElementById("lVille").value.trim();
+  const etage = document.getElementById("lEtage").value.trim();
+  const numeroLogement = document.getElementById("lNumeroLogement").value.trim();
+  if (!client || !nom || !adresse || !codePostal || !ville) { alert("Client, nom, adresse, code postal et ville sont obligatoires."); return; }
+
+  const lignes = [...(_currentJournee.lignes || [])];
+  if (_editLigneId) {
+    const idx = lignes.findIndex(x => x.id === _editLigneId);
+    if (idx !== -1) lignes[idx] = { ...lignes[idx], client, nom, adresse, codePostal, ville, etage, numeroLogement };
+  } else {
+    lignes.push({ id: uid(), client, nom, adresse, codePostal, ville, etage, numeroLogement, kizeoPushedAt: null });
+  }
+  _currentJournee.lignes = lignes;
+  await persistJournee({ lignes });
+  renderLignes();
+  refreshDetailHeader();
+  closeLigneModal();
+  showToast(_editLigneId ? "Locataire mis à jour" : "Locataire ajouté");
+};
+
+window.deleteLigne = async function(ligneId) {
+  if (!confirm("Supprimer ce locataire de la journée ?")) return;
+  const lignes = (_currentJournee.lignes || []).filter(x => x.id !== ligneId);
+  _currentJournee.lignes = lignes;
+  await persistJournee({ lignes });
+  renderLignes();
+  refreshDetailHeader();
+};
+
+// ── Techniciens ──
+async function loadTechniciensSelect() {
+  const snap = await getDocs(collection(db, "techniciens"));
+  const sel = document.getElementById("dTechnicien");
+  sel.innerHTML = '<option value="">— Sélectionner —</option>';
+  snap.docs.forEach(d => {
+    const t = d.data();
+    const o = document.createElement("option");
+    o.value = d.id;
+    o.textContent = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+    o.dataset.email = t.email || "";
+    o.dataset.kizeoUserId = t.kizeoUserId || "";
+    o.dataset.nom = o.textContent;
+    sel.appendChild(o);
+  });
+}
+
+window.assignTechnicien = async function() {
+  const sel = document.getElementById("dTechnicien");
+  const opt = sel.selectedOptions[0];
+  if (!opt || !opt.value) { alert("Sélectionnez un technicien."); return; }
+  await persistJournee({
+    technicienId: opt.value,
+    technicienNom: opt.dataset.nom,
+    technicienEmail: opt.dataset.email,
+    technicienKizeoUserId: opt.dataset.kizeoUserId,
+  });
+  _currentJournee.technicienId = opt.value;
+  _currentJournee.technicienNom = opt.dataset.nom;
+  _currentJournee.technicienEmail = opt.dataset.email;
+  _currentJournee.technicienKizeoUserId = opt.dataset.kizeoUserId;
+  refreshDetailHeader();
+  showToast("Technicien assigné");
+};
+
+// ── Clients (bailleurs en contrat) ──
+async function loadClientsSelect() {
+  const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+  const sel = document.getElementById("lClient");
+  sel.innerHTML = '<option value="">— Sélectionner —</option>';
+  const seen = new Set();
+  snap.docs.forEach(d => {
+    const cl = d.data().client;
+    if (!cl || seen.has(cl)) return;
+    seen.add(cl);
+    const o = document.createElement("option"); o.value = cl; o.textContent = cl;
+    sel.appendChild(o);
+  });
+}
+
+// ── Agenda Google ──
+window.doAgenda = async function() {
+  if (!_currentJournee.technicienEmail) { alert("Assignez d'abord un technicien."); return; }
+  const btn = document.getElementById("btnAgenda");
+  btn.disabled = true; const orig = btn.textContent; btn.textContent = "Intégration...";
+  try {
+    const lignes = _currentJournee.lignes || [];
+    const description = lignes.map(l => `${l.nom} - ${l.adresse}, ${l.codePostal} ${l.ville}`).join("\n");
+    const body = {
+      technicienEmail: _currentJournee.technicienEmail,
+      passages: [`${_currentJournee.date}T${_currentJournee.heureDebut}|${_currentJournee.date}T${_currentJournee.heureFin}`],
+      customSummary: `Garantie — ${lignes.length} locataire${lignes.length > 1 ? "s" : ""}`,
+      customDescription: description,
+      interventionId: _currentJourneeId,
+    };
+    if (_currentJournee.calEventId) { body.operation = "update"; body.calEventId = _currentJournee.calEventId; }
+    const resp = await fetch(FN_AGENDA, { method: "POST", headers: await authHeaders(), body: JSON.stringify(body) });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || "Échec de l'intégration agenda");
+    const eventId = data.results && data.results[0] ? data.results[0].eventId : null;
+    if (eventId) { await persistJournee({ calEventId: eventId }); _currentJournee.calEventId = eventId; }
+    showToast("Événement ajouté à l'agenda");
+  } catch (e) {
+    alert("Erreur agenda : " + e.message);
+  }
+  btn.disabled = false; btn.textContent = orig;
+};
+
+// ── Push Kizeo ──
+window.doPushKizeo = async function() {
+  const btn = document.getElementById("btnKizeo");
+  btn.disabled = true; const orig = btn.textContent; btn.textContent = "Envoi...";
+  try {
+    const resp = await fetch(FN_PUSH_KIZEO, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ journeeId: _currentJourneeId }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Échec de l'envoi Kizeo");
+    showToast(`${data.pushed || 0} rapport(s) envoyé(s)` + (data.errors ? `, ${data.errors} erreur(s)` : ""));
+  } catch (e) {
+    alert("Erreur Kizeo : " + e.message);
+  }
+  btn.disabled = false; btn.textContent = orig;
+};
+
+// ── Statut ──
+window.toggleStatut = async function() {
+  const next = _currentJournee.statut === "terminee" ? "en-cours" : "terminee";
+  await persistJournee({ statut: next });
+  _currentJournee.statut = next;
+  refreshDetailHeader();
+  showToast(next === "terminee" ? "Journée marquée terminée" : "Journée rouverte");
+};
+
+// ── Suppression ──
+window.deleteJournee = async function() {
+  if (!confirm("Supprimer définitivement cette journée garantie et tous ses locataires ?")) return;
+  await deleteDoc(doc(db, "garanties-journees", _currentJourneeId));
+  closeDetailModal();
+  showToast("Journée supprimée");
+};
 </script>
 <script type="module" src="suivi-badge.js"></script>
 </body>
