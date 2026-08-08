@@ -46,7 +46,7 @@
   .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start;}
   .col-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:12px;}
   .semaines-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
-  .s-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;cursor:pointer;transition:box-shadow 0.15s;}
+  .s-card{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--pair-accent,var(--border));border-radius:var(--radius);padding:18px 20px;cursor:pointer;transition:box-shadow 0.15s;min-height:112px;display:flex;flex-direction:column;justify-content:space-between;}
   .s-card:hover{box-shadow:0 4px 16px rgba(13,27,42,0.08);}
   .s-date{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px;}
   .s-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-mid);}
@@ -485,6 +485,16 @@ async function loadClients() {
   snap.docs.forEach(d => { const cl = d.data().client; if (cl && !seen.has(cl)) { seen.add(cl); clientsList.push(cl); } });
 }
 
+// Couleur d'accent partagée entre la carte "semaine" et sa carte "Gestion rapports"
+// correspondante (repère visuel léger), stable par semaine (basé sur son rang dans
+// la liste triée, pas sur son id, pour rester cohérent visuellement dans le temps).
+const PAIR_ACCENT_PALETTE = ["#4338CA", "#0E9F6E", "#C27D0A", "#DB2777", "#0891B2", "#7C3AED", "#DC2626", "#0D9488"];
+function accentForSemaine(semaineId) {
+  const idx = semaines.findIndex(s => s.id === semaineId);
+  if (idx < 0) return "var(--border)";
+  return PAIR_ACCENT_PALETTE[idx % PAIR_ACCENT_PALETTE.length];
+}
+
 // ── Liste des semaines ──
 function renderSemaines() {
   const grid = document.getElementById("semainesGrid");
@@ -494,7 +504,7 @@ function renderSemaines() {
   grid.innerHTML = semaines.map(s => {
     const blocs = s.blocs || [];
     const nbLignes = blocs.reduce((sum, b) => sum + (b.lignes || []).length, 0);
-    return `<div class="s-card" onclick="openDetailModal('${s.id}')">
+    return `<div class="s-card" style="--pair-accent:${accentForSemaine(s.id)};" onclick="openDetailModal('${s.id}')">
       <div class="s-date">${fmtDate(s.dateDebut)} → ${fmtDate(s.dateFin)}</div>
       <div class="s-row"><span>${blocs.length} bloc${blocs.length > 1 ? "s" : ""}</span><span>${nbLignes} locataire${nbLignes > 1 ? "s" : ""}</span></div>
     </div>`;
@@ -516,7 +526,7 @@ function renderRapportsGrid() {
     const label = s ? `${fmtDate(s.dateDebut)} → ${fmtDate(s.dateFin)}` : "Semaine supprimée";
     const aTraiter = list.filter(r => r.statut === "a-traiter").length;
     const retard = list.filter(isOverdueRapport).length;
-    return `<div class="s-card" style="position:relative;" onclick="openRapportsModal('${sid}')">
+    return `<div class="s-card" style="position:relative;--pair-accent:${accentForSemaine(sid)};" onclick="openRapportsModal('${sid}')">
       <button class="btn-icon danger" style="position:absolute;top:8px;right:8px;" title="Supprimer tous les rapports de cette semaine" onclick="event.stopPropagation();deleteRapportsSemaine('${sid}')"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
       <div class="s-date">${label}</div>
       <div class="s-row" style="margin-bottom:6px;"><span>${list.length} rapport${list.length > 1 ? "s" : ""}</span></div>
