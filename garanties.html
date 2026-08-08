@@ -505,7 +505,8 @@ function renderRapportsGrid() {
     const label = s ? `${fmtDate(s.dateDebut)} → ${fmtDate(s.dateFin)}` : "Semaine supprimée";
     const aTraiter = list.filter(r => r.statut === "a-traiter").length;
     const retard = list.filter(isOverdueRapport).length;
-    return `<div class="s-card" onclick="openRapportsModal('${sid}')">
+    return `<div class="s-card" style="position:relative;" onclick="openRapportsModal('${sid}')">
+      <button class="btn-icon danger" style="position:absolute;top:8px;right:8px;" title="Supprimer tous les rapports de cette semaine" onclick="event.stopPropagation();deleteRapportsSemaine('${sid}')"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
       <div class="s-date">${label}</div>
       <div class="s-row" style="margin-bottom:6px;"><span>${list.length} rapport${list.length > 1 ? "s" : ""}</span></div>
       <div class="s-row" style="gap:6px;">
@@ -885,11 +886,29 @@ window.deleteSemaine = async function() {
     } catch(e) { console.error("Suppression agenda échouée:", e); }
   }
 
-  await deleteDoc(doc(db, "garanties-semaines", _currentSemaineId));
+  const semaineIdSupprimee = _currentSemaineId;
+  await deleteDoc(doc(db, "garanties-semaines", semaineIdSupprimee));
   document.getElementById("modalDetail").classList.remove("open");
   closeCalendarPanel();
   _currentSemaineId = null; _currentSemaine = null;
   showToast("Semaine supprimée");
+
+  const rapportsSemaine = rapports.filter(r => r.semaineId === semaineIdSupprimee);
+  if (rapportsSemaine.length) {
+    for (const r of rapportsSemaine) {
+      try { await deleteDoc(doc(db, "garanties-rapports", r.id)); } catch(e) { console.error("Suppression rapport échouée:", e); }
+    }
+  }
+};
+
+window.deleteRapportsSemaine = async function(semaineId) {
+  const list = rapports.filter(r => r.semaineId === semaineId);
+  if (!list.length) return;
+  if (!confirm(`Supprimer les ${list.length} rapport(s) de cette semaine ?`)) return;
+  for (const r of list) {
+    try { await deleteDoc(doc(db, "garanties-rapports", r.id)); } catch(e) { console.error("Suppression rapport échouée:", e); }
+  }
+  showToast("Rapports supprimés");
 };
 
 window.toggleBlocStatut = async function(blocId) {
