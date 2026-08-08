@@ -676,16 +676,9 @@ function renderBlocs() {
         ${lignes.map((l, i) => {
           const rapportsLigne = rapports.filter(r => r.blocId === b.id && r.ligneId === l.id);
           const pendingLigne = rapportsLigne.find(r => r.statut === "en-attente");
-          const pendingAutre = rapports.find(r => r.blocId === b.id && r.ligneId !== l.id && r.statut === "en-attente");
           const dejaEnvoye = !!l.kizeoPushedAt;
-          let kizeoBtn;
-          if (pendingLigne) {
-            kizeoBtn = `<span class="ligne-pushed" title="En attente de réception du rapport">⏳ En attente</span>`;
-          } else if (pendingAutre) {
-            kizeoBtn = `<button class="btn-icon" disabled title="Un autre locataire du bloc est en attente de réception, attendez son rapport">${dejaEnvoye ? "Renvoyer" : "Envoyer"}</button>`;
-          } else {
-            kizeoBtn = `<button class="btn-icon" onclick="sendLigneKizeo('${b.id}','${l.id}')" title="${dejaEnvoye ? "Renvoyer le rapport Kizeo" : "Envoyer le rapport Kizeo"}">${dejaEnvoye ? "Renvoyer" : "Envoyer"}</button>`;
-          }
+          const statutBadge = pendingLigne ? `<span class="ligne-pushed" title="En attente de réception du rapport">⏳ En attente</span>` : "";
+          const kizeoBtn = `<button class="btn-icon" onclick="sendLigneKizeo('${b.id}','${l.id}')" title="${dejaEnvoye ? "Renvoyer le rapport Kizeo" : "Envoyer le rapport Kizeo"}">${dejaEnvoye ? "Renvoyer" : "Envoyer"}</button>`;
           return `
         <div class="ligne-row" draggable="true" data-bloc-id="${b.id}" data-idx="${i}">
           <span class="ligne-handle">⠿</span>
@@ -694,6 +687,7 @@ function renderBlocs() {
             <div class="ligne-nom">${l.nom || "—"} <span style="font-weight:400;color:var(--text-muted);">(${l.client || "—"})</span></div>
             <div class="ligne-adresse">${l.adresse || ""}${l.etage ? ", ét. " + l.etage : ""}${l.numeroLogement ? ", log. " + l.numeroLogement : ""} — ${l.codePostal || ""} ${l.ville || ""}</div>
           </div>
+          ${statutBadge}
           ${kizeoBtn}
           <div class="ligne-actions">
             <button class="btn-icon" onclick="openLigneModal('${b.id}','${l.id}')" title="Modifier"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>

@@ -1562,14 +1562,12 @@ exports.kizeoPull = functions
   });
 
 // Pousse le rapport Kizeo pré-rempli (nom, adresse, code postal, ville, étage)
-// d'UN SEUL locataire à la fois au technicien assigné. Le libellé visible sur
-// l'app mobile = nom du locataire. Formulaire identifié par son formId Kizeo
-// (indépendant du système de mapping "suivi" classique).
-//
-// Pousser plusieurs formulaires d'un coup au même technicien fait que Kizeo les
-// synchronise TOUS ensemble dès qu'un seul est touché sur l'app (même les
-// vides) — d'où le push strictement unitaire : le frontend verrouille l'envoi
-// du locataire suivant tant que celui en cours n'est pas reçu.
+// d'un locataire au technicien assigné, un formulaire à la fois (mais sans
+// restriction sur le nombre de rapports en attente simultanément) : l'admin
+// peut pousser tous les rapports d'un bloc à l'avance, le technicien les
+// reçoit tous et les envoie complétés au fur et à mesure de ses interventions.
+// Le libellé visible sur l'app mobile = nom du locataire. Formulaire identifié
+// par son formId Kizeo (indépendant du système de mapping "suivi" classique).
 const GARANTIE_KIZEO_FORM_ID = "1086949"; // "Garantie blattes"
 exports.pushGarantieKizeo = functions
   .region("europe-west1")
@@ -1598,16 +1596,6 @@ exports.pushGarantieKizeo = functions
     if (!ligne) { res.status(404).json({ error: "Locataire introuvable" }); return; }
     const recipient = parseInt(bloc.technicienKizeoUserId, 10);
     if (!recipient) { res.status(400).json({ error: "Technicien Kizeo manquant (assignez un technicien avec un ID Kizeo configuré)" }); return; }
-
-    // Verrou serveur : refuse le push si un autre locataire du même bloc est
-    // encore "en attente" de réception (protection contre la synchronisation groupée).
-    const pendingSnap = await db.collection("garanties-rapports")
-      .where("blocId", "==", blocId).where("statut", "==", "en-attente").get();
-    const otherPending = pendingSnap.docs.find(d => d.data().ligneId !== ligneId);
-    if (otherPending) {
-      res.status(409).json({ error: `Un autre locataire (${otherPending.data().nomLocataire || "?"}) est déjà en attente de réception sur ce bloc. Attendez son rapport avant d'envoyer le suivant.` });
-      return;
-    }
 
     const formsSnap = await db.collection("kizeo-forms").where("formId", "==", GARANTIE_KIZEO_FORM_ID).limit(1).get();
     if (formsSnap.empty) { res.status(400).json({ error: "Formulaire Kizeo garantie non configuré dans kizeo-forms" }); return; }
