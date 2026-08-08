@@ -1699,3 +1699,120 @@ exports.pushGarantieKizeo = functions
 
     res.status(200).json({ pushed, errors: errorsList.length, errorsList });
   });
+
+// ── GARANTIES : GÉNÉRER LES RAPPORTS AGRÉGÉS PAR CLIENT (semaine) ──
+// Regroupe tous les rapports "à traiter" (reçus, signés) d'une semaine garantie
+// par client, fusionne leurs PDF en un seul par client (page de garde + rapports),
+// archive les rapports sources, et remplace l'agrégé existant s'il y en a déjà un
+// pour ce client sur cette semaine (un seul agrégé par client/semaine, toujours à jour).
+function fetchBuffer(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      if (res.statusCode !== 200) { reject(new Error("HTTP " + res.statusCode)); return; }
+      const chunks = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => resolve(Buffer.concat(chunks)));
+      res.on("error", reject);
+    }).on("error", reject);
+  });
+}
+
+exports.generateGarantieRapportsParClient = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { semaineId } = req.body || {};
+    if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
+
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+    const semaineSnap = await db.collection("garanties-semaines").doc(semaineId).get();
+    if (!semaineSnap.exists) { res.status(404).json({ error: "Semaine introuvable" }); return; }
+    const semaine = semaineSnap.data();
+
+    const rapportsSnap = await db.collection("garanties-rapports")
+      .where("semaineId", "==", semaineId).where("statut", "==", "a-traiter").get();
+    const rapports = rapportsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!rapports.length) { res.status(400).json({ error: "Aucun rapport \"à traiter\" pour cette semaine" }); return; }
+
+    const byClient = {};
+    rapports.forEach(r => { const c = r.client || "_inconnu"; (byClient[c] = byClient[c] || []).push(r); });
+
+    const { PDFDocument, StandardFonts, rgb } = require("pdf-lib");
+    const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+    const periode = `${fmtDateFR(semaine.dateDebut)} au ${fmtDateFR(semaine.dateFin)}`;
+    const results = [];
+
+    for (const client of Object.keys(byClient)) {
+      const rapportsClient = byClient[client];
+      try {
+        const merged = await PDFDocument.create();
+        const font = await merged.embedFont(StandardFonts.HelveticaBold);
+
+        const cover = merged.addPage([595.28, 841.89]); // A4
+        const title = "Rapport de garantie traitement blattes";
+        const lignes = [title, `Période : ${periode}`, client];
+        let y = 500;
+        lignes.forEach((ligne, i) => {
+          const size = i === 0 ? 20 : 14;
+          const textWidth = font.widthOfTextAtSize(ligne, size);
+          cover.drawText(ligne, { x: (595.28 - textWidth) / 2, y, size, font, color: rgb(0, 0, 0) });
+          y -= size + 16;
+        });
+
+        for (const r of rapportsClient) {
+          if (!r.fileUrl) continue;
+          try {
+            const buf = await fetchBuffer(r.fileUrl);
+            const srcPdf = await PDFDocument.load(buf);
+            const pages = await merged.copyPages(srcPdf, srcPdf.getPageIndices());
+            pages.forEach(p => merged.addPage(p));
+          } catch(e) {
+            console.error(`generateGarantieRapportsParClient: rapport ${r.id} illisible:`, e.message);
+          }
+        }
+
+        const mergedBytes = await merged.save();
+        const storagePath = `garanties-agreges/${semaineId}/${client.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+        const downloadToken = crypto.randomUUID();
+        await bucket.file(storagePath).save(Buffer.from(mergedBytes), {
+          contentType: "application/pdf",
+          metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
+        });
+        const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+
+        const now = new Date().toISOString();
+        const aggDocId = `${semaineId}__${client.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+        await db.collection("garanties-rapports-agreges").doc(aggDocId).set({
+          semaineId, client, fileUrl, storagePath,
+          nbRapports: rapportsClient.length,
+          periode,
+          generatedAt: now, updatedAt: now,
+        });
+
+        const batch = db.batch();
+        rapportsClient.forEach(r => batch.update(db.collection("garanties-rapports").doc(r.id), { statut: "archive", updatedAt: now }));
+        await batch.commit();
+
+        results.push({ client, nbRapports: rapportsClient.length, fileUrl });
+      } catch(e) {
+        console.error(`generateGarantieRapportsParClient: échec pour client ${client}:`, e.message);
+        results.push({ client, error: e.message });
+      }
+    }
+
+    res.status(200).json({ results });
+  });
+
+function fmtDateFR(iso) {
+  if (!iso) return "";
+  const [y, m, d] = String(iso).split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}

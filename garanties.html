@@ -360,8 +360,13 @@
           <option value="">Tous les statuts</option>
         </select>
         <span style="font-size:12px;color:var(--text-muted);" id="rCount"></span>
+        <button class="btn-secondary" style="margin-left:auto;" onclick="genererRapportsParClient()">Générer les rapports par client</button>
       </div>
       <div id="rapportsList"></div>
+      <div id="rapportsAgregesSection" style="display:none;margin-top:24px;">
+        <div class="section-sep"><span>Rapports agrégés par client</span></div>
+        <div id="rapportsAgregesList"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -400,6 +405,7 @@ const db = getFirestore(app, "belledonne-client");
 
 const FN_AGENDA = "https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar";
 const FN_PUSH_KIZEO = "https://europe-west1-belledonne-client.cloudfunctions.net/pushGarantieKizeo";
+const FN_GEN_PAR_CLIENT = "https://europe-west1-belledonne-client.cloudfunctions.net/generateGarantieRapportsParClient";
 
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
 
@@ -429,6 +435,7 @@ function fmtDateTime(iso) {
 // ── Auth + chargement ──
 let semaines = [];
 let rapports = [];
+let rapportsAgreges = [];
 let techniciensList = [];
 let clientsList = [];
 
@@ -448,6 +455,10 @@ onAuthStateChanged(auth, (user) => {
     rapports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderRapportsGrid();
     if (document.getElementById("modalRapports").classList.contains("open")) renderRapportsList();
+  });
+  onSnapshot(collection(db, "garanties-rapports-agreges"), (snap) => {
+    rapportsAgreges = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (document.getElementById("modalRapports").classList.contains("open")) renderRapportsAgreges();
   });
   loadTechniciens();
   loadClients();
@@ -525,6 +536,7 @@ window.openRapportsModal = function(semaineId) {
   document.getElementById("rTitle").textContent = "Rapports — Semaine du " + (s ? fmtDate(s.dateDebut) + " au " + fmtDate(s.dateFin) : "—");
   document.getElementById("rFilterStatut").value = "a-traiter-retard";
   renderRapportsList();
+  renderRapportsAgreges();
   document.getElementById("modalRapports").classList.add("open");
 };
 window.closeRapportsModal = function() {
@@ -573,6 +585,41 @@ window.deleteRapport = async function(id) {
   if (!confirm("Supprimer ce rapport ?")) return;
   await deleteDoc(doc(db, "garanties-rapports", id));
   showToast("Rapport supprimé");
+};
+
+window.renderRapportsAgreges = function() {
+  const list = rapportsAgreges.filter(a => a.semaineId === _currentRapportsSemaineId);
+  const section = document.getElementById("rapportsAgregesSection");
+  const el = document.getElementById("rapportsAgregesList");
+  if (!list.length) { section.style.display = "none"; el.innerHTML = ""; return; }
+  section.style.display = "";
+  el.innerHTML = list.map(a => `
+    <div class="rap-row">
+      <div class="rap-info">
+        <div class="rap-nom">${a.client}</div>
+        <div class="rap-sub">${a.nbRapports} rapport(s) fusionné(s) · généré le ${fmtDateTime(a.generatedAt)}</div>
+      </div>
+      <div class="rap-actions">
+        <a class="btn-a btn-open" href="${a.fileUrl}" target="_blank" rel="noopener">Télécharger</a>
+      </div>
+    </div>`).join("");
+};
+
+window.genererRapportsParClient = async function() {
+  const aTraiter = rapports.filter(r => r.semaineId === _currentRapportsSemaineId && r.statut === "a-traiter");
+  if (!aTraiter.length) { alert("Aucun rapport \"à traiter\" pour cette semaine."); return; }
+  if (!confirm(`Générer les rapports agrégés par client pour cette semaine ?\n\n${aTraiter.length} rapport(s) seront fusionnés puis archivés. Un agrégé existant pour un client sera remplacé.`)) return;
+  const btn = event.currentTarget; btn.disabled = true; const orig = btn.textContent; btn.textContent = "Génération...";
+  try {
+    const resp = await fetch(FN_GEN_PAR_CLIENT, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentRapportsSemaineId }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Échec de la génération");
+    const errors = (data.results || []).filter(r => r.error);
+    showToast(`${(data.results || []).length - errors.length} rapport(s) agrégé(s) généré(s)` + (errors.length ? `, ${errors.length} erreur(s)` : ""));
+  } catch (e) {
+    alert("Erreur : " + e.message);
+  }
+  btn.disabled = false; btn.textContent = orig;
 };
 
 // ── Créer une semaine ──

@@ -50,6 +50,7 @@ service cloud.firestore {
     match /reception-rapports/{doc} { allow read, write: if isAdmin(); }
     match /garanties-semaines/{doc} { allow read, write: if isAdmin(); }
     match /garanties-rapports/{doc} { allow read, write: if isAdmin(); }
+    match /garanties-rapports-agreges/{doc} { allow read, write: if isAdmin(); }
 
     // ── config : lecture par tout utilisateur connecté (couleurs, coordonnées,
     //    templates), écriture admin only ──
