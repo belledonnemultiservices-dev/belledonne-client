@@ -1534,11 +1534,16 @@ exports.pushGarantieKizeo = functions
     let pushed = 0;
     const errorsList = [];
 
+    // Régénération : suffixe (1), (2)... sur le libellé pour distinguer chaque
+    // envoi et permettre de retrouver/supprimer les anciens rapports dans Kizeo.
+    const pushCount = (bloc.kizeoPushCount || 0) + 1;
+    const libelleSuffix = pushCount > 1 ? ` (${pushCount - 1})` : "";
+
     for (const ligne of lignes) {
       const refInterne = `garantie::${semaineId}::${blocId}::${ligne.id}`;
       const values = {
         refInterne,
-        libelle: ligne.nom || "",
+        libelle: (ligne.nom || "") + libelleSuffix,
         nom: ligne.nom || "",
         etage: ligne.etage || "",
         adresse: ligne.adresse || "",
@@ -1566,6 +1571,7 @@ exports.pushGarantieKizeo = functions
 
     bloc.lignes = lignes;
     bloc.kizeoSentAt = new Date().toISOString();
+    bloc.kizeoPushCount = pushCount;
     try { await ref.update({ blocs, updatedAt: new Date().toISOString() }); }
     catch(e) { console.error("pushGarantieKizeo: mise à jour du bloc échouée:", e.message); }
 
