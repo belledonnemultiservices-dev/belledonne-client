@@ -260,11 +260,6 @@
         <div class="kpi-val" id="kpiRapports">—</div><div class="kpi-lbl">Rapports ce mois</div>
         <span class="kpi-trend trend-neutral" id="kpiRapportsSub">—</span>
       </div>
-      <div class="kpi k-purple">
-        <div class="kpi-icon k-purple"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg></div>
-        <div class="kpi-val" id="kpiGaranties">—</div><div class="kpi-lbl">Garanties ce mois</div>
-        <span class="kpi-trend trend-neutral" id="kpiGarantiesSub">—</span>
-      </div>
       <div class="kpi k-amber">
         <div class="kpi-icon k-amber"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg></div>
         <div class="kpi-val" id="kpiAbsents">—</div><div class="kpi-lbl">Absents / Annulations ce mois</div>
@@ -291,10 +286,6 @@
 
     <!-- GRILLE BAS -->
     <div class="grid-bottom">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Garanties récentes</div><a class="card-link" href="garanties.html">Voir →</a></div>
-        <div id="recentGaranties" class="card-scroll"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
-      </div>
       <div class="card">
         <div class="card-header"><div class="card-title">Absents / Annulations récents</div><a class="card-link" href="absents.html">Voir →</a></div>
         <div id="recentAbsents" class="card-scroll"><div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Chargement...</div></div>
@@ -344,15 +335,13 @@ async function loadClientDashboard(clientFilter) {
   const annee = new Date().getFullYear().toString();
 
   // Requêtes filtrées par client (cloisonnement imposé par les règles Firestore).
-  const [snapR, snapG, snapA, snapConfig] = await Promise.all([
+  const [snapR, snapA, snapConfig] = await Promise.all([
     getDocs(query(collection(db, "rapports"), where("client", "==", clientFilter))),
-    getDocs(query(collection(db, "garanties"), where("client", "==", clientFilter))),
     getDocs(query(collection(db, "absents"), where("client", "==", clientFilter))),
     getDocs(collection(db, "config")),
   ]);
 
   const rapports  = snapR.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.client===clientFilter);
-  const garanties = snapG.docs.map(d=>({id:d.id,...d.data()})).filter(g=>g.client===clientFilter);
   const absents   = snapA.docs.map(d=>({id:d.id,...d.data()})).filter(a=>a.client===clientFilter);
   const configDoc = snapConfig.docs.find(d=>d.id==='belledonne');
   const config    = configDoc ? configDoc.data() : {};
@@ -360,8 +349,6 @@ async function loadClientDashboard(clientFilter) {
   // ── KPIs ──
   document.getElementById('kpiRapports').textContent = rapports.filter(r=>(r.date||'').startsWith(mois)).length;
   document.getElementById('kpiRapportsSub').outerHTML = `<span class="kpi-trend trend-neutral">${rapports.filter(r=>(r.date||'').startsWith(annee)).length} cette année</span>`;
-  document.getElementById('kpiGaranties').textContent = garanties.filter(g=>(g.date||'').startsWith(mois)).length;
-  document.getElementById('kpiGarantiesSub').outerHTML = `<span class="kpi-trend trend-neutral">${garanties.filter(g=>(g.date||'').startsWith(annee)).length} cette année</span>`;
   document.getElementById('kpiAbsents').textContent = absents.filter(a=>(a.date||'').startsWith(mois)).length;
   document.getElementById('kpiAbsentsSub').outerHTML = `<span class="kpi-trend trend-neutral">${absents.filter(a=>(a.date||'').startsWith(annee)).length} cette année</span>`;
   document.getElementById('kpiCampagnes').textContent = '—';
@@ -381,19 +368,6 @@ async function loadClientDashboard(clientFilter) {
           <span style="font-size:11px;color:var(--text-muted);">${formatDate(r.date)}</span>
           ${r.pdfUrl?`<a href="${r.pdfUrl}" target="_blank" style="font-size:11px;color:var(--green-dark);font-weight:600;">↓ PDF</a>`:''}
         </div>
-      </div>`).join('');
-
-  // ── 3 dernières garanties ──
-  const last3G = [...garanties].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
-  document.getElementById('recentGaranties').innerHTML = last3G.length===0
-    ? '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucune garantie.</div>'
-    : last3G.map(g=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text);">${(g.adresse||'—').split(',')[0]}</div>
-          <div style="font-size:11px;color:var(--text-muted);">${g.bc||''} · ${g.nuisible||''}</div>
-        </div>
-        <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${formatDate(g.date)}</span>
       </div>`).join('');
 
   // ── 3 derniers absents ──
@@ -433,15 +407,13 @@ async function loadDashboard() {
   const prevMois = getPrevMoisStr();
 
   // Charger toutes les collections en parallèle
-  const [snapRapports, snapGaranties, snapAbsents, snapCampagnes] = await Promise.all([
+  const [snapRapports, snapAbsents, snapCampagnes] = await Promise.all([
     getDocs(collection(db, "rapports")),
-    getDocs(collection(db, "garanties")),
     getDocs(collection(db, "absents")),
     getDocs(collection(db, "campagnes")),
   ]);
 
   const rapports = snapRapports.docs.map(d => ({id:d.id,...d.data()}));
-  const garanties = snapGaranties.docs.map(d => ({id:d.id,...d.data()}));
   const absents = snapAbsents.docs.map(d => ({id:d.id,...d.data()}));
   const campagnes = snapCampagnes.docs.map(d => ({id:d.id,...d.data()}));
 
@@ -450,11 +422,6 @@ async function loadDashboard() {
   const rPrev = rapports.filter(r => (r.date||'').startsWith(prevMois)).length;
   document.getElementById('kpiRapports').textContent = rMois;
   document.getElementById('kpiRapportsSub').outerHTML = trend(rMois, rPrev);
-
-  const gMois = garanties.filter(g => (g.date||'').startsWith(mois)).length;
-  const gPrev = garanties.filter(g => (g.date||'').startsWith(prevMois)).length;
-  document.getElementById('kpiGaranties').textContent = gMois;
-  document.getElementById('kpiGarantiesSub').outerHTML = trend(gMois, gPrev);
 
   const aMois = absents.filter(a => (a.date||'').startsWith(mois)).length;
   const aPrev = absents.filter(a => (a.date||'').startsWith(prevMois)).length;
@@ -480,19 +447,6 @@ async function loadDashboard() {
 
   // (campagnes et alertes supprimés côté client)
 
-  // ── Garanties récentes ──
-  const last4G = [...garanties].sort((a,b) => (b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'')).slice(0,4);
-  document.getElementById('recentGaranties').innerHTML = last4G.length === 0
-    ? '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucune garantie.</div>'
-    : last4G.map(g => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text);">${(g.adresse||'—').split(',')[0]}</div>
-          <div style="font-size:11px;color:var(--text-muted);">${g.client||''} · ${g.bc||''}</div>
-        </div>
-        <span style="font-size:11px;color:var(--text-muted);">${formatDate(g.date)}</span>
-      </div>`).join('');
-
   // ── Absents récents ──
   const last4A = [...absents].sort((a,b) => (b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'')).slice(0,4);
   document.getElementById('recentAbsents').innerHTML = last4A.length === 0
@@ -508,15 +462,14 @@ async function loadDashboard() {
 
   // ── Activité par client ──
   const clientMap = {};
-  [...rapports,...garanties,...absents].forEach(x => {
+  [...rapports,...absents].forEach(x => {
     if (!x.client) return;
-    if (!clientMap[x.client]) clientMap[x.client] = {rapports:0, garanties:0, absents:0};
+    if (!clientMap[x.client]) clientMap[x.client] = {rapports:0, absents:0};
   });
   rapports.forEach(r => { if(r.client && clientMap[r.client]) clientMap[r.client].rapports++; });
-  garanties.forEach(g => { if(g.client && clientMap[g.client]) clientMap[g.client].garanties++; });
   absents.forEach(a => { if(a.client && clientMap[a.client]) clientMap[a.client].absents++; });
 
-  const clientList = Object.entries(clientMap).sort((a,b) => (b[1].rapports+b[1].garanties+b[1].absents) - (a[1].rapports+a[1].garanties+a[1].absents));
+  const clientList = Object.entries(clientMap).sort((a,b) => (b[1].rapports+b[1].absents) - (a[1].rapports+a[1].absents));
   document.getElementById('activiteClients').innerHTML = clientList.length === 0
     ? '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Aucune donnée.</div>'
     : clientList.map(([client, data]) => `
@@ -524,7 +477,6 @@ async function loadDashboard() {
         <div style="font-size:13px;font-weight:600;color:var(--text);">${client}</div>
         <div style="display:flex;gap:8px;">
           <span style="font-size:11px;background:#EBF0F5;color:#1A2E42;padding:2px 7px;border-radius:10px;" title="Rapports">📄 ${data.rapports}</span>
-          <span style="font-size:11px;background:#E8F9F2;color:#1DA870;padding:2px 7px;border-radius:10px;" title="Garanties">🛡 ${data.garanties}</span>
           <span style="font-size:11px;background:#FEF3CD;color:#856404;padding:2px 7px;border-radius:10px;" title="Absents">⚠ ${data.absents}</span>
         </div>
       </div>`).join('');
