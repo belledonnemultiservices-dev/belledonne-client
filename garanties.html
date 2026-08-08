@@ -511,8 +511,8 @@ function renderBlocs() {
         <button class="btn-secondary" style="height:40px;" onclick="assignTechnicien('${b.id}')">Assigner</button>
       </div>
 
-      <div class="section-sep"><span>Description agenda (modifiable)</span></div>
-      <textarea class="form-textarea" id="desc-${b.id}">${desc}</textarea>
+      <div class="section-sep"><span>Description agenda (modifiable, sauvegarde automatique)</span></div>
+      <textarea class="form-textarea" id="desc-${b.id}" onblur="saveDescription('${b.id}')">${desc}</textarea>
       <div class="action-row">
         <button class="btn-secondary" onclick="regenDescription('${b.id}')">Régénérer automatiquement</button>
       </div>
@@ -523,10 +523,11 @@ function renderBlocs() {
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
           ${b.calEventId ? "Mettre à jour l'agenda" : "Intégrer à l'agenda"}
         </button>
+        ${b.calEventId ? `<button class="btn-secondary" style="background:rgba(231,76,60,0.08);color:var(--red);" onclick="deleteFromAgenda('${b.id}')">Supprimer de l'agenda</button>` : ""}
         <button class="btn-secondary" ${!hasTech ? "disabled" : ""} onclick="openAgendaPanel('${b.id}')">Voir l'agenda</button>
         <button class="btn-secondary" ${!hasTech || !hasLignes ? "disabled" : ""} onclick="doPushKizeo('${b.id}')">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-          Générer les rapports Kizeo
+          ${b.kizeoSentAt ? "Régénérer les rapports Kizeo" : "Générer les rapports Kizeo"}
         </button>
         <button class="btn-secondary" onclick="toggleBlocStatut('${b.id}')">${b.statut === "terminee" ? "Rouvrir" : "Marquer terminé"}</button>
       </div>
@@ -725,10 +726,20 @@ window.assignTechnicien = async function(blocId) {
   showToast("Technicien assigné");
 };
 
-// ── Description agenda ──
-window.regenDescription = function(blocId) {
+// ── Description agenda (sauvegarde automatique) ──
+window.saveDescription = async function(blocId) {
   const b = getBloc(blocId);
-  document.getElementById("desc-" + blocId).value = autoDescription(b);
+  const value = document.getElementById("desc-" + blocId).value;
+  if (b.calDescription === value) return;
+  b.calDescription = value;
+  await persistSemaine({ blocs: _currentSemaine.blocs });
+};
+window.regenDescription = async function(blocId) {
+  const b = getBloc(blocId);
+  const value = autoDescription(b);
+  document.getElementById("desc-" + blocId).value = value;
+  b.calDescription = value;
+  await persistSemaine({ blocs: _currentSemaine.blocs });
 };
 
 // ── Agenda Google ──
@@ -760,11 +771,36 @@ window.doAgenda = async function(blocId) {
   }
 };
 
+window.deleteFromAgenda = async function(blocId) {
+  const b = getBloc(blocId);
+  if (!b.calEventId) return;
+  if (!confirm("Supprimer cet événement de l'agenda Google du technicien ?")) return;
+  const btn = event.currentTarget; btn.disabled = true; const orig = btn.textContent; btn.textContent = "Suppression...";
+  try {
+    const resp = await fetch(FN_AGENDA, {
+      method: "POST", headers: await authHeaders(),
+      body: JSON.stringify({ technicienEmail: b.technicienEmail, operation: "delete", calEventId: b.calEventId }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || "Échec de la suppression");
+    b.calEventId = null; b.calSentAt = null;
+    await persistSemaine({ blocs: _currentSemaine.blocs });
+    renderBlocs();
+    showToast("Retiré de l'agenda");
+  } catch (e) {
+    alert("Erreur agenda : " + e.message);
+    btn.disabled = false; btn.textContent = orig;
+  }
+};
+
 // ── Push Kizeo ──
 window.doPushKizeo = async function(blocId) {
   const b = getBloc(blocId);
   const nb = (b.lignes || []).length;
-  if (!confirm(`Vérifiez que les ${nb} locataire(s) de ce bloc ont bien un nom, une adresse, un code postal et une ville correctement renseignés avant l'envoi.\n\nContinuer et générer les rapports Kizeo ?`)) return;
+  const msg = b.kizeoSentAt
+    ? "Supprimer les anciens rapports dans Kizeo.\n\nContinuer et régénérer les rapports du bloc ?"
+    : `Vérifiez que les ${nb} locataire(s) de ce bloc ont bien un nom, une adresse, un code postal et une ville correctement renseignés avant l'envoi.\n\nContinuer et générer les rapports Kizeo ?`;
+  if (!confirm(msg)) return;
   const btn = event.currentTarget; btn.disabled = true; const orig = btn.textContent; btn.textContent = "Envoi...";
   try {
     const resp = await fetch(FN_PUSH_KIZEO, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId, blocId }) });
