@@ -692,6 +692,8 @@ window.saveLigne = async function() {
   if (!client || !nom || !adresse || !codePostal || !ville) { alert("Client, nom, adresse, code postal et ville sont obligatoires."); return; }
 
   const b = getBloc(_editLigneBlocId);
+  const isNewLigne = !_editLigneId;
+  const needsReminder = isNewLigne && (!!b.calEventId || !!b.kizeoSentAt);
   const lignes = [...(b.lignes || [])];
   if (_editLigneId) {
     const idx = lignes.findIndex(x => x.id === _editLigneId);
@@ -703,7 +705,9 @@ window.saveLigne = async function() {
   await persistSemaine({ blocs: _currentSemaine.blocs });
   renderBlocs();
   closeLigneModal();
-  showToast(_editLigneId ? "Locataire mis à jour" : "Locataire ajouté");
+  showToast(needsReminder
+    ? "Locataire ajouté — n'oubliez pas de mettre à jour l'agenda et régénérer les rapports"
+    : (_editLigneId ? "Locataire mis à jour" : "Locataire ajouté"));
 };
 
 window.deleteLigne = async function(blocId, ligneId) {
