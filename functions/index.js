@@ -1293,6 +1293,20 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   const refInterne = mapping.refInterne ? String(getField(mapping.refInterne) || "").trim() : "";
   const reference = mapping.reference ? String(getField(mapping.reference) || "") : "";
 
+  // Un push crée déjà la donnée côté Kizeo (avec nos valeurs par défaut), donc elle
+  // apparaît "non lue" dès l'envoi, même si le technicien n'a jamais ouvert le
+  // formulaire. Le champ signature (jamais pré-rempli par nous) sert de preuve
+  // d'intervention réelle : tant qu'il est vide, on laisse la donnée "non lue" côté
+  // Kizeo (pas de markasreadbyaction) pour la retester au prochain pull.
+  if (mapping.signature) {
+    const signatureVal = getField(mapping.signature);
+    const isSigned = signatureVal && (typeof signatureVal !== "object" || Object.keys(signatureVal).length > 0) && signatureVal !== "";
+    if (!isSigned) {
+      console.log(`Kizeo: soumission ${dataId} pas encore signée par le technicien, laissée en attente`);
+      return false;
+    }
+  }
+
   // Le nom du technicien ne revient pas dans la réponse Kizeo (recipient_name vide) :
   // on le résout via user_id (l'auteur de la soumission) -> techniciens.kizeoUserId.
   let technicien = submission._recipient_name || submission.recipient_name || "";
@@ -1376,7 +1390,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
       const newRef = await db.collection("garanties-rapports").add(docDataG);
       console.log(`Kizeo garantie: soumission ${dataId} reçue -> garanties-rapports/${newRef.id}`);
     }
-    return;
+    return true;
   }
 
   let suiviId = null, client = "", bc = "", numPassage = null, passageLabel = "";
@@ -1480,6 +1494,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     const ref = await db.collection("reception-rapports").add(docData);
     console.log(`Kizeo: soumission ${dataId} reçue -> reception-rapports/${ref.id}`);
   }
+  return true;
 }
 
 // ── WEBHOOK KIZEO (public, sécurisé par secret partagé en header) ─
@@ -1549,14 +1564,22 @@ exports.kizeoPull = functions
       const ids = (list || []).map(d => d.id || d._id).filter(Boolean);
       if (!ids.length) continue;
       console.log(`kizeoPull: ${ids.length} soumission(s) non lue(s) pour ${form.formId}`);
+      const readyIds = [];
       for (const dataId of ids) {
-        try { await receiveKizeoSubmission(db, token, form.formId, dataId, "pull"); }
-        catch(e) { console.error(`kizeoPull: soumission ${dataId} échouée:`, e.message); }
+        try {
+          const processed = await receiveKizeoSubmission(db, token, form.formId, dataId, "pull");
+          // processed === false : pas encore signée par le technicien, on la laisse
+          // "non lue" côté Kizeo pour la retester au prochain pull (pas de perte).
+          if (processed !== false) readyIds.push(dataId);
+        }
+        catch(e) { console.error(`kizeoPull: soumission ${dataId} échouée:`, e.message); readyIds.push(dataId); }
       }
-      try {
-        await kizeoRequest(token, "POST", `/forms/${encodeURIComponent(form.formId)}/markasreadbyaction/${action}`, { data_ids: ids });
-      } catch(e) {
-        console.error(`kizeoPull: marquage lu échoué pour ${form.formId}:`, e.message);
+      if (readyIds.length) {
+        try {
+          await kizeoRequest(token, "POST", `/forms/${encodeURIComponent(form.formId)}/markasreadbyaction/${action}`, { data_ids: readyIds });
+        } catch(e) {
+          console.error(`kizeoPull: marquage lu échoué pour ${form.formId}:`, e.message);
+        }
       }
     }
   });
