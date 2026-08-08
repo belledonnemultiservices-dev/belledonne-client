@@ -443,10 +443,33 @@ window.openDetailModal = function(id) {
   document.getElementById("modalDetail").classList.add("open");
 };
 window.closeDetailModal = function() {
+  const blocking = findBlocsNeedingSync();
+  if (blocking.length) {
+    alert("Impossible de fermer pour le moment :\n\n" + blocking.map(m => "• " + m).join("\n"));
+    return;
+  }
   document.getElementById("modalDetail").classList.remove("open");
   closeCalendarPanel();
   _currentSemaineId = null; _currentSemaine = null;
 };
+
+// Un bloc modifié après son dernier envoi agenda/Kizeo doit être resynchronisé
+// avant de pouvoir fermer le détail de la semaine.
+function findBlocsNeedingSync() {
+  const messages = [];
+  (_currentSemaine.blocs || []).forEach(b => {
+    if (!b.dataChangedAt) return;
+    const label = `Bloc du ${fmtDate(b.date)} (${b.heureDebut || "—"}-${b.heureFin || "—"})`;
+    if (b.calEventId && (!b.calSentAt || b.dataChangedAt > b.calSentAt)) {
+      messages.push(`${label} : mettez à jour l'agenda (modifié depuis le dernier envoi).`);
+    }
+    if (b.kizeoSentAt && b.dataChangedAt > b.kizeoSentAt) {
+      messages.push(`${label} : régénérez les rapports Kizeo (modifié depuis le dernier envoi).`);
+    }
+  });
+  return messages;
+}
+function bump(bloc) { bloc.dataChangedAt = new Date().toISOString(); }
 
 async function persistSemaine(patch) {
   const now = new Date().toISOString();
@@ -593,11 +616,13 @@ async function moveLigne(targetBlocId, targetIdx) {
   if (srcBloc.id === targetBloc.id) {
     srcLignes.splice(targetIdx, 0, moved);
     srcBloc.lignes = srcLignes;
+    bump(srcBloc);
   } else {
     srcBloc.lignes = srcLignes;
     const targetLignes = [...(targetBloc.lignes || [])];
     targetLignes.splice(targetIdx, 0, moved);
     targetBloc.lignes = targetLignes;
+    bump(srcBloc); bump(targetBloc);
   }
   _dragSrc = null;
   renderBlocs();
@@ -629,7 +654,7 @@ window.saveBloc = async function() {
   const blocs = [...(_currentSemaine.blocs || [])];
   if (_editBlocId) {
     const idx = blocs.findIndex(x => x.id === _editBlocId);
-    if (idx !== -1) blocs[idx] = { ...blocs[idx], date, heureDebut, heureFin };
+    if (idx !== -1) { blocs[idx] = { ...blocs[idx], date, heureDebut, heureFin }; bump(blocs[idx]); }
   } else {
     blocs.push({
       id: uid(), date, heureDebut, heureFin, statut: "en-cours",
@@ -645,8 +670,21 @@ window.saveBloc = async function() {
 };
 
 window.deleteBloc = async function(blocId) {
-  if (!confirm("Supprimer ce bloc et tous ses locataires ?")) return;
-  const blocs = (_currentSemaine.blocs || []).filter(b => b.id !== blocId);
+  const b = getBloc(blocId);
+  let msg = "Supprimer ce bloc et tous ses locataires ?";
+  if (b.calEventId) msg += "\n\nL'événement associé sera aussi retiré de l'agenda Google du technicien.";
+  if (b.kizeoSentAt) msg += "\n\n⚠️ Des rapports Kizeo ont déjà été générés pour ce bloc : ils resteront dans Kizeo (impossible de les supprimer automatiquement), pensez à les supprimer vous-même là-bas.";
+  if (!confirm(msg)) return;
+
+  if (b.calEventId) {
+    try {
+      await fetch(FN_AGENDA, {
+        method: "POST", headers: await authHeaders(),
+        body: JSON.stringify({ technicienEmail: b.technicienEmail, operation: "delete", calEventId: b.calEventId }),
+      });
+    } catch(e) { console.error("Suppression agenda échouée:", e); }
+  }
+  const blocs = (_currentSemaine.blocs || []).filter(x => x.id !== blocId);
   _currentSemaine.blocs = blocs;
   await persistSemaine({ blocs });
   renderBlocs();
@@ -702,6 +740,7 @@ window.saveLigne = async function() {
     lignes.push({ id: uid(), client, nom, adresse, codePostal, ville, etage, numeroLogement, kizeoPushedAt: null });
   }
   b.lignes = lignes;
+  bump(b);
   await persistSemaine({ blocs: _currentSemaine.blocs });
   renderBlocs();
   closeLigneModal();
@@ -714,6 +753,7 @@ window.deleteLigne = async function(blocId, ligneId) {
   if (!confirm("Supprimer ce locataire ?")) return;
   const b = getBloc(blocId);
   b.lignes = (b.lignes || []).filter(x => x.id !== ligneId);
+  bump(b);
   await persistSemaine({ blocs: _currentSemaine.blocs });
   renderBlocs();
 };
@@ -724,7 +764,9 @@ window.assignTechnicien = async function(blocId) {
   const t = techniciensList.find(x => x.id === sel.value);
   if (!t) { alert("Sélectionnez un technicien."); return; }
   const b = getBloc(blocId);
+  const changed = b.technicienId && b.technicienId !== t.id;
   b.technicienId = t.id; b.technicienNom = t.nom; b.technicienEmail = t.email; b.technicienKizeoUserId = t.kizeoUserId;
+  if (changed) bump(b);
   await persistSemaine({ blocs: _currentSemaine.blocs });
   renderBlocs();
   showToast("Technicien assigné");
