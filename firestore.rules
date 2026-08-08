@@ -48,7 +48,7 @@ service cloud.firestore {
     match /email-sources/{doc} { allow read, write: if isAdmin(); }
     match /kizeo-forms/{doc}        { allow read, write: if isAdmin(); }
     match /reception-rapports/{doc} { allow read, write: if isAdmin(); }
-    match /garanties-journees/{doc} { allow read, write: if isAdmin(); }
+    match /garanties-semaines/{doc} { allow read, write: if isAdmin(); }
 
     // ── config : lecture par tout utilisateur connecté (couleurs, coordonnées,
     //    templates), écriture admin only ──

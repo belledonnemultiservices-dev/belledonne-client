@@ -1491,8 +1491,8 @@ exports.kizeoPull = functions
     }
   });
 
-// ── GARANTIES : POUSSER UN RAPPORT KIZEO PAR LIGNE (journée garantie) ─
-// Pousse, pour chaque locataire de la journée, un rapport Kizeo pré-rempli
+// ── GARANTIES : POUSSER UN RAPPORT KIZEO PAR LIGNE (bloc d'une semaine garantie) ─
+// Pousse, pour chaque locataire du bloc, un rapport Kizeo pré-rempli
 // (nom, adresse, code postal, ville, étage) au technicien assigné. Le libellé
 // visible sur l'app mobile = nom du locataire. Formulaire identifié par son
 // formId Kizeo (indépendant du système de mapping "suivi" classique).
@@ -1508,16 +1508,19 @@ exports.pushGarantieKizeo = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { journeeId } = req.body || {};
-    if (!journeeId) { res.status(400).json({ error: "journeeId requis" }); return; }
+    const { semaineId, blocId } = req.body || {};
+    if (!semaineId || !blocId) { res.status(400).json({ error: "semaineId et blocId requis" }); return; }
 
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
-    const ref = db.collection("garanties-journees").doc(journeeId);
+    const ref = db.collection("garanties-semaines").doc(semaineId);
     const snap = await ref.get();
-    if (!snap.exists) { res.status(404).json({ error: "Journée introuvable" }); return; }
-    const journee = snap.data();
-    const recipient = parseInt(journee.technicienKizeoUserId, 10);
+    if (!snap.exists) { res.status(404).json({ error: "Semaine introuvable" }); return; }
+    const semaine = snap.data();
+    const blocs = Array.isArray(semaine.blocs) ? semaine.blocs : [];
+    const bloc = blocs.find(b => b.id === blocId);
+    if (!bloc) { res.status(404).json({ error: "Bloc introuvable" }); return; }
+    const recipient = parseInt(bloc.technicienKizeoUserId, 10);
     if (!recipient) { res.status(400).json({ error: "Technicien Kizeo manquant (assignez un technicien avec un ID Kizeo configuré)" }); return; }
 
     const formsSnap = await db.collection("kizeo-forms").where("formId", "==", GARANTIE_KIZEO_FORM_ID).limit(1).get();
@@ -1527,12 +1530,12 @@ exports.pushGarantieKizeo = functions
     if (!mapping.refInterne) { res.status(400).json({ error: "Champ Référence interne non mappé pour ce formulaire" }); return; }
 
     const token = KIZEO_API_TOKEN.value();
-    const lignes = Array.isArray(journee.lignes) ? journee.lignes : [];
+    const lignes = Array.isArray(bloc.lignes) ? bloc.lignes : [];
     let pushed = 0;
     const errorsList = [];
 
     for (const ligne of lignes) {
-      const refInterne = `garantie::${journeeId}::${ligne.id}`;
+      const refInterne = `garantie::${semaineId}::${blocId}::${ligne.id}`;
       const values = {
         refInterne,
         libelle: ligne.nom || "",
@@ -1561,8 +1564,10 @@ exports.pushGarantieKizeo = functions
       }
     }
 
-    try { await ref.update({ lignes, updatedAt: new Date().toISOString() }); }
-    catch(e) { console.error("pushGarantieKizeo: mise à jour lignes échouée:", e.message); }
+    bloc.lignes = lignes;
+    bloc.kizeoSentAt = new Date().toISOString();
+    try { await ref.update({ blocs, updatedAt: new Date().toISOString() }); }
+    catch(e) { console.error("pushGarantieKizeo: mise à jour du bloc échouée:", e.message); }
 
     res.status(200).json({ pushed, errors: errorsList.length, errorsList });
   });
