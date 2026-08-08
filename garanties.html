@@ -246,7 +246,10 @@
       <div>
         <div class="modal-title" id="dTitle">Semaine garantie</div>
       </div>
-      <button class="btn-close" onclick="closeDetailModal()">×</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-secondary" style="background:rgba(231,76,60,0.08);color:var(--red);" onclick="deleteSemaine()">Supprimer la semaine</button>
+        <button class="btn-close" onclick="closeDetailModal()">×</button>
+      </div>
     </div>
     <div class="modal-body">
       <div class="section-sep">
@@ -851,6 +854,32 @@ window.deleteBloc = async function(blocId) {
   _currentSemaine.blocs = blocs;
   await persistSemaine({ blocs });
   renderBlocs();
+};
+
+window.deleteSemaine = async function() {
+  const blocs = _currentSemaine.blocs || [];
+  const blocsAvecAgenda = blocs.filter(b => b.calEventId);
+  const blocsAvecKizeo = blocs.filter(b => b.kizeoSentAt);
+
+  let msg = `Supprimer toute la semaine du ${fmtDate(_currentSemaine.dateDebut)} au ${fmtDate(_currentSemaine.dateFin)} ainsi que ses ${blocs.length} bloc(s) et tous leurs locataires ?`;
+  if (blocsAvecAgenda.length) msg += `\n\n${blocsAvecAgenda.length} bloc(s) ont un événement agenda : ils seront retirés automatiquement de l'agenda des techniciens.`;
+  if (blocsAvecKizeo.length) msg += `\n\n⚠️ ${blocsAvecKizeo.length} bloc(s) ont déjà des rapports Kizeo générés : ils resteront dans Kizeo (impossible de les supprimer automatiquement), pensez à les supprimer vous-même là-bas.`;
+  if (!confirm(msg)) return;
+
+  for (const b of blocsAvecAgenda) {
+    try {
+      await fetch(FN_AGENDA, {
+        method: "POST", headers: await authHeaders(),
+        body: JSON.stringify({ technicienEmail: b.technicienEmail, operation: "delete", calEventId: b.calEventId }),
+      });
+    } catch(e) { console.error("Suppression agenda échouée:", e); }
+  }
+
+  await deleteDoc(doc(db, "garanties-semaines", _currentSemaineId));
+  document.getElementById("modalDetail").classList.remove("open");
+  closeCalendarPanel();
+  _currentSemaineId = null; _currentSemaine = null;
+  showToast("Semaine supprimée");
 };
 
 window.toggleBlocStatut = async function(blocId) {
