@@ -68,8 +68,6 @@
   .btn-a{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;border:none;white-space:nowrap;text-decoration:none;}
   .btn-open{color:var(--navy);background:#EBF0F5;}
   .btn-open:hover{background:#DCE5EE;}
-  .btn-archiver{color:var(--text-mid);background:#fff;border:1px solid var(--border);}
-  .btn-archiver:hover{background:#E5EAF0;}
   .btn-suppr{color:var(--red);background:rgba(231,76,60,0.06);}
   .btn-suppr:hover{background:rgba(231,76,60,0.12);}
 
@@ -591,17 +589,12 @@ window.renderRapportsList = function() {
       ${retard ? `<span class="badge-retard">⚠ Non reçu</span>` : ""}
       <div class="rap-actions">
         ${r.fileUrl ? `<a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : ""}
-        ${r.statut === "a-traiter" ? `<button class="btn-a btn-archiver" onclick="archiveRapport('${r.id}')">Archiver</button>` : ""}
         <button class="btn-a btn-suppr" onclick="deleteRapport('${r.id}')">Supprimer</button>
       </div>
     </div>`;
   }).join("");
 };
 
-window.archiveRapport = async function(id) {
-  await updateDoc(doc(db, "garanties-rapports", id), { statut: "archive", updatedAt: new Date().toISOString() });
-  showToast("Rapport archivé");
-};
 window.deleteRapport = async function(id) {
   if (!confirm("Supprimer ce rapport ?")) return;
   await deleteDoc(doc(db, "garanties-rapports", id));
