@@ -92,6 +92,15 @@
   .btn-cancel{height:40px;padding:0 16px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
   .btn-save{height:40px;padding:0 22px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;}
   .btn-save:hover{background:var(--green-dark);color:#fff;}
+  .btn-envoyer{color:#fff;background:var(--green-dark);}
+  .btn-envoyer:hover{background:#179060;}
+  .mn-recap{background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--text-mid);line-height:1.7;border-left:3px solid var(--green);white-space:pre-wrap;}
+  .mn-contacts{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+  .mn-contact-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;}
+  .mn-contact-item input{accent-color:var(--green);width:15px;height:15px;flex-shrink:0;}
+  .mn-contact-name{font-size:13px;font-weight:600;color:var(--text);}
+  .mn-contact-email{font-size:11px;color:var(--text-muted);}
+  .mn-msg{width:100%;min-height:120px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);line-height:1.7;resize:vertical;outline:none;}
   .btn-save:disabled{opacity:0.5;cursor:default;}
 
   .section-sep{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin:22px 0 12px;padding-top:16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
@@ -350,12 +359,10 @@
     <div class="modal-body">
       <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
         <select class="form-select" id="rFilterStatut" style="width:auto;" onchange="renderRapportsList()">
-          <option value="a-traiter-retard">À traiter + Non reçu</option>
           <option value="a-traiter">À traiter</option>
           <option value="en-retard">⚠ Non reçu</option>
           <option value="en-attente">En attente technicien</option>
           <option value="archive">Archivés</option>
-          <option value="">Tous les statuts</option>
         </select>
         <span style="font-size:12px;color:var(--text-muted);" id="rCount"></span>
         <button class="btn-secondary" id="btnGenererParClient" style="margin-left:auto;display:none;" onclick="genererRapportsParClient()">Générer les rapports par client</button>
@@ -365,6 +372,43 @@
         <div class="section-sep"><span>Rapports agrégés par client</span></div>
         <div id="rapportsAgregesList"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENVOI CLIENT (rapport agrégé garantie) -->
+<div class="modal-overlay" id="modalEnvoiAgrege">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Envoyer au client</div>
+      <button class="btn-close" onclick="closeEnvoiAgrege()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="mn-recap" id="envoiAgRecap">—</div>
+      <div class="form-group">
+        <label class="form-label">Destinataires</label>
+        <div class="mn-contacts" id="envoiAgContacts"><div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div></div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input class="form-input" type="email" id="envoiAgEmailManuel" placeholder="Ajouter une adresse email..." style="flex:1;height:38px;">
+          <button type="button" class="btn-cancel" style="height:38px;" onclick="ajouterEmailManuelAgrege()">Ajouter</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Objet</label>
+        <input class="form-input" type="text" id="envoiAgSubject">
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">Message</label>
+        <textarea class="mn-msg" id="envoiAgMsg"></textarea>
+      </div>
+      <label class="mn-contact-item" id="envoiAgEspaceWrap" style="margin-bottom:0;">
+        <input type="checkbox" id="envoiAgEspace" checked>
+        <div><div class="mn-contact-name">Ajouter dans l'espace client</div><div class="mn-contact-email">Visible dans "Rapports d'intervention" côté client. Si décoché, seul l'email est envoyé.</div></div>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeEnvoiAgrege()">Annuler</button>
+      <button class="btn-save" id="envoiAgBtn" onclick="doEnvoyerAgrege()">Envoyer au client</button>
     </div>
   </div>
 </div>
@@ -404,6 +448,8 @@ const db = getFirestore(app, "belledonne-client");
 const FN_AGENDA = "https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar";
 const FN_PUSH_KIZEO = "https://europe-west1-belledonne-client.cloudfunctions.net/pushGarantieKizeo";
 const FN_GEN_PAR_CLIENT = "https://europe-west1-belledonne-client.cloudfunctions.net/generateGarantieRapportsParClient";
+const FN_NOTIFY = "https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification";
+const LIEN_ESPACE = "https://clients-belledonne-multiservices.com";
 
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
 
@@ -493,6 +539,16 @@ function accentForSemaine(semaineId) {
   return PAIR_ACCENT_PALETTE[idx % PAIR_ACCENT_PALETTE.length];
 }
 
+// Une semaine est "Terminée" une fois qu'au moins un rapport a été archivé (donc
+// généré par client) et qu'il n'en reste plus aucun à traiter ou en attente.
+function isSemaineTerminee(semaineId) {
+  const list = rapports.filter(r => r.semaineId === semaineId);
+  if (!list.length) return false;
+  const hasArchive = list.some(r => r.statut === "archive");
+  const hasRestant = list.some(r => r.statut === "a-traiter" || r.statut === "en-attente");
+  return hasArchive && !hasRestant;
+}
+
 // ── Liste des semaines ──
 function renderSemaines() {
   const grid = document.getElementById("semainesGrid");
@@ -503,7 +559,7 @@ function renderSemaines() {
     const blocs = s.blocs || [];
     const nbLignes = blocs.reduce((sum, b) => sum + (b.lignes || []).length, 0);
     return `<div class="s-card" style="--pair-accent:${accentForSemaine(s.id)};" onclick="openDetailModal('${s.id}')">
-      <div class="s-date">${fmtDate(s.dateDebut)} → ${fmtDate(s.dateFin)}</div>
+      <div class="s-date">${fmtDate(s.dateDebut)} → ${fmtDate(s.dateFin)} ${isSemaineTerminee(s.id) ? `<span class="r-badge r-badge-ok">✓ Terminé</span>` : ""}</div>
       <div class="s-row"><span>${blocs.length} bloc${blocs.length > 1 ? "s" : ""}</span><span>${nbLignes} locataire${nbLignes > 1 ? "s" : ""}</span></div>
     </div>`;
   }).join("");
@@ -529,9 +585,10 @@ function renderRapportsGrid() {
       <div class="s-date">${label}</div>
       <div class="s-row" style="margin-bottom:6px;"><span>${list.length} rapport${list.length > 1 ? "s" : ""}</span></div>
       <div class="s-row" style="gap:6px;">
+        ${isSemaineTerminee(sid) ? `<span class="r-badge r-badge-ok">✓ Terminé</span>` : ""}
         ${aTraiter ? `<span class="r-badge r-badge-traiter">${aTraiter} à traiter</span>` : ""}
         ${retard ? `<span class="r-badge r-badge-retard">${retard} non reçu</span>` : ""}
-        ${!aTraiter && !retard ? `<span class="r-badge r-badge-ok">À jour</span>` : ""}
+        ${!isSemaineTerminee(sid) && !aTraiter && !retard ? `<span class="r-badge r-badge-ok">À jour</span>` : ""}
       </div>
     </div>`;
   }).join("");
@@ -542,7 +599,7 @@ window.openRapportsModal = function(semaineId) {
   _currentRapportsSemaineId = semaineId;
   const s = semaines.find(x => x.id === semaineId);
   document.getElementById("rTitle").textContent = "Rapports — Semaine du " + (s ? fmtDate(s.dateDebut) + " au " + fmtDate(s.dateFin) : "—");
-  document.getElementById("rFilterStatut").value = "a-traiter-retard";
+  document.getElementById("rFilterStatut").value = "a-traiter";
   renderRapportsList();
   renderRapportsAgreges();
   document.getElementById("modalRapports").classList.add("open");
@@ -555,8 +612,6 @@ window.closeRapportsModal = function() {
 window.renderRapportsList = function() {
   const st = document.getElementById("rFilterStatut").value;
   const list = rapports.filter(r => r.semaineId === _currentRapportsSemaineId).filter(r => {
-    if (!st) return true;
-    if (st === "a-traiter-retard") return r.statut === "a-traiter" || isOverdueRapport(r);
     if (st === "en-retard") return isOverdueRapport(r);
     return r.statut === st;
   }).sort((a, b) => (b.arriveeAt || "").localeCompare(a.arriveeAt || ""));
@@ -611,12 +666,109 @@ window.renderRapportsAgreges = function() {
     <div class="rap-row">
       <div class="rap-info">
         <div class="rap-nom">${a.client}</div>
-        <div class="rap-sub">${a.nbRapports} rapport(s) fusionné(s) · généré le ${fmtDateTime(a.generatedAt)}</div>
+        <div class="rap-sub">${a.nbRapports} rapport(s) fusionné(s) · généré le ${fmtDateTime(a.generatedAt)}${a.notifiedAt ? ` · envoyé au client le ${fmtDateTime(a.notifiedAt)}` : ""}</div>
       </div>
       <div class="rap-actions">
         <a class="btn-a btn-open" href="${a.fileUrl}" target="_blank" rel="noopener">Télécharger</a>
+        <button class="btn-a btn-envoyer" onclick="openEnvoiAgrege('${a.id}')">Envoyer au client</button>
       </div>
     </div>`).join("");
+};
+
+// ── Envoyer au client (rapport agrégé garantie) ──
+let _envoiAgId = null;
+window.openEnvoiAgrege = async function(id) {
+  const a = rapportsAgreges.find(x => x.id === id);
+  if (!a) return;
+  _envoiAgId = id;
+  document.getElementById("envoiAgRecap").textContent = `Garantie — ${a.periode} — ${a.client}`;
+  document.getElementById("envoiAgSubject").value = `Rapport de garantie disponible - ${a.client}`;
+  document.getElementById("envoiAgMsg").value = `Bonjour,\nVotre rapport de garantie traitement blattes (période du ${a.periode}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
+  document.getElementById("envoiAgContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
+  document.getElementById("envoiAgBtn").disabled = false;
+  document.getElementById("envoiAgBtn").textContent = "Envoyer au client";
+  document.getElementById("envoiAgEmailManuel").value = "";
+  document.getElementById("modalEnvoiAgrege").classList.add("open");
+  try {
+    const snapU = await getDocs(query(collection(db, "users"), where("role", "==", "client"), where("client", "==", a.client)));
+    const hasEspaceClient = !snapU.empty;
+    document.getElementById("envoiAgEspaceWrap").style.display = hasEspaceClient ? "" : "none";
+    document.getElementById("envoiAgEspace").checked = hasEspaceClient;
+  } catch(e) {
+    document.getElementById("envoiAgEspaceWrap").style.display = "none";
+    document.getElementById("envoiAgEspace").checked = false;
+  }
+  try {
+    const snapC = await getDocs(query(collection(db, "contacts"), where("client", "==", a.client)));
+    const contacts = snapC.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!contacts.length) {
+      document.getElementById("envoiAgContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Aucun contact pour ce client. <a href="contacts.html" style="color:var(--green-dark);">Ajouter</a></div>';
+    } else {
+      document.getElementById("envoiAgContacts").innerHTML = contacts.map(c => `
+        <label class="mn-contact-item">
+          <input type="checkbox" value="${c.email}">
+          <div><div class="mn-contact-name">${c.prenom||""} ${c.nom||""}</div><div class="mn-contact-email">${c.email||"-"}</div></div>
+        </label>`).join("");
+    }
+  } catch(e) { document.getElementById("envoiAgContacts").innerHTML = '<div style="color:red;padding:12px;">Erreur : ' + e.message + '</div>'; }
+};
+window.ajouterEmailManuelAgrege = function() {
+  const input = document.getElementById("envoiAgEmailManuel");
+  const email = input.value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert("Adresse email invalide."); return; }
+  const container = document.getElementById("envoiAgContacts");
+  if (container.querySelector(`input[value="${email}"]`)) { input.value = ""; return; }
+  if (!container.querySelector(".mn-contact-item")) container.innerHTML = "";
+  container.insertAdjacentHTML("beforeend", `
+    <label class="mn-contact-item">
+      <input type="checkbox" value="${email}" checked>
+      <div><div class="mn-contact-name">Adresse ajoutée manuellement</div><div class="mn-contact-email">${email}</div></div>
+    </label>`);
+  input.value = "";
+};
+window.closeEnvoiAgrege = function() {
+  document.getElementById("modalEnvoiAgrege").classList.remove("open");
+  _envoiAgId = null;
+};
+window.doEnvoyerAgrege = async function() {
+  const a = rapportsAgreges.find(x => x.id === _envoiAgId);
+  if (!a) return;
+  const subject = document.getElementById("envoiAgSubject").value.trim();
+  const body = document.getElementById("envoiAgMsg").value.trim();
+  if (!subject || !body) { alert("Objet et message requis."); return; }
+  const recipients = Array.from(document.querySelectorAll("#envoiAgContacts input[type=checkbox]:checked")).map(c => c.value).filter(Boolean);
+  if (!recipients.length) { alert("Sélectionnez au moins un destinataire."); return; }
+  const btn = document.getElementById("envoiAgBtn");
+  btn.disabled = true; btn.textContent = "Envoi...";
+  const attachments = [{ url: a.fileUrl, filename: `Garantie_${a.client}_${a.periode}`.replace(/\s+/g, "_") + ".pdf" }];
+  let sent = 0, errors = 0;
+  for (const to of recipients) {
+    try {
+      const resp = await fetch(FN_NOTIFY, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ to, subject, body, attachments }) });
+      if (resp.ok) sent++; else errors++;
+    } catch(e) { errors++; }
+  }
+  if (sent > 0) {
+    const ajouterEspace = document.getElementById("envoiAgEspace").checked;
+    const now = new Date().toISOString();
+    try {
+      if (ajouterEspace) {
+        await addDoc(collection(db, "rapports"), {
+          bc: "", client: a.client, passage: `Garantie — ${a.periode}`,
+          site: "Garantie blattes", nuisible: "blatte",
+          date: now.split("T")[0], pdfUrl: a.fileUrl, createdAt: now,
+        });
+      }
+      await updateDoc(doc(db, "garanties-rapports-agreges", a.id), {
+        notifiedAt: now, notifiedTo: recipients, ajouteEspaceClient: ajouterEspace, updatedAt: now,
+      });
+      showToast(sent + " email(s) envoyé(s)" + (ajouterEspace ? ", ajouté à l'espace client." : "."));
+      closeEnvoiAgrege();
+    } catch(e) { alert("Envoi fait mais erreur d'enregistrement : " + e.message); }
+  } else {
+    alert("Échec de l'envoi (" + errors + " erreur(s)).");
+  }
+  btn.disabled = false; btn.textContent = "Envoyer au client";
 };
 
 window.genererRapportsParClient = async function() {
