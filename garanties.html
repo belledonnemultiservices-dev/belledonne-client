@@ -360,7 +360,7 @@
           <option value="">Tous les statuts</option>
         </select>
         <span style="font-size:12px;color:var(--text-muted);" id="rCount"></span>
-        <button class="btn-secondary" style="margin-left:auto;" onclick="genererRapportsParClient()">Générer les rapports par client</button>
+        <button class="btn-secondary" id="btnGenererParClient" style="margin-left:auto;display:none;" onclick="genererRapportsParClient()">Générer les rapports par client</button>
       </div>
       <div id="rapportsList"></div>
       <div id="rapportsAgregesSection" style="display:none;margin-top:24px;">
@@ -552,6 +552,17 @@ window.renderRapportsList = function() {
     if (st === "en-retard") return isOverdueRapport(r);
     return r.statut === st;
   }).sort((a, b) => (b.arriveeAt || "").localeCompare(a.arriveeAt || ""));
+
+  // Bouton "Générer les rapports par client" : visible uniquement sur le filtre "À
+  // traiter", cliquable seulement quand plus aucun rapport de la semaine n'est en
+  // attente (rien à recevoir, tout ce qui était attendu est arrivé).
+  const semaineRapports = rapports.filter(r => r.semaineId === _currentRapportsSemaineId);
+  const aTraiterCount = semaineRapports.filter(r => r.statut === "a-traiter").length;
+  const enAttenteCount = semaineRapports.filter(r => r.statut === "en-attente").length;
+  const btnGen = document.getElementById("btnGenererParClient");
+  btnGen.style.display = st === "a-traiter" ? "" : "none";
+  btnGen.disabled = enAttenteCount > 0 || aTraiterCount === 0;
+  btnGen.title = enAttenteCount > 0 ? "Des rapports sont encore en attente de réception" : (aTraiterCount === 0 ? "Aucun rapport à traiter" : "");
 
   document.getElementById("rCount").textContent = list.length + " rapport" + (list.length !== 1 ? "s" : "");
   const STATUT_LABEL = { "en-attente": "En attente", "a-traiter": "À traiter", "archive": "Archivé" };
