@@ -401,14 +401,12 @@
         <label class="form-label">Message</label>
         <textarea class="mn-msg" id="envoiAgMsg"></textarea>
       </div>
-      <label class="mn-contact-item" id="envoiAgEspaceWrap" style="margin-bottom:0;">
-        <input type="checkbox" id="envoiAgEspace" checked>
-        <div><div class="mn-contact-name">Ajouter dans l'espace client</div><div class="mn-contact-email">Visible dans "Garanties" côté client, indépendamment de l'envoi email. Cochez sans sélectionner de destinataire pour ajouter à l'espace client sans envoyer d'email.</div></div>
-      </label>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="flex-wrap:wrap;">
       <button class="btn-cancel" onclick="closeEnvoiAgrege()">Annuler</button>
-      <button class="btn-save" id="envoiAgBtn" onclick="doEnvoyerAgrege()">Notifier client</button>
+      <button class="btn-save" id="envoiAgBtnEspace" style="background:var(--bg);color:var(--text);" onclick="doEnvoyerAgrege('espace')">Espace client seul</button>
+      <button class="btn-save" id="envoiAgBtnEmail" onclick="doEnvoyerAgrege('email')">Email seul</button>
+      <button class="btn-save" id="envoiAgBtnBoth" onclick="doEnvoyerAgrege('both')">Email + Espace client</button>
     </div>
   </div>
 </div>
@@ -718,18 +716,17 @@ window.openEnvoiAgrege = async function(id) {
   document.getElementById("envoiAgSubject").value = subject;
   document.getElementById("envoiAgMsg").value = msg;
   document.getElementById("envoiAgContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
-  document.getElementById("envoiAgBtn").disabled = false;
-  document.getElementById("envoiAgBtn").textContent = "Notifier client";
+  ["envoiAgBtnEspace", "envoiAgBtnEmail", "envoiAgBtnBoth"].forEach(id => { document.getElementById(id).disabled = false; });
   document.getElementById("envoiAgEmailManuel").value = "";
   document.getElementById("modalEnvoiAgrege").classList.add("open");
   try {
     const snapU = await getDocs(query(collection(db, "users"), where("role", "==", "client"), where("client", "==", a.client)));
     const hasEspaceClient = !snapU.empty;
-    document.getElementById("envoiAgEspaceWrap").style.display = hasEspaceClient ? "" : "none";
-    document.getElementById("envoiAgEspace").checked = hasEspaceClient;
+    document.getElementById("envoiAgBtnEspace").style.display = hasEspaceClient ? "" : "none";
+    document.getElementById("envoiAgBtnBoth").style.display = hasEspaceClient ? "" : "none";
   } catch(e) {
-    document.getElementById("envoiAgEspaceWrap").style.display = "none";
-    document.getElementById("envoiAgEspace").checked = false;
+    document.getElementById("envoiAgBtnEspace").style.display = "none";
+    document.getElementById("envoiAgBtnBoth").style.display = "none";
   }
   try {
     const snapC = await getDocs(query(collection(db, "contacts"), where("client", "==", a.client)));
@@ -763,22 +760,25 @@ window.closeEnvoiAgrege = function() {
   document.getElementById("modalEnvoiAgrege").classList.remove("open");
   _envoiAgId = null;
 };
-window.doEnvoyerAgrege = async function() {
+window.doEnvoyerAgrege = async function(mode) {
   const a = rapportsAgreges.find(x => x.id === _envoiAgId);
   if (!a) return;
-  const recipients = Array.from(document.querySelectorAll("#envoiAgContacts input[type=checkbox]:checked")).map(c => c.value).filter(Boolean);
-  const ajouterEspace = document.getElementById("envoiAgEspace").checked;
-  // Trois combinaisons possibles : email + espace, email seul, espace seul —
-  // les deux actions sont indépendantes, seule leur absence totale est bloquée.
-  if (!recipients.length && !ajouterEspace) { alert("Choisissez au moins une action : sélectionnez un destinataire et/ou cochez \"Ajouter dans l'espace client\"."); return; }
+  // mode: "email" (email seul), "espace" (espace client seul), "both" (les deux).
+  const wantsEmail = mode === "email" || mode === "both";
+  const wantsEspace = mode === "espace" || mode === "both";
+  const recipients = wantsEmail ? Array.from(document.querySelectorAll("#envoiAgContacts input[type=checkbox]:checked")).map(c => c.value).filter(Boolean) : [];
+  if (wantsEmail && !recipients.length) { alert("Sélectionnez au moins un destinataire."); return; }
   const subject = document.getElementById("envoiAgSubject").value.trim();
   const body = document.getElementById("envoiAgMsg").value.trim();
-  if (recipients.length && (!subject || !body)) { alert("Objet et message requis."); return; }
-  const btn = document.getElementById("envoiAgBtn");
-  btn.disabled = true; btn.textContent = "Envoi...";
+  if (wantsEmail && (!subject || !body)) { alert("Objet et message requis."); return; }
+  const btnIds = { email: "envoiAgBtnEmail", espace: "envoiAgBtnEspace", both: "envoiAgBtnBoth" };
+  const btn = document.getElementById(btnIds[mode]);
+  const btnOrig = btn.textContent;
+  ["envoiAgBtnEspace", "envoiAgBtnEmail", "envoiAgBtnBoth"].forEach(id => { document.getElementById(id).disabled = true; });
+  btn.textContent = "Envoi...";
 
   let sent = 0, errors = 0;
-  if (recipients.length) {
+  if (wantsEmail) {
     const attachments = [{ url: a.fileUrl, filename: a.nomFichier || `Garantie_${a.client}.pdf` }];
     for (const to of recipients) {
       try {
@@ -788,11 +788,11 @@ window.doEnvoyerAgrege = async function() {
     }
   }
 
-  const emailOk = !recipients.length || sent > 0;
+  const emailOk = !wantsEmail || sent > 0;
   if (emailOk) {
     const now = new Date().toISOString();
     try {
-      if (ajouterEspace) {
+      if (wantsEspace) {
         const semaineRef = semaines.find(s => s.id === a.semaineId);
         const aggDocId = `${a.semaineId}__${a.client.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
         await setDoc(doc(db, "garanties", aggDocId), {
@@ -802,19 +802,21 @@ window.doEnvoyerAgrege = async function() {
           notifiedAt: now, createdAt: now,
         });
       }
-      const updateData = { ajouteEspaceClient: ajouterEspace, updatedAt: now };
-      if (recipients.length) { updateData.notifiedAt = now; updateData.notifiedTo = recipients; }
+      const updateData = { updatedAt: now };
+      if (wantsEspace) updateData.ajouteEspaceClient = true;
+      if (wantsEmail) { updateData.notifiedAt = now; updateData.notifiedTo = recipients; }
       await updateDoc(doc(db, "garanties-rapports-agreges", a.id), updateData);
       const msgParts = [];
-      if (recipients.length) msgParts.push(sent + " email(s) envoyé(s)");
-      if (ajouterEspace) msgParts.push("ajouté à l'espace client");
+      if (wantsEmail) msgParts.push(sent + " email(s) envoyé(s)");
+      if (wantsEspace) msgParts.push("ajouté à l'espace client");
       showToast(msgParts.join(", ") + ".");
       closeEnvoiAgrege();
     } catch(e) { alert("Erreur d'enregistrement : " + e.message); }
   } else {
     alert("Échec de l'envoi (" + errors + " erreur(s)).");
   }
-  btn.disabled = false; btn.textContent = "Notifier client";
+  ["envoiAgBtnEspace", "envoiAgBtnEmail", "envoiAgBtnBoth"].forEach(id => { document.getElementById(id).disabled = false; });
+  btn.textContent = btnOrig;
 };
 
 window.genererRapportsParClient = async function() {
