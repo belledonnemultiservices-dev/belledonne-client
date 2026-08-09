@@ -97,6 +97,18 @@ function setup() {
             anchorR.parentNode.insertBefore(a, anchorR.nextSibling);
           }
         }
+        // Injecter le lien "Gestion garanties" toujours juste sous "Gestion rapports"
+        // (position fixe, indépendante de l'endroit où la page place ses liens admin).
+        if (!document.querySelector('a.nav-item[href="garanties.html"]')) {
+          const anchorG = document.querySelector('a.nav-item[href="gestion-rapports.html"]');
+          if (anchorG && anchorG.parentNode) {
+            const a = document.createElement('a');
+            a.className = 'nav-item';
+            a.href = 'garanties.html';
+            a.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Gestion garanties</span>';
+            anchorG.parentNode.insertBefore(a, anchorG.nextSibling);
+          }
+        }
       }
     } catch (e) { /* en cas d'échec, on ne masque rien */ }
 
