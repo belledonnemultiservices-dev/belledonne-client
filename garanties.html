@@ -766,23 +766,30 @@ window.closeEnvoiAgrege = function() {
 window.doEnvoyerAgrege = async function() {
   const a = rapportsAgreges.find(x => x.id === _envoiAgId);
   if (!a) return;
+  const recipients = Array.from(document.querySelectorAll("#envoiAgContacts input[type=checkbox]:checked")).map(c => c.value).filter(Boolean);
+  const ajouterEspace = document.getElementById("envoiAgEspace").checked;
+  // Trois combinaisons possibles : email + espace, email seul, espace seul —
+  // les deux actions sont indépendantes, seule leur absence totale est bloquée.
+  if (!recipients.length && !ajouterEspace) { alert("Choisissez au moins une action : sélectionnez un destinataire et/ou cochez \"Ajouter dans l'espace client\"."); return; }
   const subject = document.getElementById("envoiAgSubject").value.trim();
   const body = document.getElementById("envoiAgMsg").value.trim();
-  if (!subject || !body) { alert("Objet et message requis."); return; }
-  const recipients = Array.from(document.querySelectorAll("#envoiAgContacts input[type=checkbox]:checked")).map(c => c.value).filter(Boolean);
-  if (!recipients.length) { alert("Sélectionnez au moins un destinataire."); return; }
+  if (recipients.length && (!subject || !body)) { alert("Objet et message requis."); return; }
   const btn = document.getElementById("envoiAgBtn");
   btn.disabled = true; btn.textContent = "Envoi...";
-  const attachments = [{ url: a.fileUrl, filename: a.nomFichier || `Garantie_${a.client}.pdf` }];
+
   let sent = 0, errors = 0;
-  for (const to of recipients) {
-    try {
-      const resp = await fetch(FN_NOTIFY, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ to, subject, body, attachments }) });
-      if (resp.ok) sent++; else errors++;
-    } catch(e) { errors++; }
+  if (recipients.length) {
+    const attachments = [{ url: a.fileUrl, filename: a.nomFichier || `Garantie_${a.client}.pdf` }];
+    for (const to of recipients) {
+      try {
+        const resp = await fetch(FN_NOTIFY, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ to, subject, body, attachments }) });
+        if (resp.ok) sent++; else errors++;
+      } catch(e) { errors++; }
+    }
   }
-  if (sent > 0) {
-    const ajouterEspace = document.getElementById("envoiAgEspace").checked;
+
+  const emailOk = !recipients.length || sent > 0;
+  if (emailOk) {
     const now = new Date().toISOString();
     try {
       if (ajouterEspace) {
@@ -795,12 +802,15 @@ window.doEnvoyerAgrege = async function() {
           notifiedAt: now, createdAt: now,
         });
       }
-      await updateDoc(doc(db, "garanties-rapports-agreges", a.id), {
-        notifiedAt: now, notifiedTo: recipients, ajouteEspaceClient: ajouterEspace, updatedAt: now,
-      });
-      showToast(sent + " email(s) envoyé(s)" + (ajouterEspace ? ", ajouté à l'espace client." : "."));
+      const updateData = { ajouteEspaceClient: ajouterEspace, updatedAt: now };
+      if (recipients.length) { updateData.notifiedAt = now; updateData.notifiedTo = recipients; }
+      await updateDoc(doc(db, "garanties-rapports-agreges", a.id), updateData);
+      const msgParts = [];
+      if (recipients.length) msgParts.push(sent + " email(s) envoyé(s)");
+      if (ajouterEspace) msgParts.push("ajouté à l'espace client");
+      showToast(msgParts.join(", ") + ".");
       closeEnvoiAgrege();
-    } catch(e) { alert("Envoi fait mais erreur d'enregistrement : " + e.message); }
+    } catch(e) { alert("Erreur d'enregistrement : " + e.message); }
   } else {
     alert("Échec de l'envoi (" + errors + " erreur(s)).");
   }

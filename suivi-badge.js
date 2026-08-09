@@ -61,6 +61,9 @@ function setup() {
         // Admin : on réaffiche les liens internes masqués par défaut.
         internalLinks.forEach(el => { el.style.display = ''; });
         document.querySelectorAll('a.nav-item[href="rapports.html"]').forEach(el => el.style.display = 'none');
+        // "Garanties" (espace client) n'a de sens que pour un vrai compte client :
+        // l'admin gère ça depuis "Gestion garanties", pas besoin du doublon ici.
+        document.querySelectorAll('a.nav-item[href="garanties-client.html"]').forEach(el => el.style.display = 'none');
         // Injecter le lien "Services & conso" dans la sidebar admin (si absent)
         if (!document.querySelector('a.nav-item[href="services.html"]')) {
           const anchor = document.querySelector('a.nav-item[href="imports.html"]') ||
