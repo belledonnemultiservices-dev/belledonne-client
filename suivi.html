@@ -1531,6 +1531,8 @@ window.renderRapportZone = function(n) {
   if (rec && (rec.statut === 'archive' || rec.statut === 'envoye')) {
     const notifText = rec.statut === 'envoye' && rec.notifiedAt
       ? `<span style="font-size:11px;color:var(--green-dark);font-weight:600;">✓ Notifié le ${fmtNotifDate(rec.notifiedAt)} au client</span>`
+      : rec.statut === 'envoye' && rec.ajouteEspaceClient
+      ? `<span style="font-size:11px;color:var(--green-dark);font-weight:600;">✓ Ajouté à l'espace client (sans email)</span>`
       : `<span style="font-size:11px;color:var(--text-muted);">Archivé en interne — pas encore envoyé au client (voir Gestion rapports)</span>`;
     receptionBlock = `
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">

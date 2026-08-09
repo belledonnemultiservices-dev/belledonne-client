@@ -243,14 +243,12 @@
         <label class="form-label">Message</label>
         <textarea class="mn-msg" id="envoiMsg"></textarea>
       </div>
-      <label class="mn-contact-item" id="envoiAjouterEspaceWrap" style="margin-bottom:0;">
-        <input type="checkbox" id="envoiAjouterEspace" checked>
-        <div><div class="mn-contact-name">Ajouter dans l'espace client</div><div class="mn-contact-email">Visible dans "Rapports d'intervention" côté client. Si décoché, seul l'email est envoyé.</div></div>
-      </label>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeEnvoi()">Annuler</button>
-      <button class="btn-save" id="envoiBtn" onclick="doEnvoyer()">Envoyer au client</button>
+      <button class="btn-save" id="envoiBtnEspace" style="background:var(--bg);color:var(--text);" onclick="doEnvoyer('espace')">Espace client seul</button>
+      <button class="btn-save" id="envoiBtnEmail" onclick="doEnvoyer('email')">Email seul</button>
+      <button class="btn-save" id="envoiBtnBoth" onclick="doEnvoyer('both')">Email + Espace client</button>
     </div>
   </div>
 </div>
@@ -357,6 +355,8 @@ function render() {
         ${resendBtn}
         ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
         ${r.statut === "archive" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
+        ${r.statut === "envoye" && r.ajouteEspaceClient ? `<button class="btn-a btn-annuler" onclick="retirerEspaceClient('${r.id}')">Retirer de l'espace client</button>` : ""}
+        ${r.statut === "envoye" && !r.ajouteEspaceClient ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')">Envoyer au client</button>` : ""}
         ${r.statut === "a-traiter" ? `<button class="btn-a btn-archiver" onclick="archiver('${r.id}')">Archiver</button>` : ""}
         <button class="btn-a btn-archiver" style="color:var(--red);" onclick="supprimerReception('${r.id}')">Supprimer</button>`;
     return `
@@ -541,20 +541,18 @@ window.openEnvoi = async function(id) {
   document.getElementById("envoiSubject").value = "Rapport disponible" + (r.bc ? " - BC " + r.bc : "");
   document.getElementById("envoiMsg").value = `Bonjour,\nVotre rapport (BC ${r.bc || "-"}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
   document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
-  document.getElementById("envoiBtn").disabled = false;
-  document.getElementById("envoiBtn").textContent = "Envoyer au client";
+  ["envoiBtnEspace", "envoiBtnEmail", "envoiBtnBoth"].forEach(id => { document.getElementById(id).disabled = false; });
   document.getElementById("envoiEmailManuel").value = "";
   document.getElementById("modalEnvoi").classList.add("open");
-  // La case "Ajouter dans l'espace client" n'a de sens que si ce client a un compte
-  // (espace client actif) ; sinon on la masque et on ne coche rien par défaut.
+  // Les boutons "Espace client" n'ont de sens que si ce client a un compte (espace client actif).
   try {
     const snapU = await getDocs(query(collection(db, "users"), where("role", "==", "client"), where("client", "==", r.client)));
     const hasEspaceClient = !snapU.empty;
-    document.getElementById("envoiAjouterEspaceWrap").style.display = hasEspaceClient ? "" : "none";
-    document.getElementById("envoiAjouterEspace").checked = hasEspaceClient;
+    document.getElementById("envoiBtnEspace").style.display = hasEspaceClient ? "" : "none";
+    document.getElementById("envoiBtnBoth").style.display = hasEspaceClient ? "" : "none";
   } catch(e) {
-    document.getElementById("envoiAjouterEspaceWrap").style.display = "none";
-    document.getElementById("envoiAjouterEspace").checked = false;
+    document.getElementById("envoiBtnEspace").style.display = "none";
+    document.getElementById("envoiBtnBoth").style.display = "none";
   }
   try {
     const snapC = await getDocs(query(collection(db, "contacts"), where("client", "==", r.client)));
@@ -590,31 +588,41 @@ window.closeEnvoi = function() {
   _envoiId = null;
 };
 
-window.doEnvoyer = async function() {
+window.doEnvoyer = async function(mode) {
   const r = allDocs.find(x => x.id === _envoiId);
   if (!r) return;
+  // mode: "email" (email seul), "espace" (espace client seul), "both" (les deux).
+  const wantsEmail = mode === "email" || mode === "both";
+  const wantsEspace = mode === "espace" || mode === "both";
   const subject = document.getElementById("envoiSubject").value.trim();
   const body = document.getElementById("envoiMsg").value.trim();
-  if (!subject || !body) { alert("Objet et message requis."); return; }
-  const recipients = Array.from(document.querySelectorAll("#envoiContacts input[type=checkbox]:checked")).map(c => c.value).filter(Boolean);
-  if (!recipients.length) { alert("Sélectionnez au moins un destinataire."); return; }
-  const btn = document.getElementById("envoiBtn");
-  btn.disabled = true; btn.textContent = "Envoi...";
-  const attachments = [{ url: r.fileUrl, filename: (r.bc || r.id || "rapport") + (r.type === "excel" ? ".xlsx" : ".pdf") }];
+  if (wantsEmail && (!subject || !body)) { alert("Objet et message requis."); return; }
+  const recipients = wantsEmail ? Array.from(document.querySelectorAll("#envoiContacts input[type=checkbox]:checked")).map(c => c.value).filter(Boolean) : [];
+  if (wantsEmail && !recipients.length) { alert("Sélectionnez au moins un destinataire."); return; }
+  const btnIds = { email: "envoiBtnEmail", espace: "envoiBtnEspace", both: "envoiBtnBoth" };
+  const btn = document.getElementById(btnIds[mode]);
+  const btnOrig = btn.textContent;
+  ["envoiBtnEspace", "envoiBtnEmail", "envoiBtnBoth"].forEach(id => { document.getElementById(id).disabled = true; });
+  btn.textContent = "Envoi...";
+
   let sent = 0, errors = 0;
-  for (const to of recipients) {
-    try {
-      const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-      const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
-      const resp = await fetch(FUNCTION_URL, { method: "POST", headers, body: JSON.stringify({ to, subject, body, attachments }) });
-      if (resp.ok) sent++; else errors++;
-    } catch(e) { errors++; }
+  if (wantsEmail) {
+    const attachments = [{ url: r.fileUrl, filename: (r.bc || r.id || "rapport") + (r.type === "excel" ? ".xlsx" : ".pdf") }];
+    for (const to of recipients) {
+      try {
+        const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+        const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
+        const resp = await fetch(FUNCTION_URL, { method: "POST", headers, body: JSON.stringify({ to, subject, body, attachments }) });
+        if (resp.ok) sent++; else errors++;
+      } catch(e) { errors++; }
+    }
   }
-  if (sent > 0) {
-    const ajouterEspace = document.getElementById("envoiAjouterEspace").checked;
+
+  const emailOk = !wantsEmail || sent > 0;
+  if (emailOk) {
     const now = new Date().toISOString();
     try {
-      if (ajouterEspace) {
+      if (wantsEspace) {
         await addDoc(collection(db, "rapports"), {
           bc: r.bc || r.reference || "",
           client: r.client,
@@ -627,15 +635,33 @@ window.doEnvoyer = async function() {
         });
       }
       await updateDoc(doc(db, "reception-rapports", r.id), {
-        statut: "envoye", updatedAt: now, notifiedAt: now, notifiedTo: recipients, ajouteEspaceClient: ajouterEspace,
+        statut: "envoye", updatedAt: now, ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}), ajouteEspaceClient: wantsEspace,
       });
-      showToast(sent + " email(s) envoyé(s)" + (ajouterEspace ? ", ajouté à l'espace client." : "."));
+      showToast((wantsEmail ? sent + " email(s) envoyé(s)" : "Ajouté à l'espace client") + (wantsEspace && wantsEmail ? ", ajouté à l'espace client." : "."));
       closeEnvoi();
-    } catch(e) { alert("Envoi fait mais erreur d'enregistrement : " + e.message); }
+    } catch(e) {
+      alert((wantsEmail ? "Envoi fait mais erreur" : "Erreur") + " d'enregistrement : " + e.message);
+      ["envoiBtnEspace", "envoiBtnEmail", "envoiBtnBoth"].forEach(id => { document.getElementById(id).disabled = false; });
+      btn.textContent = btnOrig;
+    }
   } else {
     alert("Aucun email envoyé (" + errors + " erreur(s)).");
-    btn.disabled = false; btn.textContent = "Envoyer au client";
+    ["envoiBtnEspace", "envoiBtnEmail", "envoiBtnBoth"].forEach(id => { document.getElementById(id).disabled = false; });
+    btn.textContent = btnOrig;
   }
+};
+
+// ── RETIRER DE L'ESPACE CLIENT (le PDF reste ici côté admin, mais le client ne le voit plus) ──
+window.retirerEspaceClient = async function(id) {
+  const r = allDocs.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm(`Retirer ce rapport de l'espace client de ${r.client} ?\n\nLe fichier reste disponible ici côté admin, mais ${r.client} ne le verra plus sur son espace.`)) return;
+  try {
+    const snap = await getDocs(query(collection(db, "rapports"), where("client", "==", r.client), where("pdfUrl", "==", r.fileUrl)));
+    for (const d of snap.docs) { await deleteDoc(doc(db, "rapports", d.id)); }
+    await updateDoc(doc(db, "reception-rapports", id), { ajouteEspaceClient: false, updatedAt: new Date().toISOString() });
+    showToast("Retiré de l'espace client");
+  } catch(e) { alert("Erreur : " + e.message); }
 };
 </script>
 <script type="module" src="suivi-badge.js"></script>
