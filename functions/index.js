@@ -1489,7 +1489,6 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     numPassage,
     passageLabel,
     type: typeSortie,
-    typeRapport: formConf.nature === "absence-annulation" ? "absence-annulation" : "intervention",
     fileUrl,
     gsheetId: null,
     gsheetUrl: null,

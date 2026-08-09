@@ -1318,7 +1318,6 @@ function getPassagesFromDOM() {
       adresse: document.getElementById('fAdresseCal' + n)?.value || '',
       techs: getPassageTechsFromDOM(n),
       kizeoPush,
-      statut: div.dataset.statutPassage || '',
     });
   });
   passages.sort((a, b) => (a.num || 0) - (b.num || 0));
@@ -1438,7 +1437,7 @@ function renderPassageCalButtons(n, calEventMap) {
 function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
-  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null, savedStatut = '';
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null;
   if (value && typeof value === 'object') {
     debut = value.debut || '';
     fin = value.fin || '';
@@ -1448,7 +1447,6 @@ function addPassage(value = '', calEventId = '') {
     savedTechs = Array.isArray(value.techs) ? value.techs : (value.tech ? [value.tech] : []);
     savedNum = value.num || null;
     savedKizeoPush = value.kizeoPush || null;
-    savedStatut = value.statut || '';
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   }
@@ -1461,7 +1459,6 @@ function addPassage(value = '', calEventId = '') {
   div.id = 'passage_' + n;
   div.dataset.calEventId = JSON.stringify(calMap);
   div.dataset.kizeoPush = JSON.stringify(savedKizeoPush);
-  div.dataset.statutPassage = savedStatut;
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
   div.innerHTML = `
     <div style="display:grid;grid-template-columns:68px 1fr 1fr 28px;gap:8px;align-items:center;">
@@ -1550,24 +1547,15 @@ window.renderRapportZone = function(n) {
 function buildKizeoControl(n) {
   const forms = window._kizeoForms || [];
   if (!forms.length) return '';
-  const div0 = document.getElementById('passage_' + n);
-  const statutPassage = div0?.dataset.statutPassage || '';
-  const wrap = (inner) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
-      <span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport terrain</span>${inner}</div>`;
-  const annulBtn = `<button type="button" onclick="ouvrirAnnulationPassage(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#FDECEA;color:#E74C3C;border:1px solid #FACACA;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>
-        Annuler l'intervention
-      </button>`;
-  if (statutPassage === 'annule') {
-    return wrap(`<span style="font-size:11px;font-weight:700;color:#E74C3C;background:#FDECEA;padding:4px 10px;border-radius:20px;white-space:nowrap;">✕ Passage annulé</span>`);
-  }
-  if (!editId) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Enregistrez l'intervention pour pouvoir générer le rapport.</span>`);
   // Techniciens du passage ayant un ID Kizeo
   const passageTechs = (typeof getPassageTechsFromDOM === 'function' ? getPassageTechsFromDOM(n) : []) || [];
   const techMatches = passageTechs
     .map(nom => (window._techniciens || []).find(t => t.nomComplet === nom || t.nom === nom))
     .filter(t => t && t.kizeoUserId);
-  if (!techMatches.length) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Assignez un technicien ayant un ID Kizeo (fiche Techniciens) sur ce passage.</span>${annulBtn}`);
+  const wrap = (inner) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
+      <span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport terrain</span>${inner}</div>`;
+  if (!editId) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Enregistrez l'intervention pour pouvoir générer le rapport.</span>`);
+  if (!techMatches.length) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Assignez un technicien ayant un ID Kizeo (fiche Techniciens) sur ce passage.</span>`);
   let kizeoPush = null;
   try { kizeoPush = JSON.parse(document.getElementById('passage_' + n)?.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }
   // Le formulaire et le technicien utilisés au dernier envoi sont conservés (sinon
@@ -1589,8 +1577,7 @@ function buildKizeoControl(n) {
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M4 4h16v2H4zm0 14h16v2H4zm7-7h9v2h-9zm0-4h9v2h-9zm0 8h9v2h-9zM4 8l3 3-3 3z"/></svg>
         ${kizeoPush ? 'Renvoyer le rapport' : 'Générer le rapport'}
       </button>
-      ${pushBadge}
-      ${annulBtn}`);
+      ${pushBadge}`);
 }
 window.genererRapportKizeo = async function(n) {
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
@@ -1790,102 +1777,6 @@ window.sendNotifRapport = async function() {
     renderRapportZoneByNum(num);
   } else {
     showToast('Échec de l\'envoi. Réessaie.', true);
-  }
-};
-// ── ANNULATION D'UN PASSAGE ──
-window._anPassageN = null;
-window.ouvrirAnnulationPassage = async function(n) {
-  const client = document.getElementById('fClient')?.value;
-  if (!client) { showToast('Client introuvable.', true); return; }
-  window._anPassageN = n;
-  const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
-  const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
-  const bc = (document.getElementById('fBC')?.value || document.getElementById('fPL')?.value || document.getElementById('fDevis')?.value || '').trim();
-  document.getElementById('anRecap').textContent = (bc ? 'BC ' + bc + ' — ' : '') + client + ' — ' + passageLabel;
-  document.getElementById('anStatut').value = 'annulation';
-  document.getElementById('anMotif').value = '';
-  document.getElementById('anSubject').value = 'Intervention annulée' + (bc ? ' - BC ' + bc : '');
-  document.getElementById('anBody').value = `Bonjour,\nL'intervention (BC ${bc || '-'} — ${passageLabel}) n'a pas pu être réalisée.\nVous trouverez le rapport en pièce jointe et sur votre espace client : https://clients-belledonne-multiservices.com\nCordialement,\nBelledonne Multiservices`;
-  ['anBtnEspace', 'anBtnEmail', 'anBtnBoth'].forEach(id => { document.getElementById(id).disabled = false; });
-  const listEl = document.getElementById('anContacts');
-  listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement des contacts...</div>';
-  document.getElementById('modalAnnulation').classList.add('open');
-  try {
-    const contacts = await window._loadRapportContacts(client);
-    listEl.innerHTML = contacts.length
-      ? contacts.map(c => _nrContactRow(c.email, (c.prenom || '') + ' ' + (c.nom || ''), c.role, false)).join('')
-      : '<div style="font-size:13px;color:var(--text-muted);padding:8px 2px;">Aucun contact enregistré pour ce client.</div>';
-  } catch (e) { listEl.innerHTML = '<div style="color:#E74C3C;padding:12px;">Erreur chargement contacts</div>'; }
-};
-window.closeAnnulation = function() {
-  document.getElementById('modalAnnulation').classList.remove('open');
-  window._anPassageN = null;
-};
-window.envoyerAnnulation = async function(mode) {
-  const n = window._anPassageN;
-  if (!n || !editId) return;
-  const wantsEmail = mode === 'email' || mode === 'both';
-  const wantsEspace = mode === 'espace' || mode === 'both';
-  const recipients = wantsEmail ? Array.from(document.querySelectorAll('#anContacts input[type=checkbox]:checked')).map(c => c.value).filter(Boolean) : [];
-  if (wantsEmail && !recipients.length) { showToast('Sélectionne au moins un destinataire.', true); return; }
-  const subject = document.getElementById('anSubject').value.trim();
-  const body = document.getElementById('anBody').value.trim();
-  if (wantsEmail && (!subject || !body)) { showToast('Objet et message requis.', true); return; }
-  const btnIds = { email: 'anBtnEmail', espace: 'anBtnEspace', both: 'anBtnBoth' };
-  const btn = document.getElementById(btnIds[mode]);
-  ['anBtnEspace', 'anBtnEmail', 'anBtnBoth'].forEach(id => { document.getElementById(id).disabled = true; });
-  btn.textContent = 'Envoi...';
-  try {
-    const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
-    const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
-    const client = document.getElementById('fClient')?.value || '';
-    const nom = document.getElementById('fNomClient')?.value || '';
-    const adresse = document.getElementById('fAdresse')?.value || '';
-    const bc = (document.getElementById('fBC')?.value || document.getElementById('fPL')?.value || document.getElementById('fDevis')?.value || '').trim();
-    const statut = document.getElementById('anStatut').value;
-    const motif = document.getElementById('anMotif').value.trim();
-    const date = new Date().toISOString().split('T')[0];
-
-    const pdfBytes = await window._genererPdfAnnulation({ client, adresse, nom, bc, passageLabel, statut, motif, date });
-    const filename = Date.now() + '_' + (statut === 'absent' ? 'absence' : 'annulation') + '_' + (bc || passageLabel).replace(/\s+/g, '_') + '.pdf';
-    const fileUrl = await window._uploadAnnulationPdf(client, pdfBytes, filename);
-
-    if (wantsEspace) {
-      await window._creerAbsent({ adresse, nom, date, bc, statut, motif, client, rapportUrl: fileUrl, notifs: wantsEmail ? 1 : 0 });
-    }
-
-    let sent = 0;
-    if (wantsEmail) {
-      const attachments = [{ url: fileUrl, filename }];
-      for (const to of recipients) {
-        try {
-          const resp = await fetch(window.FUNCTION_URL, { method: 'POST', headers: await window._authHeaders(), body: JSON.stringify({ to, subject, body, attachments }) });
-          if (resp.ok) sent++;
-        } catch (e) { /* compté comme échec */ }
-      }
-      if (!sent) { showToast('Échec de l\'envoi email. Réessaie.', true); ['anBtnEspace', 'anBtnEmail', 'anBtnBoth'].forEach(id => { document.getElementById(id).disabled = false; }); btn.textContent = mode === 'email' ? 'Email seul' : (mode === 'espace' ? 'Espace client seul' : 'Email + Espace client'); return; }
-    }
-
-    const now = new Date().toISOString();
-    await window._ajouterReceptionAnnulee({
-      suiviId: editId, client, bc, numPassage: num, passageLabel,
-      typeRapport: 'absence-annulation', origine: 'admin', technicien: '',
-      fileUrl, type: 'pdf', statut: 'envoye', ajouteEspaceClient: wantsEspace,
-      ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}),
-    });
-
-    // Annule le push Kizeo en attente pour ce passage, s'il y en a un.
-    const avaitPush = await window._supprimerReceptionEnAttente(editId, num);
-    const div = document.getElementById('passage_' + n);
-    if (div) { div.dataset.statutPassage = 'annule'; div.dataset.kizeoPush = 'null'; }
-    await window._updateSuivi(editId, { passages: getPassagesFromDOM() });
-
-    renderRapportZone(n);
-    closeAnnulation();
-    showToast('✅ Passage annulé' + (wantsEmail ? ' — email envoyé' : '') + (avaitPush ? ' (pense à supprimer l\'envoi en cours côté Kizeo)' : ''));
-  } catch (e) {
-    showToast('Erreur : ' + e.message, true);
-    ['anBtnEspace', 'anBtnEmail', 'anBtnBoth'].forEach(id => { document.getElementById(id).disabled = false; });
   }
 };
 // Re-rend la zone rapport à partir du numéro de passage (retrouve le n DOM)
@@ -3594,7 +3485,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, doc, orderBy, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-import { PDFDocument, StandardFonts, rgb } from "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.esm.js";
 
 let interventions = [];
 const FUNCTION_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/sendNotification";
@@ -3720,56 +3610,6 @@ window._loadRapportTemplate = async function() {
     const tplDoc = snap.docs.find(d => d.id === 'templates');
     return tplDoc ? (tplDoc.data().rapportSimple || {}) : {};
   } catch (e) { return {}; }
-};
-
-// ── ANNULATION D'UN PASSAGE (absence/annulation constatée avant intervention) ──
-// Génère un PDF simple (pas un rapport Kizeo) attestant l'absence/annulation.
-window._genererPdfAnnulation = async function({ client, adresse, nom, bc, passageLabel, statut, motif, date }) {
-  const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([595, 842]);
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  let y = 780;
-  const draw = (text, opts = {}) => {
-    page.drawText(String(text), { x: 50, y, size: opts.size || 11, font: opts.bold ? bold : font, color: rgb(0, 0, 0) });
-    y -= opts.gap || 20;
-  };
-  draw('Belledonne Multiservices', { bold: true, size: 16, gap: 34 });
-  draw(statut === 'absent' ? "Rapport d'absence" : "Rapport d'annulation", { bold: true, size: 14, gap: 28 });
-  draw(`Client : ${client || '-'}`);
-  draw(`Adresse : ${adresse || '-'}`);
-  if (nom) draw(`Contact : ${nom}`);
-  draw(`Bon de commande : ${bc || '-'}`);
-  draw(`Passage concerné : ${passageLabel || '-'}`);
-  draw(`Date : ${date || '-'}`);
-  draw(`Statut : ${statut === 'absent' ? 'Absent' : 'Annulation'}`);
-  if (motif) draw(`Motif : ${motif}`);
-  y -= 16;
-  draw("Ce document atteste que l'intervention prévue n'a pas pu être réalisée comme prévu.", { size: 10, gap: 16 });
-  return await pdfDoc.save();
-};
-window._uploadAnnulationPdf = async function(client, bytes, filename) {
-  const storageRef = ref(storage, `absents/${client}/${filename}`);
-  await uploadBytes(storageRef, bytes, { contentType: 'application/pdf' });
-  return await getDownloadURL(storageRef);
-};
-window._creerAbsent = async function(data) {
-  const ref2 = await addDoc(collection(db, 'absents'), { ...data, notifs: data.notifs || 0, createdAt: new Date().toISOString() });
-  return ref2.id;
-};
-window._ajouterReceptionAnnulee = async function(data) {
-  const now = new Date().toISOString();
-  const ref2 = await addDoc(collection(db, 'reception-rapports'), { ...data, arriveeAt: now, createdAt: now, updatedAt: now });
-  return ref2.id;
-};
-// Supprime la ligne "en attente" du passage (push Kizeo non répondu) s'il y en a une.
-// Ne supprime rien côté Kizeo : à faire manuellement dans leur interface si besoin.
-window._supprimerReceptionEnAttente = async function(suiviId, numPassage) {
-  const refInterne = suiviId + '::' + numPassage;
-  const snap = await getDocs(query(collection(db, 'reception-rapports'), where('refInterne', '==', refInterne), where('statut', '==', 'en-attente')));
-  let found = false;
-  for (const d of snap.docs) { await deleteDoc(doc(db, 'reception-rapports', d.id)); found = true; }
-  return found;
 };
 
 // ── AUTH ──
@@ -4260,49 +4100,6 @@ window.resetStatusColors = function() {
   </div>
 </div>
 
-<!-- MODAL ANNULATION D'UN PASSAGE -->
-<div class="modal-overlay" id="modalAnnulation">
-  <div class="modal" style="max-width:600px;">
-    <div class="modal-header">
-      <div class="modal-title">Annuler l'intervention</div>
-      <button class="modal-close" onclick="closeAnnulation()">✕</button>
-    </div>
-    <div class="modal-body" style="padding:22px 28px;">
-      <div id="anRecap" style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">—</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
-        <div>
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Statut</div>
-          <select class="form-input" id="anStatut" style="width:100%;">
-            <option value="absent">Absent</option>
-            <option value="annulation" selected>Annulation</option>
-          </select>
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Motif (optionnel)</div>
-          <input class="form-input" id="anMotif" style="width:100%;" placeholder="ex: locataire absent">
-        </div>
-      </div>
-      <div style="margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataires <span style="font-weight:400;text-transform:none;">(coche ceux à notifier)</span></div>
-        <div id="anContacts" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;"></div>
-      </div>
-      <div style="margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
-        <input class="form-input" id="anSubject" style="width:100%;">
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message</div>
-        <textarea class="form-textarea" id="anBody" style="min-height:140px;width:100%;"></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeAnnulation()">Fermer</button>
-      <button class="btn-save" id="anBtnEspace" style="background:var(--bg);color:var(--text);" onclick="envoyerAnnulation('espace')">Espace client seul</button>
-      <button class="btn-save" id="anBtnEmail" onclick="envoyerAnnulation('email')">Email seul</button>
-      <button class="btn-save" id="anBtnBoth" onclick="envoyerAnnulation('both')">Email + Espace client</button>
-    </div>
-  </div>
-</div>
 <script type="module" src="suivi-badge.js"></script>
 </body>
 </html>
