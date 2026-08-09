@@ -670,13 +670,27 @@ window.renderRapportsAgreges = function() {
     <div class="rap-row">
       <div class="rap-info">
         <div class="rap-nom">${a.client}</div>
-        <div class="rap-sub">${a.nbRapports} rapport(s) fusionné(s) · généré le ${fmtDateTime(a.generatedAt)}${a.notifiedAt ? ` · envoyé au client le ${fmtDateTime(a.notifiedAt)}` : ""}</div>
+        <div class="rap-sub">${a.nbRapports} rapport(s) fusionné(s) · généré le ${fmtDateTime(a.generatedAt)}${a.notifiedAt ? ` · envoyé au client le ${fmtDateTime(a.notifiedAt)}` : ""}${a.ajouteEspaceClient ? ` · <span style="color:var(--green-dark);">visible sur son espace client</span>` : ""}</div>
       </div>
       <div class="rap-actions">
         <a class="btn-a btn-open" href="${a.fileUrl}" download="${a.nomFichier || ""}" target="_blank" rel="noopener">Télécharger</a>
         <button class="btn-a btn-envoyer" onclick="openEnvoiAgrege('${a.id}')">Notifier client</button>
+        ${a.ajouteEspaceClient ? `<button class="btn-a btn-suppr" onclick="retirerEspaceClient('${a.id}')">Retirer de l'espace client</button>` : ""}
       </div>
     </div>`).join("");
+};
+
+window.retirerEspaceClient = async function(id) {
+  const a = rapportsAgreges.find(x => x.id === id);
+  if (!a) return;
+  if (!confirm(`Retirer ce rapport de garantie de l'espace client de ${a.client} ?\n\nLe PDF reste disponible ici côté admin, mais ${a.client} ne le verra plus sur son espace.`)) return;
+  const clientSafe = a.client.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const aggDocId = `${a.semaineId}__${clientSafe}`;
+  try {
+    await deleteDoc(doc(db, "garanties", aggDocId));
+    await updateDoc(doc(db, "garanties-rapports-agreges", a.id), { ajouteEspaceClient: false, updatedAt: new Date().toISOString() });
+    showToast("Retiré de l'espace client");
+  } catch(e) { alert("Erreur : " + e.message); }
 };
 
 // ── Notifier client (rapport agrégé garantie) ──
