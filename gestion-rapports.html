@@ -227,6 +227,13 @@
     </div>
     <div class="modal-body" id="envoiBody">
       <div class="mn-recap" id="envoiRecap">—</div>
+      <div class="form-group" id="envoiStatutWrap" style="display:none;">
+        <label class="form-label">Statut</label>
+        <select class="form-input" id="envoiStatut">
+          <option value="absent">Absent</option>
+          <option value="annulation">Annulation</option>
+        </select>
+      </div>
       <div class="form-group">
         <label class="form-label">Destinataires</label>
         <div class="mn-contacts" id="envoiContacts"><div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div></div>
@@ -366,7 +373,10 @@ function render() {
       <div>${r.bc || r.reference ? `<span class="bc-chip">${r.bc || r.reference}</span>` : `<span class="cell-muted">—</span>`}</div>
       <div>${r.passageLabel ? `<span class="passage-chip">${r.passageLabel}</span>` : `<span class="cell-muted">—</span>`}</div>
       <div class="cell-muted" style="font-size:12px;line-height:1.3;">${r.technicien || "—"}</div>
-      <div>${pending ? "" : `<span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>`}</div>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        ${pending ? "" : `<span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>`}
+        ${r.typeRapport === "absence-annulation" ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">Absence/Annulation</span>` : ""}
+      </div>
       <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
         <span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span>
         ${retard ? `<span class="badge-retard">⚠ Non reçu +${hoursLate(r)}h</span>` : ""}
@@ -537,9 +547,14 @@ window.openEnvoi = async function(id) {
   const r = allDocs.find(x => x.id === id);
   if (!r || !r.client) return;
   _envoiId = id;
+  const isAbsAnnul = r.typeRapport === "absence-annulation";
+  document.getElementById("envoiStatutWrap").style.display = isAbsAnnul ? "" : "none";
+  if (isAbsAnnul) document.getElementById("envoiStatut").value = "annulation";
   document.getElementById("envoiRecap").textContent = (r.bc ? "BC " + r.bc + " — " : "") + r.client + (r.passageLabel ? " — " + r.passageLabel : "");
-  document.getElementById("envoiSubject").value = "Rapport disponible" + (r.bc ? " - BC " + r.bc : "");
-  document.getElementById("envoiMsg").value = `Bonjour,\nVotre rapport (BC ${r.bc || "-"}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
+  document.getElementById("envoiSubject").value = (isAbsAnnul ? "Intervention non réalisée" : "Rapport disponible") + (r.bc ? " - BC " + r.bc : "");
+  document.getElementById("envoiMsg").value = isAbsAnnul
+    ? `Bonjour,\nL'intervention (BC ${r.bc || "-"}) n'a pas pu être réalisée${r.passageLabel ? " (" + r.passageLabel + ")" : ""}.\nVous trouverez le rapport en pièce jointe et sur votre espace client : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`
+    : `Bonjour,\nVotre rapport (BC ${r.bc || "-"}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
   document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
   ["envoiBtnEspace", "envoiBtnEmail", "envoiBtnBoth"].forEach(id => { document.getElementById(id).disabled = false; });
   document.getElementById("envoiEmailManuel").value = "";
@@ -618,25 +633,59 @@ window.doEnvoyer = async function(mode) {
     }
   }
 
+  const isAbsAnnul = r.typeRapport === "absence-annulation";
   const emailOk = !wantsEmail || sent > 0;
   if (emailOk) {
     const now = new Date().toISOString();
     try {
       if (wantsEspace) {
-        await addDoc(collection(db, "rapports"), {
-          bc: r.bc || r.reference || "",
-          client: r.client,
-          passage: r.passageLabel || "",
-          site: "",
-          nuisible: "",
-          date: now.split("T")[0],
-          pdfUrl: r.fileUrl,
-          createdAt: now,
-        });
+        if (isAbsAnnul) {
+          let adresse = "", nom = "";
+          if (r.suiviId) {
+            try {
+              const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+              if (sSnap.exists()) { adresse = sSnap.data().adresse || ""; nom = sSnap.data().nomClient || ""; }
+            } catch(e) { /* tant pis, adresse laissée vide */ }
+          }
+          await addDoc(collection(db, "absents"), {
+            adresse, nom,
+            date: now.split("T")[0],
+            bc: r.bc || r.reference || "",
+            statut: document.getElementById("envoiStatut").value,
+            motif: r.passageLabel || "",
+            client: r.client,
+            rapportUrl: r.fileUrl,
+            notifs: wantsEmail ? 1 : 0,
+            createdAt: now,
+          });
+        } else {
+          await addDoc(collection(db, "rapports"), {
+            bc: r.bc || r.reference || "",
+            client: r.client,
+            passage: r.passageLabel || "",
+            site: "",
+            nuisible: "",
+            date: now.split("T")[0],
+            pdfUrl: r.fileUrl,
+            createdAt: now,
+          });
+        }
       }
       await updateDoc(doc(db, "reception-rapports", r.id), {
         statut: "envoye", updatedAt: now, ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}), ajouteEspaceClient: wantsEspace,
       });
+      // Un rapport d'absence/annulation constaté par le technicien signifie que le
+      // passage n'a pas eu lieu normalement : on le marque annulé dans le Suivi.
+      if (isAbsAnnul && r.suiviId && r.numPassage) {
+        try {
+          const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+          if (sSnap.exists()) {
+            const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
+            const updated = passages.map(p => String(p.num) === String(r.numPassage) ? { ...p, statut: "annule" } : p);
+            await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
+          }
+        } catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
+      }
       showToast((wantsEmail ? sent + " email(s) envoyé(s)" : "Ajouté à l'espace client") + (wantsEspace && wantsEmail ? ", ajouté à l'espace client." : "."));
       closeEnvoi();
     } catch(e) {
@@ -657,8 +706,11 @@ window.retirerEspaceClient = async function(id) {
   if (!r) return;
   if (!confirm(`Retirer ce rapport de l'espace client de ${r.client} ?\n\nLe fichier reste disponible ici côté admin, mais ${r.client} ne le verra plus sur son espace.`)) return;
   try {
-    const snap = await getDocs(query(collection(db, "rapports"), where("client", "==", r.client), where("pdfUrl", "==", r.fileUrl)));
-    for (const d of snap.docs) { await deleteDoc(doc(db, "rapports", d.id)); }
+    const isAbsAnnul = r.typeRapport === "absence-annulation";
+    const col = isAbsAnnul ? "absents" : "rapports";
+    const urlField = isAbsAnnul ? "rapportUrl" : "pdfUrl";
+    const snap = await getDocs(query(collection(db, col), where("client", "==", r.client), where(urlField, "==", r.fileUrl)));
+    for (const d of snap.docs) { await deleteDoc(doc(db, col, d.id)); }
     await updateDoc(doc(db, "reception-rapports", id), { ajouteEspaceClient: false, updatedAt: new Date().toISOString() });
     showToast("Retiré de l'espace client");
   } catch(e) { alert("Erreur : " + e.message); }

@@ -1250,7 +1250,7 @@ exports.pushKizeoForm = functions
     try {
       const nowIso = new Date().toISOString();
       const updatedPassages = passages.map(p => String(p.num) === String(numPassage)
-        ? { ...p, kizeoPush: { at: nowIso, technicien, formNom: form.nom || "" } }
+        ? { ...p, kizeoPush: { at: nowIso, technicien, formNom: form.nom || "", libelle: baseLibelle, kizeoFormDocId: String(kizeoFormDocId), recipientUserId: String(recipientUserId) } }
         : p);
       await db.collection("suivi").doc(String(suiviId)).update({ passages: updatedPassages });
     } catch(e) {
@@ -1489,6 +1489,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     numPassage,
     passageLabel,
     type: typeSortie,
+    typeRapport: formConf.nature === "absence-annulation" ? "absence-annulation" : "intervention",
     fileUrl,
     gsheetId: null,
     gsheetUrl: null,

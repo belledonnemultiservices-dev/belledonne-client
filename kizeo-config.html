@@ -203,6 +203,16 @@
             <label class="radio-opt" id="radioExcel" onclick="selectType('excel')"><input type="radio" name="typeSortie" value="excel"> Excel</label>
           </div>
         </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Nature du rapport *</label>
+          <select class="form-select" id="fNature">
+            <option value="intervention">Rapport d'intervention</option>
+            <option value="absence-annulation">Absence / Annulation (constatée par le technicien)</option>
+          </select>
+          <div class="form-hint">Détermine où il est classé dans Gestion rapports et l'espace client.</div>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:16px">
         <div class="form-group" id="exportIdGroup" style="margin-bottom:0;display:none">
           <label class="form-label">Export Excel</label>
           <select class="form-select" id="fExportId"><option value="">— cliquez "Charger les champs" —</option></select>
@@ -339,13 +349,16 @@ function render(forms) {
     const badge = f.typeSortie === "excel"
       ? `<span class="badge-type badge-excel">Excel</span>`
       : `<span class="badge-type badge-pdf">PDF</span>`;
+    const natureBadge = f.nature === "absence-annulation"
+      ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">Absence / Annulation</span>`
+      : "";
     const mapOk = mappingComplete(m)
       ? `<span class="ok">Configuré</span>`
       : `<span class="ko">Référence interne à associer</span>`;
     return `<div class="source-card">
       <div class="source-card-header">
         <div class="source-card-info">
-          <div class="source-card-top"><div class="source-name">${f.nom || "—"}</div>${badge}</div>
+          <div class="source-card-top"><div class="source-name">${f.nom || "—"}</div>${badge}${natureBadge}</div>
           <div class="source-freq">formId ${f.formId || "—"}</div>
         </div>
         <div class="source-card-actions">
@@ -445,11 +458,13 @@ window.openModal = async function(docId) {
     document.getElementById("fFormId").value = f.formId || "";
     savedExport = f.exportId || "";
     selectType(f.typeSortie || "pdf");
+    document.getElementById("fNature").value = f.nature || "intervention";
     current = f.mapping || {};
   } else {
     document.getElementById("fNom").value = "";
     document.getElementById("fFormId").value = "";
     selectType("pdf");
+    document.getElementById("fNature").value = "intervention";
   }
   populateMapSelects(current);
   populateExports(savedExport);
@@ -471,6 +486,7 @@ window.saveForm = async function() {
   const nom = document.getElementById("fNom").value.trim();
   const formId = document.getElementById("fFormId").value.trim();
   const typeSortie = document.querySelector("input[name='typeSortie']:checked").value;
+  const nature = document.getElementById("fNature").value;
   const exportId = document.getElementById("fExportId").value.trim();
   const mapping = {};
   MAP_KEYS.forEach(k => { mapping[k] = document.getElementById(MAP_EL[k]).value || ""; });
@@ -480,7 +496,7 @@ window.saveForm = async function() {
   if (!mapping.refInterne) { showToast("Le champ Référence interne doit être associé"); return; }
   if (typeSortie === "excel" && !exportId) { showToast("ID d'export Excel requis pour un formulaire Excel"); return; }
 
-  const data = { nom, formId, typeSortie, exportId, mapping, updatedAt: new Date().toISOString() };
+  const data = { nom, formId, typeSortie, nature, exportId, mapping, updatedAt: new Date().toISOString() };
   const btn = document.getElementById("saveBtn");
   btn.disabled = true; btn.textContent = "Enregistrement...";
   try {
