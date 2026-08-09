@@ -1390,6 +1390,24 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
       const newRef = await db.collection("garanties-rapports").add(docDataG);
       console.log(`Kizeo garantie: soumission ${dataId} reçue -> garanties-rapports/${newRef.id}`);
     }
+
+    // Compteur client "passages garantie" (espace client) : un passage confirmé par
+    // ligne/bloc, daté du jour réel de l'intervention (pas de la réception du rapport).
+    // Id déterministe pour éviter les doublons en cas de renvoi/régénération.
+    try {
+      const passageId = `${semaineId}__${blocId}__${ligneId}`;
+      await db.collection("garanties-passages").doc(passageId).set({
+        client: ligne.client || "",
+        nomLocataire: ligne.nom || "",
+        adresse: ligne.adresse || "",
+        codePostal: ligne.codePostal || "",
+        ville: ligne.ville || "",
+        date: bloc.date || nowG.split("T")[0],
+        semaineId, blocId, ligneId,
+        updatedAt: nowG,
+      }, { merge: true });
+    } catch(e) { console.error(`Kizeo garantie: enregistrement passage échoué pour ${dataId}:`, e.message); }
+
     return true;
   }
 

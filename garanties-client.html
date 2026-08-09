@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garanties — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
+    --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
+    --amber:#F5A623;--red:#E74C3C;
+    --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
+    --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
+    --sidebar-w:240px;--radius:14px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+
+  /* SIDEBAR */
+  .sidebar{width:var(--sidebar-w);background:var(--navy);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-mark{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-icon svg{width:18px;height:18px;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
+  .sidebar-client{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:12px 14px;}
+  .client-label{font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;}
+  .client-name{font-size:13px;font-weight:500;color:#fff;}
+  .client-contract{font-size:11px;color:var(--green);margin-top:2px;}
+  .sidebar-nav{padding:20px 12px;flex:1;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
+  .nav-group-label:first-child{margin-top:0;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-badge{margin-left:auto;background:var(--amber);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:0.8;}
+  .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--navy-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--green);flex-shrink:0;}
+  .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .footer-role{font-size:10px;color:rgba(255,255,255,0.3);}
+
+  /* MAIN */
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
+  .content{padding:32px;flex:1;}
+  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:14px;color:var(--text-muted);}
+
+  /* KPI */
+  .kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .kpi-inner{padding:14px 18px;position:relative;}
+  .kpi-inner::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+  .kpi.green .kpi-inner::before{background:var(--green);}
+  .kpi.amber .kpi-inner::before{background:var(--amber);}
+  .kpi.navy .kpi-inner::before{background:var(--navy);}
+  .kpi-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:10px;}
+  .kpi-vals{display:flex;justify-content:space-between;align-items:flex-end;}
+  .kpi-val{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;color:var(--text);line-height:1;}
+  .kpi-lbl{font-size:11px;color:var(--text-muted);margin-top:2px;}
+  .kpi-valprev{font-size:22px;font-weight:700;color:var(--text-muted);}
+
+  /* FILTRE ADMIN */
+  .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;margin-bottom:20px;}
+
+  /* LISTE RAPPORTS */
+  .card-list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .rap-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap;}
+  .rap-row:last-child{border-bottom:none;}
+  .rap-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:600;color:var(--text);}
+  .rap-sub{font-size:12px;color:var(--text-muted);margin-top:3px;}
+  .btn-dl{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border:none;background:var(--green);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer;text-decoration:none;white-space:nowrap;}
+  .btn-dl:hover{background:var(--green-dark);color:#fff;}
+
+  /* EMPTY */
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+  .empty-state svg{width:44px;height:44px;margin-bottom:12px;opacity:0.25;}
+  .empty-state p{font-size:14px;}
+
+  .admin-badge{margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);padding:8px 12px;display:flex;align-items:center;gap:8px;}
+  .admin-badge svg{width:14px;height:14px;color:var(--amber);flex-shrink:0;}
+  .admin-badge span{font-size:11px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:0.06em;}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+    </div>
+  </div>
+  <div class="sidebar-client">
+    <div class="client-name" id="sideClientName">—</div>
+    <div class="client-contract" id="sideClientId"></div>
+  </div>
+  <div class="admin-badge" id="adminBadge" style="display:none;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Espace Admin</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" id="navSuiviItem" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
+    <a class="nav-item" href="facturation.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg><span>Facturation</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item active" href="garanties-client.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
+    <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
+    <div id="adminNav" style="display:none;">
+      <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+      <a class="nav-item" href="admin.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+      <a class="nav-item" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+      <a class="nav-item" href="techniciens.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Techniciens</span></a>
+      <a class="nav-item" href="imports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import email</span></a>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar" id="sideAvatar">—</div>
+      <div><div class="footer-name" id="sideFooterName">—</div><div class="footer-role" id="sideFooterRole">Client</div></div>
+    </div>
+    <button onclick="handleLogout()" style="width:100%;margin-top:8px;padding:8px 12px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(231,76,60,0.15)';this.style.color='#E74C3C'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.5)'">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;flex-shrink:0;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Se déconnecter
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Espace client</span><span>›</span><span>Garanties</span></div>
+    <div class="date-chip" id="dateChip"></div>
+  </header>
+
+  <div class="content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Garanties</div>
+        <div class="page-sub">Rapports de garantie traitement blattes et suivi des passages</div>
+      </div>
+    </div>
+
+    <!-- KPIs : passages garantie par locataire -->
+    <div class="kpi-row">
+      <div class="kpi green">
+        <div class="kpi-inner">
+          <div class="kpi-label">Semaine</div>
+          <div class="kpi-vals">
+            <div><div class="kpi-val" id="kpiValSemaine">0</div><div class="kpi-lbl">Cette semaine</div></div>
+            <div style="text-align:right;"><div class="kpi-valprev" id="kpiValSemPrev">0</div><div class="kpi-lbl">Sem. dernière</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="kpi amber">
+        <div class="kpi-inner">
+          <div class="kpi-label">Mois</div>
+          <div class="kpi-vals">
+            <div><div class="kpi-val" id="kpiValMois">0</div><div class="kpi-lbl">Ce mois</div></div>
+            <div style="text-align:right;"><div class="kpi-valprev" id="kpiValMoisPrev">0</div><div class="kpi-lbl">Mois dernier</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="kpi navy">
+        <div class="kpi-inner">
+          <div class="kpi-label">Année</div>
+          <div class="kpi-vals">
+            <div><div class="kpi-val" id="kpiValAnnee">0</div><div class="kpi-lbl">Cette année</div></div>
+            <div style="text-align:right;"><div class="kpi-valprev" id="kpiValAnneePrev">0</div><div class="kpi-lbl">Année dernière</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <select class="filter-select" id="filterClient" style="display:none;" onchange="applyClientFilter(this.value)">
+      <option value="">Tous les clients</option>
+    </select>
+
+    <div class="card-list" id="rapportsList">
+      <div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><p>Chargement...</p></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+
+document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
+
+let passagesAll = [];
+let rapportsAll = [];
+let currentClientFilter = null; // null = admin sans filtre (tout), sinon nom du client
+let isAdmin = false;
+
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'}) + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+}
+
+function updateKPIs() {
+  const list = currentClientFilter ? passagesAll.filter(p => p.client === currentClientFilter) : passagesAll;
+  const now = new Date();
+  const annee = now.getFullYear().toString();
+  const anneePrev = (now.getFullYear() - 1).toString();
+  const mois = annee + '-' + String(now.getMonth()+1).padStart(2,'0');
+  const prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMoisStr = prevM.getFullYear() + '-' + String(prevM.getMonth()+1).padStart(2,'0');
+  const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+  const monday = new Date(now); monday.setDate(now.getDate() - dow);
+  const mondayStr = monday.toISOString().split('T')[0];
+  const prevMonday = new Date(monday); prevMonday.setDate(monday.getDate() - 7);
+  const prevMondayStr = prevMonday.toISOString().split('T')[0];
+
+  document.getElementById('kpiValSemaine').textContent = list.filter(x => (x.date||'') >= mondayStr).length;
+  document.getElementById('kpiValSemPrev').textContent = list.filter(x => (x.date||'') >= prevMondayStr && (x.date||'') < mondayStr).length;
+  document.getElementById('kpiValMois').textContent = list.filter(x => (x.date||'').startsWith(mois)).length;
+  document.getElementById('kpiValMoisPrev').textContent = list.filter(x => (x.date||'').startsWith(prevMoisStr)).length;
+  document.getElementById('kpiValAnnee').textContent = list.filter(x => (x.date||'').startsWith(annee)).length;
+  document.getElementById('kpiValAnneePrev').textContent = list.filter(x => (x.date||'').startsWith(anneePrev)).length;
+}
+
+function renderRapports() {
+  const list = (currentClientFilter ? rapportsAll.filter(r => r.client === currentClientFilter) : rapportsAll)
+    .slice().sort((a,b) => (b.dateDebut||b.createdAt||'').localeCompare(a.dateDebut||a.createdAt||''));
+  const el = document.getElementById('rapportsList');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><p>Aucun rapport de garantie pour le moment.</p></div>`;
+    return;
+  }
+  el.innerHTML = list.map(r => `
+    <div class="rap-row">
+      <div>
+        <div class="rap-title">${isAdmin ? (r.client + ' — ') : ''}Rapport de garantie traitement blattes</div>
+        <div class="rap-sub">Période : ${r.periode || '—'}${r.nbPassages ? ' · ' + r.nbPassages + ' passage' + (r.nbPassages>1?'s':'') : ''} · envoyé le ${fmtDateTime(r.notifiedAt || r.createdAt)}</div>
+      </div>
+      <a class="btn-dl" href="${r.fileUrl}" target="_blank" rel="noopener" download="${r.nomFichier || ''}">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        Télécharger
+      </a>
+    </div>`).join('');
+}
+
+window.applyClientFilter = function(v) {
+  currentClientFilter = v || null;
+  updateKPIs();
+  renderRapports();
+};
+
+async function populateClientFilter() {
+  const sel = document.getElementById('filterClient');
+  sel.style.display = '';
+  try {
+    const snap = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+    const seen = new Set();
+    snap.docs.forEach(d => {
+      const cl = d.data().client;
+      if (!cl || seen.has(cl)) return;
+      seen.add(cl);
+      const o = document.createElement('option'); o.value = cl; o.textContent = cl;
+      sel.appendChild(o);
+    });
+  } catch(e) { console.error('populateClientFilter:', e); }
+}
+
+function loadData(clientFilter) {
+  const refPassages = clientFilter
+    ? query(collection(db, "garanties-passages"), where("client", "==", clientFilter))
+    : collection(db, "garanties-passages");
+  onSnapshot(refPassages, (snap) => {
+    passagesAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    updateKPIs();
+  }, (e) => console.error('garanties-passages:', e));
+
+  const refRapports = clientFilter
+    ? query(collection(db, "garanties"), where("client", "==", clientFilter))
+    : collection(db, "garanties");
+  onSnapshot(refRapports, (snap) => {
+    rapportsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderRapports();
+  }, (e) => console.error('garanties:', e));
+}
+
+onAuthStateChanged(auth, async function(user) {
+  if (!user) { window.location.href = "login.html"; return; }
+  if (user.email === "belledonne.multiservices@gmail.com") {
+    isAdmin = true;
+    document.getElementById("sideClientName").textContent = "Belledonne Multiservices";
+    document.getElementById("sideClientId").textContent = "belledonne-admin";
+    document.getElementById("sideAvatar").textContent = "BM";
+    document.getElementById("sideFooterName").textContent = "Belledonne Multiservices";
+    document.getElementById("sideFooterRole").textContent = "Administrateur";
+    document.getElementById("adminNav").style.display = "block";
+    document.getElementById("adminBadge").style.display = "flex";
+    await populateClientFilter();
+    loadData(null);
+  } else {
+    try {
+      const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
+      if (!snap.empty) {
+        const p = snap.docs[0].data();
+        document.getElementById("sideClientName").textContent = p.client || "Client";
+        document.getElementById("sideClientId").textContent = p.identifiant || "";
+        document.getElementById("sideAvatar").textContent = (p.client || "CL").substring(0,2).toUpperCase();
+        document.getElementById("sideFooterName").textContent = p.client || user.email;
+        document.getElementById("sideFooterRole").textContent = "Client";
+        const navSuivi = document.getElementById('navSuiviItem'); if (navSuivi) navSuivi.style.display = 'none';
+        currentClientFilter = p.client;
+        loadData(p.client);
+      }
+    } catch(e) { console.error(e); }
+  }
+});
+</script>
+<script type="module" src="suivi-badge.js"></script>
+</body>
+</html>
