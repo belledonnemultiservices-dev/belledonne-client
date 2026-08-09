@@ -439,7 +439,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, onSnapshot, doc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, onSnapshot, doc, getDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
@@ -680,14 +680,29 @@ window.renderRapportsAgreges = function() {
 };
 
 // ── Notifier client (rapport agrégé garantie) ──
+function applyVars(text, a) {
+  return text
+    .replace(/\{\{client\}\}/g, a.client || "")
+    .replace(/\{\{periode\}\}/g, a.periode || "")
+    .replace(/\{\{lien\}\}/g, LIEN_ESPACE);
+}
 let _envoiAgId = null;
 window.openEnvoiAgrege = async function(id) {
   const a = rapportsAgreges.find(x => x.id === id);
   if (!a) return;
   _envoiAgId = id;
   document.getElementById("envoiAgRecap").textContent = `Garantie — ${a.periode} — ${a.client}`;
-  document.getElementById("envoiAgSubject").value = `Rapport de garantie disponible - ${a.client}`;
-  document.getElementById("envoiAgMsg").value = `Bonjour,\nVotre rapport de garantie traitement blattes (période du ${a.periode}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
+  // Template "Garantie" (config/templates.garantieSimple, géré depuis Contacts & notifs) : {{client}}/{{periode}}/{{lien}} remplacées à la volée.
+  let subject = `Rapport de garantie disponible - ${a.client}`;
+  let msg = `Bonjour,\nVous trouverez en pièce jointe le rapport de garantie traitement blattes pour la période ${a.periode}.\nVous pouvez également le consulter à tout moment sur votre espace client : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
+  try {
+    const tplSnap = await getDoc(doc(db, "config", "templates"));
+    const tpl = tplSnap.exists() ? tplSnap.data().garantieSimple : null;
+    if (tpl && tpl.subject) subject = applyVars(tpl.subject, a);
+    if (tpl && tpl.body) msg = applyVars(tpl.body, a);
+  } catch(e) { console.error("Chargement template garantie échoué:", e); }
+  document.getElementById("envoiAgSubject").value = subject;
+  document.getElementById("envoiAgMsg").value = msg;
   document.getElementById("envoiAgContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
   document.getElementById("envoiAgBtn").disabled = false;
   document.getElementById("envoiAgBtn").textContent = "Notifier client";
