@@ -380,7 +380,7 @@
 <div class="modal-overlay" id="modalEnvoiAgrege">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Envoyer au client</div>
+      <div class="modal-title">Notifier client</div>
       <button class="btn-close" onclick="closeEnvoiAgrege()">×</button>
     </div>
     <div class="modal-body">
@@ -408,7 +408,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeEnvoiAgrege()">Annuler</button>
-      <button class="btn-save" id="envoiAgBtn" onclick="doEnvoyerAgrege()">Envoyer au client</button>
+      <button class="btn-save" id="envoiAgBtn" onclick="doEnvoyerAgrege()">Notifier client</button>
     </div>
   </div>
 </div>
@@ -674,12 +674,12 @@ window.renderRapportsAgreges = function() {
       </div>
       <div class="rap-actions">
         <a class="btn-a btn-open" href="${a.fileUrl}" download="${a.nomFichier || ""}" target="_blank" rel="noopener">Télécharger</a>
-        <button class="btn-a btn-envoyer" onclick="openEnvoiAgrege('${a.id}')">Envoyer au client</button>
+        <button class="btn-a btn-envoyer" onclick="openEnvoiAgrege('${a.id}')">Notifier client</button>
       </div>
     </div>`).join("");
 };
 
-// ── Envoyer au client (rapport agrégé garantie) ──
+// ── Notifier client (rapport agrégé garantie) ──
 let _envoiAgId = null;
 window.openEnvoiAgrege = async function(id) {
   const a = rapportsAgreges.find(x => x.id === id);
@@ -690,7 +690,7 @@ window.openEnvoiAgrege = async function(id) {
   document.getElementById("envoiAgMsg").value = `Bonjour,\nVotre rapport de garantie traitement blattes (période du ${a.periode}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
   document.getElementById("envoiAgContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
   document.getElementById("envoiAgBtn").disabled = false;
-  document.getElementById("envoiAgBtn").textContent = "Envoyer au client";
+  document.getElementById("envoiAgBtn").textContent = "Notifier client";
   document.getElementById("envoiAgEmailManuel").value = "";
   document.getElementById("modalEnvoiAgrege").classList.add("open");
   try {
@@ -772,7 +772,7 @@ window.doEnvoyerAgrege = async function() {
   } else {
     alert("Échec de l'envoi (" + errors + " erreur(s)).");
   }
-  btn.disabled = false; btn.textContent = "Envoyer au client";
+  btn.disabled = false; btn.textContent = "Notifier client";
 };
 
 window.genererRapportsParClient = async function() {
