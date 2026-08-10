@@ -309,30 +309,6 @@ Belledonne Multiservices</textarea>
         <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('rapportSimple')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedRapportSimple"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
       </div>
 
-      <div class="tpl-section">
-        <div class="tpl-header"><div class="tpl-icon" style="background:#E8F9F2;"><span style="font-size:13px;font-weight:700;color:var(--green-dark);">N</span></div><div><div class="tpl-title">Rapport — selection multiple</div><div class="tpl-sub">{{liste}} genere la liste automatiquement</div></div></div>
-        <div class="tpl-body">
-          <div class="tpl-vars">
-            <span class="tpl-var" onclick="insertVar('tplRapportMultiBody','{{liste}}')">{{liste}}</span>
-            <span class="tpl-var" onclick="insertVar('tplRapportMultiBody','{{lien}}')">{{lien}}</span>
-          </div>
-          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
-          <input class="tpl-input" type="text" id="tplRapportMultiSubject" value="Vos rapports d'intervention sont disponibles" placeholder="ex: Vos rapports sont disponibles">
-          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
-          <textarea class="tpl-textarea" id="tplRapportMultiBody">Bonjour,
-
-Vos rapports d'intervention suivants sont disponibles sur votre espace client :
-
-{{liste}}
-
-Consultez-les ici : https://clients-belledonne-multiservices.com
-
-Cordialement,
-Belledonne Multiservices</textarea>
-        </div>
-        <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('rapportMulti')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedRapportMulti"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
-      </div>
-
       <div class="tpl-group-label" style="margin-top:24px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:#F5A623;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg>Absents / Annulations</div>
 
       <div class="tpl-section">
@@ -365,32 +341,6 @@ Cordialement,
 Belledonne Multiservices</textarea>
         </div>
         <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('absentSimple')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedAbsentSimple"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
-      </div>
-
-      <div class="tpl-section">
-        <div class="tpl-header"><div class="tpl-icon" style="background:#FEF3E2;"><span style="font-size:13px;font-weight:700;color:#F5A623;">N</span></div><div><div class="tpl-title">Absent — selection multiple</div><div class="tpl-sub">{{liste}} genere la liste automatiquement</div></div></div>
-        <div class="tpl-body">
-          <div class="tpl-vars">
-            <span class="tpl-var" onclick="insertVar('tplAbsentMultiBody','{{liste}}')">{{liste}}</span>
-            <span class="tpl-var" onclick="insertVar('tplAbsentMultiBody','{{lien}}')">{{lien}}</span>
-          </div>
-          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Objet</label>
-          <input class="tpl-input" type="text" id="tplAbsentMultiSubject" value="Passages non effectues - recapitulatif" placeholder="ex: Passages non effectues - recapitulatif">
-          <label style="font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Corps</label>
-          <textarea class="tpl-textarea" id="tplAbsentMultiBody">Bonjour,
-
-Les passages suivants n'ont pas pu etre effectues :
-
-{{liste}}
-
-Merci de nous contacter pour convenir de nouveaux rendez-vous.
-
-Consultez votre espace client : https://clients-belledonne-multiservices.com
-
-Cordialement,
-Belledonne Multiservices</textarea>
-        </div>
-        <div class="tpl-footer"><button class="btn-save-tpl" onclick="window.saveTemplate('absentMulti')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>Enregistrer</button><div class="tpl-saved" id="savedAbsentMulti"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Enregistre !</div></div>
       </div>
 
       <div class="tpl-group-label" style="margin-top:24px;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:#7F77DD;"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>Garanties</div>
@@ -877,7 +827,7 @@ async function loadConfig() {
     const t = snap.docs.find(x => x.id === 'templates');
     if (t) {
       const tpl = t.data();
-      ['rapportSimple','rapportMulti','absentSimple','absentMulti','garantieSimple','suiviRdv','suiviRdvLocataire','suiviSms','rappelSms'].forEach(k => {
+      ['rapportSimple','absentSimple','garantieSimple','suiviRdv','suiviRdvLocataire','suiviSms','rappelSms'].forEach(k => {
         if (tpl[k]) {
           const cap = k.charAt(0).toUpperCase() + k.slice(1);
           const subEl = document.getElementById('tpl' + cap + 'Subject');
