@@ -1223,8 +1223,7 @@ onAuthStateChanged(auth, async (user) => {
     factures = snap.docs.map(d => ({id:d.id,...d.data()}));
     window.factures = factures;
     populateClientFilter();
-    if (typeof renderTable === 'function') renderTable();
-    else setPeriodDates('all', document.getElementById('btnPeriodAll'));
+    applyFilters();
   });
 });
 </script>
