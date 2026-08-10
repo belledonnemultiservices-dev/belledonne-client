@@ -277,8 +277,8 @@
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Motif</label>
-        <input class="form-input" type="text" id="anpMotif" placeholder="ex: locataire absent">
+        <label class="form-label">Motif *</label>
+        <input class="form-input" type="text" id="anpMotif" placeholder="ex: locataire absent, prévenu par téléphone le 10/08">
       </div>
       <div class="form-group">
         <label class="form-label">Destinataires</label>
@@ -784,7 +784,7 @@ async function genererPdfAnnulation({ client, adresse, nom, bc, passageLabel, st
   draw(`Passage concerné : ${passageLabel || '-'}`);
   draw(`Date : ${date || '-'}`);
   draw(`Statut : ${statut === 'absent' ? 'Absent' : 'Annulation'}`);
-  if (motif) draw(`Motif : ${motif}`);
+  draw(`Motif : ${motif || '-'}`);
   y -= 16;
   draw("Ce document atteste que l'intervention prévue n'a pas pu être réalisée comme prévu.", { size: 10, gap: 16 });
   return await pdfDoc.save();
@@ -847,22 +847,28 @@ window.confirmerAnnulerPassage = async function(mode) {
   if (wantsEmail && (!subject || !body)) { alert("Objet et message requis."); return; }
   const statut = document.getElementById("anpStatut").value;
   const motif = document.getElementById("anpMotif").value.trim();
+  if (!motif) { alert("Le motif est requis."); return; }
   const btnIds = { email: "anpBtnEmail", espace: "anpBtnEspace", both: "anpBtnBoth" };
   const btn = document.getElementById(btnIds[mode]);
   const btnOrig = btn.textContent;
   ["anpBtnEspace", "anpBtnEmail", "anpBtnBoth"].forEach(bid => { document.getElementById(bid).disabled = true; });
   btn.textContent = "Envoi...";
   try {
-    let adresse = "", nom = "";
+    let adresse = "", nom = "", reference = r.bc || r.reference || "";
     if (r.suiviId) {
       try {
         const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
-        if (sSnap.exists()) { adresse = sSnap.data().adresse || ""; nom = sSnap.data().nomClient || ""; }
-      } catch(e) { /* tant pis, adresse laissée vide */ }
+        if (sSnap.exists()) {
+          const s = sSnap.data();
+          adresse = s.adresse || "";
+          nom = s.nomClient || "";
+          reference = s.bc || s.pl || s.devis || reference;
+        }
+      } catch(e) { /* tant pis, valeurs par défaut conservées */ }
     }
     const date = new Date().toISOString().split("T")[0];
-    const pdfBytes = await genererPdfAnnulation({ client: r.client, adresse, nom, bc: r.bc || r.reference || "", passageLabel: r.passageLabel, statut, motif, date });
-    const filename = Date.now() + "_" + (statut === "absent" ? "absence" : "annulation") + "_" + (r.bc || r.reference || r.id) + ".pdf";
+    const pdfBytes = await genererPdfAnnulation({ client: r.client, adresse, nom, bc: reference, passageLabel: r.passageLabel, statut, motif, date });
+    const filename = Date.now() + "_" + (statut === "absent" ? "absence" : "annulation") + "_" + (reference || r.id) + ".pdf";
     const storageRef = ref(storage, `reception/${r.client || "_inconnu"}/${filename}`);
     await uploadBytesResumable(storageRef, pdfBytes, { contentType: "application/pdf" });
     const fileUrl = await getDownloadURL(storageRef);
@@ -890,7 +896,7 @@ window.confirmerAnnulerPassage = async function(mode) {
     if (wantsEspace) {
       await addDoc(collection(db, "absents"), {
         adresse, nom, date,
-        bc: r.bc || r.reference || "",
+        bc: reference,
         statut, motif,
         client: r.client,
         rapportUrl: fileUrl,
@@ -900,7 +906,7 @@ window.confirmerAnnulerPassage = async function(mode) {
     }
 
     await updateDoc(doc(db, "reception-rapports", r.id), {
-      statut: "envoye", typeRapport: "absence-annulation", fileUrl, type: "pdf",
+      statut: "envoye", typeRapport: "absence-annulation", fileUrl, type: "pdf", bc: reference,
       ajouteEspaceClient: wantsEspace, updatedAt: now,
       ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}),
     });
