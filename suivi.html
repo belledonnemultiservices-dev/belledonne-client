@@ -1318,6 +1318,7 @@ function getPassagesFromDOM() {
       adresse: document.getElementById('fAdresseCal' + n)?.value || '',
       techs: getPassageTechsFromDOM(n),
       kizeoPush,
+      statut: div.dataset.statutPassage || '',
     });
   });
   passages.sort((a, b) => (a.num || 0) - (b.num || 0));
@@ -1437,7 +1438,7 @@ function renderPassageCalButtons(n, calEventMap) {
 function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
-  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null;
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null, savedStatut = '';
   if (value && typeof value === 'object') {
     debut = value.debut || '';
     fin = value.fin || '';
@@ -1447,6 +1448,7 @@ function addPassage(value = '', calEventId = '') {
     savedTechs = Array.isArray(value.techs) ? value.techs : (value.tech ? [value.tech] : []);
     savedNum = value.num || null;
     savedKizeoPush = value.kizeoPush || null;
+    savedStatut = value.statut || '';
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   }
@@ -1459,6 +1461,7 @@ function addPassage(value = '', calEventId = '') {
   div.id = 'passage_' + n;
   div.dataset.calEventId = JSON.stringify(calMap);
   div.dataset.kizeoPush = JSON.stringify(savedKizeoPush);
+  div.dataset.statutPassage = savedStatut;
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
   div.innerHTML = `
     <div style="display:grid;grid-template-columns:68px 1fr 1fr 28px;gap:8px;align-items:center;">
@@ -1547,14 +1550,19 @@ window.renderRapportZone = function(n) {
 function buildKizeoControl(n) {
   const forms = window._kizeoForms || [];
   if (!forms.length) return '';
+  const div0 = document.getElementById('passage_' + n);
+  const statutPassage = div0?.dataset.statutPassage || '';
+  const wrap = (inner) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
+      <span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport terrain</span>${inner}</div>`;
+  if (statutPassage === 'annule') {
+    return wrap(`<span style="font-size:11px;font-weight:700;color:#E74C3C;background:#FDECEA;padding:4px 10px;border-radius:20px;white-space:nowrap;">✕ Passage annulé</span>`);
+  }
+  if (!editId) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Enregistrez l'intervention pour pouvoir générer le rapport.</span>`);
   // Techniciens du passage ayant un ID Kizeo
   const passageTechs = (typeof getPassageTechsFromDOM === 'function' ? getPassageTechsFromDOM(n) : []) || [];
   const techMatches = passageTechs
     .map(nom => (window._techniciens || []).find(t => t.nomComplet === nom || t.nom === nom))
     .filter(t => t && t.kizeoUserId);
-  const wrap = (inner) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
-      <span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport terrain</span>${inner}</div>`;
-  if (!editId) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Enregistrez l'intervention pour pouvoir générer le rapport.</span>`);
   if (!techMatches.length) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Assignez un technicien ayant un ID Kizeo (fiche Techniciens) sur ce passage.</span>`);
   let kizeoPush = null;
   try { kizeoPush = JSON.parse(document.getElementById('passage_' + n)?.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }

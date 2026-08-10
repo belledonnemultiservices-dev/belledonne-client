@@ -227,6 +227,13 @@
     </div>
     <div class="modal-body" id="envoiBody">
       <div class="mn-recap" id="envoiRecap">—</div>
+      <div class="form-group" id="envoiStatutWrap" style="display:none;">
+        <label class="form-label">Statut</label>
+        <select class="form-input" id="envoiStatut">
+          <option value="absent">Absent</option>
+          <option value="annulation">Annulation</option>
+        </select>
+      </div>
       <div class="form-group">
         <label class="form-label">Destinataires</label>
         <div class="mn-contacts" id="envoiContacts"><div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div></div>
@@ -253,6 +260,52 @@
   </div>
 </div>
 
+<!-- MODAL ANNULER LE PASSAGE (rapport d'annulation généré par nous, pas via Kizeo) -->
+<div class="modal-overlay" id="modalAnnulerPassage">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Annuler le passage</div>
+      <button class="btn-close" onclick="closeAnnulerPassage()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="mn-recap" id="anpRecap">—</div>
+      <div class="form-group">
+        <label class="form-label">Statut</label>
+        <select class="form-input" id="anpStatut">
+          <option value="absent">Absent</option>
+          <option value="annulation" selected>Annulation</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Motif</label>
+        <input class="form-input" type="text" id="anpMotif" placeholder="ex: locataire absent">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Destinataires</label>
+        <div class="mn-contacts" id="anpContacts"><div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div></div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <input class="form-input" type="email" id="anpEmailManuel" placeholder="Ajouter une adresse email..." style="flex:1;height:38px;">
+          <button type="button" class="btn-cancel" style="height:38px;" onclick="ajouterEmailManuelAnp()">Ajouter</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Objet</label>
+        <input class="form-input" type="text" id="anpSubject">
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">Message</label>
+        <textarea class="mn-msg" id="anpMsg"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeAnnulerPassage()">Fermer</button>
+      <button class="btn-save" id="anpBtnEspace" style="background:var(--bg);color:var(--text);" onclick="confirmerAnnulerPassage('espace')">Espace client seul</button>
+      <button class="btn-save" id="anpBtnEmail" onclick="confirmerAnnulerPassage('email')">Email seul</button>
+      <button class="btn-save" id="anpBtnBoth" onclick="confirmerAnnulerPassage('both')">Email + Espace client</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
   <span id="toastMsg"></span>
@@ -265,6 +318,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, updateDoc, deleteDoc, onSnapshot, getDocs, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { PDFDocument, StandardFonts, rgb } from "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.esm.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -348,7 +402,7 @@ function render() {
       ? `<button class="btn-a btn-replace" onclick="renvoyer('${r.id}')" title="Renvoie un nouveau formulaire au technicien, pré-rempli avec ses réponses précédentes">Renvoyer</button>`
       : `<button class="btn-a btn-replace" disabled title="Rapport ancien : repasser par le Suivi pour renvoyer">Renvoyer</button>`;
     const actions = pending
-      ? `${resendBtn}<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Annuler</button>`
+      ? `${resendBtn}<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Annuler</button><button class="btn-a btn-annuler" onclick="ouvrirAnnulerPassage('${r.id}')">Annuler le passage</button>`
       : `
         <a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>
         <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
@@ -366,7 +420,10 @@ function render() {
       <div>${r.bc || r.reference ? `<span class="bc-chip">${r.bc || r.reference}</span>` : `<span class="cell-muted">—</span>`}</div>
       <div>${r.passageLabel ? `<span class="passage-chip">${r.passageLabel}</span>` : `<span class="cell-muted">—</span>`}</div>
       <div class="cell-muted" style="font-size:12px;line-height:1.3;">${r.technicien || "—"}</div>
-      <div>${pending ? "" : `<span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>`}</div>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        ${pending ? "" : `<span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>`}
+        ${r.typeRapport === "absence-annulation" ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">Absence/Annulation</span>` : ""}
+      </div>
       <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
         <span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span>
         ${retard ? `<span class="badge-retard">⚠ Non reçu +${hoursLate(r)}h</span>` : ""}
@@ -537,9 +594,14 @@ window.openEnvoi = async function(id) {
   const r = allDocs.find(x => x.id === id);
   if (!r || !r.client) return;
   _envoiId = id;
+  const isAbsAnnul = r.typeRapport === "absence-annulation";
+  document.getElementById("envoiStatutWrap").style.display = isAbsAnnul ? "" : "none";
+  if (isAbsAnnul) document.getElementById("envoiStatut").value = "annulation";
   document.getElementById("envoiRecap").textContent = (r.bc ? "BC " + r.bc + " — " : "") + r.client + (r.passageLabel ? " — " + r.passageLabel : "");
-  document.getElementById("envoiSubject").value = "Rapport disponible" + (r.bc ? " - BC " + r.bc : "");
-  document.getElementById("envoiMsg").value = `Bonjour,\nVotre rapport (BC ${r.bc || "-"}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
+  document.getElementById("envoiSubject").value = (isAbsAnnul ? "Intervention non réalisée" : "Rapport disponible") + (r.bc ? " - BC " + r.bc : "");
+  document.getElementById("envoiMsg").value = isAbsAnnul
+    ? `Bonjour,\nL'intervention (BC ${r.bc || "-"}) n'a pas pu être réalisée${r.passageLabel ? " (" + r.passageLabel + ")" : ""}.\nVous trouverez le rapport en pièce jointe et sur votre espace client : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`
+    : `Bonjour,\nVotre rapport (BC ${r.bc || "-"}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
   document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
   ["envoiBtnEspace", "envoiBtnEmail", "envoiBtnBoth"].forEach(id => { document.getElementById(id).disabled = false; });
   document.getElementById("envoiEmailManuel").value = "";
@@ -618,25 +680,59 @@ window.doEnvoyer = async function(mode) {
     }
   }
 
+  const isAbsAnnul = r.typeRapport === "absence-annulation";
   const emailOk = !wantsEmail || sent > 0;
   if (emailOk) {
     const now = new Date().toISOString();
     try {
       if (wantsEspace) {
-        await addDoc(collection(db, "rapports"), {
-          bc: r.bc || r.reference || "",
-          client: r.client,
-          passage: r.passageLabel || "",
-          site: "",
-          nuisible: "",
-          date: now.split("T")[0],
-          pdfUrl: r.fileUrl,
-          createdAt: now,
-        });
+        if (isAbsAnnul) {
+          let adresse = "", nom = "";
+          if (r.suiviId) {
+            try {
+              const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+              if (sSnap.exists()) { adresse = sSnap.data().adresse || ""; nom = sSnap.data().nomClient || ""; }
+            } catch(e) { /* tant pis, adresse laissée vide */ }
+          }
+          await addDoc(collection(db, "absents"), {
+            adresse, nom,
+            date: now.split("T")[0],
+            bc: r.bc || r.reference || "",
+            statut: document.getElementById("envoiStatut").value,
+            motif: r.passageLabel || "",
+            client: r.client,
+            rapportUrl: r.fileUrl,
+            notifs: wantsEmail ? 1 : 0,
+            createdAt: now,
+          });
+        } else {
+          await addDoc(collection(db, "rapports"), {
+            bc: r.bc || r.reference || "",
+            client: r.client,
+            passage: r.passageLabel || "",
+            site: "",
+            nuisible: "",
+            date: now.split("T")[0],
+            pdfUrl: r.fileUrl,
+            createdAt: now,
+          });
+        }
       }
       await updateDoc(doc(db, "reception-rapports", r.id), {
         statut: "envoye", updatedAt: now, ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}), ajouteEspaceClient: wantsEspace,
       });
+      // Un rapport d'absence/annulation constaté par le technicien signifie que le
+      // passage n'a pas eu lieu normalement : on le marque annulé dans le Suivi.
+      if (isAbsAnnul && r.suiviId && r.numPassage) {
+        try {
+          const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+          if (sSnap.exists()) {
+            const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
+            const updated = passages.map(p => String(p.num) === String(r.numPassage) ? { ...p, statut: "annule" } : p);
+            await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
+          }
+        } catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
+      }
       showToast((wantsEmail ? sent + " email(s) envoyé(s)" : "Ajouté à l'espace client") + (wantsEspace && wantsEmail ? ", ajouté à l'espace client." : "."));
       closeEnvoi();
     } catch(e) {
@@ -657,11 +753,176 @@ window.retirerEspaceClient = async function(id) {
   if (!r) return;
   if (!confirm(`Retirer ce rapport de l'espace client de ${r.client} ?\n\nLe fichier reste disponible ici côté admin, mais ${r.client} ne le verra plus sur son espace.`)) return;
   try {
-    const snap = await getDocs(query(collection(db, "rapports"), where("client", "==", r.client), where("pdfUrl", "==", r.fileUrl)));
-    for (const d of snap.docs) { await deleteDoc(doc(db, "rapports", d.id)); }
+    const isAbsAnnul = r.typeRapport === "absence-annulation";
+    const col = isAbsAnnul ? "absents" : "rapports";
+    const urlField = isAbsAnnul ? "rapportUrl" : "pdfUrl";
+    const snap = await getDocs(query(collection(db, col), where("client", "==", r.client), where(urlField, "==", r.fileUrl)));
+    for (const d of snap.docs) { await deleteDoc(doc(db, col, d.id)); }
     await updateDoc(doc(db, "reception-rapports", id), { ajouteEspaceClient: false, updatedAt: new Date().toISOString() });
     showToast("Retiré de l'espace client");
   } catch(e) { alert("Erreur : " + e.message); }
+};
+
+// ── ANNULER LE PASSAGE (cas A : annulation décidée avant l'intervention, sur une
+// ligne "en attente" ; génère nous-mêmes un PDF, pas via Kizeo) ──
+async function genererPdfAnnulation({ client, adresse, nom, bc, passageLabel, statut, motif, date }) {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595, 842]);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  let y = 780;
+  const draw = (text, opts = {}) => {
+    page.drawText(String(text), { x: 50, y, size: opts.size || 11, font: opts.bold ? bold : font, color: rgb(0, 0, 0) });
+    y -= opts.gap || 20;
+  };
+  draw('Belledonne Multiservices', { bold: true, size: 16, gap: 34 });
+  draw(statut === 'absent' ? "Rapport d'absence" : "Rapport d'annulation", { bold: true, size: 14, gap: 28 });
+  draw(`Client : ${client || '-'}`);
+  draw(`Adresse : ${adresse || '-'}`);
+  if (nom) draw(`Contact : ${nom}`);
+  draw(`Référence : ${bc || '-'}`);
+  draw(`Passage concerné : ${passageLabel || '-'}`);
+  draw(`Date : ${date || '-'}`);
+  draw(`Statut : ${statut === 'absent' ? 'Absent' : 'Annulation'}`);
+  if (motif) draw(`Motif : ${motif}`);
+  y -= 16;
+  draw("Ce document atteste que l'intervention prévue n'a pas pu être réalisée comme prévu.", { size: 10, gap: 16 });
+  return await pdfDoc.save();
+}
+
+let _anpId = null;
+window.ouvrirAnnulerPassage = async function(id) {
+  const r = allDocs.find(x => x.id === id);
+  if (!r) return;
+  if (!confirm("Êtes-vous sûr de vouloir annuler ce passage ?\n\nPensez à supprimer le rapport en attente dans l'interface Kizeo (https://forms.kizeo.com/data/history/).")) return;
+  _anpId = id;
+  document.getElementById("anpRecap").textContent = (r.bc ? "BC " + r.bc + " — " : "") + r.client + (r.passageLabel ? " — " + r.passageLabel : "");
+  document.getElementById("anpStatut").value = "annulation";
+  document.getElementById("anpMotif").value = "";
+  document.getElementById("anpSubject").value = "Intervention annulée" + (r.bc ? " - BC " + r.bc : "");
+  document.getElementById("anpMsg").value = `Bonjour,\nL'intervention (BC ${r.bc || "-"}${r.passageLabel ? " — " + r.passageLabel : ""}) n'a pas pu être réalisée.\nVous trouverez le rapport en pièce jointe et sur votre espace client : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
+  document.getElementById("anpEmailManuel").value = "";
+  ["anpBtnEspace", "anpBtnEmail", "anpBtnBoth"].forEach(bid => { document.getElementById(bid).disabled = false; });
+  document.getElementById("anpContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
+  document.getElementById("modalAnnulerPassage").classList.add("open");
+  try {
+    const snapC = await getDocs(query(collection(db, "contacts"), where("client", "==", r.client)));
+    const contacts = snapC.docs.map(d => ({ id: d.id, ...d.data() }));
+    document.getElementById("anpContacts").innerHTML = contacts.length
+      ? contacts.map(c => `
+        <label class="mn-contact-item">
+          <input type="checkbox" value="${c.email}">
+          <div><div class="mn-contact-name">${c.prenom||""} ${c.nom||""}</div><div class="mn-contact-email">${c.email||"-"}</div></div>
+        </label>`).join("")
+      : '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Aucun contact pour ce client. <a href="contacts.html" style="color:var(--green-dark);">Ajouter</a></div>';
+  } catch(e) { document.getElementById("anpContacts").innerHTML = '<div style="color:red;padding:12px;">Erreur : ' + e.message + '</div>'; }
+};
+window.closeAnnulerPassage = function() {
+  document.getElementById("modalAnnulerPassage").classList.remove("open");
+  _anpId = null;
+};
+window.ajouterEmailManuelAnp = function() {
+  const input = document.getElementById("anpEmailManuel");
+  const email = input.value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert("Adresse email invalide."); return; }
+  const container = document.getElementById("anpContacts");
+  if (container.querySelector(`input[value="${email}"]`)) { input.value = ""; return; }
+  if (!container.querySelector(".mn-contact-item")) container.innerHTML = "";
+  container.insertAdjacentHTML("beforeend", `
+    <label class="mn-contact-item">
+      <input type="checkbox" value="${email}" checked>
+      <div><div class="mn-contact-name">Adresse ajoutée manuellement</div><div class="mn-contact-email">${email}</div></div>
+    </label>`);
+  input.value = "";
+};
+window.confirmerAnnulerPassage = async function(mode) {
+  const r = allDocs.find(x => x.id === _anpId);
+  if (!r) return;
+  const wantsEmail = mode === "email" || mode === "both";
+  const wantsEspace = mode === "espace" || mode === "both";
+  const recipients = wantsEmail ? Array.from(document.querySelectorAll("#anpContacts input[type=checkbox]:checked")).map(c => c.value).filter(Boolean) : [];
+  if (wantsEmail && !recipients.length) { alert("Sélectionnez au moins un destinataire."); return; }
+  const subject = document.getElementById("anpSubject").value.trim();
+  const body = document.getElementById("anpMsg").value.trim();
+  if (wantsEmail && (!subject || !body)) { alert("Objet et message requis."); return; }
+  const statut = document.getElementById("anpStatut").value;
+  const motif = document.getElementById("anpMotif").value.trim();
+  const btnIds = { email: "anpBtnEmail", espace: "anpBtnEspace", both: "anpBtnBoth" };
+  const btn = document.getElementById(btnIds[mode]);
+  const btnOrig = btn.textContent;
+  ["anpBtnEspace", "anpBtnEmail", "anpBtnBoth"].forEach(bid => { document.getElementById(bid).disabled = true; });
+  btn.textContent = "Envoi...";
+  try {
+    let adresse = "", nom = "";
+    if (r.suiviId) {
+      try {
+        const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+        if (sSnap.exists()) { adresse = sSnap.data().adresse || ""; nom = sSnap.data().nomClient || ""; }
+      } catch(e) { /* tant pis, adresse laissée vide */ }
+    }
+    const date = new Date().toISOString().split("T")[0];
+    const pdfBytes = await genererPdfAnnulation({ client: r.client, adresse, nom, bc: r.bc || r.reference || "", passageLabel: r.passageLabel, statut, motif, date });
+    const filename = Date.now() + "_" + (statut === "absent" ? "absence" : "annulation") + "_" + (r.bc || r.reference || r.id) + ".pdf";
+    const storageRef = ref(storage, `reception/${r.client || "_inconnu"}/${filename}`);
+    await uploadBytesResumable(storageRef, pdfBytes, { contentType: "application/pdf" });
+    const fileUrl = await getDownloadURL(storageRef);
+
+    let sent = 0;
+    if (wantsEmail) {
+      const attachments = [{ url: fileUrl, filename }];
+      for (const to of recipients) {
+        try {
+          const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+          const headers = idt ? { "Content-Type": "application/json", "Authorization": "Bearer " + idt } : { "Content-Type": "application/json" };
+          const resp = await fetch(FUNCTION_URL, { method: "POST", headers, body: JSON.stringify({ to, subject, body, attachments }) });
+          if (resp.ok) sent++;
+        } catch(e) { /* compté comme échec */ }
+      }
+      if (!sent) {
+        alert("Échec de l'envoi email. Réessaie.");
+        ["anpBtnEspace", "anpBtnEmail", "anpBtnBoth"].forEach(bid => { document.getElementById(bid).disabled = false; });
+        btn.textContent = btnOrig;
+        return;
+      }
+    }
+
+    const now = new Date().toISOString();
+    if (wantsEspace) {
+      await addDoc(collection(db, "absents"), {
+        adresse, nom, date,
+        bc: r.bc || r.reference || "",
+        statut, motif,
+        client: r.client,
+        rapportUrl: fileUrl,
+        notifs: wantsEmail ? 1 : 0,
+        createdAt: now,
+      });
+    }
+
+    await updateDoc(doc(db, "reception-rapports", r.id), {
+      statut: "envoye", typeRapport: "absence-annulation", fileUrl, type: "pdf",
+      ajouteEspaceClient: wantsEspace, updatedAt: now,
+      ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}),
+    });
+
+    if (r.suiviId && r.numPassage) {
+      try {
+        const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+        if (sSnap.exists()) {
+          const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
+          const updated = passages.map(p => String(p.num) === String(r.numPassage) ? { ...p, statut: "annule", kizeoPush: null } : p);
+          await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
+        }
+      } catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
+    }
+
+    showToast("Passage annulé" + (wantsEmail ? " — email envoyé" : "") + (wantsEspace ? ", ajouté à l'espace client." : "."));
+    closeAnnulerPassage();
+  } catch(e) {
+    alert("Erreur : " + e.message);
+    ["anpBtnEspace", "anpBtnEmail", "anpBtnBoth"].forEach(bid => { document.getElementById(bid).disabled = false; });
+    btn.textContent = btnOrig;
+  }
 };
 </script>
 <script type="module" src="suivi-badge.js"></script>
