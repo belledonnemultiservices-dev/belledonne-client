@@ -262,7 +262,22 @@ function axonautPost(key, path, body) {
   });
 }
 
+function axonautPatch(key, path, body) {
+  return new Promise((resolve) => {
+    const data = JSON.stringify(body);
+    const r = https.request({
+      hostname: "axonaut.com", path, method: "PATCH",
+      headers: { userApiKey: key, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data), Accept: "application/json" },
+    }, (x) => { let d = ""; x.on("data", c => d += c); x.on("end", () => resolve({ status: x.statusCode, body: d })); });
+    r.on("error", e => resolve({ status: 0, error: e.message }));
+    r.write(data); r.end();
+  });
+}
+
 // Trouve une fiche client Axonaut par SIRET (chiffres) ou nom, sinon la crée.
+// Si la fiche existe déjà, on la remet à jour (adresse/SIRET/TVA) avec ce qui est
+// sélectionné dans l'app : sinon Axonaut garde l'ancienne adresse enregistrée,
+// même si elle ne correspond plus à ce qu'on a choisi côté app.
 async function axonautFindOrCreateCompany(key, client) {
   const digits = (client.siret || "").replace(/\D/g, "");
   const nomNorm = (client.nom || "").trim().toLowerCase();
@@ -276,7 +291,17 @@ async function axonautFindOrCreateCompany(key, client) {
       if (digits && coSiret && coSiret === digits) return true;
       return nomNorm && (co.name || "").trim().toLowerCase() === nomNorm;
     });
-    if (hit) return { id: hit.id, created: false };
+    if (hit) {
+      const patch = {
+        address_street: client.adresse || "", address_zip_code: client.cp || "",
+        address_city: client.ville || "", address_country: "France",
+      };
+      if (client.siret) patch.siret = client.siret;
+      if (client.tva) patch.intracommunity_number = client.tva;
+      try { await axonautPatch(key, "/api/v2/companies/" + hit.id, patch); }
+      catch(e) { console.error("Axonaut: mise à jour adresse échouée pour", hit.id, e.message); }
+      return { id: hit.id, created: false };
+    }
     if (arr.length < 500) break;
   }
   // Création
@@ -310,11 +335,14 @@ exports.createAxonautInvoice = functions
     const key = AXONAUT_API_KEY.value();
     try {
       const company = await axonautFindOrCreateCompany(key, client);
-      const products = lignes.map(l => ({
+      const products = lignes.map((l, i) => ({
         name: (l.designation || "Prestation"),
         price: Number(l.pu) || 0,
         quantity: Number(l.qte) || 1,
         tax_rate: Number(l.tva) || 0,
+        // Axonaut n'a pas de champ "objet" visible sur la facture : on le met en
+        // description de la première ligne (seul champ texte visible au client).
+        ...(i === 0 && objet ? { description: "Objet : " + objet } : {}),
       }));
       const rawDate = date || new Date().toISOString().slice(0, 10);
       const rfcDate = /T/.test(rawDate) ? rawDate : (rawDate + "T12:00:00+00:00");
@@ -323,9 +351,6 @@ exports.createAxonautInvoice = functions
         date: rfcDate,
         products,
       };
-      // Le BC est porté par l'objet (title/comments), pas par order_number
-      // (order_number impose l'unicité chez Axonaut -> 409 sur régénération).
-      if (objet) { docBody.title = objet; docBody.comments = "Objet : " + objet; }
       const path = (mode === "devis") ? "/api/v2/quotations" : "/api/v2/invoices";
       console.log("AXONAUT create body:", JSON.stringify(docBody));
       const cr = await axonautPost(key, path, docBody);
