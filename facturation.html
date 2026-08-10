@@ -848,9 +848,21 @@ window.genererFactureAxonaut = async function() {
 };
 
 // ══════════ PARAMÈTRES FACTURATION (BPU + entités clients) ══════════
-window.openConfigFact = function() {
+window.openConfigFact = async function() {
   const sel = document.getElementById('cfgClient');
-  const clients = [...new Set((factures || []).map(f => f.client).filter(Boolean))].sort();
+  // Union des clients ayant une ligne de facturation, un BPU, ou une entité déjà
+  // configurée : sinon un client sans facture en attente disparaissait du menu
+  // même si son BPU/adresse existaient déjà en base.
+  const fromFactures = (factures || []).map(f => f.client).filter(Boolean);
+  const [bpuSnap, entSnap] = await Promise.all([
+    getDocs(collection(db, 'bpu')).catch(() => ({ docs: [] })),
+    getDocs(collection(db, 'facturation-clients')).catch(() => ({ docs: [] })),
+  ]);
+  const clients = [...new Set([
+    ...fromFactures,
+    ...bpuSnap.docs.map(d => d.id),
+    ...entSnap.docs.map(d => d.id),
+  ])].sort();
   sel.innerHTML = clients.map(c => '<option value="' + c.replace(/"/g, '&quot;') + '">' + c + '</option>').join('');
   document.getElementById('modalConfig').classList.add('open');
   loadConfigClient();
