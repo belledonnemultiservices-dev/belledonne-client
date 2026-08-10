@@ -402,7 +402,7 @@ function render() {
       ? `<button class="btn-a btn-replace" onclick="renvoyer('${r.id}')" title="Renvoie un nouveau formulaire au technicien, pré-rempli avec ses réponses précédentes">Renvoyer</button>`
       : `<button class="btn-a btn-replace" disabled title="Rapport ancien : repasser par le Suivi pour renvoyer">Renvoyer</button>`;
     const actions = pending
-      ? `${resendBtn}<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Annuler</button><button class="btn-a btn-annuler" onclick="ouvrirAnnulerPassage('${r.id}')">Annuler le passage</button>`
+      ? `${resendBtn}<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Supprimer</button><button class="btn-a btn-annuler" onclick="ouvrirAnnulerPassage('${r.id}')">Annuler le passage</button>`
       : `
         <a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>
         <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
