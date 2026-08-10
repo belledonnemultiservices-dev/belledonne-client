@@ -64,6 +64,9 @@ function setup() {
         // "Garanties" (espace client) n'a de sens que pour un vrai compte client :
         // l'admin gère ça depuis "Gestion garanties", pas besoin du doublon ici.
         document.querySelectorAll('a.nav-item[href="garanties-client.html"]').forEach(el => el.style.display = 'none');
+        // "Absents / Annulations" (espace client) : idem, l'admin gère ça depuis
+        // Gestion rapports (Annuler le passage), pas besoin du doublon ici.
+        document.querySelectorAll('a.nav-item[href="absents.html"]').forEach(el => el.style.display = 'none');
         // Injecter le lien "Services & conso" dans la sidebar admin (si absent)
         if (!document.querySelector('a.nav-item[href="services.html"]')) {
           const anchor = document.querySelector('a.nav-item[href="imports.html"]') ||
