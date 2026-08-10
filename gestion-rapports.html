@@ -588,6 +588,19 @@ window.confirmRattacher = async function(suiviId, client, bc) {
   } catch(e) { alert("Erreur : " + e.message); }
 };
 
+// ── TEMPLATES EMAIL (config/templates, gérés depuis Contacts & notifs) ──
+async function chargerTemplate(key) {
+  try {
+    const snap = await getDoc(doc(db, "config", "templates"));
+    return snap.exists() ? (snap.data()[key] || {}) : {};
+  } catch(e) { return {}; }
+}
+function appliquerVars(text, vars) {
+  let out = text || "";
+  for (const [k, v] of Object.entries(vars)) out = out.replace(new RegExp(`{{${k}}}`, "g"), v || "-");
+  return out;
+}
+
 // ── ENVOYER AU CLIENT ──
 let _envoiId = null;
 window.openEnvoi = async function(id) {
@@ -598,10 +611,16 @@ window.openEnvoi = async function(id) {
   document.getElementById("envoiStatutWrap").style.display = isAbsAnnul ? "" : "none";
   if (isAbsAnnul) document.getElementById("envoiStatut").value = "annulation";
   document.getElementById("envoiRecap").textContent = (r.bc ? "BC " + r.bc + " — " : "") + r.client + (r.passageLabel ? " — " + r.passageLabel : "");
-  document.getElementById("envoiSubject").value = (isAbsAnnul ? "Intervention non réalisée" : "Rapport disponible") + (r.bc ? " - BC " + r.bc : "");
-  document.getElementById("envoiMsg").value = isAbsAnnul
-    ? `Bonjour,\nL'intervention (BC ${r.bc || "-"}) n'a pas pu être réalisée${r.passageLabel ? " (" + r.passageLabel + ")" : ""}.\nVous trouverez le rapport en pièce jointe et sur votre espace client : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`
-    : `Bonjour,\nVotre rapport (BC ${r.bc || "-"}) est disponible.\nConsultez-le ici : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
+  const vars = {
+    bc: r.bc || r.reference || "", client: r.client || "", passage: r.passageLabel || "",
+    statut: isAbsAnnul ? (document.getElementById("envoiStatut").value === "absent" ? "Absent" : "Annulation") : "",
+    motif: r.motif || "", lien: LIEN_ESPACE,
+  };
+  const tpl = await chargerTemplate(isAbsAnnul ? "rapportAnnulation" : "rapportClassique");
+  document.getElementById("envoiSubject").value = appliquerVars(tpl.subject || (isAbsAnnul ? "Intervention non réalisée - BC {{bc}}" : "Rapport disponible - BC {{bc}}"), vars);
+  document.getElementById("envoiMsg").value = appliquerVars(tpl.body || (isAbsAnnul
+    ? "Bonjour,\nL'intervention (BC {{bc}}, {{passage}}) n'a pas pu être réalisée.\nConsultez votre espace client : {{lien}}\nCordialement,\nBelledonne Multiservices"
+    : "Bonjour,\nVotre rapport (BC {{bc}}, {{passage}}) est disponible.\nConsultez-le ici : {{lien}}\nCordialement,\nBelledonne Multiservices"), vars);
   document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
   ["envoiBtnEspace", "envoiBtnEmail", "envoiBtnBoth"].forEach(id => { document.getElementById(id).disabled = false; });
   document.getElementById("envoiEmailManuel").value = "";
@@ -799,8 +818,10 @@ window.ouvrirAnnulerPassage = async function(id) {
   document.getElementById("anpRecap").textContent = (r.bc ? "BC " + r.bc + " — " : "") + r.client + (r.passageLabel ? " — " + r.passageLabel : "");
   document.getElementById("anpStatut").value = "annulation";
   document.getElementById("anpMotif").value = "";
-  document.getElementById("anpSubject").value = "Intervention annulée" + (r.bc ? " - BC " + r.bc : "");
-  document.getElementById("anpMsg").value = `Bonjour,\nL'intervention (BC ${r.bc || "-"}${r.passageLabel ? " — " + r.passageLabel : ""}) n'a pas pu être réalisée.\nVous trouverez le rapport en pièce jointe et sur votre espace client : ${LIEN_ESPACE}\nCordialement,\nBelledonne Multiservices`;
+  const anpVars = { bc: r.bc || r.reference || "", client: r.client || "", passage: r.passageLabel || "", statut: "Annulation", motif: "", lien: LIEN_ESPACE };
+  const anpTpl = await chargerTemplate("rapportAnnulation");
+  document.getElementById("anpSubject").value = appliquerVars(anpTpl.subject || "Intervention non réalisée - BC {{bc}}", anpVars);
+  document.getElementById("anpMsg").value = appliquerVars(anpTpl.body || "Bonjour,\nL'intervention (BC {{bc}}, {{passage}}) n'a pas pu être réalisée.\nConsultez votre espace client : {{lien}}\nCordialement,\nBelledonne Multiservices", anpVars);
   document.getElementById("anpEmailManuel").value = "";
   ["anpBtnEspace", "anpBtnEmail", "anpBtnBoth"].forEach(bid => { document.getElementById(bid).disabled = false; });
   document.getElementById("anpContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
