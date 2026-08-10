@@ -854,15 +854,8 @@ window.openConfigFact = async function() {
   // configurée : sinon un client sans facture en attente disparaissait du menu
   // même si son BPU/adresse existaient déjà en base.
   const fromFactures = (factures || []).map(f => f.client).filter(Boolean);
-  const [bpuSnap, entSnap] = await Promise.all([
-    getDocs(collection(db, 'bpu')).catch(() => ({ docs: [] })),
-    getDocs(collection(db, 'facturation-clients')).catch(() => ({ docs: [] })),
-  ]);
-  const clients = [...new Set([
-    ...fromFactures,
-    ...bpuSnap.docs.map(d => d.id),
-    ...entSnap.docs.map(d => d.id),
-  ])].sort();
+  const configIds = (window._loadClientsConfigures ? await window._loadClientsConfigures() : []) || [];
+  const clients = [...new Set([...fromFactures, ...configIds])].sort();
   sel.innerHTML = clients.map(c => '<option value="' + c.replace(/"/g, '&quot;') + '">' + c + '</option>').join('');
   document.getElementById('modalConfig').classList.add('open');
   loadConfigClient();
@@ -1174,6 +1167,16 @@ window._loadBpu = async function(client) {
 window._loadFactClient = async function(client) {
   try { const s = await getDoc(doc(db, 'facturation-clients', client)); return s.exists() ? (s.data().entites || []) : []; }
   catch(e) { console.warn('loadFactClient:', e); return []; }
+};
+// Ids des clients ayant déjà un BPU ou une entité configurés (même sans facture en attente).
+window._loadClientsConfigures = async function() {
+  try {
+    const [bpuSnap, entSnap] = await Promise.all([
+      getDocs(collection(db, 'bpu')),
+      getDocs(collection(db, 'facturation-clients')),
+    ]);
+    return [...new Set([...bpuSnap.docs.map(d => d.id), ...entSnap.docs.map(d => d.id)])];
+  } catch(e) { console.warn('loadClientsConfigures:', e); return []; }
 };
 window._addFacture = async function(data) {
   const ref = await addDoc(collection(db, 'facturation'), data);
