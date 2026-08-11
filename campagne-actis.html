@@ -51,6 +51,17 @@
   .r-badge-traiter{background:rgba(245,166,35,0.15);color:#C27D0A;}
   .r-badge-retard{background:var(--red);color:#fff;}
   .r-badge-ok{background:var(--green-pale);color:var(--green-dark);}
+  .btn-icon{width:26px;height:26px;border:none;background:transparent;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);}
+  .btn-icon:hover{background:#E5EAF0;}
+  .btn-icon.danger:hover{background:rgba(231,76,60,0.1);color:var(--red);}
+  .steps-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+  .step-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:box-shadow 0.15s,border-color 0.15s;}
+  .step-box:hover{box-shadow:0 4px 16px rgba(13,27,42,0.08);}
+  .step-box.active{border-color:var(--green);box-shadow:0 4px 16px rgba(46,204,143,0.15);}
+  .step-box .card-num{background:var(--border);color:var(--text-mid);}
+  .step-box.active .card-num{background:var(--green);color:var(--navy);}
+  .step-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;}
+  .step-sub{font-size:11px;color:var(--text-muted);}
   .empty-state{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px;}
   .card-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
@@ -165,8 +176,15 @@
 
     <div id="campagneDetail" style="display:none;">
 
+      <div class="steps-row" id="stepsRow">
+        <div class="step-box active" data-step="1" onclick="selectStep(1)"><span class="card-num">1</span><div><div class="step-title">Push 1er passage</div><div class="step-sub">Envoi vers Kizeo</div></div></div>
+        <div class="step-box" data-step="2" onclick="selectStep(2)"><span class="card-num">2</span><div><div class="step-title">Rapports semaine</div><div class="step-sub">Retour 1er passage</div></div></div>
+        <div class="step-box" data-step="3" onclick="selectStep(3)"><span class="card-num">3</span><div><div class="step-title">Push 2ème passage</div><div class="step-sub">Absents uniquement</div></div></div>
+        <div class="step-box" data-step="4" onclick="selectStep(4)"><span class="card-num">4</span><div><div class="step-title">Reporting complet</div><div class="step-sub">Fusion des 2 passages</div></div></div>
+      </div>
+
       <!-- CARTE 1 : PUSH 1ER PASSAGE -->
-      <div class="card">
+      <div class="card step-card" id="stepCard1">
         <div class="card-title"><span class="card-num">1</span>Push 1er passage</div>
         <div class="card-sub">Uploadez l'export Excel ACTIS (une feuille = un technicien) : un enregistrement pré-rempli est envoyé par bâtiment, directement sur l'app Kizeo du technicien choisi.</div>
 
@@ -218,7 +236,7 @@
       </div>
 
       <!-- CARTE 2 : RAPPORTS DE LA SEMAINE -->
-      <div class="card">
+      <div class="card step-card" id="stepCard2" style="display:none;">
         <div class="card-title"><span class="card-num">2</span>Rapports de la semaine (1er passage)</div>
         <div class="card-sub">Rapports reçus des techniciens pour le 1er passage de cette campagne.</div>
         <div class="batiments-list" id="listPassage1"></div>
@@ -233,7 +251,7 @@
       </div>
 
       <!-- CARTE 3 : PUSH 2EME PASSAGE -->
-      <div class="card">
+      <div class="card step-card" id="stepCard3" style="display:none;">
         <div class="card-title"><span class="card-num">3</span>Push 2ème passage</div>
         <div class="card-sub">Repousse uniquement les logements marqués Absent au 1er passage.</div>
         <div class="form-group" style="max-width:320px;">
@@ -251,7 +269,7 @@
       </div>
 
       <!-- CARTE 4 : REPORTING COMPLET -->
-      <div class="card">
+      <div class="card step-card" id="stepCard4" style="display:none;">
         <div class="card-title"><span class="card-num">4</span>Reporting complet de la campagne</div>
         <div class="card-sub">Récupère les rapports du 2ème passage et fusionne avec le 1er passage.</div>
         <div class="batiments-list" id="listPassage2"></div>
@@ -295,7 +313,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -326,7 +344,7 @@ onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = "login.html"; return; }
   if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
   _user = user;
-  Promise.all([loadTechniciens(), loadCampagnes(), loadConfig()]);
+  Promise.all([loadTechniciens(), loadCampagnes()]);
 });
 
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
@@ -372,11 +390,9 @@ COL_FIELDS.forEach(id => {
   document.getElementById(id).addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ""); });
 });
 
-async function loadConfig() {
-  const snap = await getDoc(doc(db, "config", "kizeo-push-1er-passage"));
-  const c = snap.exists() ? snap.data() : {};
-  const col = c.colonnes || {};
-  document.getElementById("cfgNomFeuille").value = c.nomFeuille || "";
+function loadConfigFromCampagne(c) {
+  const col = (c.config && c.config.colonnes) || {};
+  document.getElementById("cfgNomFeuille").value = (c.config && c.config.nomFeuille) || "";
   document.getElementById("colSecteur").value = indexToLetter(col.secteur);
   document.getElementById("colNumeroRue").value = indexToLetter(col.numeroRue);
   document.getElementById("colNomRue").value = indexToLetter(col.nomRue);
@@ -388,6 +404,7 @@ async function loadConfig() {
 }
 
 window.saveConfig = async function() {
+  if (!_currentCampagneId) return;
   const btn = document.getElementById("btnSaveConfig");
   const colonnes = {};
   const fieldMap = { colSecteur: "secteur", colNumeroRue: "numeroRue", colNomRue: "nomRue", colCodePostal: "codePostal", colVille: "ville", colLocataire: "locataire", colReference: "referenceLogement", colEtage: "etage" };
@@ -399,11 +416,12 @@ window.saveConfig = async function() {
   if (!document.getElementById("cfgNomFeuille").value.trim()) { showToast("Nom de la feuille requis"); return; }
   btn.disabled = true; btn.textContent = "Enregistrement...";
   try {
-    await setDoc(doc(db, "config", "kizeo-push-1er-passage"), {
-      nomFeuille: document.getElementById("cfgNomFeuille").value.trim(),
-      colonnes, kizeoFormId: "1148587",
-      updatedAt: new Date().toISOString(), updatedBy: _user.email,
-    });
+    const config = { nomFeuille: document.getElementById("cfgNomFeuille").value.trim(), colonnes, kizeoFormId: "1148587" };
+    await setDoc(doc(db, "actis-campagnes", _currentCampagneId), {
+      config, updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    const camp = _campagnes.find(c => c.id === _currentCampagneId);
+    if (camp) camp.config = config;
     showToast("Configuration enregistrée");
   } catch(e) { showToast("Erreur : " + e.message); }
   finally { btn.disabled = false; btn.textContent = "Enregistrer la configuration"; }
@@ -426,12 +444,23 @@ function renderCampagnes() {
   if (!_campagnes.length) { grid.innerHTML = ""; empty.style.display = ""; return; }
   empty.style.display = "none";
   grid.innerHTML = _campagnes.map(c => `
-    <div class="s-card ${c.id === _currentCampagneId ? "active" : ""}" onclick="selectCampagne('${c.id}')">
+    <div class="s-card ${c.id === _currentCampagneId ? "active" : ""}" style="position:relative;" onclick="selectCampagne('${c.id}')">
+      <button class="btn-icon danger" style="position:absolute;top:8px;right:8px;" title="Supprimer cette semaine" onclick="event.stopPropagation();deleteCampagne('${c.id}')"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
       <div class="s-date">${fmtDate(c.dateDebut)} → ${fmtDate(c.dateFin)}</div>
       <div class="s-row"><span>${c.statut === "terminee" ? "Terminée" : "En cours"}</span></div>
     </div>
   `).join("");
 }
+window.deleteCampagne = async function(campagneId) {
+  if (!confirm("Supprimer cette semaine ? Les bâtiments déjà poussés resteront en base mais ne seront plus accessibles depuis cette page.")) return;
+  await deleteDoc(doc(db, "actis-campagnes", campagneId));
+  if (_currentCampagneId === campagneId) {
+    _currentCampagneId = null;
+    document.getElementById("campagneDetail").style.display = "none";
+  }
+  await loadCampagnes();
+  showToast("Semaine supprimée");
+};
 window.openCampagneModal = function() {
   document.getElementById("mDateDebut").value = "";
   document.getElementById("mDateFin").value = "";
@@ -453,7 +482,15 @@ window.selectCampagne = async function(campagneId) {
   _currentCampagneId = campagneId;
   renderCampagnes();
   document.getElementById("campagneDetail").style.display = "block";
+  const camp = _campagnes.find(c => c.id === campagneId) || {};
+  loadConfigFromCampagne(camp);
+  selectStep(1);
   await loadBatiments();
+};
+
+window.selectStep = function(n) {
+  document.querySelectorAll(".step-box").forEach(el => el.classList.toggle("active", Number(el.dataset.step) === n));
+  document.querySelectorAll(".step-card").forEach((el, i) => { el.style.display = (i + 1 === n) ? "block" : "none"; });
 };
 
 // ── Bâtiments de la campagne active ──

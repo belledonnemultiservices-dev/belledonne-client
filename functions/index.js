@@ -2335,9 +2335,8 @@ exports.pushActis1erPassageKizeo = functions
     const db = getFirestore(admin.app(), "belledonne-client");
     const campagneSnap = await db.collection("actis-campagnes").doc(campagneId).get();
     if (!campagneSnap.exists) { res.status(404).json({ error: "Campagne introuvable" }); return; }
-    const configSnap = await db.collection("config").doc("kizeo-push-1er-passage").get();
-    if (!configSnap.exists) { res.status(404).json({ error: "Configuration absente : réglez d'abord les colonnes dans la page." }); return; }
-    const config = configSnap.data();
+    const config = campagneSnap.data().config || {};
+    if (!config.nomFeuille) { res.status(400).json({ error: "Configuration absente : réglez d'abord les colonnes dans la carte 1 pour cette semaine." }); return; }
     const colonnes = config.colonnes || {};
     const nomFeuille = config.nomFeuille || "";
     const kizeoFormId = config.kizeoFormId || "1148587";
