@@ -45,6 +45,10 @@ service firebase.storage {
     match /push-actis/{file=**}          { allow read, write: if isAdmin(); }
     match /push-actis-generes/{file=**}  { allow read, write: if isAdmin(); }
 
+    // actis-reception / actis-reportings : rapports Kizeo reçus + reportings agrégés, admin only
+    match /actis-reception/{file=**}     { allow read, write: if isAdmin(); }
+    match /actis-reportings/{file=**}    { allow read, write: if isAdmin(); }
+
     // Tout le reste : refusé
     match /{path=**}                     { allow read, write: if false; }
   }

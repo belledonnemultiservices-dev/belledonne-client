@@ -35,17 +35,30 @@
   .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
   .breadcrumb span:last-child{color:var(--text);font-weight:500;}
   .btn-logout{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--red);background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.15);padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;}
-  .content{padding:32px;flex:1;max-width:920px;}
-  .page-header-row{margin-bottom:28px;}
+  .content{padding:32px;flex:1;max-width:1100px;}
+  .page-header-row{margin-bottom:20px;display:flex;align-items:flex-start;justify-content:space-between;}
   .page-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;}
   .page-sub{font-size:13px;color:var(--text-muted);}
+  .btn-add{display:flex;align-items:center;gap:8px;height:40px;padding:0 18px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;white-space:nowrap;}
+  .btn-add:hover{background:var(--green-dark);color:#fff;}
+  .semaines-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:32px;}
+  .s-card{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--border);border-radius:var(--radius);padding:16px 18px;cursor:pointer;transition:box-shadow 0.15s;}
+  .s-card.active{border-left-color:var(--green);box-shadow:0 4px 16px rgba(46,204,143,0.15);}
+  .s-card:hover{box-shadow:0 4px 16px rgba(13,27,42,0.08);}
+  .s-date{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:6px;}
+  .s-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-mid);}
+  .r-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+  .r-badge-traiter{background:rgba(245,166,35,0.15);color:#C27D0A;}
+  .r-badge-retard{background:var(--red);color:#fff;}
+  .r-badge-ok{background:var(--green-pale);color:var(--green-dark);}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px;}
-  .card-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px;}
+  .card-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+  .card-num{width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .card-sub{font-size:12px;color:var(--text-muted);margin-bottom:18px;}
   .form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
   .form-group{margin-bottom:14px;}
   .form-label{font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;}
-  .form-hint{font-size:11px;color:var(--text-muted);margin-top:4px;}
   .form-input{width:100%;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--bg);outline:none;transition:border-color 0.15s;}
   .form-input:focus{border-color:var(--green);background:#fff;}
   .section-sep{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin:20px 0 14px;display:flex;align-items:center;gap:10px;}
@@ -67,12 +80,25 @@
   .result-box{background:var(--green-pale);border:1px solid rgba(46,204,143,0.3);border-radius:var(--radius-sm);padding:16px 18px;margin-top:16px;display:none;}
   .result-box .r-title{font-weight:700;color:var(--green-dark);font-size:13px;margin-bottom:4px;}
   .result-box .r-stats{font-size:12px;color:var(--text-mid);margin-bottom:10px;}
-  .btn-download{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer;text-decoration:none;}
+  .btn-download{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer;text-decoration:none;margin-right:8px;}
   .btn-download:hover{background:var(--green-dark);color:#fff;}
   .error-box{background:#FDECEA;border:1px solid rgba(231,76,60,0.2);border-radius:var(--radius-sm);padding:14px 16px;margin-top:16px;color:var(--red);font-size:13px;display:none;}
+  .batiments-list{border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:16px;}
+  .batiment-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;}
+  .batiment-row:last-child{border-bottom:none;}
+  .batiment-row .b-adresse{flex:1;font-weight:500;}
+  .batiment-row .b-info{color:var(--text-muted);font-size:12px;}
   .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);transform:translateY(80px);opacity:0;transition:all 0.3s ease;z-index:999;}
   .toast.show{transform:translateY(0);opacity:1;}
   .toast svg{width:16px;height:16px;color:var(--green);}
+  .modal-overlay{position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal{background:#fff;border-radius:var(--radius);width:420px;max-width:100%;box-shadow:0 24px 60px rgba(13,27,42,0.2);}
+  .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+  .btn-close{width:30px;height:30px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-muted);}
+  .modal-body{padding:20px 24px;}
+  .modal-footer{padding:12px 24px 20px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);}
+  .btn-cancel{height:40px;padding:0 16px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
 </style>
 </head>
 <body>
@@ -124,68 +150,139 @@
 
   <div class="content">
     <div class="page-header-row">
-      <div class="page-title">Campagne ACTIS — Push 1er passage</div>
-      <div class="page-sub">Convertit l'export Excel ACTIS en fichier prêt à réimporter dans Kizeo pour créer les fiches terrain du 1er passage.</div>
+      <div>
+        <div class="page-title">Campagne ACTIS</div>
+        <div class="page-sub">Une campagne par semaine : push 1er passage, rapports, push 2ème passage, reporting complet.</div>
+      </div>
+      <button class="btn-add" onclick="openCampagneModal()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        Nouvelle semaine
+      </button>
     </div>
 
-    <div class="card">
-      <div class="card-title">Configuration de l'export ACTIS</div>
-      <div class="card-sub">Réglée une fois, réutilisée à chaque génération (la structure de colonnes de l'export ACTIS ne change pas).</div>
+    <div class="semaines-grid" id="campagnesGrid"></div>
+    <div class="empty-state" id="campagnesEmpty" style="display:none;">Aucune campagne. Crée une semaine pour commencer.</div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Nom de la feuille</label>
-          <input class="form-input" type="text" id="cfgNomFeuille" placeholder="ex: T4C">
+    <div id="campagneDetail" style="display:none;">
+
+      <!-- CARTE 1 : PUSH 1ER PASSAGE -->
+      <div class="card">
+        <div class="card-title"><span class="card-num">1</span>Push 1er passage</div>
+        <div class="card-sub">Uploadez l'export Excel ACTIS (une feuille = un technicien) : un enregistrement pré-rempli est envoyé par bâtiment, directement sur l'app Kizeo du technicien choisi.</div>
+
+        <div class="section-sep">Configuration de l'export ACTIS</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Nom de la feuille</label>
+            <input class="form-input" type="text" id="cfgNomFeuille" placeholder="ex: T4C">
+          </div>
         </div>
+        <div class="section-sep">Colonnes de l'export (lettre Excel, ex: A, B, C...)</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Secteur</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: A" id="colSecteur"></div>
+          <div class="form-group"><label class="form-label">N° rue</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: D" id="colNumeroRue"></div>
+          <div class="form-group"><label class="form-label">Nom rue</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: E" id="colNomRue"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Code postal</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: G" id="colCodePostal"></div>
+          <div class="form-group"><label class="form-label">Ville</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: F" id="colVille"></div>
+          <div class="form-group"><label class="form-label">Nom locataire</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: J" id="colLocataire"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Référence logement</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: I" id="colReference"></div>
+          <div class="form-group"><label class="form-label">Étage</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: O" id="colEtage"></div>
+        </div>
+        <div style="margin-bottom:20px;">
+          <button class="btn-save" id="btnSaveConfig" onclick="saveConfig()">Enregistrer la configuration</button>
+        </div>
+
+        <div class="section-sep">Envoi</div>
+        <div class="form-group">
+          <label class="form-label">Technicien destinataire</label>
+          <select class="form-input" id="pushDestinataire"><option value="">— choisir —</option></select>
+        </div>
+        <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          <div>Cliquez pour choisir un fichier Excel (.xlsx)</div>
+          <div class="fname" id="fileName"></div>
+        </div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="onFileSelected(event)">
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+        <button class="btn-generate" id="btnGenerate" onclick="pushPremierPassage()" disabled>Envoyer via Kizeo</button>
+        <div class="result-box" id="resultBox">
+          <div class="r-title">Push envoyé</div>
+          <div class="r-stats" id="resultStats"></div>
+          <div id="resultDetail" style="margin-top:10px;font-size:12px;color:var(--text-mid);max-height:200px;overflow-y:auto;"></div>
+        </div>
+        <div class="error-box" id="errorBox"></div>
       </div>
 
-      <div class="section-sep">Colonnes de l'export (lettre Excel, ex: A, B, C... comme dans le tableur)</div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Secteur</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: A" id="colSecteur"></div>
-        <div class="form-group"><label class="form-label">N° rue</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: D" id="colNumeroRue"></div>
-        <div class="form-group"><label class="form-label">Nom rue</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: E" id="colNomRue"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Code postal</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: G" id="colCodePostal"></div>
-        <div class="form-group"><label class="form-label">Ville</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: F" id="colVille"></div>
-        <div class="form-group"><label class="form-label">Nom locataire</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: J" id="colLocataire"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Référence logement</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: I" id="colReference"></div>
-        <div class="form-group"><label class="form-label">Étage</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: O" id="colEtage"></div>
+      <!-- CARTE 2 : RAPPORTS DE LA SEMAINE -->
+      <div class="card">
+        <div class="card-title"><span class="card-num">2</span>Rapports de la semaine (1er passage)</div>
+        <div class="card-sub">Rapports reçus des techniciens pour le 1er passage de cette campagne.</div>
+        <div class="batiments-list" id="listPassage1"></div>
+        <button class="btn-generate" id="btnGenSemaine" onclick="genererRapportsSemaine()">Créer le dossier PDF + reporting Excel</button>
+        <div class="result-box" id="resultBoxSemaine">
+          <div class="r-title">Reporting généré</div>
+          <div class="r-stats" id="resultStatsSemaine"></div>
+          <a class="btn-download" id="dlZipSemaine" href="#" download>Télécharger le zip des rapports</a>
+          <a class="btn-download" id="dlXlsxSemaine" href="#" download>Télécharger le reporting Excel</a>
+        </div>
+        <div class="error-box" id="errorBoxSemaine"></div>
       </div>
 
-      <div style="margin-top:20px;">
-        <button class="btn-save" id="btnSaveConfig" onclick="saveConfig()">Enregistrer la configuration</button>
+      <!-- CARTE 3 : PUSH 2EME PASSAGE -->
+      <div class="card">
+        <div class="card-title"><span class="card-num">3</span>Push 2ème passage</div>
+        <div class="card-sub">Repousse uniquement les logements marqués Absent au 1er passage.</div>
+        <div class="form-group" style="max-width:320px;">
+          <label class="form-label">Technicien destinataire</label>
+          <select class="form-input" id="push2Destinataire"><option value="">— choisir —</option></select>
+        </div>
+        <div class="batiments-list" id="listPassage2Source"></div>
+        <button class="btn-generate" id="btnPush2" onclick="pushDeuxiemePassage()">Envoyer le 2ème passage via Kizeo</button>
+        <div class="result-box" id="resultBoxPush2">
+          <div class="r-title">Push 2ème passage envoyé</div>
+          <div class="r-stats" id="resultStatsPush2"></div>
+          <div id="resultDetailPush2" style="margin-top:10px;font-size:12px;color:var(--text-mid);max-height:200px;overflow-y:auto;"></div>
+        </div>
+        <div class="error-box" id="errorBoxPush2"></div>
       </div>
+
+      <!-- CARTE 4 : REPORTING COMPLET -->
+      <div class="card">
+        <div class="card-title"><span class="card-num">4</span>Reporting complet de la campagne</div>
+        <div class="card-sub">Récupère les rapports du 2ème passage et fusionne avec le 1er passage.</div>
+        <div class="batiments-list" id="listPassage2"></div>
+        <button class="btn-generate" id="btnGenComplet" onclick="genererRapportComplet()">Créer le dossier PDF + reporting complet</button>
+        <div class="result-box" id="resultBoxComplet">
+          <div class="r-title">Reporting complet généré</div>
+          <div class="r-stats" id="resultStatsComplet"></div>
+          <a class="btn-download" id="dlZipComplet" href="#" download>Télécharger le zip des rapports</a>
+          <a class="btn-download" id="dlXlsxComplet" href="#" download>Télécharger le reporting complet</a>
+        </div>
+        <div class="error-box" id="errorBoxComplet"></div>
+      </div>
+
     </div>
+  </div>
+</div>
 
-    <div class="card">
-      <div class="card-title">Envoyer le push via Kizeo</div>
-      <div class="card-sub">Uploadez l'export Excel ACTIS (une feuille = un technicien) : un enregistrement pré-rempli est envoyé par bâtiment, directement sur l'app Kizeo du technicien choisi ci-dessous.</div>
-
-      <div class="form-group">
-        <label class="form-label">Technicien destinataire</label>
-        <select class="form-input" id="pushDestinataire"><option value="">— choisir —</option></select>
-      </div>
-
-      <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-        <div>Cliquez pour choisir un fichier Excel (.xlsx)</div>
-        <div class="fname" id="fileName"></div>
-      </div>
-      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="onFileSelected(event)">
-
-      <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
-
-      <button class="btn-generate" id="btnGenerate" onclick="generatePush()" disabled>Envoyer via Kizeo</button>
-
-      <div class="result-box" id="resultBox">
-        <div class="r-title">Push envoyé</div>
-        <div class="r-stats" id="resultStats"></div>
-        <div id="resultDetail" style="margin-top:10px;font-size:12px;color:var(--text-mid);max-height:200px;overflow-y:auto;"></div>
-      </div>
-      <div class="error-box" id="errorBox"></div>
+<!-- MODAL CREATION CAMPAGNE -->
+<div id="modalCampagne" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeCampagneModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nouvelle semaine de campagne</div>
+      <button class="btn-close" onclick="closeCampagneModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Début</label><input class="form-input" type="date" id="mDateDebut"></div>
+      <div class="form-group"><label class="form-label">Fin</label><input class="form-input" type="date" id="mDateFin"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeCampagneModal()">Annuler</button>
+      <button class="btn-save" onclick="saveCampagne()">Créer</button>
     </div>
   </div>
 </div>
@@ -198,7 +295,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -214,38 +311,49 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 const storage = getStorage(app);
-const FN_PUSH_KIZEO = "https://europe-west1-belledonne-client.cloudfunctions.net/pushActis1erPassageKizeo";
+const FN_PUSH1 = "https://europe-west1-belledonne-client.cloudfunctions.net/pushActis1erPassageKizeo";
+const FN_PUSH2 = "https://europe-west1-belledonne-client.cloudfunctions.net/pushActis2emePassageKizeo";
+const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateActisRapportsSemaine";
+const FN_GEN_COMPLET = "https://europe-west1-belledonne-client.cloudfunctions.net/generateActisRapportComplet";
 
 let _user = null;
+let _techniciens = [];
+let _campagnes = [];
+let _currentCampagneId = null;
 let _selectedFile = null;
-let _techniciens = []; // [{id, label, kizeoUserId}]
 
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = "login.html"; return; }
   if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
   _user = user;
-  loadTechniciens().then(loadConfig);
+  Promise.all([loadTechniciens(), loadCampagnes(), loadConfig()]);
 });
-
-async function loadTechniciens() {
-  const snap = await getDocs(collection(db, "techniciens"));
-  _techniciens = snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(t => (t.kizeoUserId || "").trim())
-    .map(t => ({ id: t.id, label: t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim(), kizeoUserId: t.kizeoUserId.trim() }));
-}
-
-function techOptionsHtml(selected) {
-  let opts = '<option value="">— aucun —</option>';
-  _techniciens.forEach(t => {
-    opts += `<option value="${t.kizeoUserId}" ${t.kizeoUserId === selected ? "selected" : ""}>${t.label}</option>`;
-  });
-  return opts;
-}
 
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
 
-// Conversion index Excel (0-based) <-> lettre de colonne (A, B, ..., Z, AA, AB...)
+async function authHeaders() {
+  const idt = await _user.getIdToken();
+  return { "Content-Type": "application/json", "Authorization": "Bearer " + idt };
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3500);
+}
+
+// ── Techniciens ──
+async function loadTechniciens() {
+  const snap = await getDocs(collection(db, "techniciens"));
+  _techniciens = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(t => (t.kizeoUserId || "").trim())
+    .map(t => ({ id: t.id, label: t.nomComplet || `${t.prenom||""} ${t.nom||""}`.trim(), kizeoUserId: t.kizeoUserId.trim() }));
+  const opts = '<option value="">— choisir —</option>' + _techniciens.map(t => `<option value="${t.kizeoUserId}">${t.label}</option>`).join("");
+  document.getElementById("pushDestinataire").innerHTML = opts;
+  document.getElementById("push2Destinataire").innerHTML = opts;
+}
+// ── Config colonnes (carte 1) ──
 function indexToLetter(idx) {
   if (idx === null || idx === undefined || Number.isNaN(idx)) return "";
   let n = idx + 1, s = "";
@@ -259,7 +367,6 @@ function letterToIndex(letter) {
   for (const ch of letter) n = n * 26 + (ch.charCodeAt(0) - 64);
   return n - 1;
 }
-
 const COL_FIELDS = ["colSecteur", "colNumeroRue", "colNomRue", "colCodePostal", "colVille", "colLocataire", "colReference", "colEtage"];
 COL_FIELDS.forEach(id => {
   document.getElementById(id).addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ""); });
@@ -278,40 +385,139 @@ async function loadConfig() {
   document.getElementById("colLocataire").value = indexToLetter(col.locataire);
   document.getElementById("colReference").value = indexToLetter(col.referenceLogement);
   document.getElementById("colEtage").value = indexToLetter(col.etage);
-  document.getElementById("pushDestinataire").innerHTML = techOptionsHtml("");
 }
 
 window.saveConfig = async function() {
   const btn = document.getElementById("btnSaveConfig");
-
   const colonnes = {};
   const fieldMap = { colSecteur: "secteur", colNumeroRue: "numeroRue", colNomRue: "nomRue", colCodePostal: "codePostal", colVille: "ville", colLocataire: "locataire", colReference: "referenceLogement", colEtage: "etage" };
   for (const [id, key] of Object.entries(fieldMap)) {
-    const letter = document.getElementById(id).value.trim();
-    const idx = letterToIndex(letter);
-    if (idx === null) { showToast(`Colonne manquante ou invalide : ${id === "colSecteur" ? "Secteur" : id}`); return; }
+    const idx = letterToIndex(document.getElementById(id).value.trim());
+    if (idx === null) { showToast(`Colonne manquante ou invalide : ${id}`); return; }
     colonnes[key] = idx;
   }
   if (!document.getElementById("cfgNomFeuille").value.trim()) { showToast("Nom de la feuille requis"); return; }
-
   btn.disabled = true; btn.textContent = "Enregistrement...";
   try {
-    const data = {
+    await setDoc(doc(db, "config", "kizeo-push-1er-passage"), {
       nomFeuille: document.getElementById("cfgNomFeuille").value.trim(),
-      colonnes,
-      kizeoFormId: "1148587",
-      updatedAt: new Date().toISOString(),
-      updatedBy: _user.email,
-    };
-    await setDoc(doc(db, "config", "kizeo-push-1er-passage"), data);
+      colonnes, kizeoFormId: "1148587",
+      updatedAt: new Date().toISOString(), updatedBy: _user.email,
+    });
     showToast("Configuration enregistrée");
-  } catch(e) {
-    showToast("Erreur : " + e.message);
-  } finally {
-    btn.disabled = false; btn.textContent = "Enregistrer la configuration";
-  }
+  } catch(e) { showToast("Erreur : " + e.message); }
+  finally { btn.disabled = false; btn.textContent = "Enregistrer la configuration"; }
 };
 
+// ── Campagnes (liste + création) ──
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+async function loadCampagnes() {
+  const snap = await getDocs(collection(db, "actis-campagnes"));
+  _campagnes = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.dateDebut || "").localeCompare(a.dateDebut || ""));
+  renderCampagnes();
+}
+function renderCampagnes() {
+  const grid = document.getElementById("campagnesGrid");
+  const empty = document.getElementById("campagnesEmpty");
+  if (!_campagnes.length) { grid.innerHTML = ""; empty.style.display = ""; return; }
+  empty.style.display = "none";
+  grid.innerHTML = _campagnes.map(c => `
+    <div class="s-card ${c.id === _currentCampagneId ? "active" : ""}" onclick="selectCampagne('${c.id}')">
+      <div class="s-date">${fmtDate(c.dateDebut)} → ${fmtDate(c.dateFin)}</div>
+      <div class="s-row"><span>${c.statut === "terminee" ? "Terminée" : "En cours"}</span></div>
+    </div>
+  `).join("");
+}
+window.openCampagneModal = function() {
+  document.getElementById("mDateDebut").value = "";
+  document.getElementById("mDateFin").value = "";
+  document.getElementById("modalCampagne").style.display = "flex";
+};
+window.closeCampagneModal = function() { document.getElementById("modalCampagne").style.display = "none"; };
+window.saveCampagne = async function() {
+  const dateDebut = document.getElementById("mDateDebut").value;
+  const dateFin = document.getElementById("mDateFin").value;
+  if (!dateDebut || !dateFin) { showToast("Renseigne les deux dates"); return; }
+  const now = new Date().toISOString();
+  const ref = await addDoc(collection(db, "actis-campagnes"), { dateDebut, dateFin, statut: "ouverte", createdAt: now, updatedAt: now });
+  closeCampagneModal();
+  await loadCampagnes();
+  selectCampagne(ref.id);
+};
+
+window.selectCampagne = async function(campagneId) {
+  _currentCampagneId = campagneId;
+  renderCampagnes();
+  document.getElementById("campagneDetail").style.display = "block";
+  await loadBatiments();
+};
+
+// ── Bâtiments de la campagne active ──
+let _batiments = [];
+async function loadBatiments() {
+  const q = query(collection(db, "actis-batiments"), where("campagneId", "==", _currentCampagneId));
+  const snap = await getDocs(q);
+  _batiments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderListPassage1();
+  renderListPassage2Source();
+  renderListPassage2();
+}
+
+function statutBadge(statut) {
+  if (statut === "archive") return `<span class="r-badge r-badge-ok">Archivé</span>`;
+  if (statut === "a-traiter") return `<span class="r-badge r-badge-traiter">À traiter</span>`;
+  if (statut === "en-attente") return `<span class="r-badge r-badge-retard">En attente</span>`;
+  return "";
+}
+
+function renderListPassage1() {
+  const el = document.getElementById("listPassage1");
+  if (!_batiments.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment poussé pour cette campagne.</div>`; return; }
+  el.innerHTML = _batiments.map(b => {
+    const p1 = b.passage1 || {};
+    return `<div class="batiment-row">
+      <span class="b-adresse">${b.adresseRue || "—"}</span>
+      <span class="b-info">${p1.technicienNom || "—"}</span>
+      ${statutBadge(p1.statut)}
+    </div>`;
+  }).join("");
+}
+
+function renderListPassage2Source() {
+  const el = document.getElementById("listPassage2Source");
+  const candidats = _batiments.filter(b => b.passage1 && b.passage1.statut === "a-traiter" && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
+  if (!candidats.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment avec des absents à repasser (génère d'abord les rapports en carte 2).</div>`; return; }
+  el.innerHTML = candidats.map(b => {
+    const nbAbsents = (b.passage1.resultats || []).filter(l => l.statut === "Absent").length;
+    return `<div class="batiment-row">
+      <label style="display:flex;align-items:center;gap:10px;flex:1;">
+        <input type="checkbox" class="push2-check" value="${b.id}" checked>
+        <span class="b-adresse">${b.adresseRue || "—"}</span>
+      </label>
+      <span class="b-info">${nbAbsents} absent(s)</span>
+    </div>`;
+  }).join("");
+}
+
+function renderListPassage2() {
+  const el = document.getElementById("listPassage2");
+  const avecP2 = _batiments.filter(b => b.passage2);
+  if (!avecP2.length) { el.innerHTML = `<div class="empty-state">Aucun push 2ème passage envoyé pour l'instant.</div>`; return; }
+  el.innerHTML = avecP2.map(b => {
+    const p2 = b.passage2 || {};
+    return `<div class="batiment-row">
+      <span class="b-adresse">${b.adresseRue || "—"}</span>
+      <span class="b-info">${p2.technicienNom || "—"}</span>
+      ${statutBadge(p2.statut)}
+    </div>`;
+  }).join("");
+}
+
+// ── Carte 1 : push 1er passage ──
 window.onFileSelected = function(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -322,8 +528,8 @@ window.onFileSelected = function(event) {
   document.getElementById("errorBox").style.display = "none";
 };
 
-window.generatePush = async function() {
-  if (!_selectedFile) return;
+window.pushPremierPassage = async function() {
+  if (!_selectedFile || !_currentCampagneId) return;
   const destinataireKizeoUserId = document.getElementById("pushDestinataire").value;
   if (!destinataireKizeoUserId) { showToast("Choisis le technicien destinataire"); return; }
   const btn = document.getElementById("btnGenerate");
@@ -331,57 +537,97 @@ window.generatePush = async function() {
   const progressFill = document.getElementById("progressFill");
   const resultBox = document.getElementById("resultBox");
   const errorBox = document.getElementById("errorBox");
-  resultBox.style.display = "none";
-  errorBox.style.display = "none";
+  resultBox.style.display = "none"; errorBox.style.display = "none";
   btn.disabled = true; btn.textContent = "Envoi du fichier...";
   progressBar.style.display = "block"; progressFill.style.width = "0%";
-
   try {
     const storagePath = `push-actis/${Date.now()}_${_selectedFile.name.replace(/\s+/g, "_")}`;
     const storageRef = ref(storage, storagePath);
     const uploadTask = uploadBytesResumable(storageRef, _selectedFile);
-
     await new Promise((resolve, reject) => {
-      uploadTask.on("state_changed",
-        (snap) => { progressFill.style.width = Math.round((snap.bytesTransferred / snap.totalBytes) * 100) + "%"; },
-        reject,
-        resolve
-      );
+      uploadTask.on("state_changed", (snap) => { progressFill.style.width = Math.round((snap.bytesTransferred / snap.totalBytes) * 100) + "%"; }, reject, resolve);
     });
-
-    btn.textContent = "Envoi vers Kizeo en cours (peut prendre 1-2 min)...";
-    const idt = await _user.getIdToken();
-    const resp = await fetch(FN_PUSH_KIZEO, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + idt },
-      body: JSON.stringify({ storagePath, destinataireKizeoUserId }),
-    });
+    btn.textContent = "Envoi vers Kizeo en cours...";
+    const resp = await fetch(FN_PUSH1, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ storagePath, destinataireKizeoUserId, campagneId: _currentCampagneId }) });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
-
     document.getElementById("resultStats").textContent = `${data.nbEnvoyes} envoyé(s) · ${data.nbErreurs} erreur(s) sur ${data.nbBatiments} bâtiment(s)`;
-    const detail = document.getElementById("resultDetail");
-    detail.innerHTML = (data.results || []).map(r =>
-      `<div style="padding:4px 0;border-bottom:1px solid var(--border);">
-        ${r.success ? "✅" : "❌"} ${r.adresse} — ${r.technicien || "?"} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}
-      </div>`
+    document.getElementById("resultDetail").innerHTML = (data.results || []).map(r =>
+      `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "❌"} ${r.adresse} — ${r.technicien || "?"} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
     ).join("");
     resultBox.style.display = "block";
+    await loadBatiments();
   } catch(e) {
-    errorBox.textContent = "Erreur : " + e.message;
-    errorBox.style.display = "block";
+    errorBox.textContent = "Erreur : " + e.message; errorBox.style.display = "block";
   } finally {
-    btn.disabled = false; btn.textContent = "Générer le fichier push";
-    progressBar.style.display = "none";
+    btn.disabled = false; btn.textContent = "Envoyer via Kizeo"; progressBar.style.display = "none";
   }
 };
 
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  document.getElementById("toastMsg").textContent = msg;
-  t.classList.add("show");
-  setTimeout(() => t.classList.remove("show"), 3500);
-}
+// ── Carte 2 : reporting semaine ──
+window.genererRapportsSemaine = async function() {
+  const btn = document.getElementById("btnGenSemaine");
+  const box = document.getElementById("resultBoxSemaine");
+  const err = document.getElementById("errorBoxSemaine");
+  box.style.display = "none"; err.style.display = "none";
+  btn.disabled = true; btn.textContent = "Génération en cours...";
+  try {
+    const resp = await fetch(FN_GEN_SEMAINE, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ campagneId: _currentCampagneId }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    document.getElementById("resultStatsSemaine").textContent = `${data.nbBatiments} bâtiment(s) traité(s)`;
+    document.getElementById("dlZipSemaine").href = data.zipUrl;
+    document.getElementById("dlXlsxSemaine").href = data.xlsxUrl;
+    box.style.display = "block";
+    await loadBatiments();
+  } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
+  finally { btn.disabled = false; btn.textContent = "Créer le dossier PDF + reporting Excel"; }
+};
+
+// ── Carte 3 : push 2ème passage ──
+window.pushDeuxiemePassage = async function() {
+  const destinataireKizeoUserId = document.getElementById("push2Destinataire").value;
+  if (!destinataireKizeoUserId) { showToast("Choisis le technicien destinataire"); return; }
+  const batimentIds = Array.from(document.querySelectorAll(".push2-check:checked")).map(el => el.value);
+  if (!batimentIds.length) { showToast("Sélectionne au moins un bâtiment"); return; }
+  const btn = document.getElementById("btnPush2");
+  const box = document.getElementById("resultBoxPush2");
+  const err = document.getElementById("errorBoxPush2");
+  box.style.display = "none"; err.style.display = "none";
+  btn.disabled = true; btn.textContent = "Envoi en cours...";
+  try {
+    const resp = await fetch(FN_PUSH2, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ campagneId: _currentCampagneId, destinataireKizeoUserId, batimentIds }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    document.getElementById("resultStatsPush2").textContent = `${data.nbEnvoyes} envoyé(s) · ${data.nbErreurs} erreur(s)/ignoré(s)`;
+    document.getElementById("resultDetailPush2").innerHTML = (data.results || []).map(r =>
+      `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "⚠️"} ${r.adresse || r.batimentId} ${r.nbAbsents ? `— ${r.nbAbsents} absent(s)` : ""} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
+    ).join("");
+    box.style.display = "block";
+    await loadBatiments();
+  } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
+  finally { btn.disabled = false; btn.textContent = "Envoyer le 2ème passage via Kizeo"; }
+};
+
+// ── Carte 4 : reporting complet ──
+window.genererRapportComplet = async function() {
+  const btn = document.getElementById("btnGenComplet");
+  const box = document.getElementById("resultBoxComplet");
+  const err = document.getElementById("errorBoxComplet");
+  box.style.display = "none"; err.style.display = "none";
+  btn.disabled = true; btn.textContent = "Génération en cours...";
+  try {
+    const resp = await fetch(FN_GEN_COMPLET, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ campagneId: _currentCampagneId }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    document.getElementById("resultStatsComplet").textContent = `${data.nbBatiments} bâtiment(s) traité(s)`;
+    document.getElementById("dlZipComplet").href = data.zipUrl;
+    document.getElementById("dlXlsxComplet").href = data.xlsxUrl;
+    box.style.display = "block";
+    await loadBatiments();
+  } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
+  finally { btn.disabled = false; btn.textContent = "Créer le dossier PDF + reporting complet"; }
+};
 </script>
 <script type="module" src="suivi-badge.js"></script>
 </body>

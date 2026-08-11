@@ -1348,6 +1348,83 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     }
   }
 
+  // ── Circuit Campagne ACTIS (bâtiment > passage 1 ou 2), distinct des deux
+  // autres circuits. refInterne = actis::campagneId::passage(1|2)::batimentId.
+  // Les données de reporting (statut/niveau d'infestation par logement) sont
+  // lues directement dans le JSON de la soumission (fields.tableau.value),
+  // plus fiable que de re-parser le fichier Excel généré par Kizeo. Ce fichier
+  // Excel est quand même téléchargé et archivé pour consultation.
+  if (refInterne.startsWith("actis::")) {
+    const partsA = refInterne.split("::");
+    if (partsA.length !== 4) { console.warn(`Kizeo actis: refInterne invalide (${refInterne}), soumission ${dataId} ignorée`); return; }
+    const [, campagneId, passageStr, batimentId] = partsA;
+    const passageNum = parseInt(passageStr, 10);
+    if (passageNum !== 1 && passageNum !== 2) { console.warn(`Kizeo actis: numéro de passage invalide (${refInterne})`); return; }
+    const passageKey = passageNum === 1 ? "passage1" : "passage2";
+
+    const batimentRefA = db.collection("actis-batiments").doc(batimentId);
+    const batimentSnapA = await batimentRefA.get();
+    if (!batimentSnapA.exists) { console.warn(`Kizeo actis: bâtiment ${batimentId} introuvable, soumission ${dataId} ignorée`); return; }
+    const batimentA = batimentSnapA.data();
+    if (batimentA.campagneId !== campagneId) { console.warn(`Kizeo actis: campagneId incohérent pour ${refInterne}`); return; }
+
+    // Extraction des résultats par logement depuis le champ liste "tableau".
+    const getRowVal = (row, key) => {
+      const cell = row && row[key];
+      if (!cell) return "";
+      if (cell.valuesAsArray) return cell.valuesAsArray;
+      return cell.value !== undefined ? cell.value : "";
+    };
+    const tableauRows = (fields.tableau && fields.tableau.value) || [];
+    const resultatsA = tableauRows.map(row => ({
+      nom: getRowVal(row, "nom") || "",
+      numero: getRowVal(row, "numero_logement") || "",
+      etage: getRowVal(row, "etage") || "",
+      statut: getRowVal(row, "statut_1er_passage") || "",
+      niveauInfestation: (() => { const v = getRowVal(row, "niveau_infestation"); return Array.isArray(v) ? v : (v ? [v] : []); })(),
+    }));
+
+    // PDF (obligatoire) + Excel Kizeo (archive, non bloquant si absent/échoue).
+    const pdfA = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
+    if (pdfA.status !== 200) { console.error(`Kizeo actis: téléchargement PDF échoué (${pdfA.status}) pour ${dataId}`); return; }
+
+    const bucketA = admin.storage().bucket("belledonne-client.firebasestorage.app");
+    const nomBaseA = `${batimentA.adresseRue || "adresse"}_passage_${passageNum}`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const storagePathPdfA = `actis-reception/${campagneId}/${passageNum}/${Date.now()}_${nomBaseA}.pdf`;
+    const tokenPdfA = crypto.randomUUID();
+    await bucketA.file(storagePathPdfA).save(pdfA.body, { contentType: "application/pdf", metadata: { metadata: { firebaseStorageDownloadTokens: tokenPdfA } } });
+    const fileUrlPdfA = `https://firebasestorage.googleapis.com/v0/b/${bucketA.name}/o/${encodeURIComponent(storagePathPdfA)}?alt=media&token=${tokenPdfA}`;
+
+    let fileUrlExcelA = null;
+    if (formConf.exportId) {
+      try {
+        const exA = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/exports/${encodeURIComponent(formConf.exportId)}`, null, true);
+        if (exA.status === 200) {
+          const storagePathXlsA = `actis-reception/${campagneId}/${passageNum}/${Date.now()}_${nomBaseA}.xlsx`;
+          const tokenXlsA = crypto.randomUUID();
+          await bucketA.file(storagePathXlsA).save(exA.body, { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", metadata: { metadata: { firebaseStorageDownloadTokens: tokenXlsA } } });
+          fileUrlExcelA = `https://firebasestorage.googleapis.com/v0/b/${bucketA.name}/o/${encodeURIComponent(storagePathXlsA)}?alt=media&token=${tokenXlsA}`;
+        }
+      } catch(e) { console.error(`Kizeo actis: export Excel archive échoué pour ${dataId}:`, e.message); }
+    }
+
+    const nowA = new Date().toISOString();
+    await batimentRefA.set({
+      [passageKey]: {
+        ...(batimentA[passageKey] || {}),
+        statut: "a-traiter",
+        kizeoDataId: String(dataId),
+        resultats: resultatsA,
+        fileUrlPdf: fileUrlPdfA,
+        fileUrlExcel: fileUrlExcelA,
+        receivedAt: nowA,
+      },
+      updatedAt: nowA,
+    }, { merge: true });
+    console.log(`Kizeo actis: soumission ${dataId} reçue -> actis-batiments/${batimentId}.${passageKey}`);
+    return true;
+  }
+
   // ── Circuit garantie (semaine > bloc > ligne locataire), distinct du circuit
   // "suivi" classique ci-dessous. refInterne = garantie::semaineId::blocId::ligneId.
   if (refInterne.startsWith("garantie::")) {
@@ -1761,6 +1838,215 @@ function fetchBuffer(url) {
   });
 }
 
+// ── CAMPAGNE ACTIS : construction du reporting Excel 3 onglets ────
+// Reprend le format historique (Absentsrefus / Logements Surinfestés /
+// Logements punaises de lit). `rows` = une ligne par logement, avec
+// {adresse, codePostal, ville, secteur, technicien, nom, numero, etage,
+//  statut, niveauInfestation(array)}. Un logement peut apparaître dans
+// plusieurs onglets infestation.
+function buildActisReportWorkbook(ExcelJS, rows) {
+  const wb = new ExcelJS.Workbook();
+  const header = ["Adresse", "Code postal", "Ville", "Secteur", "Technicien", "Nom", "Numéro logement", "Etage", "Statut", "Niveau infestation"];
+  const rowValues = (r) => [r.adresse, r.codePostal, r.ville, r.secteur, r.technicien, r.nom, r.numero, r.etage, r.statut, (r.niveauInfestation || []).join(", ")];
+
+  const wsAbsents = wb.addWorksheet("Absentsrefus");
+  wsAbsents.addRow(header);
+  rows.filter(r => r.statut && r.statut !== "Présent").forEach(r => wsAbsents.addRow(rowValues(r)));
+
+  const wsSurinf = wb.addWorksheet("Logements Surinfestés");
+  wsSurinf.addRow(header);
+  rows.filter(r => (r.niveauInfestation || []).includes("Sur-infestation")).forEach(r => wsSurinf.addRow(rowValues(r)));
+
+  const wsPunaises = wb.addWorksheet("Logements punaises de lit");
+  wsPunaises.addRow(header);
+  rows.filter(r => (r.niveauInfestation || []).includes("Présence punaises de lit")).forEach(r => wsPunaises.addRow(rowValues(r)));
+
+  return wb;
+}
+
+// ── CAMPAGNE ACTIS : rapports de la semaine (retour 1er passage) ──
+// Pour chaque bâtiment "à traiter" de la campagne : zippe les PDF reçus
+// (renommés adresse_passage_1) et construit le reporting Excel de la
+// semaine à partir de passage1.resultats (données brutes déjà extraites
+// à la réception, pas de reparsing du fichier Excel Kizeo).
+exports.generateActisRapportsSemaine = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId } = req.body || {};
+    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+
+    try {
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const snap = await db.collection("actis-batiments")
+        .where("campagneId", "==", campagneId)
+        .where("passage1.statut", "==", "a-traiter")
+        .get();
+      if (snap.empty) { res.status(400).json({ error: "Aucun rapport 'à traiter' pour cette campagne" }); return; }
+      const batiments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const JSZip = require("jszip");
+      const ExcelJS = require("exceljs");
+      const zip = new JSZip();
+      const rows = [];
+
+      for (const b of batiments) {
+        const p1 = b.passage1 || {};
+        if (p1.fileUrlPdf) {
+          try {
+            const buf = await fetchBuffer(p1.fileUrlPdf);
+            const nomFichier = `${(b.adresseRue || "adresse")}_passage_1.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+            zip.file(nomFichier, buf);
+          } catch(e) { console.error(`generateActisRapportsSemaine: PDF illisible pour ${b.id}:`, e.message); }
+        }
+        (p1.resultats || []).forEach(l => rows.push({
+          adresse: b.adresseRue, codePostal: b.codePostal, ville: b.ville, secteur: b.secteur,
+          technicien: p1.technicienNom, nom: l.nom, numero: l.numero, etage: l.etage,
+          statut: l.statut, niveauInfestation: l.niveauInfestation,
+        }));
+      }
+
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+      const wb = buildActisReportWorkbook(ExcelJS, rows);
+      const xlsxBuffer = await wb.xlsx.writeBuffer();
+
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const basePath = `actis-reportings/${campagneId}`;
+      const tokenZip = crypto.randomUUID();
+      const zipPath = `${basePath}/rapports_1er_passage_${Date.now()}.zip`;
+      await bucket.file(zipPath).save(zipBuffer, { contentType: "application/zip", metadata: { metadata: { firebaseStorageDownloadTokens: tokenZip } } });
+      const zipUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(zipPath)}?alt=media&token=${tokenZip}`;
+
+      const tokenXlsx = crypto.randomUUID();
+      const xlsxPath = `${basePath}/reporting_semaine_${Date.now()}.xlsx`;
+      await bucket.file(xlsxPath).save(Buffer.from(xlsxBuffer), { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", metadata: { metadata: { firebaseStorageDownloadTokens: tokenXlsx } } });
+      const xlsxUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(xlsxPath)}?alt=media&token=${tokenXlsx}`;
+
+      const nowIso = new Date().toISOString();
+      const batch = db.batch();
+      batiments.forEach(b => batch.update(db.collection("actis-batiments").doc(b.id), { "passage1.statut": "archive", updatedAt: nowIso }));
+      await batch.commit();
+
+      const recapId = `${campagneId}__semaine_${Date.now()}`;
+      await db.collection("actis-reportings-semaine").doc(recapId).set({
+        campagneId, zipUrl, xlsxUrl, nbBatiments: batiments.length, generatedAt: nowIso,
+      });
+
+      res.status(200).json({ zipUrl, xlsxUrl, nbBatiments: batiments.length });
+    } catch(e) {
+      console.error("generateActisRapportsSemaine:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+// ── CAMPAGNE ACTIS : reporting complet (fusion 1er + 2ème passage) ──
+// Pour chaque bâtiment de la campagne, fusionne passage1.resultats et
+// passage2.resultats logement par logement (clé nom+numero) :
+// - statut 1er = Présent/Refus/Vacant (traité) -> on garde les données du 1er passage
+// - statut 1er = Absent -> on prend le résultat du 2ème passage s'il existe,
+//   sinon on garde le 1er passage tel quel (rapport 2ème passage manquant).
+function fusionnerLogementsActis(resultats1, resultats2) {
+  const cle = (l) => `${(l.nom || "").trim().toLowerCase()}|${(l.numero || "").trim()}`;
+  const map2 = new Map((resultats2 || []).map(l => [cle(l), l]));
+  return (resultats1 || []).map(l1 => {
+    if (l1.statut !== "Absent") return { ...l1 };
+    const l2 = map2.get(cle(l1));
+    if (l2) return { ...l2 };
+    return { ...l1, note: "2ème passage non reçu" };
+  });
+}
+
+exports.generateActisRapportComplet = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId } = req.body || {};
+    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+
+    try {
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const snap = await db.collection("actis-batiments").where("campagneId", "==", campagneId).get();
+      if (snap.empty) { res.status(400).json({ error: "Aucun bâtiment pour cette campagne" }); return; }
+      const batiments = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(b => (b.passage1 && b.passage1.resultats && b.passage1.resultats.length));
+      if (!batiments.length) { res.status(400).json({ error: "Aucun rapport 1er passage reçu pour cette campagne" }); return; }
+
+      const JSZip = require("jszip");
+      const ExcelJS = require("exceljs");
+      const zip = new JSZip();
+      const rows = [];
+      const batimentsAvecPassage2 = [];
+
+      for (const b of batiments) {
+        const p1 = b.passage1 || {};
+        const p2 = b.passage2 || {};
+        if (p2.fileUrlPdf) {
+          try {
+            const buf = await fetchBuffer(p2.fileUrlPdf);
+            const nomFichier = `${(b.adresseRue || "adresse")}_passage_2.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+            zip.file(nomFichier, buf);
+          } catch(e) { console.error(`generateActisRapportComplet: PDF passage 2 illisible pour ${b.id}:`, e.message); }
+        }
+        if (p2.statut === "a-traiter") batimentsAvecPassage2.push(b.id);
+
+        const fusion = fusionnerLogementsActis(p1.resultats, p2.resultats);
+        fusion.forEach(l => rows.push({
+          adresse: b.adresseRue, codePostal: b.codePostal, ville: b.ville, secteur: b.secteur,
+          technicien: (p2.technicienNom || p1.technicienNom), nom: l.nom, numero: l.numero, etage: l.etage,
+          statut: l.statut, niveauInfestation: l.niveauInfestation,
+        }));
+      }
+
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+      const wb = buildActisReportWorkbook(ExcelJS, rows);
+      const xlsxBuffer = await wb.xlsx.writeBuffer();
+
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const basePath = `actis-reportings/${campagneId}`;
+      const tokenZip = crypto.randomUUID();
+      const zipPath = `${basePath}/rapports_2eme_passage_${Date.now()}.zip`;
+      await bucket.file(zipPath).save(zipBuffer, { contentType: "application/zip", metadata: { metadata: { firebaseStorageDownloadTokens: tokenZip } } });
+      const zipUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(zipPath)}?alt=media&token=${tokenZip}`;
+
+      const tokenXlsx = crypto.randomUUID();
+      const xlsxPath = `${basePath}/reporting_complet_${Date.now()}.xlsx`;
+      await bucket.file(xlsxPath).save(Buffer.from(xlsxBuffer), { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", metadata: { metadata: { firebaseStorageDownloadTokens: tokenXlsx } } });
+      const xlsxUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(xlsxPath)}?alt=media&token=${tokenXlsx}`;
+
+      const nowIso = new Date().toISOString();
+      if (batimentsAvecPassage2.length) {
+        const batch = db.batch();
+        batimentsAvecPassage2.forEach(id => batch.update(db.collection("actis-batiments").doc(id), { "passage2.statut": "archive", updatedAt: nowIso }));
+        await batch.commit();
+      }
+
+      const recapId = `${campagneId}__complet_${Date.now()}`;
+      await db.collection("actis-reportings-complet").doc(recapId).set({
+        campagneId, zipUrl, xlsxUrl, nbBatiments: batiments.length, generatedAt: nowIso,
+      });
+
+      res.status(200).json({ zipUrl, xlsxUrl, nbBatiments: batiments.length });
+    } catch(e) {
+      console.error("generateActisRapportComplet:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 exports.generateGarantieRapportsParClient = functions
   .region("europe-west1")
   .runWith({ timeoutSeconds: 300 })
@@ -2039,13 +2325,16 @@ exports.pushActis1erPassageKizeo = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { storagePath, destinataireKizeoUserId } = req.body || {};
+    const { storagePath, destinataireKizeoUserId, campagneId } = req.body || {};
     if (!storagePath) { res.status(400).json({ error: "storagePath requis" }); return; }
     const recipient = String(destinataireKizeoUserId || "").trim();
     if (!recipient) { res.status(400).json({ error: "destinataireKizeoUserId requis" }); return; }
+    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
 
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
+    const campagneSnap = await db.collection("actis-campagnes").doc(campagneId).get();
+    if (!campagneSnap.exists) { res.status(404).json({ error: "Campagne introuvable" }); return; }
     const configSnap = await db.collection("config").doc("kizeo-push-1er-passage").get();
     if (!configSnap.exists) { res.status(404).json({ error: "Configuration absente : réglez d'abord les colonnes dans la page." }); return; }
     const config = configSnap.data();
@@ -2112,7 +2401,10 @@ exports.pushActis1erPassageKizeo = functions
 
       const results = [];
       for (const data of batiments.values()) {
+        const batimentRef = db.collection("actis-batiments").doc();
+        const refInterne = `actis::${campagneId}::1::${batimentRef.id}`;
         const fields = {
+          ref_interne: { value: refInterne },
           secteur: { value: data.secteur },
           technicien: { value: technicienNom },
           passage: { value: "N°1" },
@@ -2135,7 +2427,25 @@ exports.pushActis1erPassageKizeo = functions
         if (r.status >= 200 && r.status < 300) {
           let dataId = null;
           try { dataId = JSON.parse(r.body).data.data_id; } catch(e) {}
-          results.push({ adresse: data.adresse_rue, technicien: technicienNom, success: true, dataId });
+          const nowIso = new Date().toISOString();
+          await batimentRef.set({
+            campagneId,
+            secteur: data.secteur,
+            adresseRue: data.adresse_rue,
+            codePostal: data.code_postal,
+            ville: data.ville,
+            passage1: {
+              technicienKizeoUserId: recipient,
+              technicienNom,
+              logements: data.logements,
+              statut: "en-attente",
+              kizeoDataId: dataId ? String(dataId) : null,
+              pushedAt: nowIso,
+            },
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          });
+          results.push({ adresse: data.adresse_rue, technicien: technicienNom, success: true, dataId, batimentId: batimentRef.id });
         } else {
           results.push({ adresse: data.adresse_rue, technicien: technicienNom, success: false, error: `Kizeo a répondu ${r.status}` });
         }
@@ -2149,4 +2459,107 @@ exports.pushActis1erPassageKizeo = functions
       console.error("pushActis1erPassageKizeo:", e);
       res.status(500).json({ error: e.message });
     }
+  });
+
+// ── PUSH ACTIS 2ÈME PASSAGE — ENVOI DIRECT VIA L'API KIZEO ──────────
+// Reprend, pour chaque bâtiment sélectionné, uniquement les logements
+// marqués "Absent" au 1er passage (passage1.resultats), et pousse un
+// nouveau formulaire (form 2ème passage) vers le technicien choisi.
+const ACTIS_KIZEO_FORM_ID_PASSAGE2 = "1165672";
+exports.pushActis2emePassageKizeo = functions
+  .region("europe-west1")
+  .runWith({ secrets: [KIZEO_API_TOKEN], timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId, destinataireKizeoUserId, batimentIds } = req.body || {};
+    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+    const recipient2 = String(destinataireKizeoUserId || "").trim();
+    if (!recipient2) { res.status(400).json({ error: "destinataireKizeoUserId requis" }); return; }
+    if (!Array.isArray(batimentIds) || !batimentIds.length) { res.status(400).json({ error: "batimentIds requis" }); return; }
+
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+
+    let technicienNom2 = "";
+    try {
+      const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", recipient2).limit(1).get();
+      if (!tSnap.empty) {
+        const t = tSnap.docs[0].data();
+        technicienNom2 = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+      }
+    } catch(e) { console.error("pushActis2emePassageKizeo: lookup technicien échoué:", e.message); }
+
+    const now2 = new Date();
+    const pad2 = n => String(n).padStart(2, "0");
+    const dateHeure2 = `${now2.getFullYear()}-${pad2(now2.getMonth() + 1)}-${pad2(now2.getDate())} ${pad2(now2.getHours())}:${pad2(now2.getMinutes())}`;
+
+    const results2 = [];
+    for (const batimentId of batimentIds) {
+      try {
+        const bRef = db.collection("actis-batiments").doc(String(batimentId));
+        const bSnap = await bRef.get();
+        if (!bSnap.exists) { results2.push({ batimentId, success: false, error: "Bâtiment introuvable" }); continue; }
+        const b = bSnap.data();
+        if (b.campagneId !== campagneId) { results2.push({ batimentId, success: false, error: "Bâtiment hors campagne" }); continue; }
+        const resultats1 = (b.passage1 && b.passage1.resultats) || [];
+        const absents = resultats1.filter(l => l.statut === "Absent").map(l => ({ nom: l.nom, numero: l.numero, etage: l.etage }));
+        if (!absents.length) { results2.push({ batimentId, adresse: b.adresseRue, success: false, error: "Aucun absent, rien à repasser" }); continue; }
+
+        const refInterne2 = `actis::${campagneId}::2::${batimentId}`;
+        const fields2 = {
+          ref_interne: { value: refInterne2 },
+          secteur: { value: b.secteur || "" },
+          technicien: { value: technicienNom2 },
+          passage: { value: "N°2" },
+          adresse_address: { value: b.adresseRue || "" },
+          adresse_zip: { value: b.codePostal || "" },
+          adresse_city: { value: b.ville || "" },
+          date_et_heure_2nd_passage: { value: dateHeure2 },
+          tableau: {
+            value: absents.map(log => ({
+              nom: { value: log.nom },
+              numero_logement: { value: log.numero },
+              etage: { value: log.etage },
+            })),
+          },
+        };
+        const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", `/forms/${encodeURIComponent(ACTIS_KIZEO_FORM_ID_PASSAGE2)}/push`, {
+          recipient_user_id: Number(recipient2),
+          fields: fields2,
+        });
+        if (r.status >= 200 && r.status < 300) {
+          let dataId2 = null;
+          try { dataId2 = JSON.parse(r.body).data.data_id; } catch(e) {}
+          const nowIso2 = new Date().toISOString();
+          await bRef.set({
+            passage2: {
+              technicienKizeoUserId: recipient2,
+              technicienNom: technicienNom2,
+              logements: absents,
+              statut: "en-attente",
+              kizeoDataId: dataId2 ? String(dataId2) : null,
+              pushedAt: nowIso2,
+            },
+            updatedAt: nowIso2,
+          }, { merge: true });
+          results2.push({ batimentId, adresse: b.adresseRue, nbAbsents: absents.length, success: true, dataId: dataId2 });
+        } else {
+          results2.push({ batimentId, adresse: b.adresseRue, success: false, error: `Kizeo a répondu ${r.status}` });
+        }
+      } catch(e) {
+        console.error(`pushActis2emePassageKizeo: échec bâtiment ${batimentId}:`, e.message);
+        results2.push({ batimentId, success: false, error: e.message });
+      }
+    }
+
+    const nbEnvoyes2 = results2.filter(r => r.success).length;
+    const nbErreurs2 = results2.length - nbEnvoyes2;
+    console.log(`pushActis2emePassageKizeo: ${nbEnvoyes2} envoyés, ${nbErreurs2} erreurs/ignorés sur ${results2.length} bâtiments`);
+    res.status(200).json({ results: results2, nbEnvoyes: nbEnvoyes2, nbErreurs: nbErreurs2 });
   });
