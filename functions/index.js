@@ -2054,6 +2054,17 @@ exports.pushActis1erPassageKizeo = functions
     const kizeoFormId = config.kizeoFormId || "1148587";
     if (!nomFeuille) { res.status(400).json({ error: "Nom de feuille non configuré" }); return; }
 
+    // Nom affiché sur la fiche Kizeo : celui du technicien réellement sélectionné
+    // dans l'app (fiche Techniciens), pas le nom brut de la colonne Excel.
+    let technicienNom = "";
+    try {
+      const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", recipient).limit(1).get();
+      if (!tSnap.empty) {
+        const t = tSnap.docs[0].data();
+        technicienNom = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+      }
+    } catch(e) { console.error("pushActis1erPassageKizeo: lookup technicien échoué:", e.message); }
+
     try {
       const ExcelJS = require("exceljs");
       const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
@@ -2104,7 +2115,7 @@ exports.pushActis1erPassageKizeo = functions
       for (const data of batiments.values()) {
         const fields = {
           secteur: { value: data.secteur },
-          technicien: { value: data.technicien },
+          technicien: { value: technicienNom || data.technicien },
           passage: { value: "N°1" },
           adresse_address: { value: data.adresse_rue },
           adresse_zip: { value: data.code_postal },
