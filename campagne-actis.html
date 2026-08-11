@@ -140,8 +140,8 @@
           <input class="form-input" type="text" id="cfgNomFeuille" placeholder="ex: T4C">
         </div>
         <div class="form-group">
-          <label class="form-label">Destinataire par défaut</label>
-          <input class="form-input" type="text" id="cfgDestinataireDefaut" placeholder="ex: Technicien4">
+          <label class="form-label">Technicien destinataire par défaut</label>
+          <select class="form-input" id="cfgDestinataireDefaut"><option value="">— aucun —</option></select>
         </div>
       </div>
 
@@ -162,7 +162,8 @@
         <div class="form-group"><label class="form-label">Technicien</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: P" id="colTechnicien"></div>
       </div>
 
-      <div class="section-sep">Mapping technicien → destinataire Kizeo (optionnel)</div>
+      <div class="section-sep">Mapping technicien (nom dans l'export ACTIS) → technicien de l'app (optionnel)</div>
+      <div class="card-sub" style="margin-bottom:12px;">Si absent du mapping, le technicien par défaut ci-dessus est utilisé. Seuls les techniciens avec un compte Kizeo lié (fiche Techniciens) apparaissent dans la liste.</div>
       <div id="techList"></div>
       <button class="btn-mini" onclick="addTechRow()">+ Ajouter une ligne</button>
 
@@ -172,8 +173,8 @@
     </div>
 
     <div class="card">
-      <div class="card-title">Générer le fichier de push</div>
-      <div class="card-sub">Uploadez l'export Excel ACTIS pour ce passage.</div>
+      <div class="card-title">Envoyer le push via Kizeo</div>
+      <div class="card-sub">Uploadez l'export Excel ACTIS : un enregistrement pré-rempli est envoyé par bâtiment, directement sur l'app Kizeo du technicien destinataire.</div>
 
       <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
@@ -184,15 +185,12 @@
 
       <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
 
-      <button class="btn-generate" id="btnGenerate" onclick="generatePush()" disabled>Générer le fichier push</button>
+      <button class="btn-generate" id="btnGenerate" onclick="generatePush()" disabled>Envoyer via Kizeo</button>
 
       <div class="result-box" id="resultBox">
-        <div class="r-title">Fichier généré</div>
+        <div class="r-title">Push envoyé</div>
         <div class="r-stats" id="resultStats"></div>
-        <a class="btn-download" id="downloadLink" href="#" download>
-          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-          Télécharger le fichier
-        </a>
+        <div id="resultDetail" style="margin-top:10px;font-size:12px;color:var(--text-mid);max-height:200px;overflow-y:auto;"></div>
       </div>
       <div class="error-box" id="errorBox"></div>
     </div>
@@ -207,7 +205,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -223,17 +221,34 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 const storage = getStorage(app);
-const FN_GENERATE = "https://europe-west1-belledonne-client.cloudfunctions.net/generatePushActis1erPassage";
+const FN_PUSH_KIZEO = "https://europe-west1-belledonne-client.cloudfunctions.net/pushActis1erPassageKizeo";
 
 let _user = null;
 let _selectedFile = null;
+let _techniciens = []; // [{id, label, kizeoUserId}]
 
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = "login.html"; return; }
   if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
   _user = user;
-  loadConfig();
+  loadTechniciens().then(loadConfig);
 });
+
+async function loadTechniciens() {
+  const snap = await getDocs(collection(db, "techniciens"));
+  _techniciens = snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(t => (t.kizeoUserId || "").trim())
+    .map(t => ({ id: t.id, label: t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim(), kizeoUserId: t.kizeoUserId.trim() }));
+}
+
+function techOptionsHtml(selected) {
+  let opts = '<option value="">— aucun —</option>';
+  _techniciens.forEach(t => {
+    opts += `<option value="${t.kizeoUserId}" ${t.kizeoUserId === selected ? "selected" : ""}>${t.label}</option>`;
+  });
+  return opts;
+}
 
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
 
@@ -262,7 +277,7 @@ async function loadConfig() {
   const c = snap.exists() ? snap.data() : {};
   const col = c.colonnes || {};
   document.getElementById("cfgNomFeuille").value = c.nomFeuille || "";
-  document.getElementById("cfgDestinataireDefaut").value = c.destinataireDefaut || "";
+  document.getElementById("cfgDestinataireDefaut").innerHTML = techOptionsHtml(c.destinataireDefautKizeoUserId || "");
   document.getElementById("colSecteur").value = indexToLetter(col.secteur);
   document.getElementById("colNumeroRue").value = indexToLetter(col.numeroRue);
   document.getElementById("colNomRue").value = indexToLetter(col.nomRue);
@@ -281,12 +296,12 @@ async function loadConfig() {
   else entries.forEach(([tech, dest]) => addTechRow(tech, dest));
 }
 
-window.addTechRow = function(tech, dest) {
+window.addTechRow = function(tech, kizeoUserId) {
   const row = document.createElement("div");
   row.className = "tech-row";
   row.innerHTML = `
-    <input class="form-input tech-name" type="text" placeholder="Nom du technicien" value="${tech ? tech.replace(/"/g, '&quot;') : ''}">
-    <input class="form-input tech-dest" type="text" placeholder="Destinataire Kizeo" value="${dest ? dest.replace(/"/g, '&quot;') : ''}">
+    <input class="form-input tech-name" type="text" placeholder="Nom du technicien (dans l'export ACTIS)" value="${tech ? tech.replace(/"/g, '&quot;') : ''}">
+    <select class="form-input tech-dest">${techOptionsHtml(kizeoUserId || "")}</select>
     <button class="btn-x" onclick="this.closest('.tech-row').remove()">×</button>
   `;
   document.getElementById("techList").appendChild(row);
@@ -310,14 +325,15 @@ window.saveConfig = async function() {
     const techniciensMap = {};
     document.querySelectorAll("#techList .tech-row").forEach(row => {
       const tech = row.querySelector(".tech-name").value.trim();
-      const dest = row.querySelector(".tech-dest").value.trim();
-      if (tech) techniciensMap[tech] = dest;
+      const dest = row.querySelector(".tech-dest").value;
+      if (tech && dest) techniciensMap[tech] = dest;
     });
     const data = {
       nomFeuille: document.getElementById("cfgNomFeuille").value.trim(),
-      destinataireDefaut: document.getElementById("cfgDestinataireDefaut").value.trim(),
+      destinataireDefautKizeoUserId: document.getElementById("cfgDestinataireDefaut").value,
       colonnes,
       techniciensMap,
+      kizeoFormId: "1148587",
       updatedAt: new Date().toISOString(),
       updatedBy: _user.email,
     };
@@ -365,9 +381,9 @@ window.generatePush = async function() {
       );
     });
 
-    btn.textContent = "Génération en cours...";
+    btn.textContent = "Envoi vers Kizeo en cours (peut prendre 1-2 min)...";
     const idt = await _user.getIdToken();
-    const resp = await fetch(FN_GENERATE, {
+    const resp = await fetch(FN_PUSH_KIZEO, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + idt },
       body: JSON.stringify({ storagePath }),
@@ -375,10 +391,13 @@ window.generatePush = async function() {
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
 
-    document.getElementById("resultStats").textContent = `${data.nbBatiments} bâtiment(s) · ${data.nbLogements} logement(s)`;
-    const link = document.getElementById("downloadLink");
-    link.href = data.fileUrl;
-    link.setAttribute("download", data.nomFichier);
+    document.getElementById("resultStats").textContent = `${data.nbEnvoyes} envoyé(s) · ${data.nbErreurs} erreur(s) sur ${data.nbBatiments} bâtiment(s)`;
+    const detail = document.getElementById("resultDetail");
+    detail.innerHTML = (data.results || []).map(r =>
+      `<div style="padding:4px 0;border-bottom:1px solid var(--border);">
+        ${r.success ? "✅" : "❌"} ${r.adresse} — ${r.technicien || "?"} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}
+      </div>`
+    ).join("");
     resultBox.style.display = "block";
   } catch(e) {
     errorBox.textContent = "Erreur : " + e.message;

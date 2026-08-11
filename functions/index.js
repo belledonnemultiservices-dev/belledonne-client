@@ -2020,3 +2020,128 @@ exports.generatePushActis1erPassage = functions
       res.status(500).json({ error: e.message });
     }
   });
+
+// ── PUSH ACTIS 1ER PASSAGE — ENVOI DIRECT VIA L'API KIZEO ──────────
+// Remplace le fichier Excel à importer manuellement : pousse un
+// enregistrement par bâtiment directement sur l'app Kizeo du technicien
+// (recipient_user_id = kizeoUserId déjà lié sur sa fiche technicien).
+// Format du champ liste "tableau" (subform) et "adresse_*" (address)
+// vérifiés empiriquement contre le formulaire Kizeo 1148587 (la doc
+// officielle Kizeo ne documente pas le format d'écriture des subforms).
+exports.pushActis1erPassageKizeo = functions
+  .region("europe-west1")
+  .runWith({ secrets: [KIZEO_API_TOKEN], timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { storagePath } = req.body || {};
+    if (!storagePath) { res.status(400).json({ error: "storagePath requis" }); return; }
+
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+    const configSnap = await db.collection("config").doc("kizeo-push-1er-passage").get();
+    if (!configSnap.exists) { res.status(404).json({ error: "Configuration absente : réglez d'abord les colonnes dans la page." }); return; }
+    const config = configSnap.data();
+    const colonnes = config.colonnes || {};
+    const nomFeuille = config.nomFeuille || "";
+    const kizeoFormId = config.kizeoFormId || "1148587";
+    const destinataireDefautUserId = (config.destinataireDefautKizeoUserId || "").trim();
+    const techniciensMap = config.techniciensMap || {}; // { nomTechnicienExcel: kizeoUserId }
+    if (!nomFeuille) { res.status(400).json({ error: "Nom de feuille non configuré" }); return; }
+
+    try {
+      const ExcelJS = require("exceljs");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const [buffer] = await bucket.file(storagePath).download();
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const ws = workbook.getWorksheet(nomFeuille);
+      if (!ws) {
+        const dispo = workbook.worksheets.map(s => s.name).join(", ");
+        res.status(400).json({ error: `Feuille '${nomFeuille}' introuvable. Feuilles disponibles : ${dispo}` });
+        return;
+      }
+
+      const batiments = new Map();
+      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1) return;
+        try {
+          const secteurBrut = cellStr(row, colonnes.secteur);
+          const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
+          const nomRue = cellStr(row, colonnes.nomRue);
+          const codePostal = nettoyerNombre(cellStr(row, colonnes.codePostal));
+          const ville = cellStr(row, colonnes.ville);
+          if (!nomRue) return;
+          const secteur = formaterSecteur(secteurBrut);
+          const adresseRue = `${numeroRue} ${nomRue}`.trim();
+          const cle = `${secteur}|${numeroRue}|${nomRue}|${codePostal}|${ville}`;
+          const nomLocataire = cellStr(row, colonnes.locataire);
+          const reference = cellStr(row, colonnes.referenceLogement);
+          const etage = cellStr(row, colonnes.etage);
+          const technicien = cellStr(row, colonnes.technicien);
+          const numeroCourt = extraire4DerniersChiffres(reference);
+
+          if (!batiments.has(cle)) {
+            batiments.set(cle, { secteur, adresse_rue: adresseRue, code_postal: codePostal, ville, technicien, logements: [] });
+          }
+          batiments.get(cle).logements.push({ nom: nomLocataire, numero: numeroCourt, etage });
+        } catch (e) { /* ligne ignorée, cohérent avec le script Python */ }
+      });
+
+      if (batiments.size === 0) { res.status(400).json({ error: "Aucune donnée trouvée" }); return; }
+
+      const now = new Date();
+      const pad = n => String(n).padStart(2, "0");
+      const dateHeure = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+      const results = [];
+      for (const data of batiments.values()) {
+        const recipient = (techniciensMap[data.technicien] || destinataireDefautUserId || "").trim();
+        if (!recipient) {
+          results.push({ adresse: data.adresse_rue, technicien: data.technicien, success: false, error: "Aucun destinataire Kizeo pour ce technicien" });
+          continue;
+        }
+        const fields = {
+          secteur: { value: data.secteur },
+          technicien: { value: data.technicien },
+          passage: { value: "N°1" },
+          adresse_address: { value: data.adresse_rue },
+          adresse_zip: { value: data.code_postal },
+          adresse_city: { value: data.ville },
+          date_et_heure_1er_passage: { value: dateHeure },
+          tableau: {
+            value: data.logements.map(log => ({
+              nom: { value: log.nom },
+              numero_logement: { value: log.numero },
+              etage: { value: log.etage },
+            })),
+          },
+        };
+        const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", `/forms/${encodeURIComponent(kizeoFormId)}/push`, {
+          recipient_user_id: Number(recipient),
+          fields,
+        });
+        if (r.status >= 200 && r.status < 300) {
+          let dataId = null;
+          try { dataId = JSON.parse(r.body).data.data_id; } catch(e) {}
+          results.push({ adresse: data.adresse_rue, technicien: data.technicien, success: true, dataId });
+        } else {
+          results.push({ adresse: data.adresse_rue, technicien: data.technicien, success: false, error: `Kizeo a répondu ${r.status}` });
+        }
+      }
+
+      const nbEnvoyes = results.filter(r => r.success).length;
+      const nbErreurs = results.length - nbEnvoyes;
+      console.log(`pushActis1erPassageKizeo: ${nbEnvoyes} envoyés, ${nbErreurs} erreurs sur ${results.length} bâtiments`);
+      res.status(200).json({ results, nbEnvoyes, nbErreurs, nbBatiments: batiments.size });
+    } catch (e) {
+      console.error("pushActis1erPassageKizeo:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
