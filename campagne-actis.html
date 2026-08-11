@@ -535,14 +535,18 @@ function renderListPassage1() {
 
 function renderListPassage2Source() {
   const el = document.getElementById("listPassage2Source");
-  const candidats = _batiments.filter(b => b.passage1 && b.passage1.statut === "a-traiter" && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
+  // Éligible dès que le 1er passage a des résultats avec au moins un absent, que le
+  // reporting semaine (carte 2) l'ait déjà archivé ou non — l'archivage ne signifie
+  // pas "rien à faire", juste "reporting généré".
+  const candidats = _batiments.filter(b => b.passage1 && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
   if (!candidats.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment avec des absents à repasser (génère d'abord les rapports en carte 2).</div>`; return; }
   el.innerHTML = candidats.map(b => {
     const nbAbsents = (b.passage1.resultats || []).filter(l => l.statut === "Absent").length;
+    const dejaEnvoye = b.passage2 ? `<span class="r-badge r-badge-ok" style="margin-left:8px;">Déjà envoyé</span>` : "";
     return `<div class="batiment-row">
       <label style="display:flex;align-items:center;gap:10px;flex:1;">
-        <input type="checkbox" class="push2-check" value="${b.id}" checked>
-        <span class="b-adresse">${b.adresseRue || "—"}</span>
+        <input type="checkbox" class="push2-check" value="${b.id}" ${b.passage2 ? "" : "checked"}>
+        <span class="b-adresse">${b.adresseRue || "—"}</span>${dejaEnvoye}
       </label>
       <span class="b-info">${nbAbsents} absent(s)</span>
     </div>`;
