@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campagne ACTIS — Belledonne Multiservices</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#0D1B2A;--green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;--amber:#F5A623;--red:#E74C3C;--text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;--border:rgba(13,27,42,0.09);--surface:#fff;--bg:#F2F5F8;--sidebar-w:240px;--radius:14px;--radius-sm:8px;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+  .sidebar{width:var(--sidebar-w);background:var(--navy);height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .sidebar-logo{padding:28px 24px 24px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-mark{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-icon svg{width:18px;height:18px;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
+  .admin-badge{margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);padding:8px 12px;display:flex;align-items:center;gap:8px;}
+  .admin-badge svg{width:14px;height:14px;color:var(--amber);flex-shrink:0;}
+  .admin-badge span{font-size:11px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:0.06em;}
+  .sidebar-nav{padding:20px 12px;flex:1;overflow-y:auto;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:0 12px;margin-bottom:6px;margin-top:18px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.85);}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;}
+  .sidebar-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--navy);}
+  .footer-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.8);}
+  .footer-role{font-size:10px;color:var(--amber);}
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .btn-logout{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--red);background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.15);padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font-family:'DM Sans',sans-serif;}
+  .content{padding:32px;flex:1;max-width:920px;}
+  .page-header-row{margin-bottom:28px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px;}
+  .page-sub{font-size:13px;color:var(--text-muted);}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px;}
+  .card-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px;}
+  .card-sub{font-size:12px;color:var(--text-muted);margin-bottom:18px;}
+  .form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  .form-group{margin-bottom:14px;}
+  .form-label{font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;}
+  .form-hint{font-size:11px;color:var(--text-muted);margin-top:4px;}
+  .form-input{width:100%;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--bg);outline:none;transition:border-color 0.15s;}
+  .form-input:focus{border-color:var(--green);background:#fff;}
+  .section-sep{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin:20px 0 14px;display:flex;align-items:center;gap:10px;}
+  .section-sep::after{content:'';flex:1;height:1px;background:var(--border);}
+  .tech-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:center;}
+  .btn-x{width:34px;height:34px;border:1px solid rgba(231,76,60,0.15);background:rgba(231,76,60,0.06);border-radius:6px;color:var(--red);cursor:pointer;font-size:16px;line-height:1;}
+  .btn-mini{height:34px;padding:0 14px;border:1px solid var(--border);background:transparent;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--text-mid);cursor:pointer;}
+  .btn-mini:hover{background:var(--bg);}
+  .btn-save{height:40px;padding:0 22px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;}
+  .btn-save:hover{background:var(--green-dark);color:#fff;}
+  .btn-save:disabled{opacity:0.5;cursor:default;}
+  .btn-generate{height:44px;padding:0 24px;background:var(--navy);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#fff;cursor:pointer;}
+  .btn-generate:hover{background:#1a3350;}
+  .btn-generate:disabled{opacity:0.5;cursor:default;}
+  .file-drop{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:24px;text-align:center;cursor:pointer;transition:border-color 0.15s;margin-bottom:16px;}
+  .file-drop:hover{border-color:var(--green);}
+  .file-drop svg{width:28px;height:28px;color:var(--text-muted);margin-bottom:8px;}
+  .file-drop .fname{font-size:13px;font-weight:600;color:var(--text);margin-top:6px;}
+  .progress-bar{height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin:10px 0;display:none;}
+  .progress-fill{height:100%;background:var(--green);width:0%;transition:width 0.2s;}
+  .result-box{background:var(--green-pale);border:1px solid rgba(46,204,143,0.3);border-radius:var(--radius-sm);padding:16px 18px;margin-top:16px;display:none;}
+  .result-box .r-title{font-weight:700;color:var(--green-dark);font-size:13px;margin-bottom:4px;}
+  .result-box .r-stats{font-size:12px;color:var(--text-mid);margin-bottom:10px;}
+  .btn-download{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 16px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer;text-decoration:none;}
+  .btn-download:hover{background:var(--green-dark);color:#fff;}
+  .error-box{background:#FDECEA;border:1px solid rgba(231,76,60,0.2);border-radius:var(--radius-sm);padding:14px 16px;margin-top:16px;color:var(--red);font-size:13px;display:none;}
+  .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);transform:translateY(80px);opacity:0;transition:all 0.3s ease;z-index:999;}
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast svg{width:16px;height:16px;color:var(--green);}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+    </div>
+  </div>
+  <div class="admin-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Espace Admin</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item" href="garanties-client.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item active" href="campagne-actis.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 5H4V6h16v3zm0 9H4v-7h16v7z"/></svg><span>Campagne ACTIS</span></a>
+    <a class="nav-item" href="facturation.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg><span>Facturation</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
+    <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
+    <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+    <a class="nav-item" href="admin.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+    <a class="nav-item" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+    <a class="nav-item" href="techniciens.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Techniciens</span></a>
+    <a class="nav-item" href="imports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import email</span></a>
+    <a class="nav-item" href="kizeo-config.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg><span>Formulaires Kizeo</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar">BM</div>
+      <div><div class="footer-name">Belledonne Multiservices</div><div class="footer-role">Administrateur</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Admin</span><span>›</span><span>Campagne ACTIS</span></div>
+    <button class="btn-logout" onclick="handleLogout()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Déconnexion
+    </button>
+  </header>
+
+  <div class="content">
+    <div class="page-header-row">
+      <div class="page-title">Campagne ACTIS — Push 1er passage</div>
+      <div class="page-sub">Convertit l'export Excel ACTIS en fichier prêt à réimporter dans Kizeo pour créer les fiches terrain du 1er passage.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Configuration de l'export ACTIS</div>
+      <div class="card-sub">Réglée une fois, réutilisée à chaque génération (la structure de colonnes de l'export ACTIS ne change pas).</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nom de la feuille</label>
+          <input class="form-input" type="text" id="cfgNomFeuille" placeholder="ex: T4C">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Destinataire par défaut</label>
+          <input class="form-input" type="text" id="cfgDestinataireDefaut" placeholder="ex: Technicien4">
+        </div>
+      </div>
+
+      <div class="section-sep">Index des colonnes (0 = colonne A)</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Secteur</label><input class="form-input" type="number" id="colSecteur"></div>
+        <div class="form-group"><label class="form-label">N° rue</label><input class="form-input" type="number" id="colNumeroRue"></div>
+        <div class="form-group"><label class="form-label">Nom rue</label><input class="form-input" type="number" id="colNomRue"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Code postal</label><input class="form-input" type="number" id="colCodePostal"></div>
+        <div class="form-group"><label class="form-label">Ville</label><input class="form-input" type="number" id="colVille"></div>
+        <div class="form-group"><label class="form-label">Nom locataire</label><input class="form-input" type="number" id="colLocataire"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Référence logement</label><input class="form-input" type="number" id="colReference"></div>
+        <div class="form-group"><label class="form-label">Étage</label><input class="form-input" type="number" id="colEtage"></div>
+        <div class="form-group"><label class="form-label">Technicien</label><input class="form-input" type="number" id="colTechnicien"></div>
+      </div>
+
+      <div class="section-sep">Mapping technicien → destinataire Kizeo (optionnel)</div>
+      <div id="techList"></div>
+      <button class="btn-mini" onclick="addTechRow()">+ Ajouter une ligne</button>
+
+      <div style="margin-top:20px;">
+        <button class="btn-save" id="btnSaveConfig" onclick="saveConfig()">Enregistrer la configuration</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Générer le fichier de push</div>
+      <div class="card-sub">Uploadez l'export Excel ACTIS pour ce passage.</div>
+
+      <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        <div>Cliquez pour choisir un fichier Excel (.xlsx)</div>
+        <div class="fname" id="fileName"></div>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="onFileSelected(event)">
+
+      <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+
+      <button class="btn-generate" id="btnGenerate" onclick="generatePush()" disabled>Générer le fichier push</button>
+
+      <div class="result-box" id="resultBox">
+        <div class="r-title">Fichier généré</div>
+        <div class="r-stats" id="resultStats"></div>
+        <a class="btn-download" id="downloadLink" href="#" download>
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          Télécharger le fichier
+        </a>
+      </div>
+      <div class="error-box" id="errorBox"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
+  authDomain: "belledonne-client.firebaseapp.com",
+  projectId: "belledonne-client",
+  storageBucket: "belledonne-client.firebasestorage.app",
+  messagingSenderId: "737384028313",
+  appId: "1:737384028313:web:700aee1467ac27d0c58008"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+const storage = getStorage(app);
+const FN_GENERATE = "https://europe-west1-belledonne-client.cloudfunctions.net/generatePushActis1erPassage";
+
+let _user = null;
+let _selectedFile = null;
+
+onAuthStateChanged(auth, (user) => {
+  if (!user) { window.location.href = "login.html"; return; }
+  if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
+  _user = user;
+  loadConfig();
+});
+
+window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
+
+async function loadConfig() {
+  const snap = await getDoc(doc(db, "config", "kizeo-push-1er-passage"));
+  const c = snap.exists() ? snap.data() : {};
+  const col = c.colonnes || {};
+  document.getElementById("cfgNomFeuille").value = c.nomFeuille || "";
+  document.getElementById("cfgDestinataireDefaut").value = c.destinataireDefaut || "";
+  document.getElementById("colSecteur").value = col.secteur ?? 0;
+  document.getElementById("colNumeroRue").value = col.numeroRue ?? 1;
+  document.getElementById("colNomRue").value = col.nomRue ?? 2;
+  document.getElementById("colCodePostal").value = col.codePostal ?? 3;
+  document.getElementById("colVille").value = col.ville ?? 4;
+  document.getElementById("colLocataire").value = col.locataire ?? 5;
+  document.getElementById("colReference").value = col.referenceLogement ?? 6;
+  document.getElementById("colEtage").value = col.etage ?? 7;
+  document.getElementById("colTechnicien").value = col.technicien ?? 8;
+
+  const techList = document.getElementById("techList");
+  techList.innerHTML = "";
+  const map = c.techniciensMap || {};
+  const entries = Object.entries(map);
+  if (entries.length === 0) addTechRow();
+  else entries.forEach(([tech, dest]) => addTechRow(tech, dest));
+}
+
+window.addTechRow = function(tech, dest) {
+  const row = document.createElement("div");
+  row.className = "tech-row";
+  row.innerHTML = `
+    <input class="form-input tech-name" type="text" placeholder="Nom du technicien" value="${tech ? tech.replace(/"/g, '&quot;') : ''}">
+    <input class="form-input tech-dest" type="text" placeholder="Destinataire Kizeo" value="${dest ? dest.replace(/"/g, '&quot;') : ''}">
+    <button class="btn-x" onclick="this.closest('.tech-row').remove()">×</button>
+  `;
+  document.getElementById("techList").appendChild(row);
+};
+
+window.saveConfig = async function() {
+  const btn = document.getElementById("btnSaveConfig");
+  btn.disabled = true; btn.textContent = "Enregistrement...";
+  try {
+    const techniciensMap = {};
+    document.querySelectorAll("#techList .tech-row").forEach(row => {
+      const tech = row.querySelector(".tech-name").value.trim();
+      const dest = row.querySelector(".tech-dest").value.trim();
+      if (tech) techniciensMap[tech] = dest;
+    });
+    const data = {
+      nomFeuille: document.getElementById("cfgNomFeuille").value.trim(),
+      destinataireDefaut: document.getElementById("cfgDestinataireDefaut").value.trim(),
+      colonnes: {
+        secteur: Number(document.getElementById("colSecteur").value),
+        numeroRue: Number(document.getElementById("colNumeroRue").value),
+        nomRue: Number(document.getElementById("colNomRue").value),
+        codePostal: Number(document.getElementById("colCodePostal").value),
+        ville: Number(document.getElementById("colVille").value),
+        locataire: Number(document.getElementById("colLocataire").value),
+        referenceLogement: Number(document.getElementById("colReference").value),
+        etage: Number(document.getElementById("colEtage").value),
+        technicien: Number(document.getElementById("colTechnicien").value),
+      },
+      techniciensMap,
+      updatedAt: new Date().toISOString(),
+      updatedBy: _user.email,
+    };
+    await setDoc(doc(db, "config", "kizeo-push-1er-passage"), data);
+    showToast("Configuration enregistrée");
+  } catch(e) {
+    showToast("Erreur : " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Enregistrer la configuration";
+  }
+};
+
+window.onFileSelected = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  _selectedFile = file;
+  document.getElementById("fileName").textContent = file.name;
+  document.getElementById("btnGenerate").disabled = false;
+  document.getElementById("resultBox").style.display = "none";
+  document.getElementById("errorBox").style.display = "none";
+};
+
+window.generatePush = async function() {
+  if (!_selectedFile) return;
+  const btn = document.getElementById("btnGenerate");
+  const progressBar = document.getElementById("progressBar");
+  const progressFill = document.getElementById("progressFill");
+  const resultBox = document.getElementById("resultBox");
+  const errorBox = document.getElementById("errorBox");
+  resultBox.style.display = "none";
+  errorBox.style.display = "none";
+  btn.disabled = true; btn.textContent = "Envoi du fichier...";
+  progressBar.style.display = "block"; progressFill.style.width = "0%";
+
+  try {
+    const storagePath = `push-actis/${Date.now()}_${_selectedFile.name.replace(/\s+/g, "_")}`;
+    const storageRef = ref(storage, storagePath);
+    const uploadTask = uploadBytesResumable(storageRef, _selectedFile);
+
+    await new Promise((resolve, reject) => {
+      uploadTask.on("state_changed",
+        (snap) => { progressFill.style.width = Math.round((snap.bytesTransferred / snap.totalBytes) * 100) + "%"; },
+        reject,
+        resolve
+      );
+    });
+
+    btn.textContent = "Génération en cours...";
+    const idt = await _user.getIdToken();
+    const resp = await fetch(FN_GENERATE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + idt },
+      body: JSON.stringify({ storagePath }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+
+    document.getElementById("resultStats").textContent = `${data.nbBatiments} bâtiment(s) · ${data.nbLogements} logement(s)`;
+    const link = document.getElementById("downloadLink");
+    link.href = data.fileUrl;
+    link.setAttribute("download", data.nomFichier);
+    resultBox.style.display = "block";
+  } catch(e) {
+    errorBox.textContent = "Erreur : " + e.message;
+    errorBox.style.display = "block";
+  } finally {
+    btn.disabled = false; btn.textContent = "Générer le fichier push";
+    progressBar.style.display = "none";
+  }
+};
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3500);
+}
+</script>
+<script type="module" src="suivi-badge.js"></script>
+</body>
+</html>

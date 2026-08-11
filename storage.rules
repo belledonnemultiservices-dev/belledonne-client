@@ -41,6 +41,10 @@ service firebase.storage {
     // reception : rapports Kizeo bruts en attente de traitement, admin only
     match /reception/{file=**}           { allow read, write: if isAdmin(); }
 
+    // push-actis : exports ACTIS source + fichiers de push Kizeo générés, admin only
+    match /push-actis/{file=**}          { allow read, write: if isAdmin(); }
+    match /push-actis-generes/{file=**}  { allow read, write: if isAdmin(); }
+
     // Tout le reste : refusé
     match /{path=**}                     { allow read, write: if false; }
   }

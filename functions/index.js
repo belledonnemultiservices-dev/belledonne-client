@@ -1865,3 +1865,158 @@ function fmtDateFR(iso) {
   const [y, m, d] = String(iso).split("-");
   return d && m && y ? `${d}/${m}/${y}` : iso;
 }
+
+// ── PUSH ACTIS 1ER PASSAGE ─────────────────────────────────────────
+// Porte la logique du script Python `generer_fichier_1er_passage` :
+// regroupe l'export Excel ACTIS par bâtiment et génère un fichier
+// prêt à être réimporté dans Kizeo pour créer les fiches terrain.
+
+function nettoyerNombre(valeur) {
+  if (valeur === null || valeur === undefined || valeur === "") return "";
+  const f = Number(valeur);
+  if (!Number.isNaN(f) && String(valeur).trim() !== "") return String(f);
+  return String(valeur).trim();
+}
+
+function formaterSecteur(secteurBrut) {
+  if (!secteurBrut) return "";
+  const secteur = String(secteurBrut).trim();
+  const match = secteur.match(/(Secteur\s+\d+\s+(?:TMR|TPC))/i);
+  if (match) return match[1];
+  const parts = secteur.split(/\s+/);
+  if (parts.length >= 3) {
+    for (let i = 0; i < parts.length; i++) {
+      if (["TMR", "TPC"].includes(parts[i].toUpperCase())) return parts.slice(0, i + 1).join(" ");
+    }
+  }
+  return secteur;
+}
+
+function extraire4DerniersChiffres(ref) {
+  if (!ref) return "";
+  const refClean = String(ref).replace(/-/g, "").replace(/\s/g, "");
+  return refClean.length >= 4 ? refClean.slice(-4) : refClean;
+}
+
+function cellStr(row, idx) {
+  if (idx === null || idx === undefined || Number.isNaN(idx)) return "";
+  const cell = row.getCell(idx + 1); // ExcelJS 1-indexé
+  const v = cell.value;
+  if (v === null || v === undefined) return "";
+  if (typeof v === "object" && v.result !== undefined) return String(v.result).trim(); // formule
+  if (typeof v === "object" && v.text !== undefined) return String(v.text).trim(); // rich text
+  return String(v).trim();
+}
+
+exports.generatePushActis1erPassage = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 120 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { storagePath } = req.body || {};
+    if (!storagePath) { res.status(400).json({ error: "storagePath requis" }); return; }
+
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+    const configSnap = await db.collection("config").doc("kizeo-push-1er-passage").get();
+    if (!configSnap.exists) { res.status(404).json({ error: "Configuration absente : réglez d'abord les colonnes dans la page." }); return; }
+    const config = configSnap.data();
+    const colonnes = config.colonnes || {};
+    const nomFeuille = config.nomFeuille || "";
+    const destinataireDefaut = (config.destinataireDefaut || "").trim();
+    const techniciensMap = config.techniciensMap || {};
+    if (!nomFeuille) { res.status(400).json({ error: "Nom de feuille non configuré" }); return; }
+
+    try {
+      const ExcelJS = require("exceljs");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const [buffer] = await bucket.file(storagePath).download();
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const ws = workbook.getWorksheet(nomFeuille);
+      if (!ws) {
+        const dispo = workbook.worksheets.map(s => s.name).join(", ");
+        res.status(400).json({ error: `Feuille '${nomFeuille}' introuvable. Feuilles disponibles : ${dispo}` });
+        return;
+      }
+
+      const batiments = new Map(); // cle -> { secteur, adresse_rue, code_postal, ville, technicien, logements: [] }
+
+      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1) return; // en-tête
+        try {
+          const secteurBrut = cellStr(row, colonnes.secteur);
+          const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
+          const nomRue = cellStr(row, colonnes.nomRue);
+          const codePostal = nettoyerNombre(cellStr(row, colonnes.codePostal));
+          const ville = cellStr(row, colonnes.ville);
+          if (!nomRue) return;
+          const secteur = formaterSecteur(secteurBrut);
+          const adresseRue = `${numeroRue} ${nomRue}`.trim();
+          const cle = `${secteur}|${numeroRue}|${nomRue}|${codePostal}|${ville}`;
+          const nomLocataire = cellStr(row, colonnes.locataire);
+          const reference = cellStr(row, colonnes.referenceLogement);
+          const etage = cellStr(row, colonnes.etage);
+          const technicien = cellStr(row, colonnes.technicien);
+          const numeroCourt = extraire4DerniersChiffres(reference);
+
+          if (!batiments.has(cle)) {
+            batiments.set(cle, { secteur, adresse_rue: adresseRue, code_postal: codePostal, ville, technicien, logements: [] });
+          }
+          batiments.get(cle).logements.push({ nom: nomLocataire, numero: numeroCourt, etage });
+        } catch (e) { /* ligne ignorée, cohérent avec le script Python */ }
+      });
+
+      if (batiments.size === 0) { res.status(400).json({ error: "Aucune donnée trouvée" }); return; }
+
+      const wbOut = new ExcelJS.Workbook();
+      const ws1 = wbOut.addWorksheet("Formulaire principal");
+      ws1.addRow(["PUSH_ID", "Destinataire", "Adresse - Adresse", "Adresse - Codepostal", "Adresse - Ville", "Secteur", "Technicien", "Numéro de passage"]);
+
+      const ws2 = wbOut.addWorksheet("Tableau");
+      ws2.addRow(["PUSH_PARENT_ID", "Nom", "Numéro logement", "Etage"]);
+
+      let pushId = 1;
+      let totalLogements = 0;
+      for (const data of batiments.values()) {
+        const tech = data.technicien;
+        const destinataire = (techniciensMap[tech] || "").trim() || destinataireDefaut;
+        ws1.addRow([pushId, destinataire, data.adresse_rue, data.code_postal, data.ville, data.secteur, tech, "N°1"]);
+        data.logements.forEach(log => {
+          ws2.addRow([pushId, log.nom, log.numero, log.etage]);
+          totalLogements++;
+        });
+        pushId++;
+      }
+
+      const outBuffer = await wbOut.xlsx.writeBuffer();
+
+      const now = new Date();
+      const pad = n => String(n).padStart(2, "0");
+      const horodatage = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}_${pad(now.getHours())}h${pad(now.getMinutes())}`;
+      const nomFeuilleSafe = nomFeuille.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const nomFichier = `FORM_ACTIS_push_1er_passage_${nomFeuilleSafe}_${horodatage}.xlsx`;
+      const outPath = `push-actis-generes/${Date.now()}_${nomFichier}`;
+      const downloadToken = crypto.randomUUID();
+      await bucket.file(outPath).save(Buffer.from(outBuffer), {
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        metadata: {
+          contentDisposition: `attachment; filename="${nomFichier}"`,
+          metadata: { firebaseStorageDownloadTokens: downloadToken },
+        },
+      });
+      const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${downloadToken}`;
+
+      res.status(200).json({ fileUrl, nomFichier, nbBatiments: batiments.size, nbLogements: totalLogements });
+    } catch (e) {
+      console.error("generatePushActis1erPassage:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
