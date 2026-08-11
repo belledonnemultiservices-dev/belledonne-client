@@ -153,7 +153,6 @@
       <div class="form-row">
         <div class="form-group"><label class="form-label">Référence logement</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: I" id="colReference"></div>
         <div class="form-group"><label class="form-label">Étage</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: O" id="colEtage"></div>
-        <div class="form-group"><label class="form-label">Technicien</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: P" id="colTechnicien"></div>
       </div>
 
       <div style="margin-top:20px;">
@@ -261,7 +260,7 @@ function letterToIndex(letter) {
   return n - 1;
 }
 
-const COL_FIELDS = ["colSecteur", "colNumeroRue", "colNomRue", "colCodePostal", "colVille", "colLocataire", "colReference", "colEtage", "colTechnicien"];
+const COL_FIELDS = ["colSecteur", "colNumeroRue", "colNomRue", "colCodePostal", "colVille", "colLocataire", "colReference", "colEtage"];
 COL_FIELDS.forEach(id => {
   document.getElementById(id).addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ""); });
 });
@@ -279,8 +278,6 @@ async function loadConfig() {
   document.getElementById("colLocataire").value = indexToLetter(col.locataire);
   document.getElementById("colReference").value = indexToLetter(col.referenceLogement);
   document.getElementById("colEtage").value = indexToLetter(col.etage);
-  document.getElementById("colTechnicien").value = indexToLetter(col.technicien);
-
   document.getElementById("pushDestinataire").innerHTML = techOptionsHtml("");
 }
 
@@ -288,7 +285,7 @@ window.saveConfig = async function() {
   const btn = document.getElementById("btnSaveConfig");
 
   const colonnes = {};
-  const fieldMap = { colSecteur: "secteur", colNumeroRue: "numeroRue", colNomRue: "nomRue", colCodePostal: "codePostal", colVille: "ville", colLocataire: "locataire", colReference: "referenceLogement", colEtage: "etage", colTechnicien: "technicien" };
+  const fieldMap = { colSecteur: "secteur", colNumeroRue: "numeroRue", colNomRue: "nomRue", colCodePostal: "codePostal", colVille: "ville", colLocataire: "locataire", colReference: "referenceLogement", colEtage: "etage" };
   for (const [id, key] of Object.entries(fieldMap)) {
     const letter = document.getElementById(id).value.trim();
     const idx = letterToIndex(letter);

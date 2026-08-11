@@ -2095,11 +2095,10 @@ exports.pushActis1erPassageKizeo = functions
           const nomLocataire = cellStr(row, colonnes.locataire);
           const reference = cellStr(row, colonnes.referenceLogement);
           const etage = cellStr(row, colonnes.etage);
-          const technicien = cellStr(row, colonnes.technicien);
           const numeroCourt = extraire4DerniersChiffres(reference);
 
           if (!batiments.has(cle)) {
-            batiments.set(cle, { secteur, adresse_rue: adresseRue, code_postal: codePostal, ville, technicien, logements: [] });
+            batiments.set(cle, { secteur, adresse_rue: adresseRue, code_postal: codePostal, ville, logements: [] });
           }
           batiments.get(cle).logements.push({ nom: nomLocataire, numero: numeroCourt, etage });
         } catch (e) { /* ligne ignorée, cohérent avec le script Python */ }
@@ -2115,7 +2114,7 @@ exports.pushActis1erPassageKizeo = functions
       for (const data of batiments.values()) {
         const fields = {
           secteur: { value: data.secteur },
-          technicien: { value: technicienNom || data.technicien },
+          technicien: { value: technicienNom },
           passage: { value: "N°1" },
           adresse_address: { value: data.adresse_rue },
           adresse_zip: { value: data.code_postal },
@@ -2136,9 +2135,9 @@ exports.pushActis1erPassageKizeo = functions
         if (r.status >= 200 && r.status < 300) {
           let dataId = null;
           try { dataId = JSON.parse(r.body).data.data_id; } catch(e) {}
-          results.push({ adresse: data.adresse_rue, technicien: data.technicien, success: true, dataId });
+          results.push({ adresse: data.adresse_rue, technicien: technicienNom, success: true, dataId });
         } else {
-          results.push({ adresse: data.adresse_rue, technicien: data.technicien, success: false, error: `Kizeo a répondu ${r.status}` });
+          results.push({ adresse: data.adresse_rue, technicien: technicienNom, success: false, error: `Kizeo a répondu ${r.status}` });
         }
       }
 
