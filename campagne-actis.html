@@ -484,13 +484,16 @@ window.selectCampagne = async function(campagneId) {
   document.getElementById("campagneDetail").style.display = "block";
   const camp = _campagnes.find(c => c.id === campagneId) || {};
   loadConfigFromCampagne(camp);
+  _openStep = null;
   selectStep(1);
   await loadBatiments();
 };
 
+let _openStep = null;
 window.selectStep = function(n) {
-  document.querySelectorAll(".step-box").forEach(el => el.classList.toggle("active", Number(el.dataset.step) === n));
-  document.querySelectorAll(".step-card").forEach((el, i) => { el.style.display = (i + 1 === n) ? "block" : "none"; });
+  _openStep = (_openStep === n) ? null : n;
+  document.querySelectorAll(".step-box").forEach(el => el.classList.toggle("active", Number(el.dataset.step) === _openStep));
+  document.querySelectorAll(".step-card").forEach((el, i) => { el.style.display = (i + 1 === _openStep) ? "block" : "none"; });
 };
 
 // ── Bâtiments de la campagne active ──
