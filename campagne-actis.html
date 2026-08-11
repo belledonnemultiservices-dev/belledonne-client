@@ -479,6 +479,12 @@ window.saveCampagne = async function() {
 };
 
 window.selectCampagne = async function(campagneId) {
+  if (_currentCampagneId === campagneId) {
+    _currentCampagneId = null;
+    renderCampagnes();
+    document.getElementById("campagneDetail").style.display = "none";
+    return;
+  }
   _currentCampagneId = campagneId;
   renderCampagnes();
   document.getElementById("campagneDetail").style.display = "block";
