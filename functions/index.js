@@ -1369,19 +1369,25 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     if (batimentA.campagneId !== campagneId) { console.warn(`Kizeo actis: campagneId incohérent pour ${refInterne}`); return; }
 
     // Extraction des résultats par logement depuis le champ liste "tableau".
-    const getRowVal = (row, key) => {
+    // statut_1er_passage = choix UNIQUE -> on lit .value (texte simple).
+    // niveau_infestation = choix MULTIPLE -> on lit .valuesAsArray (liste).
+    const getRowText = (row, key) => {
       const cell = row && row[key];
-      if (!cell) return "";
-      if (cell.valuesAsArray) return cell.valuesAsArray;
-      return cell.value !== undefined ? cell.value : "";
+      return (cell && cell.value !== undefined) ? cell.value : "";
+    };
+    const getRowArray = (row, key) => {
+      const cell = row && row[key];
+      if (!cell) return [];
+      if (Array.isArray(cell.valuesAsArray)) return cell.valuesAsArray;
+      return cell.value ? [cell.value] : [];
     };
     const tableauRows = (fields.tableau && fields.tableau.value) || [];
     const resultatsA = tableauRows.map(row => ({
-      nom: getRowVal(row, "nom") || "",
-      numero: getRowVal(row, "numero_logement") || "",
-      etage: getRowVal(row, "etage") || "",
-      statut: getRowVal(row, "statut_1er_passage") || "",
-      niveauInfestation: (() => { const v = getRowVal(row, "niveau_infestation"); return Array.isArray(v) ? v : (v ? [v] : []); })(),
+      nom: getRowText(row, "nom"),
+      numero: getRowText(row, "numero_logement"),
+      etage: getRowText(row, "etage"),
+      statut: getRowText(row, "statut_1er_passage"),
+      niveauInfestation: getRowArray(row, "niveau_infestation"),
     }));
 
     // PDF (obligatoire) + Excel Kizeo (archive, non bloquant si absent/échoue).
@@ -1674,7 +1680,7 @@ exports.kizeoPull = functions
     for (const doc of formsSnap.docs) {
       const form = doc.data();
       if (!form.formId) continue;
-      const r = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(form.formId)}/data/unread/${action}/50`);
+      const r = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(form.formId)}/data/unread/${action}/500`);
       if (r.status !== 200) {
         if (r.status !== 404) console.error(`kizeoPull: formulaire ${form.formId} -> ${r.status}`);
         continue;
