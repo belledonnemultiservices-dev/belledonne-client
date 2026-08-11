@@ -145,21 +145,21 @@
         </div>
       </div>
 
-      <div class="section-sep">Index des colonnes (0 = colonne A)</div>
+      <div class="section-sep">Colonnes de l'export (lettre Excel, ex: A, B, C... comme dans le tableur)</div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Secteur</label><input class="form-input" type="number" id="colSecteur"></div>
-        <div class="form-group"><label class="form-label">N° rue</label><input class="form-input" type="number" id="colNumeroRue"></div>
-        <div class="form-group"><label class="form-label">Nom rue</label><input class="form-input" type="number" id="colNomRue"></div>
+        <div class="form-group"><label class="form-label">Secteur</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: A" id="colSecteur"></div>
+        <div class="form-group"><label class="form-label">N° rue</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: D" id="colNumeroRue"></div>
+        <div class="form-group"><label class="form-label">Nom rue</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: E" id="colNomRue"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Code postal</label><input class="form-input" type="number" id="colCodePostal"></div>
-        <div class="form-group"><label class="form-label">Ville</label><input class="form-input" type="number" id="colVille"></div>
-        <div class="form-group"><label class="form-label">Nom locataire</label><input class="form-input" type="number" id="colLocataire"></div>
+        <div class="form-group"><label class="form-label">Code postal</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: G" id="colCodePostal"></div>
+        <div class="form-group"><label class="form-label">Ville</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: F" id="colVille"></div>
+        <div class="form-group"><label class="form-label">Nom locataire</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: J" id="colLocataire"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Référence logement</label><input class="form-input" type="number" id="colReference"></div>
-        <div class="form-group"><label class="form-label">Étage</label><input class="form-input" type="number" id="colEtage"></div>
-        <div class="form-group"><label class="form-label">Technicien</label><input class="form-input" type="number" id="colTechnicien"></div>
+        <div class="form-group"><label class="form-label">Référence logement</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: I" id="colReference"></div>
+        <div class="form-group"><label class="form-label">Étage</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: O" id="colEtage"></div>
+        <div class="form-group"><label class="form-label">Technicien</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: P" id="colTechnicien"></div>
       </div>
 
       <div class="section-sep">Mapping technicien → destinataire Kizeo (optionnel)</div>
@@ -237,21 +237,41 @@ onAuthStateChanged(auth, (user) => {
 
 window.handleLogout = async function() { await signOut(auth); window.location.href = "login.html"; };
 
+// Conversion index Excel (0-based) <-> lettre de colonne (A, B, ..., Z, AA, AB...)
+function indexToLetter(idx) {
+  if (idx === null || idx === undefined || Number.isNaN(idx)) return "";
+  let n = idx + 1, s = "";
+  while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+function letterToIndex(letter) {
+  letter = (letter || "").trim().toUpperCase();
+  if (!/^[A-Z]+$/.test(letter)) return null;
+  let n = 0;
+  for (const ch of letter) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+const COL_FIELDS = ["colSecteur", "colNumeroRue", "colNomRue", "colCodePostal", "colVille", "colLocataire", "colReference", "colEtage", "colTechnicien"];
+COL_FIELDS.forEach(id => {
+  document.getElementById(id).addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ""); });
+});
+
 async function loadConfig() {
   const snap = await getDoc(doc(db, "config", "kizeo-push-1er-passage"));
   const c = snap.exists() ? snap.data() : {};
   const col = c.colonnes || {};
   document.getElementById("cfgNomFeuille").value = c.nomFeuille || "";
   document.getElementById("cfgDestinataireDefaut").value = c.destinataireDefaut || "";
-  document.getElementById("colSecteur").value = col.secteur ?? 0;
-  document.getElementById("colNumeroRue").value = col.numeroRue ?? 1;
-  document.getElementById("colNomRue").value = col.nomRue ?? 2;
-  document.getElementById("colCodePostal").value = col.codePostal ?? 3;
-  document.getElementById("colVille").value = col.ville ?? 4;
-  document.getElementById("colLocataire").value = col.locataire ?? 5;
-  document.getElementById("colReference").value = col.referenceLogement ?? 6;
-  document.getElementById("colEtage").value = col.etage ?? 7;
-  document.getElementById("colTechnicien").value = col.technicien ?? 8;
+  document.getElementById("colSecteur").value = indexToLetter(col.secteur);
+  document.getElementById("colNumeroRue").value = indexToLetter(col.numeroRue);
+  document.getElementById("colNomRue").value = indexToLetter(col.nomRue);
+  document.getElementById("colCodePostal").value = indexToLetter(col.codePostal);
+  document.getElementById("colVille").value = indexToLetter(col.ville);
+  document.getElementById("colLocataire").value = indexToLetter(col.locataire);
+  document.getElementById("colReference").value = indexToLetter(col.referenceLogement);
+  document.getElementById("colEtage").value = indexToLetter(col.etage);
+  document.getElementById("colTechnicien").value = indexToLetter(col.technicien);
 
   const techList = document.getElementById("techList");
   techList.innerHTML = "";
@@ -274,6 +294,17 @@ window.addTechRow = function(tech, dest) {
 
 window.saveConfig = async function() {
   const btn = document.getElementById("btnSaveConfig");
+
+  const colonnes = {};
+  const fieldMap = { colSecteur: "secteur", colNumeroRue: "numeroRue", colNomRue: "nomRue", colCodePostal: "codePostal", colVille: "ville", colLocataire: "locataire", colReference: "referenceLogement", colEtage: "etage", colTechnicien: "technicien" };
+  for (const [id, key] of Object.entries(fieldMap)) {
+    const letter = document.getElementById(id).value.trim();
+    const idx = letterToIndex(letter);
+    if (idx === null) { showToast(`Colonne manquante ou invalide : ${id === "colSecteur" ? "Secteur" : id}`); return; }
+    colonnes[key] = idx;
+  }
+  if (!document.getElementById("cfgNomFeuille").value.trim()) { showToast("Nom de la feuille requis"); return; }
+
   btn.disabled = true; btn.textContent = "Enregistrement...";
   try {
     const techniciensMap = {};
@@ -285,17 +316,7 @@ window.saveConfig = async function() {
     const data = {
       nomFeuille: document.getElementById("cfgNomFeuille").value.trim(),
       destinataireDefaut: document.getElementById("cfgDestinataireDefaut").value.trim(),
-      colonnes: {
-        secteur: Number(document.getElementById("colSecteur").value),
-        numeroRue: Number(document.getElementById("colNumeroRue").value),
-        nomRue: Number(document.getElementById("colNomRue").value),
-        codePostal: Number(document.getElementById("colCodePostal").value),
-        ville: Number(document.getElementById("colVille").value),
-        locataire: Number(document.getElementById("colLocataire").value),
-        referenceLogement: Number(document.getElementById("colReference").value),
-        etage: Number(document.getElementById("colEtage").value),
-        technicien: Number(document.getElementById("colTechnicien").value),
-      },
+      colonnes,
       techniciensMap,
       updatedAt: new Date().toISOString(),
       updatedBy: _user.email,
