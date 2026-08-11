@@ -2039,8 +2039,10 @@ exports.pushActis1erPassageKizeo = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { storagePath } = req.body || {};
+    const { storagePath, destinataireKizeoUserId } = req.body || {};
     if (!storagePath) { res.status(400).json({ error: "storagePath requis" }); return; }
+    const recipient = String(destinataireKizeoUserId || "").trim();
+    if (!recipient) { res.status(400).json({ error: "destinataireKizeoUserId requis" }); return; }
 
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
@@ -2050,8 +2052,6 @@ exports.pushActis1erPassageKizeo = functions
     const colonnes = config.colonnes || {};
     const nomFeuille = config.nomFeuille || "";
     const kizeoFormId = config.kizeoFormId || "1148587";
-    const destinataireDefautUserId = (config.destinataireDefautKizeoUserId || "").trim();
-    const techniciensMap = config.techniciensMap || {}; // { nomTechnicienExcel: kizeoUserId }
     if (!nomFeuille) { res.status(400).json({ error: "Nom de feuille non configuré" }); return; }
 
     try {
@@ -2102,11 +2102,6 @@ exports.pushActis1erPassageKizeo = functions
 
       const results = [];
       for (const data of batiments.values()) {
-        const recipient = (techniciensMap[data.technicien] || destinataireDefautUserId || "").trim();
-        if (!recipient) {
-          results.push({ adresse: data.adresse_rue, technicien: data.technicien, success: false, error: "Aucun destinataire Kizeo pour ce technicien" });
-          continue;
-        }
         const fields = {
           secteur: { value: data.secteur },
           technicien: { value: data.technicien },

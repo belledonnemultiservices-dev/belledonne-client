@@ -50,8 +50,6 @@
   .form-input:focus{border-color:var(--green);background:#fff;}
   .section-sep{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin:20px 0 14px;display:flex;align-items:center;gap:10px;}
   .section-sep::after{content:'';flex:1;height:1px;background:var(--border);}
-  .tech-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:8px;align-items:center;}
-  .btn-x{width:34px;height:34px;border:1px solid rgba(231,76,60,0.15);background:rgba(231,76,60,0.06);border-radius:6px;color:var(--red);cursor:pointer;font-size:16px;line-height:1;}
   .btn-mini{height:34px;padding:0 14px;border:1px solid var(--border);background:transparent;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--text-mid);cursor:pointer;}
   .btn-mini:hover{background:var(--bg);}
   .btn-save{height:40px;padding:0 22px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;}
@@ -139,10 +137,6 @@
           <label class="form-label">Nom de la feuille</label>
           <input class="form-input" type="text" id="cfgNomFeuille" placeholder="ex: T4C">
         </div>
-        <div class="form-group">
-          <label class="form-label">Technicien destinataire par défaut</label>
-          <select class="form-input" id="cfgDestinataireDefaut"><option value="">— aucun —</option></select>
-        </div>
       </div>
 
       <div class="section-sep">Colonnes de l'export (lettre Excel, ex: A, B, C... comme dans le tableur)</div>
@@ -162,11 +156,6 @@
         <div class="form-group"><label class="form-label">Technicien</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: P" id="colTechnicien"></div>
       </div>
 
-      <div class="section-sep">Mapping technicien (nom dans l'export ACTIS) → technicien de l'app (optionnel)</div>
-      <div class="card-sub" style="margin-bottom:12px;">Si absent du mapping, le technicien par défaut ci-dessus est utilisé. Seuls les techniciens avec un compte Kizeo lié (fiche Techniciens) apparaissent dans la liste.</div>
-      <div id="techList"></div>
-      <button class="btn-mini" onclick="addTechRow()">+ Ajouter une ligne</button>
-
       <div style="margin-top:20px;">
         <button class="btn-save" id="btnSaveConfig" onclick="saveConfig()">Enregistrer la configuration</button>
       </div>
@@ -174,7 +163,12 @@
 
     <div class="card">
       <div class="card-title">Envoyer le push via Kizeo</div>
-      <div class="card-sub">Uploadez l'export Excel ACTIS : un enregistrement pré-rempli est envoyé par bâtiment, directement sur l'app Kizeo du technicien destinataire.</div>
+      <div class="card-sub">Uploadez l'export Excel ACTIS (une feuille = un technicien) : un enregistrement pré-rempli est envoyé par bâtiment, directement sur l'app Kizeo du technicien choisi ci-dessous.</div>
+
+      <div class="form-group">
+        <label class="form-label">Technicien destinataire</label>
+        <select class="form-input" id="pushDestinataire"><option value="">— choisir —</option></select>
+      </div>
 
       <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
@@ -277,7 +271,6 @@ async function loadConfig() {
   const c = snap.exists() ? snap.data() : {};
   const col = c.colonnes || {};
   document.getElementById("cfgNomFeuille").value = c.nomFeuille || "";
-  document.getElementById("cfgDestinataireDefaut").innerHTML = techOptionsHtml(c.destinataireDefautKizeoUserId || "");
   document.getElementById("colSecteur").value = indexToLetter(col.secteur);
   document.getElementById("colNumeroRue").value = indexToLetter(col.numeroRue);
   document.getElementById("colNomRue").value = indexToLetter(col.nomRue);
@@ -288,24 +281,8 @@ async function loadConfig() {
   document.getElementById("colEtage").value = indexToLetter(col.etage);
   document.getElementById("colTechnicien").value = indexToLetter(col.technicien);
 
-  const techList = document.getElementById("techList");
-  techList.innerHTML = "";
-  const map = c.techniciensMap || {};
-  const entries = Object.entries(map);
-  if (entries.length === 0) addTechRow();
-  else entries.forEach(([tech, dest]) => addTechRow(tech, dest));
+  document.getElementById("pushDestinataire").innerHTML = techOptionsHtml("");
 }
-
-window.addTechRow = function(tech, kizeoUserId) {
-  const row = document.createElement("div");
-  row.className = "tech-row";
-  row.innerHTML = `
-    <input class="form-input tech-name" type="text" placeholder="Nom du technicien (dans l'export ACTIS)" value="${tech ? tech.replace(/"/g, '&quot;') : ''}">
-    <select class="form-input tech-dest">${techOptionsHtml(kizeoUserId || "")}</select>
-    <button class="btn-x" onclick="this.closest('.tech-row').remove()">×</button>
-  `;
-  document.getElementById("techList").appendChild(row);
-};
 
 window.saveConfig = async function() {
   const btn = document.getElementById("btnSaveConfig");
@@ -322,17 +299,9 @@ window.saveConfig = async function() {
 
   btn.disabled = true; btn.textContent = "Enregistrement...";
   try {
-    const techniciensMap = {};
-    document.querySelectorAll("#techList .tech-row").forEach(row => {
-      const tech = row.querySelector(".tech-name").value.trim();
-      const dest = row.querySelector(".tech-dest").value;
-      if (tech && dest) techniciensMap[tech] = dest;
-    });
     const data = {
       nomFeuille: document.getElementById("cfgNomFeuille").value.trim(),
-      destinataireDefautKizeoUserId: document.getElementById("cfgDestinataireDefaut").value,
       colonnes,
-      techniciensMap,
       kizeoFormId: "1148587",
       updatedAt: new Date().toISOString(),
       updatedBy: _user.email,
@@ -358,6 +327,8 @@ window.onFileSelected = function(event) {
 
 window.generatePush = async function() {
   if (!_selectedFile) return;
+  const destinataireKizeoUserId = document.getElementById("pushDestinataire").value;
+  if (!destinataireKizeoUserId) { showToast("Choisis le technicien destinataire"); return; }
   const btn = document.getElementById("btnGenerate");
   const progressBar = document.getElementById("progressBar");
   const progressFill = document.getElementById("progressFill");
@@ -386,7 +357,7 @@ window.generatePush = async function() {
     const resp = await fetch(FN_PUSH_KIZEO, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + idt },
-      body: JSON.stringify({ storagePath }),
+      body: JSON.stringify({ storagePath, destinataireKizeoUserId }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
