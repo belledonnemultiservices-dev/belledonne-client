@@ -454,7 +454,7 @@ async function loadTechniciens() {
 // VUE 1 : CAMPAGNES
 // ═══════════════════════════════════════════════════════════════
 async function loadCampagnes() {
-  const snap = await getDocs(collection(db, "campagnes"));
+  const snap = await getDocs(collection(db, "gestion-campagnes"));
   _campagnes = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   renderCampagnes();
 }
@@ -486,14 +486,14 @@ window.saveCampagne = async function() {
   const kizeoFormId2 = document.getElementById("mForm2").value.trim();
   if (!nom || !client || !kizeoFormId1 || !kizeoFormId2) { showToast("Tous les champs sont requis"); return; }
   const now = new Date().toISOString();
-  const ref = await addDoc(collection(db, "campagnes"), { nom, client, kizeoFormId1, kizeoFormId2, statut: "ouverte", createdAt: now, updatedAt: now });
+  const ref = await addDoc(collection(db, "gestion-campagnes"), { nom, client, kizeoFormId1, kizeoFormId2, statut: "ouverte", createdAt: now, updatedAt: now });
   closeCampagneModal();
   await loadCampagnes();
   openCampagne(ref.id);
 };
 window.deleteCampagne = async function(campagneId) {
   if (!confirm("Supprimer cette campagne ? Les semaines et bâtiments déjà créés resteront en base mais ne seront plus accessibles depuis cette page.")) return;
-  await deleteDoc(doc(db, "campagnes", campagneId));
+  await deleteDoc(doc(db, "gestion-campagnes", campagneId));
   await loadCampagnes();
   showToast("Campagne supprimée");
 };

@@ -52,7 +52,7 @@ service cloud.firestore {
     match /garanties-rapports/{doc} { allow read, write: if isAdmin(); }
     match /garanties-rapports-agreges/{doc} { allow read, write: if isAdmin(); }
     match /garanties-passages/{doc} { allow read: if isAdmin() || ownsClient(resource.data.get('client', '')); allow write: if isAdmin(); }
-    match /campagnes/{doc}                    { allow read, write: if isAdmin(); }
+    match /gestion-campagnes/{doc}            { allow read, write: if isAdmin(); }
     match /campagnes-semaines/{doc}           { allow read, write: if isAdmin(); }
     match /campagnes-batiments/{doc}          { allow read, write: if isAdmin(); }
     match /campagnes-reportings-semaine/{doc}   { allow read, write: if isAdmin(); }

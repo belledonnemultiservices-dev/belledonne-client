@@ -2316,7 +2316,7 @@ exports.pushCampagnePassage1Kizeo = functions
     if (!semaineSnap.exists) { res.status(404).json({ error: "Semaine introuvable" }); return; }
     const semaine = semaineSnap.data();
     const campagneId = semaine.campagneId;
-    const campagneSnap = await db.collection("campagnes").doc(campagneId).get();
+    const campagneSnap = await db.collection("gestion-campagnes").doc(campagneId).get();
     if (!campagneSnap.exists) { res.status(404).json({ error: "Campagne introuvable" }); return; }
     const kizeoFormId = campagneSnap.data().kizeoFormId1;
     if (!kizeoFormId) { res.status(400).json({ error: "ID du formulaire Kizeo 1er passage non configuré pour cette campagne" }); return; }
@@ -2469,7 +2469,7 @@ exports.pushCampagnePassage2Kizeo = functions
     const db = getFirestore(admin.app(), "belledonne-client");
     const semaineSnap = await db.collection("campagnes-semaines").doc(semaineId).get();
     if (!semaineSnap.exists) { res.status(404).json({ error: "Semaine introuvable" }); return; }
-    const campagneSnap = await db.collection("campagnes").doc(semaineSnap.data().campagneId).get();
+    const campagneSnap = await db.collection("gestion-campagnes").doc(semaineSnap.data().campagneId).get();
     if (!campagneSnap.exists) { res.status(404).json({ error: "Campagne introuvable" }); return; }
     const kizeoFormId2 = campagneSnap.data().kizeoFormId2;
     if (!kizeoFormId2) { res.status(400).json({ error: "ID du formulaire Kizeo 2ème passage non configuré pour cette campagne" }); return; }
