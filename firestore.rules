@@ -52,10 +52,12 @@ service cloud.firestore {
     match /garanties-rapports/{doc} { allow read, write: if isAdmin(); }
     match /garanties-rapports-agreges/{doc} { allow read, write: if isAdmin(); }
     match /garanties-passages/{doc} { allow read: if isAdmin() || ownsClient(resource.data.get('client', '')); allow write: if isAdmin(); }
-    match /actis-campagnes/{doc}    { allow read, write: if isAdmin(); }
-    match /actis-batiments/{doc}    { allow read, write: if isAdmin(); }
-    match /actis-reportings-semaine/{doc}  { allow read, write: if isAdmin(); }
-    match /actis-reportings-complet/{doc}  { allow read, write: if isAdmin(); }
+    match /campagnes/{doc}                    { allow read, write: if isAdmin(); }
+    match /campagnes-semaines/{doc}           { allow read, write: if isAdmin(); }
+    match /campagnes-batiments/{doc}          { allow read, write: if isAdmin(); }
+    match /campagnes-reportings-semaine/{doc}   { allow read, write: if isAdmin(); }
+    match /campagnes-reportings-complet/{doc}   { allow read, write: if isAdmin(); }
+    match /campagnes-reportings-consolide/{doc} { allow read, write: if isAdmin(); }
 
     // ── config : lecture par tout utilisateur connecté (couleurs, coordonnées,
     //    templates), écriture admin only ──

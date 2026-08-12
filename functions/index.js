@@ -1348,25 +1348,25 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     }
   }
 
-  // ── Circuit Campagne ACTIS (bâtiment > passage 1 ou 2), distinct des deux
-  // autres circuits. refInterne = actis::campagneId::passage(1|2)::batimentId.
+  // ── Circuit Campagnes (bâtiment > passage 1 ou 2), distinct des deux autres
+  // circuits. refInterne = campagne::semaineId::passage(1|2)::batimentId.
   // Les données de reporting (statut/niveau d'infestation par logement) sont
   // lues directement dans le JSON de la soumission (fields.tableau.value),
   // plus fiable que de re-parser le fichier Excel généré par Kizeo. Ce fichier
   // Excel est quand même téléchargé et archivé pour consultation.
-  if (refInterne.startsWith("actis::")) {
+  if (refInterne.startsWith("campagne::")) {
     const partsA = refInterne.split("::");
-    if (partsA.length !== 4) { console.warn(`Kizeo actis: refInterne invalide (${refInterne}), soumission ${dataId} ignorée`); return; }
-    const [, campagneId, passageStr, batimentId] = partsA;
+    if (partsA.length !== 4) { console.warn(`Kizeo campagne: refInterne invalide (${refInterne}), soumission ${dataId} ignorée`); return; }
+    const [, semaineId, passageStr, batimentId] = partsA;
     const passageNum = parseInt(passageStr, 10);
-    if (passageNum !== 1 && passageNum !== 2) { console.warn(`Kizeo actis: numéro de passage invalide (${refInterne})`); return; }
+    if (passageNum !== 1 && passageNum !== 2) { console.warn(`Kizeo campagne: numéro de passage invalide (${refInterne})`); return; }
     const passageKey = passageNum === 1 ? "passage1" : "passage2";
 
-    const batimentRefA = db.collection("actis-batiments").doc(batimentId);
+    const batimentRefA = db.collection("campagnes-batiments").doc(batimentId);
     const batimentSnapA = await batimentRefA.get();
-    if (!batimentSnapA.exists) { console.warn(`Kizeo actis: bâtiment ${batimentId} introuvable, soumission ${dataId} ignorée`); return; }
+    if (!batimentSnapA.exists) { console.warn(`Kizeo campagne: bâtiment ${batimentId} introuvable, soumission ${dataId} ignorée`); return; }
     const batimentA = batimentSnapA.data();
-    if (batimentA.campagneId !== campagneId) { console.warn(`Kizeo actis: campagneId incohérent pour ${refInterne}`); return; }
+    if (batimentA.semaineId !== semaineId) { console.warn(`Kizeo campagne: semaineId incohérent pour ${refInterne}`); return; }
 
     // Extraction des résultats par logement depuis le champ liste "tableau".
     // statut_1er_passage = choix UNIQUE -> on lit .value (texte simple).
@@ -1392,11 +1392,11 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
 
     // PDF (obligatoire) + Excel Kizeo (archive, non bloquant si absent/échoue).
     const pdfA = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
-    if (pdfA.status !== 200) { console.error(`Kizeo actis: téléchargement PDF échoué (${pdfA.status}) pour ${dataId}`); return; }
+    if (pdfA.status !== 200) { console.error(`Kizeo campagne: téléchargement PDF échoué (${pdfA.status}) pour ${dataId}`); return; }
 
     const bucketA = admin.storage().bucket("belledonne-client.firebasestorage.app");
     const nomBaseA = `${batimentA.adresseRue || "adresse"}_passage_${passageNum}`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
-    const storagePathPdfA = `actis-reception/${campagneId}/${passageNum}/${Date.now()}_${nomBaseA}.pdf`;
+    const storagePathPdfA = `campagnes-reception/${semaineId}/${passageNum}/${Date.now()}_${nomBaseA}.pdf`;
     const tokenPdfA = crypto.randomUUID();
     await bucketA.file(storagePathPdfA).save(pdfA.body, { contentType: "application/pdf", metadata: { metadata: { firebaseStorageDownloadTokens: tokenPdfA } } });
     const fileUrlPdfA = `https://firebasestorage.googleapis.com/v0/b/${bucketA.name}/o/${encodeURIComponent(storagePathPdfA)}?alt=media&token=${tokenPdfA}`;
@@ -1406,12 +1406,12 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
       try {
         const exA = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/exports/${encodeURIComponent(formConf.exportId)}`, null, true);
         if (exA.status === 200) {
-          const storagePathXlsA = `actis-reception/${campagneId}/${passageNum}/${Date.now()}_${nomBaseA}.xlsx`;
+          const storagePathXlsA = `campagnes-reception/${semaineId}/${passageNum}/${Date.now()}_${nomBaseA}.xlsx`;
           const tokenXlsA = crypto.randomUUID();
           await bucketA.file(storagePathXlsA).save(exA.body, { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", metadata: { metadata: { firebaseStorageDownloadTokens: tokenXlsA } } });
           fileUrlExcelA = `https://firebasestorage.googleapis.com/v0/b/${bucketA.name}/o/${encodeURIComponent(storagePathXlsA)}?alt=media&token=${tokenXlsA}`;
         }
-      } catch(e) { console.error(`Kizeo actis: export Excel archive échoué pour ${dataId}:`, e.message); }
+      } catch(e) { console.error(`Kizeo campagne: export Excel archive échoué pour ${dataId}:`, e.message); }
     }
 
     const nowA = new Date().toISOString();
@@ -1427,7 +1427,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
       },
       updatedAt: nowA,
     }, { merge: true });
-    console.log(`Kizeo actis: soumission ${dataId} reçue -> actis-batiments/${batimentId}.${passageKey}`);
+    console.log(`Kizeo campagne: soumission ${dataId} reçue -> campagnes-batiments/${batimentId}.${passageKey}`);
     return true;
   }
 
@@ -1844,13 +1844,13 @@ function fetchBuffer(url) {
   });
 }
 
-// ── CAMPAGNE ACTIS : construction du reporting Excel 3 onglets ────
+// ── CAMPAGNES : construction du reporting Excel 3 onglets ─────────
 // Reprend le format historique (Absentsrefus / Logements Surinfestés /
 // Logements punaises de lit). `rows` = une ligne par logement, avec
 // {adresse, codePostal, ville, secteur, technicien, nom, numero, etage,
 //  statut, niveauInfestation(array)}. Un logement peut apparaître dans
 // plusieurs onglets infestation.
-function buildActisReportWorkbook(ExcelJS, rows) {
+function buildReportWorkbook(ExcelJS, rows) {
   const wb = new ExcelJS.Workbook();
   const header = ["Adresse", "Code postal", "Ville", "Secteur", "Technicien", "Nom", "Numéro logement", "Etage", "Statut", "Niveau infestation"];
   const rowValues = (r) => [r.adresse, r.codePostal, r.ville, r.secteur, r.technicien, r.nom, r.numero, r.etage, r.statut, (r.niveauInfestation || []).join(", ")];
@@ -1870,12 +1870,12 @@ function buildActisReportWorkbook(ExcelJS, rows) {
   return wb;
 }
 
-// ── CAMPAGNE ACTIS : rapports de la semaine (retour 1er passage) ──
-// Pour chaque bâtiment "à traiter" de la campagne : zippe les PDF reçus
+// ── CAMPAGNES : rapports de la semaine (retour 1er passage) ───────
+// Pour chaque bâtiment "à traiter" de la semaine : zippe les PDF reçus
 // (renommés adresse_passage_1) et construit le reporting Excel de la
 // semaine à partir de passage1.resultats (données brutes déjà extraites
 // à la réception, pas de reparsing du fichier Excel Kizeo).
-exports.generateActisRapportsSemaine = functions
+exports.generateCampagneRapportsSemaine = functions
   .region("europe-west1")
   .runWith({ timeoutSeconds: 300 })
   .https.onRequest(async (req, res) => {
@@ -1886,17 +1886,17 @@ exports.generateActisRapportsSemaine = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId } = req.body || {};
-    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+    const { semaineId } = req.body || {};
+    if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
 
     try {
       const { getFirestore } = require("firebase-admin/firestore");
       const db = getFirestore(admin.app(), "belledonne-client");
-      const snap = await db.collection("actis-batiments")
-        .where("campagneId", "==", campagneId)
+      const snap = await db.collection("campagnes-batiments")
+        .where("semaineId", "==", semaineId)
         .where("passage1.statut", "==", "a-traiter")
         .get();
-      if (snap.empty) { res.status(400).json({ error: "Aucun rapport 'à traiter' pour cette campagne" }); return; }
+      if (snap.empty) { res.status(400).json({ error: "Aucun rapport 'à traiter' pour cette semaine" }); return; }
       const batiments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       const JSZip = require("jszip");
@@ -1911,7 +1911,7 @@ exports.generateActisRapportsSemaine = functions
             const buf = await fetchBuffer(p1.fileUrlPdf);
             const nomFichier = `${(b.adresseRue || "adresse")}_passage_1.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
             zip.file(nomFichier, buf);
-          } catch(e) { console.error(`generateActisRapportsSemaine: PDF illisible pour ${b.id}:`, e.message); }
+          } catch(e) { console.error(`generateCampagneRapportsSemaine: PDF illisible pour ${b.id}:`, e.message); }
         }
         (p1.resultats || []).forEach(l => rows.push({
           adresse: b.adresseRue, codePostal: b.codePostal, ville: b.ville, secteur: b.secteur,
@@ -1921,11 +1921,11 @@ exports.generateActisRapportsSemaine = functions
       }
 
       const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
-      const wb = buildActisReportWorkbook(ExcelJS, rows);
+      const wb = buildReportWorkbook(ExcelJS, rows);
       const xlsxBuffer = await wb.xlsx.writeBuffer();
 
       const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-      const basePath = `actis-reportings/${campagneId}`;
+      const basePath = `campagnes-reportings/${semaineId}`;
       const tokenZip = crypto.randomUUID();
       const zipPath = `${basePath}/rapports_1er_passage_${Date.now()}.zip`;
       await bucket.file(zipPath).save(zipBuffer, { contentType: "application/zip", metadata: { metadata: { firebaseStorageDownloadTokens: tokenZip } } });
@@ -1938,28 +1938,28 @@ exports.generateActisRapportsSemaine = functions
 
       const nowIso = new Date().toISOString();
       const batch = db.batch();
-      batiments.forEach(b => batch.update(db.collection("actis-batiments").doc(b.id), { "passage1.statut": "archive", updatedAt: nowIso }));
+      batiments.forEach(b => batch.update(db.collection("campagnes-batiments").doc(b.id), { "passage1.statut": "archive", updatedAt: nowIso }));
       await batch.commit();
 
-      const recapId = `${campagneId}__semaine_${Date.now()}`;
-      await db.collection("actis-reportings-semaine").doc(recapId).set({
-        campagneId, zipUrl, xlsxUrl, nbBatiments: batiments.length, generatedAt: nowIso,
+      const recapId = `${semaineId}__semaine_${Date.now()}`;
+      await db.collection("campagnes-reportings-semaine").doc(recapId).set({
+        semaineId, zipUrl, xlsxUrl, nbBatiments: batiments.length, generatedAt: nowIso,
       });
 
       res.status(200).json({ zipUrl, xlsxUrl, nbBatiments: batiments.length });
     } catch(e) {
-      console.error("generateActisRapportsSemaine:", e);
+      console.error("generateCampagneRapportsSemaine:", e);
       res.status(500).json({ error: e.message });
     }
   });
 
-// ── CAMPAGNE ACTIS : reporting complet (fusion 1er + 2ème passage) ──
-// Pour chaque bâtiment de la campagne, fusionne passage1.resultats et
+// ── CAMPAGNES : reporting complet d'une semaine (fusion 1er + 2ème passage) ──
+// Pour chaque bâtiment de la semaine, fusionne passage1.resultats et
 // passage2.resultats logement par logement (clé nom+numero) :
 // - statut 1er = Présent/Refus/Vacant (traité) -> on garde les données du 1er passage
 // - statut 1er = Absent -> on prend le résultat du 2ème passage s'il existe,
 //   sinon on garde le 1er passage tel quel (rapport 2ème passage manquant).
-function fusionnerLogementsActis(resultats1, resultats2) {
+function fusionnerLogements(resultats1, resultats2) {
   const cle = (l) => `${(l.nom || "").trim().toLowerCase()}|${(l.numero || "").trim()}`;
   const map2 = new Map((resultats2 || []).map(l => [cle(l), l]));
   return (resultats1 || []).map(l1 => {
@@ -1970,7 +1970,7 @@ function fusionnerLogementsActis(resultats1, resultats2) {
   });
 }
 
-exports.generateActisRapportComplet = functions
+exports.generateCampagneRapportComplet = functions
   .region("europe-west1")
   .runWith({ timeoutSeconds: 300 })
   .https.onRequest(async (req, res) => {
@@ -1981,16 +1981,16 @@ exports.generateActisRapportComplet = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId } = req.body || {};
-    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+    const { semaineId } = req.body || {};
+    if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
 
     try {
       const { getFirestore } = require("firebase-admin/firestore");
       const db = getFirestore(admin.app(), "belledonne-client");
-      const snap = await db.collection("actis-batiments").where("campagneId", "==", campagneId).get();
-      if (snap.empty) { res.status(400).json({ error: "Aucun bâtiment pour cette campagne" }); return; }
+      const snap = await db.collection("campagnes-batiments").where("semaineId", "==", semaineId).get();
+      if (snap.empty) { res.status(400).json({ error: "Aucun bâtiment pour cette semaine" }); return; }
       const batiments = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(b => (b.passage1 && b.passage1.resultats && b.passage1.resultats.length));
-      if (!batiments.length) { res.status(400).json({ error: "Aucun rapport 1er passage reçu pour cette campagne" }); return; }
+      if (!batiments.length) { res.status(400).json({ error: "Aucun rapport 1er passage reçu pour cette semaine" }); return; }
 
       const JSZip = require("jszip");
       const ExcelJS = require("exceljs");
@@ -2006,11 +2006,11 @@ exports.generateActisRapportComplet = functions
             const buf = await fetchBuffer(p2.fileUrlPdf);
             const nomFichier = `${(b.adresseRue || "adresse")}_passage_2.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
             zip.file(nomFichier, buf);
-          } catch(e) { console.error(`generateActisRapportComplet: PDF passage 2 illisible pour ${b.id}:`, e.message); }
+          } catch(e) { console.error(`generateCampagneRapportComplet: PDF passage 2 illisible pour ${b.id}:`, e.message); }
         }
         if (p2.statut === "a-traiter") batimentsAvecPassage2.push(b.id);
 
-        const fusion = fusionnerLogementsActis(p1.resultats, p2.resultats);
+        const fusion = fusionnerLogements(p1.resultats, p2.resultats);
         fusion.forEach(l => rows.push({
           adresse: b.adresseRue, codePostal: b.codePostal, ville: b.ville, secteur: b.secteur,
           technicien: (p2.technicienNom || p1.technicienNom), nom: l.nom, numero: l.numero, etage: l.etage,
@@ -2019,11 +2019,11 @@ exports.generateActisRapportComplet = functions
       }
 
       const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
-      const wb = buildActisReportWorkbook(ExcelJS, rows);
+      const wb = buildReportWorkbook(ExcelJS, rows);
       const xlsxBuffer = await wb.xlsx.writeBuffer();
 
       const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-      const basePath = `actis-reportings/${campagneId}`;
+      const basePath = `campagnes-reportings/${semaineId}`;
       const tokenZip = crypto.randomUUID();
       const zipPath = `${basePath}/rapports_2eme_passage_${Date.now()}.zip`;
       await bucket.file(zipPath).save(zipBuffer, { contentType: "application/zip", metadata: { metadata: { firebaseStorageDownloadTokens: tokenZip } } });
@@ -2037,18 +2037,107 @@ exports.generateActisRapportComplet = functions
       const nowIso = new Date().toISOString();
       if (batimentsAvecPassage2.length) {
         const batch = db.batch();
-        batimentsAvecPassage2.forEach(id => batch.update(db.collection("actis-batiments").doc(id), { "passage2.statut": "archive", updatedAt: nowIso }));
+        batimentsAvecPassage2.forEach(id => batch.update(db.collection("campagnes-batiments").doc(id), { "passage2.statut": "archive", updatedAt: nowIso }));
         await batch.commit();
       }
 
-      const recapId = `${campagneId}__complet_${Date.now()}`;
-      await db.collection("actis-reportings-complet").doc(recapId).set({
+      const recapId = `${semaineId}__complet_${Date.now()}`;
+      await db.collection("campagnes-reportings-complet").doc(recapId).set({
+        semaineId, zipUrl, xlsxUrl, nbBatiments: batiments.length, generatedAt: nowIso,
+      });
+
+      res.status(200).json({ zipUrl, xlsxUrl, nbBatiments: batiments.length });
+    } catch(e) {
+      console.error("generateCampagneRapportComplet:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+// ── CAMPAGNES : rapport consolidé de toute la campagne (toutes semaines) ──
+// Agrège tous les bâtiments de la campagne (peu importe la semaine),
+// applique la même fusion 1er/2ème passage par bâtiment, et regroupe tous
+// les PDF dans un zip à 2 sous-dossiers "1er passage"/"2nd passage" (pas
+// de déduplication : les deux passages y figurent quand ils existent).
+exports.generateCampagneRapportConsolide = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId } = req.body || {};
+    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+
+    try {
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const snap = await db.collection("campagnes-batiments").where("campagneId", "==", campagneId).get();
+      if (snap.empty) { res.status(400).json({ error: "Aucun bâtiment pour cette campagne" }); return; }
+      const batiments = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(b => (b.passage1 && b.passage1.resultats && b.passage1.resultats.length));
+      if (!batiments.length) { res.status(400).json({ error: "Aucun rapport reçu pour cette campagne" }); return; }
+
+      const JSZip = require("jszip");
+      const ExcelJS = require("exceljs");
+      const zip = new JSZip();
+      const folder1 = zip.folder("1er passage");
+      const folder2 = zip.folder("2nd passage");
+      const rows = [];
+
+      for (const b of batiments) {
+        const p1 = b.passage1 || {};
+        const p2 = b.passage2 || {};
+        if (p1.fileUrlPdf) {
+          try {
+            const buf = await fetchBuffer(p1.fileUrlPdf);
+            const nomFichier = `${(b.adresseRue || "adresse")}_passage_1.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+            folder1.file(nomFichier, buf);
+          } catch(e) { console.error(`generateCampagneRapportConsolide: PDF passage 1 illisible pour ${b.id}:`, e.message); }
+        }
+        if (p2.fileUrlPdf) {
+          try {
+            const buf = await fetchBuffer(p2.fileUrlPdf);
+            const nomFichier = `${(b.adresseRue || "adresse")}_passage_2.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+            folder2.file(nomFichier, buf);
+          } catch(e) { console.error(`generateCampagneRapportConsolide: PDF passage 2 illisible pour ${b.id}:`, e.message); }
+        }
+
+        const fusion = fusionnerLogements(p1.resultats, p2.resultats);
+        fusion.forEach(l => rows.push({
+          adresse: b.adresseRue, codePostal: b.codePostal, ville: b.ville, secteur: b.secteur,
+          technicien: (p2.technicienNom || p1.technicienNom), nom: l.nom, numero: l.numero, etage: l.etage,
+          statut: l.statut, niveauInfestation: l.niveauInfestation,
+        }));
+      }
+
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+      const wb = buildReportWorkbook(ExcelJS, rows);
+      const xlsxBuffer = await wb.xlsx.writeBuffer();
+
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const basePath = `campagnes-reportings/${campagneId}`;
+      const tokenZip = crypto.randomUUID();
+      const zipPath = `${basePath}/rapports_consolides_${Date.now()}.zip`;
+      await bucket.file(zipPath).save(zipBuffer, { contentType: "application/zip", metadata: { metadata: { firebaseStorageDownloadTokens: tokenZip } } });
+      const zipUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(zipPath)}?alt=media&token=${tokenZip}`;
+
+      const tokenXlsx = crypto.randomUUID();
+      const xlsxPath = `${basePath}/reporting_consolide_${Date.now()}.xlsx`;
+      await bucket.file(xlsxPath).save(Buffer.from(xlsxBuffer), { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", metadata: { metadata: { firebaseStorageDownloadTokens: tokenXlsx } } });
+      const xlsxUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(xlsxPath)}?alt=media&token=${tokenXlsx}`;
+
+      const nowIso = new Date().toISOString();
+      const recapId = `${campagneId}__consolide_${Date.now()}`;
+      await db.collection("campagnes-reportings-consolide").doc(recapId).set({
         campagneId, zipUrl, xlsxUrl, nbBatiments: batiments.length, generatedAt: nowIso,
       });
 
       res.status(200).json({ zipUrl, xlsxUrl, nbBatiments: batiments.length });
     } catch(e) {
-      console.error("generateActisRapportComplet:", e);
+      console.error("generateCampagneRapportConsolide:", e);
       res.status(500).json({ error: e.message });
     }
   });
@@ -2158,10 +2247,8 @@ function fmtDateFR(iso) {
   return d && m && y ? `${d}/${m}/${y}` : iso;
 }
 
-// ── PUSH ACTIS 1ER PASSAGE ─────────────────────────────────────────
-// Porte la logique du script Python `generer_fichier_1er_passage` :
-// regroupe l'export Excel ACTIS par bâtiment et génère un fichier
-// prêt à être réimporté dans Kizeo pour créer les fiches terrain.
+// ── CAMPAGNES : utilitaires de parsing de l'export Excel ───────────
+// Regroupe l'export Excel client par bâtiment (secteur/adresse/logements).
 
 function nettoyerNombre(valeur) {
   if (valeur === null || valeur === undefined || valeur === "") return "";
@@ -2200,127 +2287,13 @@ function cellStr(row, idx) {
   return String(v).trim();
 }
 
-exports.generatePushActis1erPassage = functions
-  .region("europe-west1")
-  .runWith({ timeoutSeconds: 120 })
-  .https.onRequest(async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
-    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
-    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
-
-    const { storagePath } = req.body || {};
-    if (!storagePath) { res.status(400).json({ error: "storagePath requis" }); return; }
-
-    const { getFirestore } = require("firebase-admin/firestore");
-    const db = getFirestore(admin.app(), "belledonne-client");
-    const configSnap = await db.collection("config").doc("kizeo-push-1er-passage").get();
-    if (!configSnap.exists) { res.status(404).json({ error: "Configuration absente : réglez d'abord les colonnes dans la page." }); return; }
-    const config = configSnap.data();
-    const colonnes = config.colonnes || {};
-    const nomFeuille = config.nomFeuille || "";
-    const destinataireDefaut = (config.destinataireDefaut || "").trim();
-    const techniciensMap = config.techniciensMap || {};
-    if (!nomFeuille) { res.status(400).json({ error: "Nom de feuille non configuré" }); return; }
-
-    try {
-      const ExcelJS = require("exceljs");
-      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-      const [buffer] = await bucket.file(storagePath).download();
-
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(buffer);
-      const ws = workbook.getWorksheet(nomFeuille);
-      if (!ws) {
-        const dispo = workbook.worksheets.map(s => s.name).join(", ");
-        res.status(400).json({ error: `Feuille '${nomFeuille}' introuvable. Feuilles disponibles : ${dispo}` });
-        return;
-      }
-
-      const batiments = new Map(); // cle -> { secteur, adresse_rue, code_postal, ville, technicien, logements: [] }
-
-      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-        if (rowNumber === 1) return; // en-tête
-        try {
-          const secteurBrut = cellStr(row, colonnes.secteur);
-          const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
-          const nomRue = cellStr(row, colonnes.nomRue);
-          const codePostal = nettoyerNombre(cellStr(row, colonnes.codePostal));
-          const ville = cellStr(row, colonnes.ville);
-          if (!nomRue) return;
-          const secteur = formaterSecteur(secteurBrut);
-          const adresseRue = `${numeroRue} ${nomRue}`.trim();
-          const cle = `${secteur}|${numeroRue}|${nomRue}|${codePostal}|${ville}`;
-          const nomLocataire = cellStr(row, colonnes.locataire);
-          const reference = cellStr(row, colonnes.referenceLogement);
-          const etage = cellStr(row, colonnes.etage);
-          const technicien = cellStr(row, colonnes.technicien);
-          const numeroCourt = extraire4DerniersChiffres(reference);
-
-          if (!batiments.has(cle)) {
-            batiments.set(cle, { secteur, adresse_rue: adresseRue, code_postal: codePostal, ville, technicien, logements: [] });
-          }
-          batiments.get(cle).logements.push({ nom: nomLocataire, numero: numeroCourt, etage });
-        } catch (e) { /* ligne ignorée, cohérent avec le script Python */ }
-      });
-
-      if (batiments.size === 0) { res.status(400).json({ error: "Aucune donnée trouvée" }); return; }
-
-      const wbOut = new ExcelJS.Workbook();
-      const ws1 = wbOut.addWorksheet("Formulaire principal");
-      ws1.addRow(["PUSH_ID", "Destinataire", "Adresse - Adresse", "Adresse - Codepostal", "Adresse - Ville", "Secteur", "Technicien", "Numéro de passage"]);
-
-      const ws2 = wbOut.addWorksheet("Tableau");
-      ws2.addRow(["PUSH_PARENT_ID", "Nom", "Numéro logement", "Etage"]);
-
-      let pushId = 1;
-      let totalLogements = 0;
-      for (const data of batiments.values()) {
-        const tech = data.technicien;
-        const destinataire = (techniciensMap[tech] || "").trim() || destinataireDefaut;
-        ws1.addRow([pushId, destinataire, data.adresse_rue, data.code_postal, data.ville, data.secteur, tech, "N°1"]);
-        data.logements.forEach(log => {
-          ws2.addRow([pushId, log.nom, log.numero, log.etage]);
-          totalLogements++;
-        });
-        pushId++;
-      }
-
-      const outBuffer = await wbOut.xlsx.writeBuffer();
-
-      const now = new Date();
-      const pad = n => String(n).padStart(2, "0");
-      const horodatage = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}_${pad(now.getHours())}h${pad(now.getMinutes())}`;
-      const nomFeuilleSafe = nomFeuille.replace(/[^a-zA-Z0-9_-]/g, "_");
-      const nomFichier = `FORM_ACTIS_push_1er_passage_${nomFeuilleSafe}_${horodatage}.xlsx`;
-      const outPath = `push-actis-generes/${Date.now()}_${nomFichier}`;
-      const downloadToken = crypto.randomUUID();
-      await bucket.file(outPath).save(Buffer.from(outBuffer), {
-        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        metadata: {
-          contentDisposition: `attachment; filename="${nomFichier}"`,
-          metadata: { firebaseStorageDownloadTokens: downloadToken },
-        },
-      });
-      const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${downloadToken}`;
-
-      res.status(200).json({ fileUrl, nomFichier, nbBatiments: batiments.size, nbLogements: totalLogements });
-    } catch (e) {
-      console.error("generatePushActis1erPassage:", e);
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-// ── PUSH ACTIS 1ER PASSAGE — ENVOI DIRECT VIA L'API KIZEO ──────────
-// Remplace le fichier Excel à importer manuellement : pousse un
-// enregistrement par bâtiment directement sur l'app Kizeo du technicien
-// (recipient_user_id = kizeoUserId déjà lié sur sa fiche technicien).
-// Format du champ liste "tableau" (subform) et "adresse_*" (address)
-// vérifiés empiriquement contre le formulaire Kizeo 1148587 (la doc
+// ── CAMPAGNES : PUSH 1ER PASSAGE — ENVOI DIRECT VIA L'API KIZEO ────
+// Pousse un enregistrement par bâtiment directement sur l'app Kizeo du
+// technicien (recipient_user_id = kizeoUserId déjà lié sur sa fiche
+// technicien). Format du champ liste "tableau" (subform) et "adresse_*"
+// (address) vérifiés empiriquement (la doc
 // officielle Kizeo ne documente pas le format d'écriture des subforms).
-exports.pushActis1erPassageKizeo = functions
+exports.pushCampagnePassage1Kizeo = functions
   .region("europe-west1")
   .runWith({ secrets: [KIZEO_API_TOKEN], timeoutSeconds: 300 })
   .https.onRequest(async (req, res) => {
@@ -2331,22 +2304,26 @@ exports.pushActis1erPassageKizeo = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { storagePath, destinataireKizeoUserId, campagneId } = req.body || {};
+    const { storagePath, destinataireKizeoUserId, semaineId } = req.body || {};
     if (!storagePath) { res.status(400).json({ error: "storagePath requis" }); return; }
     const recipient = String(destinataireKizeoUserId || "").trim();
     if (!recipient) { res.status(400).json({ error: "destinataireKizeoUserId requis" }); return; }
-    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+    if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
 
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
-    const campagneSnap = await db.collection("actis-campagnes").doc(campagneId).get();
+    const semaineSnap = await db.collection("campagnes-semaines").doc(semaineId).get();
+    if (!semaineSnap.exists) { res.status(404).json({ error: "Semaine introuvable" }); return; }
+    const semaine = semaineSnap.data();
+    const campagneId = semaine.campagneId;
+    const campagneSnap = await db.collection("campagnes").doc(campagneId).get();
     if (!campagneSnap.exists) { res.status(404).json({ error: "Campagne introuvable" }); return; }
-    const config = campagneSnap.data().config || {};
+    const kizeoFormId = campagneSnap.data().kizeoFormId1;
+    if (!kizeoFormId) { res.status(400).json({ error: "ID du formulaire Kizeo 1er passage non configuré pour cette campagne" }); return; }
+    const config = semaine.config || {};
     if (!config.nomFeuille) { res.status(400).json({ error: "Configuration absente : réglez d'abord les colonnes dans la carte 1 pour cette semaine." }); return; }
     const colonnes = config.colonnes || {};
     const nomFeuille = config.nomFeuille || "";
-    const kizeoFormId = config.kizeoFormId || "1148587";
-    if (!nomFeuille) { res.status(400).json({ error: "Nom de feuille non configuré" }); return; }
 
     // Nom affiché sur la fiche Kizeo : celui du technicien réellement sélectionné
     // dans l'app (fiche Techniciens), pas le nom brut de la colonne Excel.
@@ -2357,7 +2334,7 @@ exports.pushActis1erPassageKizeo = functions
         const t = tSnap.docs[0].data();
         technicienNom = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
       }
-    } catch(e) { console.error("pushActis1erPassageKizeo: lookup technicien échoué:", e.message); }
+    } catch(e) { console.error("pushCampagnePassage1Kizeo: lookup technicien échoué:", e.message); }
 
     try {
       const ExcelJS = require("exceljs");
@@ -2406,8 +2383,8 @@ exports.pushActis1erPassageKizeo = functions
 
       const results = [];
       for (const data of batiments.values()) {
-        const batimentRef = db.collection("actis-batiments").doc();
-        const refInterne = `actis::${campagneId}::1::${batimentRef.id}`;
+        const batimentRef = db.collection("campagnes-batiments").doc();
+        const refInterne = `campagne::${semaineId}::1::${batimentRef.id}`;
         const fields = {
           ref_interne: { value: refInterne },
           secteur: { value: data.secteur },
@@ -2435,6 +2412,7 @@ exports.pushActis1erPassageKizeo = functions
           const nowIso = new Date().toISOString();
           await batimentRef.set({
             campagneId,
+            semaineId,
             secteur: data.secteur,
             adresseRue: data.adresse_rue,
             codePostal: data.code_postal,
@@ -2458,20 +2436,19 @@ exports.pushActis1erPassageKizeo = functions
 
       const nbEnvoyes = results.filter(r => r.success).length;
       const nbErreurs = results.length - nbEnvoyes;
-      console.log(`pushActis1erPassageKizeo: ${nbEnvoyes} envoyés, ${nbErreurs} erreurs sur ${results.length} bâtiments`);
+      console.log(`pushCampagnePassage1Kizeo: ${nbEnvoyes} envoyés, ${nbErreurs} erreurs sur ${results.length} bâtiments`);
       res.status(200).json({ results, nbEnvoyes, nbErreurs, nbBatiments: batiments.size });
     } catch (e) {
-      console.error("pushActis1erPassageKizeo:", e);
+      console.error("pushCampagnePassage1Kizeo:", e);
       res.status(500).json({ error: e.message });
     }
   });
 
-// ── PUSH ACTIS 2ÈME PASSAGE — ENVOI DIRECT VIA L'API KIZEO ──────────
+// ── PUSH CAMPAGNE 2ÈME PASSAGE — ENVOI DIRECT VIA L'API KIZEO ───────
 // Reprend, pour chaque bâtiment sélectionné, uniquement les logements
 // marqués "Absent" au 1er passage (passage1.resultats), et pousse un
 // nouveau formulaire (form 2ème passage) vers le technicien choisi.
-const ACTIS_KIZEO_FORM_ID_PASSAGE2 = "1165672";
-exports.pushActis2emePassageKizeo = functions
+exports.pushCampagnePassage2Kizeo = functions
   .region("europe-west1")
   .runWith({ secrets: [KIZEO_API_TOKEN], timeoutSeconds: 300 })
   .https.onRequest(async (req, res) => {
@@ -2482,14 +2459,20 @@ exports.pushActis2emePassageKizeo = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId, destinataireKizeoUserId, batimentIds } = req.body || {};
-    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+    const { semaineId, destinataireKizeoUserId, batimentIds } = req.body || {};
+    if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
     const recipient2 = String(destinataireKizeoUserId || "").trim();
     if (!recipient2) { res.status(400).json({ error: "destinataireKizeoUserId requis" }); return; }
     if (!Array.isArray(batimentIds) || !batimentIds.length) { res.status(400).json({ error: "batimentIds requis" }); return; }
 
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
+    const semaineSnap = await db.collection("campagnes-semaines").doc(semaineId).get();
+    if (!semaineSnap.exists) { res.status(404).json({ error: "Semaine introuvable" }); return; }
+    const campagneSnap = await db.collection("campagnes").doc(semaineSnap.data().campagneId).get();
+    if (!campagneSnap.exists) { res.status(404).json({ error: "Campagne introuvable" }); return; }
+    const kizeoFormId2 = campagneSnap.data().kizeoFormId2;
+    if (!kizeoFormId2) { res.status(400).json({ error: "ID du formulaire Kizeo 2ème passage non configuré pour cette campagne" }); return; }
 
     let technicienNom2 = "";
     try {
@@ -2498,7 +2481,7 @@ exports.pushActis2emePassageKizeo = functions
         const t = tSnap.docs[0].data();
         technicienNom2 = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
       }
-    } catch(e) { console.error("pushActis2emePassageKizeo: lookup technicien échoué:", e.message); }
+    } catch(e) { console.error("pushCampagnePassage2Kizeo: lookup technicien échoué:", e.message); }
 
     const now2 = new Date();
     const pad2 = n => String(n).padStart(2, "0");
@@ -2507,16 +2490,16 @@ exports.pushActis2emePassageKizeo = functions
     const results2 = [];
     for (const batimentId of batimentIds) {
       try {
-        const bRef = db.collection("actis-batiments").doc(String(batimentId));
+        const bRef = db.collection("campagnes-batiments").doc(String(batimentId));
         const bSnap = await bRef.get();
         if (!bSnap.exists) { results2.push({ batimentId, success: false, error: "Bâtiment introuvable" }); continue; }
         const b = bSnap.data();
-        if (b.campagneId !== campagneId) { results2.push({ batimentId, success: false, error: "Bâtiment hors campagne" }); continue; }
+        if (b.semaineId !== semaineId) { results2.push({ batimentId, success: false, error: "Bâtiment hors semaine" }); continue; }
         const resultats1 = (b.passage1 && b.passage1.resultats) || [];
         const absents = resultats1.filter(l => l.statut === "Absent").map(l => ({ nom: l.nom, numero: l.numero, etage: l.etage }));
         if (!absents.length) { results2.push({ batimentId, adresse: b.adresseRue, success: false, error: "Aucun absent, rien à repasser" }); continue; }
 
-        const refInterne2 = `actis::${campagneId}::2::${batimentId}`;
+        const refInterne2 = `campagne::${semaineId}::2::${batimentId}`;
         const fields2 = {
           ref_interne: { value: refInterne2 },
           secteur: { value: b.secteur || "" },
@@ -2534,7 +2517,7 @@ exports.pushActis2emePassageKizeo = functions
             })),
           },
         };
-        const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", `/forms/${encodeURIComponent(ACTIS_KIZEO_FORM_ID_PASSAGE2)}/push`, {
+        const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", `/forms/${encodeURIComponent(kizeoFormId2)}/push`, {
           recipient_user_id: Number(recipient2),
           fields: fields2,
         });
@@ -2558,13 +2541,13 @@ exports.pushActis2emePassageKizeo = functions
           results2.push({ batimentId, adresse: b.adresseRue, success: false, error: `Kizeo a répondu ${r.status}` });
         }
       } catch(e) {
-        console.error(`pushActis2emePassageKizeo: échec bâtiment ${batimentId}:`, e.message);
+        console.error(`pushCampagnePassage2Kizeo: échec bâtiment ${batimentId}:`, e.message);
         results2.push({ batimentId, success: false, error: e.message });
       }
     }
 
     const nbEnvoyes2 = results2.filter(r => r.success).length;
     const nbErreurs2 = results2.length - nbEnvoyes2;
-    console.log(`pushActis2emePassageKizeo: ${nbEnvoyes2} envoyés, ${nbErreurs2} erreurs/ignorés sur ${results2.length} bâtiments`);
+    console.log(`pushCampagnePassage2Kizeo: ${nbEnvoyes2} envoyés, ${nbErreurs2} erreurs/ignorés sur ${results2.length} bâtiments`);
     res.status(200).json({ results: results2, nbEnvoyes: nbEnvoyes2, nbErreurs: nbErreurs2 });
   });
