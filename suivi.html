@@ -897,7 +897,13 @@
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title" id="modalTitleT">Nouvelle tâche</div>
-      <button class="modal-close" onclick="closeModalTache()">✕</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button id="btnToggleCalendarT" onclick="toggleCalendarPanelT()" style="display:inline-flex;align-items:center;gap:6px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:6px 12px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+          Agenda
+        </button>
+        <button class="modal-close" onclick="closeModalTache()">✕</button>
+      </div>
     </div>
     <div class="modal-body">
       <div class="form-section">
@@ -918,9 +924,9 @@
             <input class="form-input" id="fTypeTacheAutre" placeholder="Type d'intervention...">
           </div>
           <div class="form-group form-full">
-            <label class="form-label">Client / Lieu concerné <span style="color:#E74C3C">*</span></label>
-            <input class="form-input" id="fClientT" list="fClientTList" placeholder="Nom du client (en contrat) ou du lieu...">
-            <datalist id="fClientTList"></datalist>
+            <label class="form-label">Client en contrat <span class="opt">— optionnel</span></label>
+            <select class="form-select" id="fClientT"><option value="">— Aucun / non lié —</option></select>
+            <div class="form-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Permet de rattacher la tâche à un client existant (notification possible plus tard).</div>
           </div>
           <div class="form-group form-full">
             <label class="form-label">Adresse</label>
@@ -940,6 +946,31 @@
           <button type="button" onclick="addPassageT()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Ajouter</button>
         </div>
         <div id="passagesContainerT" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;"></div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secContactTBody','chevronContactT')">
+          <span>Contact <span class="sec-hint">nom · téléphone · email — optionnel</span></span>
+          <svg id="chevronContactT" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secContactTBody" style="display:none;margin-top:12px;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Nom du contact</label>
+              <input class="form-input" id="fNomContactT">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>Téléphone(s)</span>
+                <button type="button" onclick="addPhoneFieldT()" style="font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:3px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Ajouter</button>
+              </label>
+              <div id="phonesContainerT" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+            <div class="form-group form-full">
+              <label class="form-label">Email</label>
+              <input class="form-input" type="email" id="fEmailT">
+            </div>
+          </div>
+        </div>
       </div>
       <div class="form-section" style="margin-bottom:0;">
         <div class="form-section-title section-toggle" onclick="toggleCollapse('secNotesTBody','chevronNotesT')">
@@ -1156,6 +1187,30 @@ function closeCalendarPanel() {
   const btn = document.getElementById('btnToggleCalendar');
   if (btn) { btn.style.background = '#EEF2FF'; btn.style.color = '#4338CA'; btn.style.borderColor = '#C7D2FE'; }
   const overlay = document.getElementById('modal');
+  overlay.style.justifyContent = 'center';
+  overlay.style.paddingRight = '20px';
+}
+// Même panneau agenda partagé, mais ancré sur la modale Tâches (#modalTache) au lieu de #modal.
+function toggleCalendarPanelT() {
+  if (calendarPanelOpen) { closeCalendarPanelT(); return; }
+  const panel = document.getElementById('calendarPanel');
+  panel.style.display = 'flex';
+  calendarPanelOpen = true;
+  const btn = document.getElementById('btnToggleCalendarT');
+  if (btn) { btn.style.background = '#4338CA'; btn.style.color = '#fff'; btn.style.borderColor = '#4338CA'; }
+  const frame = document.getElementById('calendarFrame');
+  if (!frame.src || frame.src === window.location.href) frame.src = buildCalendarUrl();
+  const overlay = document.getElementById('modalTache');
+  overlay.style.justifyContent = 'flex-start';
+  overlay.style.paddingRight = '52vw';
+}
+function closeCalendarPanelT() {
+  const panel = document.getElementById('calendarPanel');
+  panel.style.display = 'none';
+  calendarPanelOpen = false;
+  const btn = document.getElementById('btnToggleCalendarT');
+  if (btn) { btn.style.background = '#EEF2FF'; btn.style.color = '#4338CA'; btn.style.borderColor = '#C7D2FE'; }
+  const overlay = document.getElementById('modalTache');
   overlay.style.justifyContent = 'center';
   overlay.style.paddingRight = '20px';
 }
@@ -3644,6 +3699,19 @@ function addPhoneFieldP(value='') {
 }
 function removePhoneP(n) { const el=document.getElementById('phoneP_'+n); if(el) el.remove(); }
 
+// ── PHONES TÂCHES ──
+let phoneCountT = 0;
+function addPhoneFieldT(value='') {
+  phoneCountT++;
+  const n = phoneCountT;
+  const container = document.getElementById('phonesContainerT');
+  const div = document.createElement('div');
+  div.id = 'phoneT_'+n; div.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  div.innerHTML = `<input class="form-input" type="tel" id="fPhoneT${n}" value="${value}" placeholder="06 XX XX XX XX" style="flex:1;">${phoneCountT>1?`<button type="button" onclick="removePhoneT(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`:'<div style="width:28px;"></div>'}`;
+  container.appendChild(div);
+}
+function removePhoneT(n) { const el=document.getElementById('phoneT_'+n); if(el) el.remove(); }
+
 // ── PHONES ENTREPRISE ──
 let phoneCountE = 0;
 function addPhoneFieldE(value='') {
@@ -3938,35 +4006,45 @@ window.openModalTache = function(id=null) {
     document.getElementById('fAdresseT').value = item.adresse||'';
     document.getElementById('fObservationsT').value = item.observations||'';
     document.getElementById('fNotesT').value = item.notes||'';
+    document.getElementById('fNomContactT').value = item.nomClient||'';
+    document.getElementById('fEmailT').value = item.emailClient||'';
     setAssignesInContainer('fAssigneMultiT', item.assignes||(item.assigne?[item.assigne]:[]));
+    document.getElementById('phonesContainerT').innerHTML=''; phoneCountT=0;
+    const phones = item.coordonnees?(Array.isArray(item.coordonnees)?item.coordonnees:[item.coordonnees]):[];
+    if(phones.length) phones.forEach(p=>addPhoneFieldT(p)); else addPhoneFieldT();
     (item.passages||[]).filter(Boolean).forEach(p=>addPassageT(p));
     if(item.observations||item.notes){const b=document.getElementById('secNotesTBody');if(b)b.style.display='';const c=document.getElementById('chevronNotesT');if(c)c.style.transform='rotate(0deg)';}
+    if(item.nomClient||item.emailClient||phones.length){const b=document.getElementById('secContactTBody');if(b)b.style.display='';const c=document.getElementById('chevronContactT');if(c)c.style.transform='rotate(0deg)';}
     window._loadReceptionForInterventionT(editIdT).then(() => window.refreshAllRapportZonesT());
+  } else {
+    addPhoneFieldT();
   }
   document.getElementById('modalTache').classList.add('open');
 };
 window.closeModalTache = function() {
   document.getElementById('modalTache').classList.remove('open');
+  closeCalendarPanelT();
   resetFormTache(); editIdT=null;
 };
 function resetFormTache() {
-  ['fClientT','fAdresseT','fObservationsT','fNotesT','fTypeTacheAutre'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['fClientT','fAdresseT','fObservationsT','fNotesT','fTypeTacheAutre','fNomContactT','fEmailT'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('fTypeTache').value = 'devis';
   document.getElementById('fTypeTacheAutreRow').style.display = 'none';
   document.getElementById('passagesContainerT').innerHTML=''; passageCountT=0;
+  document.getElementById('phonesContainerT').innerHTML=''; phoneCountT=0;
   document.getElementById('secNotesTBody').style.display='none';
+  document.getElementById('secContactTBody').style.display='none';
   const c=document.getElementById('chevronNotesT'); if(c) c.style.transform='rotate(-90deg)';
+  const cc=document.getElementById('chevronContactT'); if(cc) cc.style.transform='rotate(-90deg)';
   window._receptionMapT = {};
 }
 window.saveInterventionTache = async function() {
-  const client=(document.getElementById('fClientT')?.value||'').trim();
-  if(!client){alert('Le client / lieu est obligatoire.');return;}
   const typeIntervention = document.getElementById('fTypeTache')?.value||'devis';
   const btn=document.getElementById('btnSaveT');
   btn.disabled=true; btn.textContent='Enregistrement...';
   try {
     const data={
-      client, clientType:'tache',
+      client:(document.getElementById('fClientT')?.value||'').trim(), clientType:'tache',
       typeIntervention,
       typeInterventionAutre: typeIntervention==='autre' ? (document.getElementById('fTypeTacheAutre')?.value||'').trim() : '',
       nature: TYPE_TACHE_LABELS[typeIntervention] || 'Tâche',
@@ -3974,6 +4052,9 @@ window.saveInterventionTache = async function() {
       assignes:getAssignesFromContainer('fAssigneMultiT'),
       assigne:getAssignesFromContainer('fAssigneMultiT')[0]||'',
       passages:getPassagesFromDOMT(), calEventIds:getPassagesFromDOMT().map((p,i)=>getPassageCalMapT(i+1)),
+      nomClient:(document.getElementById('fNomContactT')?.value||'').trim(),
+      coordonnees:Array.from(document.querySelectorAll('#phonesContainerT input')).map(i=>i.value.trim()).filter(Boolean),
+      emailClient:(document.getElementById('fEmailT')?.value||'').trim(),
       observations:(document.getElementById('fObservationsT')?.value||'').trim(),
       notes:(document.getElementById('fNotesT')?.value||'').trim(),
       statut:editIdT?((window.interventions||[]).find(i=>i.id===editIdT)?.statut||'À traiter'):'À traiter',
@@ -4200,9 +4281,9 @@ onAuthStateChanged(auth, async (user) => {
       opt.value = name; opt.textContent = name;
       clientSel.appendChild(opt);
     });
-    // Suggestions clients (en contrat) dans le champ Client/Lieu de la modale Tâches.
-    const clientTList = document.getElementById('fClientTList');
-    if (clientTList) existing.forEach(name => { const o = document.createElement('option'); o.value = name; clientTList.appendChild(o); });
+    // Même liste de clients en contrat, dans le select de la modale Tâches (optionnel).
+    const clientTSel = document.getElementById('fClientT');
+    if (clientTSel) existing.forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; clientTSel.appendChild(o); });
   } catch(e) { console.warn('clients load:', e); }
 
   // Load couleurs statuts
