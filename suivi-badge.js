@@ -115,6 +115,18 @@ function setup() {
             anchorG.parentNode.insertBefore(a, anchorG.nextSibling);
           }
         }
+        // Injecter le lien "Gestion campagnes" juste sous "Reportings campagnes"
+        // (admin only : jamais visible côté client).
+        if (!document.querySelector('a.nav-item[href="gestion-campagnes.html"]')) {
+          const anchorC = document.querySelector('a.nav-item[href="reportings.html"]');
+          if (anchorC && anchorC.parentNode) {
+            const a = document.createElement('a');
+            a.className = 'nav-item';
+            a.href = 'gestion-campagnes.html';
+            a.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 5H4V6h16v3zm0 9H4v-7h16v7z"/></svg><span>Gestion campagnes</span>';
+            anchorC.parentNode.insertBefore(a, anchorC.nextSibling);
+          }
+        }
       }
     } catch (e) { /* en cas d'échec, on ne masque rien */ }
 
