@@ -304,6 +304,7 @@
       <button class="tab-pill active" id="tab_contrat" onclick="switchTab('contrat')">En contrat</button>
       <button class="tab-pill" id="tab_particulier" onclick="switchTab('particulier')">Particuliers</button>
       <button class="tab-pill" id="tab_entreprise" onclick="switchTab('entreprise')">Entreprises</button>
+      <button class="tab-pill" id="tab_tache" onclick="switchTab('tache')">Tâches</button>
     </div>
 
     <!-- FILTERS -->
@@ -420,6 +421,28 @@
         </thead>
         <tbody id="tableBodyEntreprise">
           <tr><td colspan="12"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TABLE TÂCHES -->
+    <div class="table-wrap" id="tableWrap_tache" style="display:none;">
+      <table class="suivi-table" style="min-width:900px;">
+        <thead>
+          <tr>
+            <th style="width:32px;"><input type="checkbox" id="checkAllT" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
+            <th>Type</th>
+            <th>Client / Lieu</th>
+            <th>Date</th>
+            <th style="min-width:200px;">Adresse</th>
+            <th>Assigné</th>
+            <th>Passages</th>
+            <th>Statut</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBodyTache">
+          <tr><td colspan="9"><div class="empty-state"><p>Aucune tâche enregistrée.</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -862,6 +885,81 @@
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModalEntreprise()">Annuler</button>
       <button class="btn-save" id="btnSaveE" onclick="saveInterventionEntreprise()">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+        Enregistrer
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TÂCHES (interventions non facturables) -->
+<div class="modal-overlay" id="modalTache">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitleT">Nouvelle tâche</div>
+      <button class="modal-close" onclick="closeModalTache()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-section-title">Dossier</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Type d'intervention <span style="color:#E74C3C">*</span></label>
+            <select class="form-select" id="fTypeTache" onchange="document.getElementById('fTypeTacheAutreRow').style.display = this.value==='autre' ? '' : 'none';">
+              <option value="devis">Devis</option>
+              <option value="inspection">Inspection / diagnostic</option>
+              <option value="affiches">Pose d'affiches</option>
+              <option value="cles">Récupération de clés</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div class="form-group" id="fTypeTacheAutreRow" style="display:none;">
+            <label class="form-label">Préciser</label>
+            <input class="form-input" id="fTypeTacheAutre" placeholder="Type d'intervention...">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Client / Lieu concerné <span style="color:#E74C3C">*</span></label>
+            <input class="form-input" id="fClientT" placeholder="Nom du client, du lieu...">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Adresse</label>
+            <input class="form-input" id="fAdresseT">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Assigné à</label>
+            <div id="fAssigneMultiT" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);min-height:38px;align-items:center;">
+              <span style="font-size:12px;color:var(--text-muted);font-style:italic;">Chargement...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Dates de passage</span>
+          <button type="button" onclick="addPassageT()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Ajouter</button>
+        </div>
+        <div id="passagesContainerT" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;"></div>
+      </div>
+      <div class="form-section" style="margin-bottom:0;">
+        <div class="form-section-title section-toggle" onclick="toggleCollapse('secNotesTBody','chevronNotesT')">
+          <span>Observations & Notes <span class="sec-hint">contexte · suivi interne</span></span>
+          <svg id="chevronNotesT" class="chevron collapsed" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+        <div id="secNotesTBody" style="display:none;margin-top:12px;">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Observations</label>
+            <textarea class="form-textarea" id="fObservationsT" placeholder="Détails, contexte, contraintes..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes internes</label>
+            <textarea class="form-textarea" id="fNotesT" placeholder="Notes internes, suivi, rappels..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModalTache()">Annuler</button>
+      <button class="btn-save" id="btnSaveT" onclick="saveInterventionTache()">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
         Enregistrer
       </button>
@@ -3052,7 +3150,8 @@ function filterTable() {
   document.getElementById('resultsCount').textContent = filtered.length + ' intervention' + (filtered.length!==1?'s':'');
   if (activeTab === 'contrat') { if(window.renderTable) window.renderTable(filtered); }
   else if (activeTab === 'particulier') { renderTableParticulier(filtered); }
-  else { renderTableEntreprise(filtered); }
+  else if (activeTab === 'entreprise') { renderTableEntreprise(filtered); }
+  else { renderTableTache(filtered); }
 }
 window.filterTable = filterTable;
 
@@ -3076,7 +3175,7 @@ let activeTab = 'contrat';
 
 function switchTab(tab) {
   activeTab = tab;
-  ['contrat','particulier','entreprise'].forEach(t => {
+  ['contrat','particulier','entreprise','tache'].forEach(t => {
     const wrap = document.getElementById('tableWrap_' + t);
     const pill = document.getElementById('tab_' + t);
     if (wrap) wrap.style.display = t === tab ? '' : 'none';
@@ -3090,6 +3189,7 @@ function switchTab(tab) {
 function ouvrirNouvelleIntervention() {
   if (activeTab === 'particulier') openModalParticulier();
   else if (activeTab === 'entreprise') openModalEntreprise();
+  else if (activeTab === 'tache') openModalTache();
   else openModal();
 }
 
@@ -3197,6 +3297,338 @@ function getPassagesFromContainerE() {
   passages.sort((a,b)=>(a.num||0)-(b.num||0));
   return passages;
 }
+
+// ── PASSAGES TÂCHES (avec agenda + rapport Kizeo optionnel, comme le contrat) ──
+let passageCountT = 0;
+let editIdT = null;
+function getPassageTechsFromDOMT(n) {
+  return Array.from(document.querySelectorAll('#fPassageTechChipsT' + n + ' .tech-chip.selected')).map(b=>b.dataset.id);
+}
+function refreshPassageTechsT(n, selectedArr) {
+  const container = document.getElementById('fPassageTechChipsT' + n);
+  if (!container) return;
+  const current = selectedArr !== undefined ? selectedArr : getPassageTechsFromDOMT(n);
+  const assignes = getAssignesFromContainer('fAssigneMultiT');
+  const list = assignes.length ? assignes : (window._techniciens||[]).map(t=>t.nomComplet||t.nom||t.id);
+  container.innerHTML = '';
+  list.forEach(techName => {
+    const t = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    const color = t?.color || '#8FA4B8';
+    const isSelected = current.includes(techName);
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'tech-chip' + (isSelected ? ' selected' : '');
+    btn.textContent = techName; btn.dataset.id = techName; btn.dataset.color = color;
+    if (isSelected) { btn.style.background = color; btn.style.borderColor = color; btn.style.color = isLightColor(color) ? '#0D1B2A' : '#fff'; }
+    btn.onclick = function() {
+      const isNow = !this.classList.contains('selected');
+      this.classList.toggle('selected', isNow);
+      if (isNow) { this.style.background = color; this.style.borderColor = color; this.style.color = isLightColor(color)?'#0D1B2A':'#fff'; }
+      else { this.style.background=''; this.style.borderColor=''; this.style.color=''; }
+      try { renderRapportZoneT(n); } catch(e) {}
+    };
+    container.appendChild(btn);
+  });
+}
+function refreshAllPassageTechsT() {
+  let n = 1;
+  while (document.getElementById('fDateDebutT' + n)) { refreshPassageTechsT(n, getPassageTechsFromDOMT(n)); n++; }
+}
+function getPassageCalMapT(n) {
+  const div = document.getElementById('passageT_' + n);
+  const raw = div?.dataset.calEventId || '';
+  if (!raw) return {};
+  try { const p = JSON.parse(raw); return (typeof p === 'object' && p !== null) ? p : (raw ? {_: raw} : {}); }
+  catch { return raw ? {_: raw} : {}; }
+}
+function getPassagesFromDOMT() {
+  const passages = [];
+  document.querySelectorAll('#passagesContainerT > [id^="passageT_"]').forEach(div => {
+    const n = div.id.replace('passageT_', '');
+    let kizeoPush = null;
+    try { kizeoPush = JSON.parse(div.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }
+    passages.push({
+      num: parseInt(document.getElementById('fPassageNumT' + n)?.value) || null,
+      debut: document.getElementById('fDateDebutT' + n)?.value || '',
+      fin: document.getElementById('fDateFinT' + n)?.value || '',
+      titre: document.getElementById('fTitreT' + n)?.value || '',
+      desc: document.getElementById('fDescT' + n)?.value || '',
+      adresse: document.getElementById('fAdresseCalT' + n)?.value || '',
+      techs: getPassageTechsFromDOMT(n),
+      kizeoPush,
+      statut: div.dataset.statutPassage || '',
+    });
+  });
+  passages.sort((a, b) => (a.num || 0) - (b.num || 0));
+  return passages;
+}
+async function _saveCalEventIdT(n, eventMap) {
+  if (!editIdT) return;
+  const calEventIds = getPassagesFromDOMT().map((p,i) => (i===n-1 ? eventMap : (getPassageCalMapT(i+1))));
+  const div = document.getElementById('passageT_' + n);
+  if (div) div.dataset.calEventId = JSON.stringify(eventMap);
+  await window._updateSuivi(editIdT, { calEventIds, passages: getPassagesFromDOMT() });
+}
+function renderPassageCalButtonsT(n, calEventMap) {
+  const container = document.getElementById('calBtnsT' + n);
+  if (!container) return;
+  const div = document.getElementById('passageT_' + n);
+  const mapObj = (calEventMap && typeof calEventMap === 'object') ? calEventMap : (calEventMap ? {_: calEventMap} : {});
+  if (div) div.dataset.calEventId = JSON.stringify(mapObj);
+  const hasEvents = Object.values(mapObj).some(Boolean);
+  if (hasEvents) {
+    container.innerHTML = `
+      <button type="button" onclick="updatePassageInCalendarT(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:8px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        MàJ agenda
+      </button>
+      <button type="button" onclick="removePassageFromCalendarT(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#FDECEA;color:#E74C3C;border:1px solid #FACACA;padding:8px 10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        Retirer
+      </button>`;
+  } else {
+    container.innerHTML = `
+      <button type="button" onclick="addPassageToCalendarT(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:8px 12px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+        Ajouter dans agenda
+      </button>`;
+  }
+}
+async function addPassageToCalendarT(n) {
+  const techs = getPassageTechsFromDOMT(n);
+  if (!techs.length) { showToast('Sélectionnez au moins un technicien pour ce passage.', true); return; }
+  const debut = document.getElementById('fDateDebutT' + n)?.value || '';
+  if (!debut) { showToast('Ajoutez une date de début pour ce passage.', true); return; }
+  const fin = document.getElementById('fDateFinT' + n)?.value || '';
+  const container = document.getElementById('calBtnsT' + n);
+  const origHTML = container.innerHTML;
+  container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Envoi...</span>';
+  const calMap = {...getPassageCalMapT(n)};
+  let added = 0;
+  for (const techName of techs) {
+    const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    if (!tech?.email) continue;
+    try {
+      const result = await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], customSummary: document.getElementById('fTitreT'+n)?.value||'', customDescription: document.getElementById('fDescT'+n)?.value||'', adresse: document.getElementById('fAdresseCalT'+n)?.value||'', colorId: tech.calendarColorId||null });
+      if (result.success || result.created > 0) { calMap[techName] = result.results?.[0]?.eventId || ''; added++; }
+      else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
+    } catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }
+  }
+  if (added > 0) {
+    renderPassageCalButtonsT(n, calMap);
+    await _saveCalEventIdT(n, calMap);
+    showToast('✅ Passage ajouté à l\'agenda (' + added + ' technicien(s))');
+    if (typeof refreshCalendarFrame === 'function') refreshCalendarFrame(debut);
+  } else { container.innerHTML = origHTML; }
+}
+async function updatePassageInCalendarT(n) {
+  const calMap = getPassageCalMapT(n);
+  const techsWithEvents = Object.entries(calMap).filter(([,id])=>id);
+  if (!techsWithEvents.length) { showToast('Aucun événement agenda lié à ce passage.', true); return; }
+  const debut = document.getElementById('fDateDebutT' + n)?.value || '';
+  const fin = document.getElementById('fDateFinT' + n)?.value || '';
+  const container = document.getElementById('calBtnsT' + n);
+  const origHTML = container.innerHTML;
+  container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Mise à jour...</span>';
+  let updated = 0;
+  for (const [techName, calEventId] of techsWithEvents) {
+    const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    if (!tech?.email) continue;
+    try {
+      const result = await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitreT'+n)?.value||'', customDescription: document.getElementById('fDescT'+n)?.value||'', adresse: document.getElementById('fAdresseCalT'+n)?.value||'', colorId: tech.calendarColorId||null });
+      if (result.success || result.created > 0) updated++;
+      else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
+    } catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }
+  }
+  if (updated > 0) { showToast('✅ Agenda mis à jour'); renderPassageCalButtonsT(n, calMap); if (typeof refreshCalendarFrame === 'function') refreshCalendarFrame(debut); }
+  else container.innerHTML = origHTML;
+}
+async function removePassageFromCalendarT(n) {
+  const calMap = getPassageCalMapT(n);
+  const techsWithEvents = Object.entries(calMap).filter(([,id])=>id);
+  if (!techsWithEvents.length) return;
+  const container = document.getElementById('calBtnsT' + n);
+  container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Suppression...</span>';
+  for (const [techName, calEventId] of techsWithEvents) {
+    const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    if (!tech?.email) continue;
+    try { await _calendarRequest({ technicienEmail: tech.email, operation: 'delete', calEventId }); }
+    catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }
+  }
+  renderPassageCalButtonsT(n, {});
+  await _saveCalEventIdT(n, {});
+  showToast('✅ Événements retirés de l\'agenda');
+  if (typeof refreshCalendarFrame === 'function') refreshCalendarFrame(document.getElementById('fDateDebutT' + n)?.value);
+}
+// Rapport Kizeo optionnel pour une tâche (même contrôle que le contrat, editIdT au lieu de editId).
+window.renderRapportZoneT = function(n) {
+  const zone = document.getElementById('rapportZoneT' + n);
+  if (!zone) return;
+  const rec = (window._receptionMapT || {})[parseInt(document.getElementById('fPassageNumT' + n)?.value) || n];
+  let receptionBlock = '';
+  if (rec && (rec.statut === 'archive' || rec.statut === 'envoye')) {
+    const notifText = rec.statut === 'envoye' && rec.notifiedAt
+      ? `<span style="font-size:11px;color:var(--green-dark);font-weight:600;">✓ Notifié le ${fmtNotifDate(rec.notifiedAt)} au client</span>`
+      : rec.statut === 'envoye' && rec.ajouteEspaceClient
+      ? `<span style="font-size:11px;color:var(--green-dark);font-weight:600;">✓ Ajouté à l'espace client (sans email)</span>`
+      : `<span style="font-size:11px;color:var(--text-muted);">Archivé en interne — pas encore envoyé au client (voir Gestion rapports)</span>`;
+    receptionBlock = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+        <span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport archivé</span>
+        <a href="${rec.fileUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Voir le fichier</a>
+        ${notifText}
+      </div>`;
+  }
+  zone.innerHTML = buildKizeoControlT(n) + receptionBlock;
+};
+function buildKizeoControlT(n) {
+  const forms = window._kizeoForms || [];
+  if (!forms.length) return '';
+  const div0 = document.getElementById('passageT_' + n);
+  const statutPassage = div0?.dataset.statutPassage || '';
+  const wrap = (inner) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
+      <span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport terrain <span class="opt">— optionnel</span></span>${inner}</div>`;
+  if (statutPassage === 'annule') {
+    return wrap(`<span style="font-size:11px;font-weight:700;color:#E74C3C;background:#FDECEA;padding:4px 10px;border-radius:20px;white-space:nowrap;">✕ Passage annulé</span>`);
+  }
+  if (!editIdT) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Enregistrez la tâche pour pouvoir générer un rapport.</span>`);
+  const passageTechs = getPassageTechsFromDOMT(n);
+  const techMatches = passageTechs
+    .map(nom => (window._techniciens || []).find(t => t.nomComplet === nom || t.nom === nom))
+    .filter(t => t && t.kizeoUserId);
+  if (!techMatches.length) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Assignez un technicien ayant un ID Kizeo (fiche Techniciens) sur ce passage.</span>`);
+  let kizeoPush = null;
+  try { kizeoPush = JSON.parse(document.getElementById('passageT_' + n)?.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }
+  const formOpts = forms.map(f => `<option value="${f.id}" ${kizeoPush && kizeoPush.kizeoFormDocId === f.id ? 'selected' : ''}>${(f.nom||'Formulaire').replace(/"/g,'&quot;')}</option>`).join('');
+  const techOpts = techMatches.map(t => `<option value="${t.kizeoUserId}" ${kizeoPush && String(kizeoPush.recipientUserId) === String(t.kizeoUserId) ? 'selected' : ''}>${(t.nomComplet||t.nom).replace(/"/g,'&quot;')}</option>`).join('');
+  const num = parseInt(document.getElementById('fPassageNumT' + n)?.value) || n;
+  const typeLabel = document.getElementById('fTypeTache')?.selectedOptions?.[0]?.textContent || 'Tâche';
+  const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
+  const defLabel = (typeLabel + ' - ' + passageLabel).replace(/"/g,'&quot;');
+  const labelValue = (kizeoPush && kizeoPush.libelle ? kizeoPush.libelle : defLabel).replace(/"/g,'&quot;');
+  const pushBadge = kizeoPush ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);padding:4px 10px;border-radius:20px;white-space:nowrap;" title="${(kizeoPush.formNom||'').replace(/"/g,'&quot;')}">✓ Envoyé le ${fmtNotifDate(kizeoPush.at)} à ${(kizeoPush.technicien||'').replace(/"/g,'&quot;')}</span>` : '';
+  return wrap(`
+      <select id="kzFormT${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:180px;">${formOpts}</select>
+      <select id="kzTechT${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:150px;">${techOpts}</select>
+      <input id="kzLabelT${n}" class="form-input" value="${labelValue}" placeholder="Nom du rapport" title="Nom affiché sur le mobile" style="font-size:12px;height:32px;padding:0 8px;max-width:200px;">
+      <button type="button" onclick="genererRapportKizeoT(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M4 4h16v2H4zm0 14h16v2H4zm7-7h9v2h-9zm0-4h9v2h-9zm0 8h9v2h-9zM4 8l3 3-3 3z"/></svg>
+        ${kizeoPush ? 'Renvoyer le rapport' : 'Générer le rapport'}
+      </button>
+      ${pushBadge}`);
+}
+window.genererRapportKizeoT = async function(n) {
+  const num = parseInt(document.getElementById('fPassageNumT' + n)?.value) || n;
+  const kizeoFormDocId = document.getElementById('kzFormT' + n)?.value;
+  const recipientUserId = document.getElementById('kzTechT' + n)?.value;
+  const libelle = (document.getElementById('kzLabelT' + n)?.value || '').trim();
+  if (!editIdT) { showToast("Enregistre la tâche d'abord.", true); return; }
+  if (!kizeoFormDocId) { showToast('Choisis un formulaire Kizeo.', true); return; }
+  if (!recipientUserId) { showToast('Choisis un technicien.', true); return; }
+  let existingPush = null;
+  try { existingPush = JSON.parse(document.getElementById('passageT_' + n)?.dataset.kizeoPush || 'null'); } catch(e) { existingPush = null; }
+  if (existingPush) {
+    if (!confirm("Renvoyer un nouveau rapport au technicien pour ce passage ?\n\nSupprimer l'ancien rapport non répondu depuis l'interface Kizeo (https://forms.kizeo.com/data/history/).")) return;
+  } else {
+    if (!confirm("Êtes-vous sûr d'avoir bien rempli les champs avant de générer le rapport ?")) return;
+  }
+  const btn = document.querySelector('#rapportZoneT' + n + ' button[onclick^="genererRapportKizeoT"]');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  try {
+    const resp = await fetch("https://europe-west1-belledonne-client.cloudfunctions.net/pushKizeoForm", {
+      method: 'POST',
+      headers: await window._authHeaders(),
+      body: JSON.stringify({ suiviId: editIdT, numPassage: num, kizeoFormDocId, recipientUserId, libelle }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+    const formNom = document.getElementById('kzFormT' + n)?.selectedOptions?.[0]?.textContent || '';
+    const technicien = document.getElementById('kzTechT' + n)?.selectedOptions?.[0]?.textContent || '';
+    const pushInfo = { at: new Date().toISOString(), technicien, formNom, libelle, kizeoFormDocId, recipientUserId };
+    const div = document.getElementById('passageT_' + n);
+    if (div) div.dataset.kizeoPush = JSON.stringify(pushInfo);
+    renderRapportZoneT(n);
+    showToast('✅ Rapport envoyé sur le mobile de ' + (technicien || 'le technicien') + (data.renvois > 0 ? ' (renvoi ' + data.renvois + ')' : ''));
+  } catch(e) {
+    showToast('Erreur Kizeo : ' + e.message, true);
+  } finally {
+    const btn2 = document.querySelector('#rapportZoneT' + n + ' button[onclick^="genererRapportKizeoT"]');
+    if (btn2) { btn2.disabled = false; btn2.style.opacity = '1'; }
+  }
+};
+window._receptionMapT = {};
+window.refreshAllRapportZonesT = function() {
+  document.querySelectorAll('#passagesContainerT > [id^="passageT_"]').forEach(div => { renderRapportZoneT(div.id.replace('passageT_', '')); });
+};
+function addPassageT(value = '', calEventId = '') {
+  passageCountT++;
+  const n = passageCountT;
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null, savedStatut = '';
+  if (value && typeof value === 'object') {
+    debut = value.debut || ''; fin = value.fin || ''; savedTitre = value.titre || ''; savedDesc = value.desc || '';
+    savedAdresse = value.adresse || ''; savedTechs = Array.isArray(value.techs) ? value.techs : (value.tech ? [value.tech] : []);
+    savedNum = value.num || null; savedKizeoPush = value.kizeoPush || null; savedStatut = value.statut || '';
+  } else if (typeof value === 'string') {
+    [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
+  }
+  const existingNums = Array.from(document.querySelectorAll('#passagesContainerT [id^="fPassageNumT"]')).map(el => parseInt(el.value) || 0);
+  const displayNum = savedNum || (existingNums.length ? Math.max(...existingNums) + 1 : 1);
+  const calMap = (calEventId && typeof calEventId === 'object') ? calEventId : (calEventId ? {_: calEventId} : {});
+  const defaultAdresse = (savedAdresse || document.getElementById('fAdresseT')?.value || '').replace(/"/g,'&quot;');
+  const container = document.getElementById('passagesContainerT');
+  const div = document.createElement('div');
+  div.id = 'passageT_' + n;
+  div.dataset.calEventId = JSON.stringify(calMap);
+  div.dataset.kizeoPush = JSON.stringify(savedKizeoPush);
+  div.dataset.statutPassage = savedStatut;
+  div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
+  div.innerHTML = `
+    <div style="display:grid;grid-template-columns:68px 1fr 1fr 28px;gap:8px;align-items:center;">
+      <div style="display:flex;flex-direction:column;gap:2px;align-items:center;">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Passage</div>
+        <input type="number" id="fPassageNumT${n}" value="${displayNum}" min="1" style="width:52px;padding:4px 2px;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:700;text-align:center;background:var(--bg);color:var(--text-mid);font-family:inherit;">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div>
+        <input class="form-input" type="datetime-local" id="fDateDebutT${n}" value="${debut}" style="width:100%;">
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div>
+        <input class="form-input" type="datetime-local" id="fDateFinT${n}" value="${fin}" style="width:100%;">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-top:16px;">
+        <button type="button" onclick="removePassageT(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;">
+      <span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Technicien(s) :</span>
+      <div id="fPassageTechChipsT${n}" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Titre agenda</div>
+          <input class="form-input" id="fTitreT${n}" value="${savedTitre.replace(/"/g,'&quot;')}" style="width:100%;font-size:12px;" placeholder="Titre de l'événement">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Adresse</div>
+          <input class="form-input" id="fAdresseCalT${n}" value="${defaultAdresse}" style="width:100%;font-size:12px;" placeholder="Adresse...">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:flex-end;">
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Description</div>
+          <textarea class="form-input" id="fDescT${n}" rows="2" style="width:100%;font-size:12px;resize:vertical;min-height:52px;" placeholder="Description...">${savedDesc.replace(/</g,'&lt;')}</textarea>
+        </div>
+        <div id="calBtnsT${n}" style="margin-bottom:2px;"></div>
+      </div>
+    </div>
+    <div id="rapportZoneT${n}" style="border-top:1px dashed var(--border);padding-top:8px;margin-top:2px;"></div>`;
+  container.appendChild(div);
+  refreshPassageTechsT(n, savedTechs);
+  renderPassageCalButtonsT(n, calMap);
+  renderRapportZoneT(n);
+}
+function removePassageT(n) { const el=document.getElementById('passageT_'+n); if(el) el.remove(); }
 
 // ── PHONES PARTICULIER ──
 let phoneCountP = 0;
@@ -3486,6 +3918,111 @@ async function saveInterventionEntreprise() {
   } catch(e){console.error(e);alert('Erreur : '+e.message);}
   finally{btn.disabled=false;btn.textContent=editIdE?'Mettre à jour':'Enregistrer';}
 }
+
+// ── MODAL TÂCHES ──
+const TYPE_TACHE_LABELS = { devis: 'Devis', inspection: 'Inspection / diagnostic', affiches: "Pose d'affiches", cles: 'Récupération de clés', autre: 'Autre' };
+window.openModalTache = function(id=null) {
+  editIdT = id;
+  document.getElementById('modalTitleT').textContent = id ? 'Mise à jour de la tâche' : 'Nouvelle tâche';
+  document.getElementById('btnSaveT').textContent = id ? 'Mettre à jour' : 'Enregistrer';
+  resetFormTache();
+  populateTechChipsForContainer('fAssigneMultiT');
+  if (id) {
+    const item = (window.interventions||[]).find(i=>i.id===id);
+    if (!item) return;
+    document.getElementById('fClientT').value = item.client||'';
+    document.getElementById('fTypeTache').value = item.typeIntervention||'devis';
+    document.getElementById('fTypeTacheAutre').value = item.typeInterventionAutre||'';
+    document.getElementById('fTypeTacheAutreRow').style.display = item.typeIntervention==='autre' ? '' : 'none';
+    document.getElementById('fAdresseT').value = item.adresse||'';
+    document.getElementById('fObservationsT').value = item.observations||'';
+    document.getElementById('fNotesT').value = item.notes||'';
+    setAssignesInContainer('fAssigneMultiT', item.assignes||(item.assigne?[item.assigne]:[]));
+    (item.passages||[]).filter(Boolean).forEach(p=>addPassageT(p));
+    if(item.observations||item.notes){const b=document.getElementById('secNotesTBody');if(b)b.style.display='';const c=document.getElementById('chevronNotesT');if(c)c.style.transform='rotate(0deg)';}
+    window._loadReceptionForInterventionT(editIdT).then(() => window.refreshAllRapportZonesT());
+  }
+  document.getElementById('modalTache').classList.add('open');
+};
+window.closeModalTache = function() {
+  document.getElementById('modalTache').classList.remove('open');
+  resetFormTache(); editIdT=null;
+};
+function resetFormTache() {
+  ['fClientT','fAdresseT','fObservationsT','fNotesT','fTypeTacheAutre'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('fTypeTache').value = 'devis';
+  document.getElementById('fTypeTacheAutreRow').style.display = 'none';
+  document.getElementById('passagesContainerT').innerHTML=''; passageCountT=0;
+  document.getElementById('secNotesTBody').style.display='none';
+  const c=document.getElementById('chevronNotesT'); if(c) c.style.transform='rotate(-90deg)';
+  window._receptionMapT = {};
+}
+window.saveInterventionTache = async function() {
+  const client=(document.getElementById('fClientT')?.value||'').trim();
+  if(!client){alert('Le client / lieu est obligatoire.');return;}
+  const typeIntervention = document.getElementById('fTypeTache')?.value||'devis';
+  const btn=document.getElementById('btnSaveT');
+  btn.disabled=true; btn.textContent='Enregistrement...';
+  try {
+    const data={
+      client, clientType:'tache',
+      typeIntervention,
+      typeInterventionAutre: typeIntervention==='autre' ? (document.getElementById('fTypeTacheAutre')?.value||'').trim() : '',
+      nature: TYPE_TACHE_LABELS[typeIntervention] || 'Tâche',
+      adresse:(document.getElementById('fAdresseT')?.value||'').trim(),
+      assignes:getAssignesFromContainer('fAssigneMultiT'),
+      assigne:getAssignesFromContainer('fAssigneMultiT')[0]||'',
+      passages:getPassagesFromDOMT(), calEventIds:getPassagesFromDOMT().map((p,i)=>getPassageCalMapT(i+1)),
+      observations:(document.getElementById('fObservationsT')?.value||'').trim(),
+      notes:(document.getElementById('fNotesT')?.value||'').trim(),
+      statut:editIdT?((window.interventions||[]).find(i=>i.id===editIdT)?.statut||'À traiter'):'À traiter',
+      updatedAt:new Date().toISOString()
+    };
+    if(editIdT){
+      await window._updateSuivi(editIdT,data);
+      const idx=(window.interventions||[]).findIndex(i=>i.id===editIdT);
+      if(idx!==-1) window.interventions[idx]={...window.interventions[idx],...data};
+    } else {
+      data.createdAt=new Date().toISOString();
+      const id=await window._addSuivi(data);
+      (window.interventions=window.interventions||[]).unshift({id,...data});
+      editIdT = id; // pour permettre de générer un rapport Kizeo juste après création sans rouvrir
+    }
+    closeModalTache(); filterTable();
+    showToast(editIdT?'Tâche mise à jour !':'Tâche enregistrée !');
+  } catch(e){console.error(e);alert('Erreur : '+e.message);}
+  finally{btn.disabled=false;btn.textContent=editIdT?'Mettre à jour':'Enregistrer';}
+};
+function renderTableTache(list) {
+  const body = document.getElementById('tableBodyTache');
+  if (!body) return;
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>Aucune tâche enregistrée.</p></div></td></tr>';
+    return;
+  }
+  let html = '';
+  list.forEach(function(item) {
+    const rowClass = item.statut==='Annulé'?'row-annule':item.statut==='Terminé'?'row-termine':item.statut==='À valider'?'row-a-valider':item.statut==='À traiter'?'row-a-traiter':item.statut==='En attente'?'row-en-attente':item.statut==='En cours'?'row-en-cours':'';
+    const isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
+    const _assignes = item.assignes || (item.assigne ? [item.assigne] : []);
+    const typeLabel = item.typeIntervention==='autre' ? (item.typeInterventionAutre||'Autre') : (TYPE_TACHE_LABELS[item.typeIntervention]||'—');
+    html += '<tr id="row-'+item.id+'" class="'+rowClass+'">';
+    html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="'+item.id+'" '+(isChecked?'checked':'')+' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
+    html += '<td style="font-size:13px;font-weight:600;">'+typeLabel+'</td>';
+    html += '<td class="client-cell">'+(item.client||'—')+'</td>';
+    html += '<td style="font-size:12px;white-space:nowrap;color:var(--text-muted);">'+fmtDate(item.dateEmission||(item.createdAt||'').substring(0,10))+'</td>';
+    html += '<td style="min-width:180px;font-size:13px;">'+(item.adresse||'—')+'</td>';
+    html += '<td>'+(_assignes.length?'<div style="display:flex;flex-wrap:wrap;gap:3px;">'+_assignes.map(a=>assigneBadge(a)).join('')+'</div>':'<span style="color:var(--text-muted)">—</span>')+'</td>';
+    html += '<td>'+passagesDropdown(item.passages||[])+'</td>';
+    html += '<td>'+statutSelect(item.id, item.statut)+'</td>';
+    html += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;">';
+    html += '<button class="btn-row-edit" onclick="openModalTache(\''+item.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Compléter</button>';
+    html += '<button class="btn-row-del" onclick="deleteIntervention(\''+item.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
+    html += '</div></td></tr>';
+  });
+  body.innerHTML = html;
+}
+document.getElementById('modalTache')?.addEventListener('click', e => { if(e.target===document.getElementById('modalTache')) closeModalTache(); });
 </script>
 
 <script type="module">
@@ -3565,6 +4102,14 @@ window._loadReceptionForIntervention = async function(suiviId) {
       if (r.numPassage) window._receptionMap[r.numPassage] = r;
     });
   } catch(e) { console.warn('loadReception', e); }
+};
+window._loadReceptionForInterventionT = async function(suiviId) {
+  window._receptionMapT = {};
+  if (!suiviId) return;
+  try {
+    const snap = await getDocs(query(collection(db, 'reception-rapports'), where('suiviId', '==', suiviId)));
+    snap.forEach(d => { const r = d.data(); if (r.numPassage) window._receptionMapT[r.numPassage] = r; });
+  } catch(e) { console.warn('loadReceptionT', e); }
 };
 window._loadRapportsForIntervention = async function(client, bc) {
   window._rapportsMap = {};
