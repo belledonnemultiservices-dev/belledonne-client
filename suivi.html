@@ -919,7 +919,8 @@
           </div>
           <div class="form-group form-full">
             <label class="form-label">Client / Lieu concerné <span style="color:#E74C3C">*</span></label>
-            <input class="form-input" id="fClientT" placeholder="Nom du client, du lieu...">
+            <input class="form-input" id="fClientT" list="fClientTList" placeholder="Nom du client (en contrat) ou du lieu...">
+            <datalist id="fClientTList"></datalist>
           </div>
           <div class="form-group form-full">
             <label class="form-label">Adresse</label>
@@ -4199,6 +4200,9 @@ onAuthStateChanged(auth, async (user) => {
       opt.value = name; opt.textContent = name;
       clientSel.appendChild(opt);
     });
+    // Suggestions clients (en contrat) dans le champ Client/Lieu de la modale Tâches.
+    const clientTList = document.getElementById('fClientTList');
+    if (clientTList) existing.forEach(name => { const o = document.createElement('option'); o.value = name; clientTList.appendChild(o); });
   } catch(e) { console.warn('clients load:', e); }
 
   // Load couleurs statuts
