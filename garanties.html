@@ -337,8 +337,8 @@
           <input class="form-input" type="text" id="lEtage" placeholder="ex: 3">
         </div>
         <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">N° logement</label>
-          <input class="form-input" type="text" id="lNumeroLogement" placeholder="ex: 12">
+          <label class="form-label">Téléphone</label>
+          <input class="form-input" type="tel" id="lTelephone" placeholder="06 XX XX XX XX">
         </div>
       </div>
     </div>
@@ -905,7 +905,7 @@ async function persistSemaine(patch) {
 }
 function getBloc(blocId) { return (_currentSemaine.blocs || []).find(b => b.id === blocId); }
 function autoDescription(bloc) {
-  return (bloc.lignes || []).map(l => `${l.nom} - ${l.adresse}, ${l.codePostal} ${l.ville}`).join("\n");
+  return (bloc.lignes || []).map(l => `${l.nom} - ${l.adresse}, ${l.codePostal} ${l.ville}${l.telephone ? " - Tél: " + l.telephone : ""}`).join("\n");
 }
 
 // ── Rendu des blocs ──
@@ -940,7 +940,7 @@ function renderBlocs() {
           <div class="ligne-num">${i + 1}</div>
           <div class="ligne-info">
             <div class="ligne-nom">${l.nom || "—"} <span style="font-weight:400;color:var(--text-muted);">(${l.client || "—"})</span></div>
-            <div class="ligne-adresse">${l.adresse || ""}${l.etage ? ", ét. " + l.etage : ""}${l.numeroLogement ? ", log. " + l.numeroLogement : ""} — ${l.codePostal || ""} ${l.ville || ""}</div>
+            <div class="ligne-adresse">${l.adresse || ""}${l.etage ? ", ét. " + l.etage : ""}${l.telephone ? ", tél. " + l.telephone : ""} — ${l.codePostal || ""} ${l.ville || ""}</div>
           </div>
           ${l.kizeoPushedAt ? `<span class="ligne-pushed">✓ Kizeo</span>` : ""}
           <div class="ligne-actions">
@@ -1186,7 +1186,7 @@ window.openLigneModal = function(blocId, ligneId) {
   document.getElementById("lCodePostal").value = l ? (l.codePostal || "") : "";
   document.getElementById("lVille").value = l ? (l.ville || "") : "";
   document.getElementById("lEtage").value = l ? (l.etage || "") : "";
-  document.getElementById("lNumeroLogement").value = l ? (l.numeroLogement || "") : "";
+  document.getElementById("lTelephone").value = l ? (l.telephone || "") : "";
   document.getElementById("modalLigne").classList.add("open");
 };
 window.closeLigneModal = function() { document.getElementById("modalLigne").classList.remove("open"); _editLigneBlocId = null; _editLigneId = null; };
@@ -1198,7 +1198,7 @@ window.saveLigne = async function() {
   const codePostal = document.getElementById("lCodePostal").value.trim();
   const ville = document.getElementById("lVille").value.trim();
   const etage = document.getElementById("lEtage").value.trim();
-  const numeroLogement = document.getElementById("lNumeroLogement").value.trim();
+  const telephone = document.getElementById("lTelephone").value.trim();
   if (!client || !nom || !adresse || !codePostal || !ville) { alert("Client, nom, adresse, code postal et ville sont obligatoires."); return; }
 
   const b = getBloc(_editLigneBlocId);
@@ -1207,9 +1207,9 @@ window.saveLigne = async function() {
   const lignes = [...(b.lignes || [])];
   if (_editLigneId) {
     const idx = lignes.findIndex(x => x.id === _editLigneId);
-    if (idx !== -1) lignes[idx] = { ...lignes[idx], client, nom, adresse, codePostal, ville, etage, numeroLogement };
+    if (idx !== -1) lignes[idx] = { ...lignes[idx], client, nom, adresse, codePostal, ville, etage, telephone };
   } else {
-    lignes.push({ id: uid(), client, nom, adresse, codePostal, ville, etage, numeroLogement, kizeoPushedAt: null });
+    lignes.push({ id: uid(), client, nom, adresse, codePostal, ville, etage, telephone, kizeoPushedAt: null });
   }
   b.lignes = lignes;
   bumpBoth(b);

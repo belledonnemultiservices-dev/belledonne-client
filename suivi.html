@@ -1266,10 +1266,8 @@ window.openModal = function openModal(id = null) {
     const calEventIds = item.calEventIds || [];
     (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach((d, i) => addPassage(d, calEventIds[i] || ''));
     // Charger les rapports déjà déposés + les rapports Kizeo archivés en interne, puis rafraîchir les zones
-    if (item.client && item.bc) {
-      window._loadRapportsForIntervention(item.client, item.bc).then(() => refreshAllRapportZones());
-    }
     if (editId) {
+      window._loadRapportsForIntervention(editId).then(() => refreshAllRapportZones());
       window._loadReceptionForIntervention(editId).then(() => refreshAllRapportZones());
     }
     document.getElementById('fNotes').value = item.notes || '';
@@ -1682,7 +1680,6 @@ window.renderRapportZone = function(n) {
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
   const kizeoCtrl = buildKizeoControl(n);
   // Rapport reçu de Kizeo et archivé en interne (pas forcément encore envoyé au client).
-  // Dépôt manuel retiré : le flux Kizeo (Rapport terrain) + Gestion rapports couvre tout le cycle.
   let receptionBlock = '';
   const rec = (window._receptionMap || {})[num];
   if (rec && (rec.statut === 'archive' || rec.statut === 'envoye')) {
@@ -1698,8 +1695,41 @@ window.renderRapportZone = function(n) {
         ${notifText}
       </div>`;
   }
-  zone.innerHTML = kizeoCtrl + receptionBlock;
+  const manualBlock = buildManualRapportBlock('', n, num, editId);
+  zone.innerHTML = kizeoCtrl + receptionBlock + manualBlock;
 };
+// Bloc "Ajouter un rapport manuellement" — commun au modal Contrat (prefix '') et Tâches (prefix 'T').
+function buildManualRapportBlock(prefix, n, num, currentEditId) {
+  const rapportsMap = prefix === 'T' ? (window._rapportsMapT || {}) : (window._rapportsMap || {});
+  const pendingMap = prefix === 'T' ? (window._pendingRapportMapT || {}) : (window._pendingRapportMap || {});
+  const published = rapportsMap[num];
+  const pending = pendingMap[num];
+  const label = `<span style="font-size:10px;color:#7C3AED;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;font-weight:700;">Rapport manuel</span>`;
+  const row = (inner) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">${label}${inner}</div>`;
+  if (published) {
+    const notifText = published.notifs
+      ? `<span style="font-size:11px;color:var(--green-dark);font-weight:600;">✓ Notifié le ${fmtNotifDate(published.lastNotif)} au client</span>`
+      : `<span style="font-size:11px;color:var(--green-dark);font-weight:600;">✓ Dans l'espace client</span>`;
+    return row(`
+      <a href="${published.pdfUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Voir le fichier</a>
+      ${notifText}
+      <button type="button" onclick="openNotifRapport${prefix}(${n})" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Notifier</button>
+      <button type="button" onclick="deleteRapport${prefix}(${n})" style="background:#FDECEA;border:1px solid #F5C6C0;color:#E74C3C;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Supprimer</button>
+    `);
+  }
+  if (pending) {
+    return row(`
+      <span style="font-size:11px;color:var(--text-muted);">Fichier ajouté, pas encore diffusé</span>
+      <button type="button" onclick="openNotifRapport${prefix}(${n})" style="background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Notifier</button>
+      <button type="button" onclick="cancelPendingRapport${prefix}(${n})" style="background:var(--bg);border:1px solid var(--border);color:var(--text-muted);padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Annuler</button>
+    `);
+  }
+  if (!currentEditId) return row(`<span style="font-size:11px;color:var(--text-muted);">Enregistrez l'intervention pour pouvoir ajouter un rapport.</span>`);
+  return row(`
+    <button type="button" onclick="triggerRapportUpload${prefix}(${n})" style="background:var(--bg);border:1px dashed var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ Ajouter un rapport manuellement</button>
+    <input type="file" id="rapportFile${prefix}${n}" style="display:none;" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" onchange="onRapportFile${prefix}(${n})">
+  `);
+}
 // Contrôle "Générer le rapport Kizeo" pour un passage donné.
 function buildKizeoControl(n) {
   const forms = window._kizeoForms || [];
@@ -1784,18 +1814,15 @@ window.genererRapportKizeo = async function(n) {
   }
 };
 window.triggerRapportUpload = function(n) {
-  const client = document.getElementById('fClient')?.value;
-  const bc = document.getElementById('fBC')?.value?.trim();
-  if (!client) { showToast('Sélectionne un client avant de déposer un rapport.', true); return; }
-  if (!bc) { showToast('Renseigne le N° de BC avant de déposer un rapport.', true); return; }
+  if (!editId) { showToast("Enregistre l'intervention d'abord.", true); return; }
   document.getElementById('rapportFile' + n)?.click();
 };
 window.onRapportFile = async function(n) {
   const input = document.getElementById('rapportFile' + n);
   const file = input?.files?.[0];
   if (!file) return;
-  const client = document.getElementById('fClient')?.value;
-  const bc = document.getElementById('fBC')?.value?.trim();
+  const client = document.getElementById('fClient')?.value || '';
+  const bc = (document.getElementById('fBC')?.value || document.getElementById('fPL')?.value || '').trim();
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
   const debut = document.getElementById('fDateDebut' + n)?.value || '';
   const date = debut ? debut.split('T')[0] : (document.getElementById('fDateEmission')?.value || new Date().toISOString().split('T')[0]);
@@ -1804,21 +1831,23 @@ window.onRapportFile = async function(n) {
   const zone = document.getElementById('rapportZone' + n);
   if (zone) zone.style.opacity = '0.5';
   try {
-    const pdfUrl = await window._uploadRapport(file, client);
+    const pdfUrl = await window._uploadRapport(file, client || 'divers');
     const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
-    const data = { bc, site, client, passage: passageLabel, nuisible, date, pdfUrl };
-    const existing = window._rapportsMap[num];
-    const id = await window._saveRapportDoc(existing && existing.id ? existing.id : null, data);
-    window._rapportsMap[num] = { ...(existing || {}), id, ...data };
-    showToast('Rapport enregistré ✅');
+    window._pendingRapportMap[num] = { suiviId: editId, numPassage: num, bc, site, client, passage: passageLabel, nuisible, date, pdfUrl };
+    showToast('Fichier ajouté — clique sur Notifier pour le diffuser');
   } catch (e) { showToast('Erreur upload rapport : ' + e.message, true); }
   finally { if (zone) zone.style.opacity = '1'; if (input) input.value = ''; renderRapportZone(n); }
+};
+window.cancelPendingRapport = function(n) {
+  const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
+  delete window._pendingRapportMap[num];
+  renderRapportZone(n);
 };
 window.deleteRapport = async function(n) {
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
   const r = window._rapportsMap[num];
   if (!r || !r.id) return;
-  if (!confirm('Supprimer le rapport de ce passage ?')) return;
+  if (!confirm('Supprimer ce rapport et le retirer de l\'espace client ?')) return;
   try {
     await window._deleteRapportDoc(r.id, r.pdfUrl);
     delete window._rapportsMap[num];
@@ -1826,24 +1855,24 @@ window.deleteRapport = async function(n) {
   } catch (e) { showToast('Erreur : ' + e.message, true); }
   renderRapportZone(n);
 };
-// ── NOTIFICATION D'UN RAPPORT (email + PDF joint) ──
+// ── NOTIFICATION D'UN RAPPORT MANUEL (Email seul / Espace client seul / les deux) ──
 window._notifRapportNum = null;
 window.openNotifRapport = async function(n) {
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
-  const r = window._rapportsMap[num];
+  const r = window._rapportsMap[num] || window._pendingRapportMap[num];
   if (!r || !r.pdfUrl) { showToast('Aucun rapport à notifier sur ce passage.', true); return; }
   const client = document.getElementById('fClient')?.value;
-  if (!client) { showToast('Client introuvable.', true); return; }
   window._notifRapportNum = num;
   window._notifRapportClient = client;
   const overlay = document.getElementById('modalNotifRapport');
   const listEl = document.getElementById('nrContacts');
   listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement des contacts...</div>';
-  // Réinitialise le formulaire "nouveau contact"
   const ncForm = document.getElementById('nrNewContactForm'); if (ncForm) ncForm.style.display = 'none';
   ['nrNewPrenom', 'nrNewNom', 'nrNewEmail', 'nrNewPoste', 'nrNewTel'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   overlay.classList.add('open');
-  // Template + placeholders
+  const espaceBtn = document.getElementById('nrBtnEspace'); const bothBtn = document.getElementById('nrBtnBoth');
+  if (espaceBtn) espaceBtn.style.display = client ? '' : 'none';
+  if (bothBtn) bothBtn.style.display = client ? '' : 'none';
   const tpl = await window._loadRapportTemplate();
   const fill = s => (s || '')
     .replace(/{{bc}}/g, r.bc || '-').replace(/{{site}}/g, r.site || '-')
@@ -1851,13 +1880,12 @@ window.openNotifRapport = async function(n) {
     .replace(/{{passage}}/g, r.passage || '-').replace(/{{lien}}/g, 'https://clients-belledonne-multiservices.com');
   document.getElementById('nrSubject').value = fill(tpl.subject || 'Rapport disponible - BC {{bc}}');
   document.getElementById('nrBody').value = fill(tpl.body || 'Bonjour,\nLe rapport d\'intervention (BC {{bc}} — {{passage}}) est disponible.\nConsultez-le ici : {{lien}}\nCordialement,\nBelledonne Multiservices');
-  // Contacts
+  if (!client) { listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 2px;">Aucun client lié — sélectionne des destinataires manuellement ci-dessous.</div>'; return; }
   try {
     const contacts = await window._loadRapportContacts(client);
     if (!contacts.length) {
       listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 2px;">Aucun contact enregistré pour ce client. Ajoute-en un ci-dessous.</div>';
     } else {
-      // Cases DÉCOCHÉES par défaut : tu coches toi-même les destinataires
       listEl.innerHTML = contacts.map(c => _nrContactRow(c.email, (c.prenom || '') + ' ' + (c.nom || ''), c.role, false)).join('');
     }
   } catch (e) { listEl.innerHTML = '<div style="color:#E74C3C;padding:12px;">Erreur chargement contacts</div>'; }
@@ -1887,12 +1915,10 @@ window.addNrContact = async function() {
   const btn = document.getElementById('nrAddContactBtn');
   btn.disabled = true; btn.textContent = 'Ajout...';
   try {
-    await window._addContact({ prenom, nom, email, role: poste, telephone: tel, client });
-    // Retire le message "aucun contact" éventuel et ajoute la ligne cochée
+    if (client) await window._addContact({ prenom, nom, email, role: poste, telephone: tel, client });
     const listEl = document.getElementById('nrContacts');
     if (listEl.querySelector('label') === null) listEl.innerHTML = '';
     listEl.insertAdjacentHTML('beforeend', _nrContactRow(email, (prenom + ' ' + nom).trim(), poste, true));
-    // Reset + masque le formulaire
     ['nrNewPrenom', 'nrNewNom', 'nrNewEmail', 'nrNewPoste', 'nrNewTel'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('nrNewContactForm').style.display = 'none';
     showToast('Contact ajouté ✅');
@@ -1903,42 +1929,64 @@ window.closeNotifRapport = function() {
   document.getElementById('modalNotifRapport').classList.remove('open');
   window._notifRapportNum = null;
 };
-window.sendNotifRapport = async function() {
+// mode: 'espace' | 'email' | 'both'
+window.sendNotifRapport = async function(mode) {
   const num = window._notifRapportNum;
-  const r = window._rapportsMap[num];
+  const r = window._rapportsMap[num] || window._pendingRapportMap[num];
   if (!r) return;
+  const wantsEmail = mode === 'email' || mode === 'both';
+  const wantsEspace = mode === 'espace' || mode === 'both';
   const subject = document.getElementById('nrSubject').value.trim();
   const body = document.getElementById('nrBody').value.trim();
-  if (!subject || !body) { showToast('Objet et message requis.', true); return; }
-  const recipients = Array.from(document.querySelectorAll('#nrContacts input[type=checkbox]:checked')).map(c => c.value).filter(Boolean);
-  if (!recipients.length) { showToast('Sélectionne au moins un destinataire.', true); return; }
-  // Nom de fichier avec la bonne extension
-  let ext = 'pdf';
-  try { const m = decodeURIComponent(r.pdfUrl).match(/\.(pdf|xlsx|xls|docx?)(\?|$)/i); if (m) ext = m[1].toLowerCase(); } catch (e) {}
-  const filename = 'rapport_' + String(r.bc || 'fichier').replace(/[^a-zA-Z0-9]/g, '_') + '.' + ext;
-  const attachments = r.pdfUrl ? [{ url: r.pdfUrl, filename }] : [];
-  const btn = document.getElementById('nrBtnSend');
-  btn.disabled = true; btn.textContent = 'Envoi...';
+  const recipients = wantsEmail ? Array.from(document.querySelectorAll('#nrContacts input[type=checkbox]:checked')).map(c => c.value).filter(Boolean) : [];
+  if (wantsEmail && (!subject || !body)) { showToast('Objet et message requis.', true); return; }
+  if (wantsEmail && !recipients.length) { showToast('Sélectionne au moins un destinataire.', true); return; }
+  const btnIds = { email: 'nrBtnEmail', espace: 'nrBtnEspace', both: 'nrBtnBoth' };
+  const btn = document.getElementById(btnIds[mode]);
+  ['nrBtnEspace', 'nrBtnEmail', 'nrBtnBoth'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = true; });
+  const btnOrig = btn ? btn.textContent : '';
+  if (btn) btn.textContent = 'Envoi...';
   let sent = 0;
-  for (const to of recipients) {
-    try {
-      const resp = await fetch(window.FUNCTION_URL, { method: 'POST', headers: await window._authHeaders(), body: JSON.stringify({ to, subject, body, attachments }) });
-      if (resp.ok) sent++;
-    } catch (e) { /* compté comme échec */ }
+  if (wantsEmail) {
+    let ext = 'pdf';
+    try { const m = decodeURIComponent(r.pdfUrl).match(/\.(pdf|xlsx|xls|docx?)(\?|$)/i); if (m) ext = m[1].toLowerCase(); } catch (e) {}
+    const filename = 'rapport_' + String(r.bc || 'fichier').replace(/[^a-zA-Z0-9]/g, '_') + '.' + ext;
+    const attachments = r.pdfUrl ? [{ url: r.pdfUrl, filename }] : [];
+    for (const to of recipients) {
+      try {
+        const resp = await fetch(window.FUNCTION_URL, { method: 'POST', headers: await window._authHeaders(), body: JSON.stringify({ to, subject, body, attachments }) });
+        if (resp.ok) sent++;
+      } catch (e) { /* compté comme échec */ }
+    }
   }
-  btn.disabled = false; btn.textContent = 'Envoyer';
-  if (sent > 0) {
-    const newCount = (r.notifs || 0) + 1;
-    const entry = { ts: new Date().toISOString(), to: recipients };
-    try { await window._recordRapportNotif(r.id, newCount, entry); } catch (e) {}
-    r.notifs = newCount;
-    r.lastNotif = entry.ts;
-    r.notifHistory = [...(r.notifHistory || []), entry];
-    showToast('Email envoyé à ' + sent + ' destinataire' + (sent > 1 ? 's' : '') + ' ✅');
+  const emailOk = !wantsEmail || sent > 0;
+  if (!emailOk) {
+    showToast('Échec de l\'envoi. Réessaie.', true);
+    ['nrBtnEspace', 'nrBtnEmail', 'nrBtnBoth'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
+    if (btn) btn.textContent = btnOrig;
+    return;
+  }
+  try {
+    let id = r.id || null;
+    if (wantsEspace) {
+      id = await window._saveRapportDoc(id, { suiviId: r.suiviId, numPassage: r.numPassage, bc: r.bc, site: r.site, client: r.client, passage: r.passage, nuisible: r.nuisible, date: r.date, pdfUrl: r.pdfUrl });
+      window._rapportsMap[num] = { ...r, id };
+      delete window._pendingRapportMap[num];
+    }
+    if (wantsEmail && id) {
+      const newCount = (r.notifs || 0) + 1;
+      const entry = { ts: new Date().toISOString(), to: recipients };
+      try { await window._recordRapportNotif(id, newCount, entry); } catch (e) {}
+      window._rapportsMap[num] = { ...(window._rapportsMap[num] || r), id, notifs: newCount, lastNotif: entry.ts };
+    }
+    showToast((wantsEmail ? 'Email envoyé à ' + sent + ' destinataire' + (sent > 1 ? 's' : '') : 'Ajouté à l\'espace client') + (wantsEspace && wantsEmail ? ', ajouté à l\'espace client.' : '.') + ' ✅');
     closeNotifRapport();
     renderRapportZoneByNum(num);
-  } else {
-    showToast('Échec de l\'envoi. Réessaie.', true);
+  } catch (e) {
+    showToast('Envoi fait mais erreur d\'enregistrement : ' + e.message, true);
+  } finally {
+    ['nrBtnEspace', 'nrBtnEmail', 'nrBtnBoth'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
+    if (btn) btn.textContent = btnOrig;
   }
 };
 // Re-rend la zone rapport à partir du numéro de passage (retrouve le n DOM)
@@ -2022,6 +2070,7 @@ function resetForm() {
   document.getElementById('passagesContainer').innerHTML = '';
   passageCount = 0;
   window._rapportsMap = {};
+  window._pendingRapportMap = {};
   window._existingPlUrl = null; window._existingBcUrl = null; window._existingDevisUrl = null;
   ['secAdminBody','secContactBody','secNotesBody'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
   ['chevronAdmin','chevronContact','chevronNotes'].forEach(id => { const el=document.getElementById(id); if(el) el.style.transform='rotate(-90deg)'; });
@@ -2088,9 +2137,7 @@ async function saveIntervention() {
     window.interventions = interventions;
     } else {
       data.createdAt = new Date().toISOString();
-      const id = await window._addSuivi(data);
-      interventions.unshift({id, ...data});
-    window.interventions = interventions;
+      await window._addSuivi(data);
     }
 
     closeModal();
@@ -3534,7 +3581,147 @@ window.renderRapportZoneT = function(n) {
         ${notifText}
       </div>`;
   }
-  zone.innerHTML = buildKizeoControlT(n) + receptionBlock;
+  const manualBlock = buildManualRapportBlock('T', n, parseInt(document.getElementById('fPassageNumT' + n)?.value) || n, editIdT);
+  zone.innerHTML = buildKizeoControlT(n) + receptionBlock + manualBlock;
+};
+// ── Rapport manuel (Tâches) — upload + notification ──
+window.triggerRapportUploadT = function(n) {
+  if (!editIdT) { showToast("Enregistre la tâche d'abord.", true); return; }
+  document.getElementById('rapportFileT' + n)?.click();
+};
+window.onRapportFileT = async function(n) {
+  const input = document.getElementById('rapportFileT' + n);
+  const file = input?.files?.[0];
+  if (!file) return;
+  const client = document.getElementById('fClientT')?.value || '';
+  const num = parseInt(document.getElementById('fPassageNumT' + n)?.value) || n;
+  const debut = document.getElementById('fDateDebutT' + n)?.value || '';
+  const date = debut ? debut.split('T')[0] : new Date().toISOString().split('T')[0];
+  const site = document.getElementById('fAdresseT')?.value?.trim() || '';
+  const typeLabel = document.getElementById('fTypeTache')?.selectedOptions?.[0]?.textContent || 'Tâche';
+  const zone = document.getElementById('rapportZoneT' + n);
+  if (zone) zone.style.opacity = '0.5';
+  try {
+    const pdfUrl = await window._uploadRapport(file, client || 'divers');
+    const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
+    window._pendingRapportMapT[num] = { suiviId: editIdT, numPassage: num, bc: '', site, client, passage: passageLabel, nuisible: typeLabel, date, pdfUrl };
+    showToast('Fichier ajouté — clique sur Notifier pour le diffuser');
+  } catch (e) { showToast('Erreur upload rapport : ' + e.message, true); }
+  finally { if (zone) zone.style.opacity = '1'; if (input) input.value = ''; renderRapportZoneT(n); }
+};
+window.cancelPendingRapportT = function(n) {
+  const num = parseInt(document.getElementById('fPassageNumT' + n)?.value) || n;
+  delete window._pendingRapportMapT[num];
+  renderRapportZoneT(n);
+};
+window.deleteRapportT = async function(n) {
+  const num = parseInt(document.getElementById('fPassageNumT' + n)?.value) || n;
+  const r = window._rapportsMapT[num];
+  if (!r || !r.id) return;
+  if (!confirm('Supprimer ce rapport et le retirer de l\'espace client ?')) return;
+  try {
+    await window._deleteRapportDoc(r.id, r.pdfUrl);
+    delete window._rapportsMapT[num];
+    showToast('Rapport supprimé');
+  } catch (e) { showToast('Erreur : ' + e.message, true); }
+  renderRapportZoneT(n);
+};
+window._notifRapportNumT = null;
+window.openNotifRapportT = async function(n) {
+  const num = parseInt(document.getElementById('fPassageNumT' + n)?.value) || n;
+  const r = window._rapportsMapT[num] || window._pendingRapportMapT[num];
+  if (!r || !r.pdfUrl) { showToast('Aucun rapport à notifier sur ce passage.', true); return; }
+  const client = document.getElementById('fClientT')?.value || '';
+  window._notifRapportNumT = num;
+  window._notifRapportClientT = client;
+  const overlay = document.getElementById('modalNotifRapportT');
+  const listEl = document.getElementById('nrContactsT');
+  overlay.classList.add('open');
+  const espaceBtn = document.getElementById('nrBtnEspaceT'); const bothBtn = document.getElementById('nrBtnBothT');
+  if (espaceBtn) espaceBtn.style.display = client ? '' : 'none';
+  if (bothBtn) bothBtn.style.display = client ? '' : 'none';
+  document.getElementById('nrSubjectT').value = 'Rapport disponible';
+  document.getElementById('nrBodyT').value = 'Bonjour,\nLe rapport est disponible en pièce jointe.\nCordialement,\nBelledonne Multiservices';
+  if (client) {
+    listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement des contacts...</div>';
+    try {
+      const contacts = await window._loadRapportContacts(client);
+      listEl.innerHTML = contacts.length
+        ? contacts.map(c => _nrContactRow(c.email, (c.prenom || '') + ' ' + (c.nom || ''), c.role, false)).join('')
+        : '<div style="font-size:13px;color:var(--text-muted);padding:8px 2px;">Aucun contact enregistré pour ce client.</div>';
+    } catch (e) { listEl.innerHTML = '<div style="color:#E74C3C;padding:12px;">Erreur chargement contacts</div>'; }
+  } else {
+    const email = (document.getElementById('fEmailT')?.value || '').trim();
+    const nom = (document.getElementById('fNomContactT')?.value || '').trim();
+    listEl.innerHTML = email ? _nrContactRow(email, nom, '', true) : '<div style="font-size:13px;color:var(--text-muted);padding:8px 2px;">Aucun email de contact renseigné — ajoute-le dans la section Contact de la tâche.</div>';
+  }
+};
+window.closeNotifRapportT = function() {
+  document.getElementById('modalNotifRapportT').classList.remove('open');
+  window._notifRapportNumT = null;
+};
+window.sendNotifRapportT = async function(mode) {
+  const num = window._notifRapportNumT;
+  const r = window._rapportsMapT[num] || window._pendingRapportMapT[num];
+  if (!r) return;
+  const wantsEmail = mode === 'email' || mode === 'both';
+  const wantsEspace = mode === 'espace' || mode === 'both';
+  const subject = document.getElementById('nrSubjectT').value.trim();
+  const body = document.getElementById('nrBodyT').value.trim();
+  const recipients = wantsEmail ? Array.from(document.querySelectorAll('#nrContactsT input[type=checkbox]:checked')).map(c => c.value).filter(Boolean) : [];
+  if (wantsEmail && (!subject || !body)) { showToast('Objet et message requis.', true); return; }
+  if (wantsEmail && !recipients.length) { showToast('Sélectionne au moins un destinataire.', true); return; }
+  const btnIds = { email: 'nrBtnEmailT', espace: 'nrBtnEspaceT', both: 'nrBtnBothT' };
+  const btn = document.getElementById(btnIds[mode]);
+  ['nrBtnEspaceT', 'nrBtnEmailT', 'nrBtnBothT'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = true; });
+  const btnOrig = btn ? btn.textContent : '';
+  if (btn) btn.textContent = 'Envoi...';
+  let sent = 0;
+  if (wantsEmail) {
+    let ext = 'pdf';
+    try { const m = decodeURIComponent(r.pdfUrl).match(/\.(pdf|xlsx|xls|docx?)(\?|$)/i); if (m) ext = m[1].toLowerCase(); } catch (e) {}
+    const filename = 'rapport_tache.' + ext;
+    const attachments = r.pdfUrl ? [{ url: r.pdfUrl, filename }] : [];
+    for (const to of recipients) {
+      try {
+        const resp = await fetch(window.FUNCTION_URL, { method: 'POST', headers: await window._authHeaders(), body: JSON.stringify({ to, subject, body, attachments }) });
+        if (resp.ok) sent++;
+      } catch (e) { /* compté comme échec */ }
+    }
+  }
+  const emailOk = !wantsEmail || sent > 0;
+  if (!emailOk) {
+    showToast('Échec de l\'envoi. Réessaie.', true);
+    ['nrBtnEspaceT', 'nrBtnEmailT', 'nrBtnBothT'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
+    if (btn) btn.textContent = btnOrig;
+    return;
+  }
+  try {
+    let id = r.id || null;
+    if (wantsEspace) {
+      id = await window._saveRapportDoc(id, { suiviId: r.suiviId, numPassage: r.numPassage, bc: r.bc, site: r.site, client: r.client, passage: r.passage, nuisible: r.nuisible, date: r.date, pdfUrl: r.pdfUrl });
+      window._rapportsMapT[num] = { ...r, id };
+      delete window._pendingRapportMapT[num];
+    }
+    if (wantsEmail && id) {
+      const newCount = (r.notifs || 0) + 1;
+      const entry = { ts: new Date().toISOString(), to: recipients };
+      try { await window._recordRapportNotif(id, newCount, entry); } catch (e) {}
+      window._rapportsMapT[num] = { ...(window._rapportsMapT[num] || r), id, notifs: newCount, lastNotif: entry.ts };
+    }
+    showToast((wantsEmail ? 'Email envoyé à ' + sent + ' destinataire' + (sent > 1 ? 's' : '') : 'Ajouté à l\'espace client') + (wantsEspace && wantsEmail ? ', ajouté à l\'espace client.' : '.') + ' ✅');
+    closeNotifRapportT();
+    document.querySelectorAll('#passagesContainerT > [id^="passageT_"]').forEach(div => {
+      const n2 = div.id.replace('passageT_', '');
+      const pn = parseInt(document.getElementById('fPassageNumT' + n2)?.value) || parseInt(n2);
+      if (pn === num) renderRapportZoneT(n2);
+    });
+  } catch (e) {
+    showToast('Envoi fait mais erreur d\'enregistrement : ' + e.message, true);
+  } finally {
+    ['nrBtnEspaceT', 'nrBtnEmailT', 'nrBtnBothT'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
+    if (btn) btn.textContent = btnOrig;
+  }
 };
 function buildKizeoControlT(n) {
   const forms = window._kizeoForms || [];
@@ -3886,8 +4073,7 @@ async function saveInterventionParticulier() {
       if(idx!==-1) window.interventions[idx]={...window.interventions[idx],...data};
     } else {
       data.createdAt=new Date().toISOString();
-      const id=await window._addSuivi(data);
-      (window.interventions=window.interventions||[]).unshift({id,...data});
+      await window._addSuivi(data);
     }
     closeModalParticulier(); filterTable();
     showToast(editIdP?'Intervention mise à jour !':'Intervention enregistrée !');
@@ -3979,8 +4165,7 @@ async function saveInterventionEntreprise() {
       if(idx!==-1) window.interventions[idx]={...window.interventions[idx],...data};
     } else {
       data.createdAt=new Date().toISOString();
-      const id=await window._addSuivi(data);
-      (window.interventions=window.interventions||[]).unshift({id,...data});
+      await window._addSuivi(data);
     }
     closeModalEntreprise(); filterTable();
     showToast(editIdE?'Intervention mise à jour !':'Intervention enregistrée !');
@@ -4015,6 +4200,7 @@ window.openModalTache = function(id=null) {
     (item.passages||[]).filter(Boolean).forEach(p=>addPassageT(p));
     if(item.observations||item.notes){const b=document.getElementById('secNotesTBody');if(b)b.style.display='';const c=document.getElementById('chevronNotesT');if(c)c.style.transform='rotate(0deg)';}
     if(item.nomClient||item.emailClient||phones.length){const b=document.getElementById('secContactTBody');if(b)b.style.display='';const c=document.getElementById('chevronContactT');if(c)c.style.transform='rotate(0deg)';}
+    window._loadRapportsForInterventionT(editIdT).then(() => window.refreshAllRapportZonesT());
     window._loadReceptionForInterventionT(editIdT).then(() => window.refreshAllRapportZonesT());
   } else {
     addPhoneFieldT();
@@ -4037,6 +4223,8 @@ function resetFormTache() {
   const c=document.getElementById('chevronNotesT'); if(c) c.style.transform='rotate(-90deg)';
   const cc=document.getElementById('chevronContactT'); if(cc) cc.style.transform='rotate(-90deg)';
   window._receptionMapT = {};
+  window._rapportsMapT = {};
+  window._pendingRapportMapT = {};
 }
 window.saveInterventionTache = async function() {
   const typeIntervention = document.getElementById('fTypeTache')?.value||'devis';
@@ -4067,7 +4255,6 @@ window.saveInterventionTache = async function() {
     } else {
       data.createdAt=new Date().toISOString();
       const id=await window._addSuivi(data);
-      (window.interventions=window.interventions||[]).unshift({id,...data});
       editIdT = id; // pour permettre de générer un rapport Kizeo juste après création sans rouvrir
     }
     closeModalTache(); filterTable();
@@ -4193,17 +4380,29 @@ window._loadReceptionForInterventionT = async function(suiviId) {
     snap.forEach(d => { const r = d.data(); if (r.numPassage) window._receptionMapT[r.numPassage] = r; });
   } catch(e) { console.warn('loadReceptionT', e); }
 };
-window._loadRapportsForIntervention = async function(client, bc) {
+window._loadRapportsForIntervention = async function(suiviId) {
   window._rapportsMap = {};
-  if (!client || !bc) return;
+  if (!suiviId) return;
   try {
-    const snap = await getDocs(query(collection(db, 'rapports'), where('client', '==', client), where('bc', '==', bc)));
+    const snap = await getDocs(query(collection(db, 'rapports'), where('suiviId', '==', suiviId)));
     snap.forEach(d => {
       const r = { id: d.id, ...d.data() };
-      const num = _passageLabelToNum(r.passage);
+      const num = r.numPassage || _passageLabelToNum(r.passage);
       if (num) window._rapportsMap[num] = r;
     });
   } catch (e) { console.warn('loadRapports', e); }
+};
+window._loadRapportsForInterventionT = async function(suiviId) {
+  window._rapportsMapT = {};
+  if (!suiviId) return;
+  try {
+    const snap = await getDocs(query(collection(db, 'rapports'), where('suiviId', '==', suiviId)));
+    snap.forEach(d => {
+      const r = { id: d.id, ...d.data() };
+      const num = r.numPassage || _passageLabelToNum(r.passage);
+      if (num) window._rapportsMapT[num] = r;
+    });
+  } catch (e) { console.warn('loadRapportsT', e); }
 };
 // Écriture d'un rapport (create ou update). Retourne l'id du doc.
 window._saveRapportDoc = async function(existingId, data) {
@@ -4728,12 +4927,45 @@ window.resetStatusColors = function() {
         Le rapport PDF sera joint automatiquement à l'email.
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="flex-wrap:wrap;">
       <button class="btn-cancel" onclick="closeNotifRapport()">Annuler</button>
-      <button class="btn-save" id="nrBtnSend" onclick="sendNotifRapport()">
-        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-        Envoyer
-      </button>
+      <button class="btn-save" id="nrBtnEspace" style="background:var(--bg);color:var(--text);" onclick="sendNotifRapport('espace')">Espace client seul</button>
+      <button class="btn-save" id="nrBtnEmail" onclick="sendNotifRapport('email')">Email seul</button>
+      <button class="btn-save" id="nrBtnBoth" onclick="sendNotifRapport('both')">Email + Espace client</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOTIFICATION RAPPORT MANUEL (Tâches) -->
+<div class="modal-overlay" id="modalNotifRapportT">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <div class="modal-title">Notifier — Rapport de la tâche</div>
+      <button class="modal-close" onclick="closeNotifRapportT()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:22px 28px;">
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataires <span style="font-weight:400;text-transform:none;">(coche ceux à notifier)</span></div>
+        <div id="nrContactsT" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;"></div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>
+        <input class="form-input" id="nrSubjectT" style="width:100%;">
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Message <span style="font-weight:400;text-transform:none;">(modifiable)</span></div>
+        <textarea class="form-textarea" id="nrBodyT" style="min-height:180px;width:100%;"></textarea>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px;">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;color:var(--green-dark);"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5S13.5 3.62 13.5 5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7.5 2.79 7.5 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+        Le rapport sera joint automatiquement à l'email.
+      </div>
+    </div>
+    <div class="modal-footer" style="flex-wrap:wrap;">
+      <button class="btn-cancel" onclick="closeNotifRapportT()">Annuler</button>
+      <button class="btn-save" id="nrBtnEspaceT" style="background:var(--bg);color:var(--text);" onclick="sendNotifRapportT('espace')">Espace client seul</button>
+      <button class="btn-save" id="nrBtnEmailT" onclick="sendNotifRapportT('email')">Email seul</button>
+      <button class="btn-save" id="nrBtnBothT" onclick="sendNotifRapportT('both')">Email + Espace client</button>
     </div>
   </div>
 </div>
