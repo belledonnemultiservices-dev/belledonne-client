@@ -202,6 +202,10 @@
     <div class="two-cols">
       <div class="col">
         <div class="col-title">Semaines garantie</div>
+        <div style="position:relative;margin-bottom:12px;">
+          <input class="form-input" type="text" id="garantieSearch" placeholder="Rechercher un nom ou une adresse..." oninput="onGarantieSearch()" autocomplete="off">
+          <div id="garantieSearchResults" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);max-height:320px;overflow-y:auto;z-index:50;"></div>
+        </div>
         <div class="semaines-grid" id="semainesGrid"></div>
         <div class="empty-state" id="emptyState" style="display:none;">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
@@ -562,6 +566,55 @@ function renderSemaines() {
     </div>`;
   }).join("");
 }
+
+// ── Recherche textuelle (nom / adresse) à travers toutes les semaines ──
+function normalizeSearch(s) {
+  return (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+window.onGarantieSearch = function() {
+  const term = normalizeSearch(document.getElementById("garantieSearch").value.trim());
+  const resultsEl = document.getElementById("garantieSearchResults");
+  if (!term) { resultsEl.style.display = "none"; resultsEl.innerHTML = ""; return; }
+  const matches = [];
+  semaines.forEach(s => {
+    (s.blocs || []).forEach(b => {
+      (b.lignes || []).forEach(l => {
+        const hay = normalizeSearch((l.nom || "") + " " + (l.adresse || "") + " " + (l.ville || ""));
+        if (hay.includes(term)) matches.push({ semaineId: s.id, blocId: b.id, nom: l.nom, adresse: l.adresse, ville: l.ville, dateDebut: s.dateDebut, dateFin: s.dateFin });
+      });
+    });
+  });
+  if (!matches.length) {
+    resultsEl.innerHTML = `<div style="padding:12px;font-size:13px;color:var(--text-muted);">Aucun résultat.</div>`;
+    resultsEl.style.display = "";
+    return;
+  }
+  resultsEl.innerHTML = matches.slice(0, 30).map(m => `
+    <div onclick="openDetailModalToBloc('${m.semaineId}','${m.blocId}')" style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+      <div style="font-size:13px;font-weight:600;color:var(--text);">${m.nom || "—"}</div>
+      <div style="font-size:12px;color:var(--text-muted);">${m.adresse || ""}${m.ville ? ", " + m.ville : ""} · Semaine du ${fmtDate(m.dateDebut)} au ${fmtDate(m.dateFin)}</div>
+    </div>`).join("");
+  resultsEl.style.display = "";
+};
+document.addEventListener("click", (e) => {
+  const wrap = document.getElementById("garantieSearch");
+  const resultsEl = document.getElementById("garantieSearchResults");
+  if (!wrap || !resultsEl) return;
+  if (e.target !== wrap && !resultsEl.contains(e.target)) resultsEl.style.display = "none";
+});
+window.openDetailModalToBloc = function(semaineId, blocId) {
+  document.getElementById("garantieSearchResults").style.display = "none";
+  document.getElementById("garantieSearch").value = "";
+  openDetailModal(semaineId);
+  setTimeout(() => {
+    const el = document.querySelector(`.bloc-card[data-bloc-id="${blocId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.style.transition = "box-shadow 0.3s";
+    el.style.boxShadow = "0 0 0 3px #4338CA";
+    setTimeout(() => { el.style.boxShadow = ""; }, 2000);
+  }, 100);
+};
 
 // ── Colonne droite : Gestion rapports (une carte par semaine ayant des rapports) ──
 function renderRapportsGrid() {
