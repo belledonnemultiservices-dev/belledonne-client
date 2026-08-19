@@ -345,6 +345,14 @@
           <input class="form-input" type="tel" id="lTelephone" placeholder="06 XX XX XX XX">
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label">Remarque technicien <span style="font-weight:400;color:var(--text-muted);">(ajoutée sous ce locataire dans l'agenda)</span></label>
+        <textarea class="form-textarea" id="lRemarqueTech" placeholder="ex: Chien dans le logement, prévenir avant de sonner"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Remarque interne <span style="font-weight:400;color:var(--text-muted);">(jamais envoyée, visible ici uniquement)</span></label>
+        <textarea class="form-textarea" id="lRemarqueInterne" placeholder="ex: Locataire difficile, litige en cours"></textarea>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeLigneModal()">Annuler</button>
@@ -958,7 +966,11 @@ async function persistSemaine(patch) {
 }
 function getBloc(blocId) { return (_currentSemaine.blocs || []).find(b => b.id === blocId); }
 function autoDescription(bloc) {
-  return (bloc.lignes || []).map(l => `${l.nom} - ${l.adresse}, ${l.codePostal} ${l.ville}${l.telephone ? " - Tél: " + l.telephone : ""}`).join("\n");
+  return (bloc.lignes || []).map(l => {
+    let line = `${l.nom} - ${l.adresse}, ${l.codePostal} ${l.ville}${l.telephone ? " - Tél: " + l.telephone : ""}`;
+    if (l.remarqueTech) line += `\n  ↳ ${l.remarqueTech}`;
+    return line;
+  }).join("\n");
 }
 
 // ── Rendu des blocs ──
@@ -994,6 +1006,8 @@ function renderBlocs() {
           <div class="ligne-info">
             <div class="ligne-nom">${l.nom || "—"} <span style="font-weight:400;color:var(--text-muted);">(${l.client || "—"})</span></div>
             <div class="ligne-adresse">${l.adresse || ""}${l.etage ? ", ét. " + l.etage : ""}${l.telephone ? ", tél. " + l.telephone : ""} — ${l.codePostal || ""} ${l.ville || ""}</div>
+            ${l.remarqueTech ? `<div style="font-size:11px;color:#4338CA;margin-top:2px;">↳ ${l.remarqueTech}</div>` : ""}
+            ${l.remarqueInterne ? `<div style="font-size:11px;color:var(--red);margin-top:2px;">🔒 ${l.remarqueInterne}</div>` : ""}
           </div>
           ${l.kizeoPushedAt ? `<span class="ligne-pushed">✓ Kizeo</span>` : ""}
           <div class="ligne-actions">
@@ -1240,6 +1254,8 @@ window.openLigneModal = function(blocId, ligneId) {
   document.getElementById("lVille").value = l ? (l.ville || "") : "";
   document.getElementById("lEtage").value = l ? (l.etage || "") : "";
   document.getElementById("lTelephone").value = l ? (l.telephone || "") : "";
+  document.getElementById("lRemarqueTech").value = l ? (l.remarqueTech || "") : "";
+  document.getElementById("lRemarqueInterne").value = l ? (l.remarqueInterne || "") : "";
   document.getElementById("modalLigne").classList.add("open");
 };
 window.closeLigneModal = function() { document.getElementById("modalLigne").classList.remove("open"); _editLigneBlocId = null; _editLigneId = null; };
@@ -1252,6 +1268,8 @@ window.saveLigne = async function() {
   const ville = document.getElementById("lVille").value.trim();
   const etage = document.getElementById("lEtage").value.trim();
   const telephone = document.getElementById("lTelephone").value.trim();
+  const remarqueTech = document.getElementById("lRemarqueTech").value.trim();
+  const remarqueInterne = document.getElementById("lRemarqueInterne").value.trim();
   if (!client || !nom || !adresse || !codePostal || !ville) { alert("Client, nom, adresse, code postal et ville sont obligatoires."); return; }
 
   const b = getBloc(_editLigneBlocId);
@@ -1260,9 +1278,9 @@ window.saveLigne = async function() {
   const lignes = [...(b.lignes || [])];
   if (_editLigneId) {
     const idx = lignes.findIndex(x => x.id === _editLigneId);
-    if (idx !== -1) lignes[idx] = { ...lignes[idx], client, nom, adresse, codePostal, ville, etage, telephone };
+    if (idx !== -1) lignes[idx] = { ...lignes[idx], client, nom, adresse, codePostal, ville, etage, telephone, remarqueTech, remarqueInterne };
   } else {
-    lignes.push({ id: uid(), client, nom, adresse, codePostal, ville, etage, telephone, kizeoPushedAt: null });
+    lignes.push({ id: uid(), client, nom, adresse, codePostal, ville, etage, telephone, remarqueTech, remarqueInterne, kizeoPushedAt: null });
   }
   b.lignes = lignes;
   bumpBoth(b);
