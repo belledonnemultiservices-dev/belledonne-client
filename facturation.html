@@ -413,6 +413,38 @@
         </div>
       </div>
 
+      <div class="form-section">
+        <div class="form-section-title">Ou : facture déjà faite ailleurs — dépôt manuel du PDF</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">N° Facture</label>
+            <input class="form-input" id="fManualNum" placeholder="ex: 26-08-1900">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date facture</label>
+            <input class="form-input" type="date" id="fManualDate">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Montant HT</label>
+            <input class="form-input" type="number" step="0.01" min="0" id="fManualMontant" placeholder="Montant HT en €">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">PDF de la facture</label>
+            <div class="drop-zone" id="dropManualFacture" ondragover="manualFactDragOver(event)" ondragleave="manualFactDragLeave()" ondrop="manualFactDropFile(event)" onclick="document.getElementById('fileManualFacture').click()">
+              <div class="drop-zone-text">Glisser un PDF ici ou</div>
+              <button type="button" class="drop-zone-btn" onclick="event.stopPropagation();document.getElementById('fileManualFacture').click()">Choisir un fichier</button>
+              <input type="file" id="fileManualFacture" accept="application/pdf" style="display:none;" onchange="manualFactureFileChosen()">
+              <div class="drop-zone-chosen" id="chosenManualFacture"></div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button type="button" class="btn-save" id="btnSaveManualFacture" onclick="saveFactureManuelle()" style="background:var(--navy);">
+            Enregistrer la facture manuelle
+          </button>
+          <span id="manualFactMsg" style="font-size:12px;color:var(--text-muted);"></span>
+        </div>
+      </div>
 
     </div>
     <div class="modal-footer">
@@ -641,6 +673,13 @@ function populateClientFilter() {
 function openModalFact(id) {
   editFactId = id;
   factFilePdfBlob = null;
+  manualFactPdfBlob = null;
+  document.getElementById('fManualNum').value = '';
+  document.getElementById('fManualDate').value = '';
+  document.getElementById('fManualMontant').value = '';
+  document.getElementById('fileManualFacture').value = '';
+  document.getElementById('chosenManualFacture').style.display = 'none';
+  document.getElementById('manualFactMsg').textContent = '';
   const item = factures.find(f => f.id === id);
   if (!item) return;
 
@@ -660,6 +699,7 @@ function closeModalFact() {
   document.getElementById('modalFact').classList.remove('open');
   editFactId = null;
   factFilePdfBlob = null;
+  manualFactPdfBlob = null;
 }
 
 // ── Composition de la facture (objet, entité, lignes BPU, totaux) ──
@@ -843,6 +883,63 @@ window.genererFactureAxonaut = async function() {
     }
     msg.style.color = 'var(--green-dark)';
     msg.innerHTML = (MODE === 'facture' ? 'Facture créée ✓ ' : 'Devis test créé ✓ ') + (r.number || '') + (r.pdfUrl ? ' — <a href="' + r.pdfUrl + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
+  } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }
+  finally { btn.disabled = false; }
+};
+
+// ── Dépôt manuel d'une facture PDF (sans passer par Axonaut) ──
+let manualFactPdfBlob = null;
+
+function manualFactureFileChosen() {
+  const input = document.getElementById('fileManualFacture');
+  if (!input.files[0]) return;
+  manualFactPdfBlob = input.files[0];
+  const chosen = document.getElementById('chosenManualFacture');
+  chosen.textContent = '✓ ' + input.files[0].name;
+  chosen.style.display = 'block';
+}
+
+function manualFactDragOver(e) { e.preventDefault(); document.getElementById('dropManualFacture').classList.add('drag-over'); }
+function manualFactDragLeave() { document.getElementById('dropManualFacture').classList.remove('drag-over'); }
+function manualFactDropFile(e) {
+  e.preventDefault();
+  document.getElementById('dropManualFacture').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file || file.type !== 'application/pdf') { alert('Fichier PDF uniquement.'); return; }
+  const dt = new DataTransfer(); dt.items.add(file);
+  document.getElementById('fileManualFacture').files = dt.files;
+  manualFactureFileChosen();
+}
+
+window.saveFactureManuelle = async function() {
+  const msg = document.getElementById('manualFactMsg');
+  if (!editFactId) return;
+  const numFacture = document.getElementById('fManualNum').value.trim();
+  const dateFacture = document.getElementById('fManualDate').value;
+  const montantHT = parseFloat(document.getElementById('fManualMontant').value);
+  if (!numFacture) { msg.style.color = 'var(--red)'; msg.textContent = 'Renseigne le n° de facture.'; return; }
+  if (!manualFactPdfBlob) { msg.style.color = 'var(--red)'; msg.textContent = 'Ajoute le PDF de la facture.'; return; }
+  const item = factures.find(f => f.id === editFactId) || {};
+  if ((item.axonautId || item.factureUrl) && !confirm('Une facture existe déjà pour cette ligne (' + (item.numFacture || '') + ').\nLa remplacer par ce PDF ?')) return;
+  const btn = document.getElementById('btnSaveManualFacture'); btn.disabled = true;
+  msg.style.color = 'var(--text-muted)'; msg.textContent = 'Envoi du PDF...';
+  try {
+    const path = 'facturation/' + editFactId + '/' + Date.now() + '_' + manualFactPdfBlob.name;
+    const factureUrl = await window._uploadFacturePdf(manualFactPdfBlob, path);
+    const changes = {
+      statut: 'Facturé',
+      numFacture,
+      factureUrl,
+      axonautId: '',
+      montantHT: isNaN(montantHT) ? (item.montantHT || 0) : montantHT,
+      dateFacture: dateFacture || new Date().toISOString().slice(0, 10),
+    };
+    await window._updateFacture(editFactId, changes);
+    const idx = factures.findIndex(f => f.id === editFactId);
+    if (idx !== -1) Object.assign(factures[idx], changes);
+    applyFilters();
+    msg.style.color = 'var(--green-dark)';
+    msg.innerHTML = 'Facture enregistrée ✓ — <a href="' + factureUrl + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>';
   } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }
   finally { btn.disabled = false; }
 };
