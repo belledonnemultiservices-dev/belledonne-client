@@ -1265,6 +1265,15 @@ window.openModal = function openModal(id = null) {
     document.getElementById('fObservations').value = item.observations || '';
     const calEventIds = item.calEventIds || [];
     (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach((d, i) => addPassage(d, calEventIds[i] || ''));
+    // Restaure les rapports manuels déposés mais pas encore notifiés (persistés dans passages[].manualRapport)
+    document.querySelectorAll('#passagesContainer > [id^="passage_"]').forEach(div => {
+      let mr = null;
+      try { mr = JSON.parse(div.dataset.manualRapport || 'null'); } catch(e) { mr = null; }
+      if (!mr) return;
+      const n = div.id.replace('passage_', '');
+      const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || parseInt(n);
+      window._pendingRapportMap[num] = mr;
+    });
     // Charger les rapports déjà déposés + les rapports Kizeo archivés en interne, puis rafraîchir les zones
     if (editId) {
       window._loadRapportsForIntervention(editId).then(() => refreshAllRapportZones());
@@ -1461,6 +1470,8 @@ function getPassagesFromDOM() {
     const n = div.id.replace('passage_', '');
     let kizeoPush = null;
     try { kizeoPush = JSON.parse(div.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }
+    let manualRapport = null;
+    try { manualRapport = JSON.parse(div.dataset.manualRapport || 'null'); } catch(e) { manualRapport = null; }
     passages.push({
       num: parseInt(document.getElementById('fPassageNum' + n)?.value) || null,
       debut: document.getElementById('fDateDebut' + n)?.value || '',
@@ -1471,6 +1482,7 @@ function getPassagesFromDOM() {
       techs: getPassageTechsFromDOM(n),
       kizeoPush,
       statut: div.dataset.statutPassage || '',
+      manualRapport,
     });
   });
   passages.sort((a, b) => (a.num || 0) - (b.num || 0));
@@ -1590,7 +1602,7 @@ function renderPassageCalButtons(n, calEventMap) {
 function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
-  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null, savedStatut = '';
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null, savedStatut = '', savedManualRapport = null;
   if (value && typeof value === 'object') {
     debut = value.debut || '';
     fin = value.fin || '';
@@ -1601,6 +1613,7 @@ function addPassage(value = '', calEventId = '') {
     savedNum = value.num || null;
     savedKizeoPush = value.kizeoPush || null;
     savedStatut = value.statut || '';
+    savedManualRapport = value.manualRapport || null;
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   }
@@ -1614,6 +1627,7 @@ function addPassage(value = '', calEventId = '') {
   div.dataset.calEventId = JSON.stringify(calMap);
   div.dataset.kizeoPush = JSON.stringify(savedKizeoPush);
   div.dataset.statutPassage = savedStatut;
+  div.dataset.manualRapport = JSON.stringify(savedManualRapport);
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
   div.innerHTML = `
     <div style="display:grid;grid-template-columns:68px 1fr 1fr 28px;gap:8px;align-items:center;">
@@ -1719,7 +1733,8 @@ function buildManualRapportBlock(prefix, n, num, currentEditId) {
   }
   if (pending) {
     return row(`
-      <span style="font-size:11px;color:var(--text-muted);">Fichier ajouté, pas encore diffusé</span>
+      <a href="${pending.pdfUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">Voir le fichier</a>
+      <span style="font-size:11px;color:var(--text-muted);">Enregistré sur ce passage, pas encore diffusé au client</span>
       <button type="button" onclick="openNotifRapport${prefix}(${n})" style="background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Notifier</button>
       <button type="button" onclick="cancelPendingRapport${prefix}(${n})" style="background:var(--bg);border:1px solid var(--border);color:var(--text-muted);padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Annuler</button>
     `);
@@ -1833,14 +1848,23 @@ window.onRapportFile = async function(n) {
   try {
     const pdfUrl = await window._uploadRapport(file, client || 'divers');
     const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
-    window._pendingRapportMap[num] = { suiviId: editId, numPassage: num, bc, site, client, passage: passageLabel, nuisible, date, pdfUrl };
-    showToast('Fichier ajouté — clique sur Notifier pour le diffuser');
+    const manualRapport = { suiviId: editId, numPassage: num, bc, site, client, passage: passageLabel, nuisible, date, pdfUrl, fileName: file.name, uploadedAt: new Date().toISOString() };
+    window._pendingRapportMap[num] = manualRapport;
+    const div = document.getElementById('passage_' + n);
+    if (div) div.dataset.manualRapport = JSON.stringify(manualRapport);
+    // Persisté tout de suite dans le passage (suivi/{id}.passages[].manualRapport) : le fichier
+    // reste attaché et téléchargeable même sans cliquer "Notifier" ni "Enregistrer".
+    await window._updateSuivi(editId, { passages: getPassagesFromDOM() });
+    showToast('Rapport ajouté au passage — clique sur Notifier pour le diffuser au client');
   } catch (e) { showToast('Erreur upload rapport : ' + e.message, true); }
   finally { if (zone) zone.style.opacity = '1'; if (input) input.value = ''; renderRapportZone(n); }
 };
-window.cancelPendingRapport = function(n) {
+window.cancelPendingRapport = async function(n) {
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
   delete window._pendingRapportMap[num];
+  const div = document.getElementById('passage_' + n);
+  if (div) div.dataset.manualRapport = JSON.stringify(null);
+  if (editId) { try { await window._updateSuivi(editId, { passages: getPassagesFromDOM() }); } catch(e) {} }
   renderRapportZone(n);
 };
 window.deleteRapport = async function(n) {
@@ -1972,6 +1996,8 @@ window.sendNotifRapport = async function(mode) {
       id = await window._saveRapportDoc(id, { suiviId: r.suiviId, numPassage: r.numPassage, bc: r.bc, site: r.site, client: r.client, passage: r.passage, nuisible: r.nuisible, date: r.date, pdfUrl: r.pdfUrl });
       window._rapportsMap[num] = { ...r, id };
       delete window._pendingRapportMap[num];
+      const pubDiv = Array.from(document.querySelectorAll('#passagesContainer > [id^="passage_"]')).find(d => (parseInt(document.getElementById('fPassageNum' + d.id.replace('passage_', ''))?.value) || 0) === num);
+      if (pubDiv) { pubDiv.dataset.manualRapport = JSON.stringify(null); if (editId) { try { await window._updateSuivi(editId, { passages: getPassagesFromDOM() }); } catch(e) {} } }
     }
     if (wantsEmail && id) {
       const newCount = (r.notifs || 0) + 1;
