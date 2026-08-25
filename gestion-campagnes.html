@@ -730,6 +730,7 @@ window.genererPlanningClient = async function() {
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
     document.getElementById("resultStatsPlanningClient").textContent = `${data.nbAdresses} adresse(s)`;
     document.getElementById("dlPlanningClient").href = data.url;
+    document.getElementById("dlPlanningClient").setAttribute("download", data.fileName || "planning-client.xlsx");
     box.style.display = "block";
   } catch(e) {
     err.textContent = "Erreur : " + e.message; err.style.display = "block";
