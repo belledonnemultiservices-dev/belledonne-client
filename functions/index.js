@@ -1243,6 +1243,7 @@ exports.pushKizeoForm = functions
         recipientUserId: recipient,
         refInterne,
         reference,
+        libelle: baseLibelle,
         arriveeAt: now,
         pushedAt: now,
         dateFin: passage.fin || null,
