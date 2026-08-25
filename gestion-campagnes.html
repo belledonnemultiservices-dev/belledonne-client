@@ -296,8 +296,25 @@
 
         <div class="card">
           <div class="card-title">Avis de passage</div>
-          <div class="card-sub">Un avis PDF par adresse pour le 1er passage.</div>
-          <button class="btn-generate" disabled>Bientôt disponible</button>
+          <div class="card-sub">Un avis PDF par adresse pour le 1er passage (1 PDF regroupant toutes les pages).</div>
+          <div class="tpl-row" id="tplRow-avisPassage">
+            <button class="btn-tpl" onclick="document.getElementById('tplInput-avisPassage').click()">Charger le template (.pdf)</button>
+            <span class="tpl-fname" id="tplFname-avisPassage">Template par défaut</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Le template doit être au format PDF (pas .docx) : convertis-le depuis Word ("Exporter en PDF") avant de le charger.</div>
+          <input type="file" id="tplInput-avisPassage" accept=".pdf" style="display:none" onchange="onTemplateSelected(event,'avisPassage')">
+          <div class="form-group" style="max-width:400px;">
+            <label class="form-label">Nom (sert aussi de nom de fichier)</label>
+            <input class="form-input" type="text" id="apNom" placeholder="ex: Avis de passage ACTIS TMR - Octobre 2026">
+          </div>
+          <button class="btn-generate" id="btnGenAvisPassage" onclick="genererAvisPassage()">Générer les avis de passage</button>
+          <div class="result-box" id="resultBoxAvisPassage">
+            <div class="r-title">Avis de passage générés</div>
+            <div class="r-stats" id="resultStatsAvisPassage"></div>
+            <div class="doc-date" id="resultDateAvisPassage" style="margin-bottom:8px;"></div>
+            <a class="btn-download" id="dlAvisPassage" href="#">Télécharger le PDF</a>
+          </div>
+          <div class="error-box" id="errorBoxAvisPassage"></div>
         </div>
 
         <div class="card">
@@ -529,6 +546,7 @@ const FN_GEN_COMPLET = "https://europe-west1-belledonne-client.cloudfunctions.ne
 const FN_GEN_CONSOLIDE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportConsolide";
 const FN_DOC_PLANNING_CLIENT = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningClient";
 const FN_DOC_PLANNING_TECHNICIEN = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningTechnicien";
+const FN_DOC_AVIS_PASSAGE = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererAvisPassage";
 
 let _user = null;
 let _techniciens = [];
@@ -678,6 +696,7 @@ window.selectCampTab = function(n) {
     renderDocSourceState();
     loadGeneratedDoc("planning-client", "PlanningClient");
     loadGeneratedDoc("planning-technicien", "PlanningTechnicien");
+    loadGeneratedDoc("avis-passage", "AvisPassage");
   }
 };
 
@@ -708,7 +727,7 @@ function renderGeneratedDoc(suffix, d) {
 // ═══════════════════════════════════════════════════════════════
 // ONGLET GESTION DOCUMENTATION
 // ═══════════════════════════════════════════════════════════════
-const TEMPLATE_KEYS = ["planningClient", "planningTechnicien"]; // étendu plus tard : avisPassage, convocation
+const TEMPLATE_KEYS = ["planningClient", "planningTechnicien", "avisPassage"]; // étendu plus tard : convocation
 function renderDocSourceState() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
   document.getElementById("docFileName").textContent = c.docSourceNom || "";
@@ -814,6 +833,33 @@ window.genererPlanningTechnicien = async function() {
     btn.disabled = false; btn.textContent = "Générer les plannings techniciens";
   }
 };
+
+window.genererAvisPassage = async function() {
+  const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
+  const nom = document.getElementById("apNom").value.trim();
+  const box = document.getElementById("resultBoxAvisPassage");
+  const err = document.getElementById("errorBoxAvisPassage");
+  box.style.display = "none"; err.style.display = "none";
+  if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
+  if (!nom) { showToast("Donne un nom aux avis de passage"); return; }
+  const btn = document.getElementById("btnGenAvisPassage");
+  btn.disabled = true; btn.textContent = "Génération en cours...";
+  try {
+    const resp = await fetch(FN_DOC_AVIS_PASSAGE, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_avisPassage_StoragePath || null }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    renderGeneratedDoc("AvisPassage", { statsText: data.statsText, url: data.url, fileName: data.fileName, createdAt: new Date().toISOString() });
+  } catch(e) {
+    err.textContent = "Erreur : " + e.message; err.style.display = "block";
+  } finally {
+    btn.disabled = false; btn.textContent = "Générer les avis de passage";
+  }
+};
+
 window.backToCampagnes = function() {
   _currentCampagneId = null;
   document.getElementById("topBreadcrumb").innerHTML = `<span>Admin</span><span>›</span><span>Gestion campagnes</span>`;

@@ -2893,3 +2893,113 @@ exports.campagneGenererPlanningTechnicien = functions
       res.status(500).json({ error: e.message });
     }
   });
+
+// ══════════════════════════════════════════════════════════════════
+// AVIS DE PASSAGE (PDF) : le template Word ne peut pas être converti à la
+// volée côté Cloud Functions (pas de LibreOffice dans ce runtime). Le
+// template par défaut est donc pré-converti en PDF une fois pour toutes
+// (functions/templates/Template-Avis-de passage.pdf, mêmes police/taille
+// que le .docx d'origine) ; on "tamponne" le texte dynamique par-dessus
+// à des positions fixes (relevées via une analyse ponctuelle du PDF).
+// Un template personnalisé doit donc être fourni déjà au format PDF
+// (converti par l'utilisateur depuis Word), pas en .docx.
+// ══════════════════════════════════════════════════════════════════
+
+// Réduit la taille de police si le texte dépasse la largeur disponible
+// (jamais en dessous de minSize), pour ne jamais déborder de la page.
+function tailleAjustee(font, text, maxWidth, preferredSize, minSize) {
+  let size = preferredSize;
+  while (size > minSize && font.widthOfTextAtSize(text, size) > maxWidth) size -= 0.5;
+  return size;
+}
+
+exports.campagneGenererAvisPassage = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId, storagePath, nom, templateStoragePath } = req.body || {};
+    if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+
+    try {
+      const ExcelJS = require("exceljs");
+      const { PDFDocument, StandardFonts, rgb } = require("pdf-lib");
+      const path = require("path");
+      const fs = require("fs");
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const [buffer] = await bucket.file(storagePath).download();
+
+      const srcWb = new ExcelJS.Workbook();
+      await srcWb.xlsx.load(buffer);
+      const srcWs = srcWb.worksheets[0];
+      if (!srcWs) { res.status(400).json({ error: "Feuille source introuvable" }); return; }
+
+      const toutesLignes = lirePlanningSource(srcWs);
+      if (!toutesLignes.length) { res.status(400).json({ error: "Aucune adresse trouvée dans le fichier source" }); return; }
+      const vues = new Set();
+      const lignes = toutesLignes.filter(l => { if (vues.has(l.adresse)) return false; vues.add(l.adresse); return true; });
+
+      let templateBytes;
+      if (templateStoragePath) {
+        const [tplBuffer] = await bucket.file(templateStoragePath).download();
+        templateBytes = tplBuffer;
+      } else {
+        templateBytes = fs.readFileSync(path.join(__dirname, "templates", "Template-Avis-de passage.pdf"));
+      }
+
+      const outputDoc = await PDFDocument.create();
+
+      for (const l of lignes) {
+        const srcDoc = await PDFDocument.load(templateBytes);
+        const page = srcDoc.getPages()[0];
+        const { width: pageWidth, height: pageHeight } = page.getSize();
+        const helvBold = await srcDoc.embedFont(StandardFonts.HelveticaBold);
+        const helv = await srcDoc.embedFont(StandardFonts.Helvetica);
+
+        const dateHeureLigne = `Date et heure du passage : ${l.date1 ? `${l.date1} entre ${l.heure1}` : ""}`;
+        // Reblanchit toute la ligne (pas seulement le placeholder) pour avoir
+        // toute la largeur disponible avant de réécrire la phrase complète.
+        page.drawRectangle({ x: 168, y: 515, width: pageWidth - 168 - 30, height: 20, color: rgb(1, 1, 1) });
+        const sizeDate = tailleAjustee(helvBold, dateHeureLigne, pageWidth - 168 - 30, 13, 9);
+        page.drawText(dateHeureLigne, { x: 172.8, y: 521.39, size: sizeDate, font: helvBold, color: rgb(0, 0, 0) });
+
+        const adresseMaxWidth = pageWidth - 494.8 - 24;
+        page.drawRectangle({ x: 490, y: 126, width: pageWidth - 490 - 15, height: 10, color: rgb(1, 1, 1) });
+        const sizeAdresse = tailleAjustee(helv, l.adresse, adresseMaxWidth, 6, 3.5);
+        page.drawText(l.adresse, { x: 494.8, y: 129.34, size: sizeAdresse, font: helv, color: rgb(117 / 255, 117 / 255, 117 / 255) });
+
+        const [copiedPage] = await outputDoc.copyPages(srcDoc, [0]);
+        outputDoc.addPage(copiedPage);
+      }
+
+      const outBytes = await outputDoc.save();
+      const safeNom = sanitizeNomFichier(nom);
+      const outPath = `campagnes-documents/${campagneId}/avis-passage/avis-passage.pdf`;
+      const outFileName = `${safeNom} - Avis de passage.pdf`;
+      const token = crypto.randomUUID();
+      await bucket.file(outPath).save(Buffer.from(outBytes), {
+        contentType: "application/pdf",
+        metadata: { contentDisposition: contentDispositionHeader(outFileName), metadata: { firebaseStorageDownloadTokens: token } },
+      });
+      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
+
+      const nowIso = new Date().toISOString();
+      const statsText = `${lignes.length} avis (${lignes.length} page(s))`;
+      await db.collection("campagnes-documents-generes").doc(`${campagneId}__avis-passage`).set({
+        campagneId, type: "avis-passage", fileName: outFileName, url, storagePath: outPath, statsText, createdAt: nowIso,
+      });
+
+      res.status(200).json({ success: true, url, fileName: outFileName, statsText });
+    } catch(e) {
+      console.error("campagneGenererAvisPassage:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
