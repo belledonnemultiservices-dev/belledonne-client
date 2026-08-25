@@ -47,12 +47,15 @@
   .results-count{font-size:12px;color:var(--text-muted);white-space:nowrap;}
 
   .list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;overflow-x:auto;}
-  .list-head{display:grid;grid-template-columns:0.8fr 0.8fr 0.7fr 0.9fr 1.1fr 1.2fr 0.6fr 1.1fr 560px;gap:0;padding:11px 0;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);min-width:1400px;}
-  .row{display:grid;grid-template-columns:0.8fr 0.8fr 0.7fr 0.9fr 1.1fr 1.2fr 0.6fr 1.1fr 560px;gap:0;align-items:start;padding:13px 0;border-bottom:1px solid var(--border);min-width:1400px;}
+  .list-head{display:grid;grid-template-columns:var(--grid-cols);gap:0;padding:11px 0;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border);width:max-content;min-width:100%;}
+  .row{display:grid;grid-template-columns:var(--grid-cols);gap:0;align-items:start;padding:13px 0;border-bottom:1px solid var(--border);width:max-content;min-width:100%;}
   .row:last-child{border-bottom:none;}
   .row:hover{background:var(--bg);}
-  .list-head>span,.row>div{padding:0 14px;border-right:1px solid var(--border);min-width:0;}
+  .list-head>span,.row>div{padding:0 14px;border-right:1px solid var(--border);min-width:0;overflow:hidden;}
   .list-head>span:last-child,.row>div:last-child{border-right:none;}
+  .list-head>span{position:relative;display:flex;align-items:center;}
+  .col-resizer{position:absolute;top:0;right:0;bottom:0;width:8px;cursor:col-resize;z-index:2;touch-action:none;}
+  .col-resizer:hover,.col-resizer.resizing{background:rgba(46,204,143,0.35);}
   .cell-muted{color:var(--text-muted);}
   .cell-ellipsis{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;}
   .badge-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:2px 8px;border-radius:6px;white-space:nowrap;}
@@ -186,8 +189,8 @@
     </div>
 
     <div class="list" id="list">
-      <div class="list-head">
-        <span>Date</span><span>Client</span><span>BC</span><span>Passage</span><span>Technicien</span><span>Libellé</span><span>Type</span><span>Statut</span><span></span>
+      <div class="list-head" id="listHead">
+        <span>Date<div class="col-resizer" data-col="0"></div></span><span>Client<div class="col-resizer" data-col="1"></div></span><span>BC<div class="col-resizer" data-col="2"></div></span><span>Passage<div class="col-resizer" data-col="3"></div></span><span>Technicien<div class="col-resizer" data-col="4"></div></span><span>Libellé<div class="col-resizer" data-col="5"></div></span><span>Type<div class="col-resizer" data-col="6"></div></span><span>Statut<div class="col-resizer" data-col="7"></div></span><span></span>
       </div>
     </div>
     <div class="empty-state" id="emptyState" style="display:none;">
@@ -375,6 +378,48 @@ function hoursLate(r) {
   const finMs = new Date(r.dateFin).getTime();
   return Math.max(0, Math.floor((Date.now() - finMs) / 3600000));
 }
+
+// ── Colonnes redimensionnables (persistées en localStorage) ──
+const COL_WIDTHS_KEY = "gestionRapports.colWidths";
+const DEFAULT_COL_WIDTHS = [110, 110, 100, 130, 150, 180, 90, 150, 560];
+function loadColWidths() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(COL_WIDTHS_KEY));
+    if (Array.isArray(saved) && saved.length === DEFAULT_COL_WIDTHS.length) return saved;
+  } catch(e) {}
+  return DEFAULT_COL_WIDTHS.slice();
+}
+let colWidths = loadColWidths();
+function applyColWidths() {
+  document.getElementById("list").style.setProperty("--grid-cols", colWidths.map(w => w + "px").join(" "));
+}
+applyColWidths();
+(function initColResize() {
+  let dragCol = null, startX = 0, startWidth = 0, dragEl = null;
+  document.getElementById("listHead").addEventListener("mousedown", e => {
+    const handle = e.target.closest(".col-resizer");
+    if (!handle) return;
+    dragCol = parseInt(handle.dataset.col, 10);
+    startX = e.clientX;
+    startWidth = colWidths[dragCol];
+    dragEl = handle;
+    handle.classList.add("resizing");
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", e => {
+    if (dragCol === null) return;
+    colWidths[dragCol] = Math.max(50, startWidth + (e.clientX - startX));
+    applyColWidths();
+  });
+  document.addEventListener("mouseup", () => {
+    if (dragCol === null) return;
+    if (dragEl) dragEl.classList.remove("resizing");
+    dragCol = null; dragEl = null;
+    document.body.style.userSelect = "";
+    localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(colWidths));
+  });
+})();
 
 function render() {
   const q = (document.getElementById("searchInput").value || "").toLowerCase();
