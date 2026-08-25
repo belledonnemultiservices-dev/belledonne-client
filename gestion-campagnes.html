@@ -296,13 +296,13 @@
 
         <div class="card">
           <div class="card-title">Avis de passage</div>
-          <div class="card-sub">Un avis PDF par adresse pour le 1er passage (1 PDF regroupant toutes les pages).</div>
+          <div class="card-sub">Un avis par adresse pour le 1er passage (1 document Word regroupant toutes les pages, à convertir en PDF de ton côté).</div>
           <div class="tpl-row" id="tplRow-avisPassage">
-            <button class="btn-tpl" onclick="document.getElementById('tplInput-avisPassage').click()">Charger le template (.pdf)</button>
+            <button class="btn-tpl" onclick="document.getElementById('tplInput-avisPassage').click()">Charger le template (.docx)</button>
             <span class="tpl-fname" id="tplFname-avisPassage">Template par défaut</span>
           </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Le template doit être au format PDF (pas .docx) : convertis-le depuis Word ("Exporter en PDF") avant de le charger.</div>
-          <input type="file" id="tplInput-avisPassage" accept=".pdf" style="display:none" onchange="onTemplateSelected(event,'avisPassage')">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Le template est un .docx normal, une seule page, avec les balises {Adresse} et {date-heure}. Pas besoin d'ajouter de boucle ni de saut de page, c'est géré automatiquement.</div>
+          <input type="file" id="tplInput-avisPassage" accept=".docx" style="display:none" onchange="onTemplateSelected(event,'avisPassage')">
           <div class="form-group" style="max-width:400px;">
             <label class="form-label">Nom (sert aussi de nom de fichier)</label>
             <input class="form-input" type="text" id="apNom" placeholder="ex: Avis de passage ACTIS TMR - Octobre 2026">
@@ -312,7 +312,7 @@
             <div class="r-title">Avis de passage générés</div>
             <div class="r-stats" id="resultStatsAvisPassage"></div>
             <div class="doc-date" id="resultDateAvisPassage" style="margin-bottom:8px;"></div>
-            <a class="btn-download" id="dlAvisPassage" href="#">Télécharger le PDF</a>
+            <a class="btn-download" id="dlAvisPassage" href="#">Télécharger le Word</a>
           </div>
           <div class="error-box" id="errorBoxAvisPassage"></div>
         </div>

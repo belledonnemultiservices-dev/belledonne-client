@@ -2895,22 +2895,40 @@ exports.campagneGenererPlanningTechnicien = functions
   });
 
 // ══════════════════════════════════════════════════════════════════
-// AVIS DE PASSAGE (PDF) : le template Word ne peut pas être converti à la
-// volée côté Cloud Functions (pas de LibreOffice dans ce runtime). Le
-// template par défaut est donc pré-converti en PDF une fois pour toutes
-// (functions/templates/Template-Avis-de passage.pdf, mêmes police/taille
-// que le .docx d'origine) ; on "tamponne" le texte dynamique par-dessus
-// à des positions fixes (relevées via une analyse ponctuelle du PDF).
-// Un template personnalisé doit donc être fourni déjà au format PDF
-// (converti par l'utilisateur depuis Word), pas en .docx.
+// AVIS DE PASSAGE (docx) : le template reste un .docx normal, une seule
+// page, avec des balises {Adresse} / {date-heure} (syntaxe docxtemplater).
+// Le générateur enveloppe ce contenu dans une boucle {#pages}/{#break}
+// injectée automatiquement dans le XML au moment de la génération (pas
+// besoin que l'utilisateur ajoute quoi que ce soit dans son template) :
+// une page par adresse, saut de page entre chaque, jamais de page finale
+// blanche. Sortie : un seul .docx multi-pages, à convertir en PDF par
+// l'utilisateur (Word / Aperçu) — pas de conversion serveur (pas de
+// LibreOffice disponible dans ce runtime Cloud Functions).
 // ══════════════════════════════════════════════════════════════════
 
-// Réduit la taille de police si le texte dépasse la largeur disponible
-// (jamais en dessous de minSize), pour ne jamais déborder de la page.
-function tailleAjustee(font, text, maxWidth, preferredSize, minSize) {
-  let size = preferredSize;
-  while (size > minSize && font.widthOfTextAtSize(text, size) > maxWidth) size -= 0.5;
-  return size;
+// Injecte dans le XML brut du document une boucle Docxtemplater autour de
+// tout le contenu du corps (entre le 1er tableau et le sectPr final) :
+// {#pages} ... {#break}<saut de page>{/break} ... {/pages}. Le dernier
+// paragraphe avant sectPr (paragraphe vide que Word ajoute automatiquement
+// après un tableau) est remplacé par la fermeture de boucle plutôt que
+// complété : les laisser tous les deux provoque un double saut de page
+// sous Word/LibreOffice (bug constaté et vérifié empiriquement).
+function envelopperBouclePages(xml) {
+  const PAGES_OPEN = '<w:p><w:r><w:t xml:space="preserve">{#pages}</w:t></w:r></w:p>';
+  const BREAK_OPEN = '<w:p><w:r><w:t xml:space="preserve">{#break}</w:t></w:r></w:p>';
+  const PAGEBREAK = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+  const BREAK_CLOSE = '<w:p><w:r><w:t xml:space="preserve">{/break}</w:t></w:r></w:p>';
+  const CLOSE_P = '<w:p><w:r><w:t xml:space="preserve">{/pages}</w:t></w:r></w:p>';
+
+  const tblIdx = xml.indexOf("<w:tbl>");
+  const insertBeforeIdx = tblIdx !== -1 ? tblIdx : xml.indexOf("<w:p");
+  let out = xml.slice(0, insertBeforeIdx) + PAGES_OPEN + BREAK_OPEN + PAGEBREAK + BREAK_CLOSE + xml.slice(insertBeforeIdx);
+
+  const sectIdx = out.indexOf("<w:sectPr");
+  const before = out.slice(0, sectIdx);
+  const lastPStart = Math.max(before.lastIndexOf("<w:p "), before.lastIndexOf("<w:p>"));
+  out = lastPStart > -1 ? out.slice(0, lastPStart) + CLOSE_P + out.slice(sectIdx) : out.slice(0, sectIdx) + CLOSE_P + out.slice(sectIdx);
+  return out;
 }
 
 exports.campagneGenererAvisPassage = functions
@@ -2929,7 +2947,8 @@ exports.campagneGenererAvisPassage = functions
 
     try {
       const ExcelJS = require("exceljs");
-      const { PDFDocument, StandardFonts, rgb } = require("pdf-lib");
+      const PizZip = require("pizzip");
+      const Docxtemplater = require("docxtemplater");
       const path = require("path");
       const fs = require("fs");
       const { getFirestore } = require("firebase-admin/firestore");
@@ -2952,41 +2971,28 @@ exports.campagneGenererAvisPassage = functions
         const [tplBuffer] = await bucket.file(templateStoragePath).download();
         templateBytes = tplBuffer;
       } else {
-        templateBytes = fs.readFileSync(path.join(__dirname, "templates", "Template-Avis-de passage.pdf"));
+        templateBytes = fs.readFileSync(path.join(__dirname, "templates", "Template-Avis-de passage.docx"));
       }
 
-      const outputDoc = await PDFDocument.create();
+      const zip = new PizZip(templateBytes);
+      const rawXml = zip.file("word/document.xml").asText();
+      zip.file("word/document.xml", envelopperBouclePages(rawXml));
+      const docxtpl = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
-      for (const l of lignes) {
-        const srcDoc = await PDFDocument.load(templateBytes);
-        const page = srcDoc.getPages()[0];
-        const { width: pageWidth, height: pageHeight } = page.getSize();
-        const helvBold = await srcDoc.embedFont(StandardFonts.HelveticaBold);
-        const helv = await srcDoc.embedFont(StandardFonts.Helvetica);
+      const pages = lignes.map((l, i) => ({
+        "Adresse": l.adresse,
+        "date-heure": l.date1 ? `${l.date1} entre ${l.heure1}` : "",
+        break: i > 0,
+      }));
+      docxtpl.render({ pages });
+      const outBytes = docxtpl.getZip().generate({ type: "nodebuffer" });
 
-        const dateHeureLigne = `Date et heure du passage : ${l.date1 ? `${l.date1} entre ${l.heure1}` : ""}`;
-        // Reblanchit toute la ligne (pas seulement le placeholder) pour avoir
-        // toute la largeur disponible avant de réécrire la phrase complète.
-        page.drawRectangle({ x: 168, y: 515, width: pageWidth - 168 - 30, height: 20, color: rgb(1, 1, 1) });
-        const sizeDate = tailleAjustee(helvBold, dateHeureLigne, pageWidth - 168 - 30, 13, 9);
-        page.drawText(dateHeureLigne, { x: 172.8, y: 521.39, size: sizeDate, font: helvBold, color: rgb(0, 0, 0) });
-
-        const adresseMaxWidth = pageWidth - 494.8 - 24;
-        page.drawRectangle({ x: 490, y: 126, width: pageWidth - 490 - 15, height: 10, color: rgb(1, 1, 1) });
-        const sizeAdresse = tailleAjustee(helv, l.adresse, adresseMaxWidth, 6, 3.5);
-        page.drawText(l.adresse, { x: 494.8, y: 129.34, size: sizeAdresse, font: helv, color: rgb(117 / 255, 117 / 255, 117 / 255) });
-
-        const [copiedPage] = await outputDoc.copyPages(srcDoc, [0]);
-        outputDoc.addPage(copiedPage);
-      }
-
-      const outBytes = await outputDoc.save();
       const safeNom = sanitizeNomFichier(nom);
-      const outPath = `campagnes-documents/${campagneId}/avis-passage/avis-passage.pdf`;
-      const outFileName = `${safeNom} - Avis de passage.pdf`;
+      const outPath = `campagnes-documents/${campagneId}/avis-passage/avis-passage.docx`;
+      const outFileName = `${safeNom} - Avis de passage.docx`;
       const token = crypto.randomUUID();
-      await bucket.file(outPath).save(Buffer.from(outBytes), {
-        contentType: "application/pdf",
+      await bucket.file(outPath).save(outBytes, {
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         metadata: { contentDisposition: contentDispositionHeader(outFileName), metadata: { firebaseStorageDownloadTokens: token } },
       });
       const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
