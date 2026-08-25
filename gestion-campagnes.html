@@ -65,6 +65,15 @@
   .step-box.active{border-color:var(--green);box-shadow:0 4px 16px rgba(46,204,143,0.15);}
   .step-box .card-num{background:var(--border);color:var(--text-mid);}
   .step-box.active .card-num{background:var(--green);color:var(--navy);}
+  .camp-tabs-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+  .camp-tab{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:box-shadow 0.15s,border-color 0.15s;}
+  .camp-tab:hover{box-shadow:0 4px 16px rgba(13,27,42,0.08);}
+  .camp-tab.active{border-color:var(--green);box-shadow:0 4px 16px rgba(46,204,143,0.15);}
+  .camp-tab .card-num{background:var(--border);color:var(--text-mid);}
+  .camp-tab.active .card-num{background:var(--green);color:var(--navy);}
+  .camp-period{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-mid);margin-top:2px;}
+  .camp-period input{border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-mid);background:var(--bg);}
+  .camp-period .btn-icon{width:22px;height:22px;}
   .step-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;}
   .step-sub{font-size:11px;color:var(--text-muted);}
   .empty-state{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;}
@@ -182,36 +191,72 @@
       <div class="empty-state" id="campagnesEmpty" style="display:none;">Aucune campagne. Crée-en une pour commencer.</div>
     </div>
 
-    <!-- ═══ VUE 2 : DÉTAIL D'UNE CAMPAGNE (rapport consolidé + semaines) ═══ -->
+    <!-- ═══ VUE 2 : DÉTAIL D'UNE CAMPAGNE (3 onglets) ═══ -->
     <div id="viewCampagneDetail" style="display:none;">
       <button class="btn-back" onclick="backToCampagnes()">← Toutes les campagnes</button>
       <div class="page-header-row">
         <div>
           <div class="page-title" id="campagneTitle">—</div>
           <div class="page-sub" id="campagneSub">—</div>
+          <div class="camp-period" id="campPeriodView">
+            <span id="campPeriodText">Période non définie</span>
+            <button class="btn-icon" title="Modifier la période" onclick="openPeriodeEdit()">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            </button>
+          </div>
+          <div class="camp-period" id="campPeriodEdit" style="display:none;">
+            <input type="date" id="campDateDebut">
+            <span>→</span>
+            <input type="date" id="campDateFin">
+            <button class="btn-icon" title="Enregistrer" onclick="savePeriode()"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></button>
+            <button class="btn-icon" title="Annuler" onclick="cancelPeriodeEdit()">×</button>
+          </div>
         </div>
-        <button class="btn-add" onclick="openSemaineModal()">
-          <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          Nouvelle semaine
-        </button>
       </div>
 
-      <div class="card">
-        <div class="card-title">Rapport consolidé de la campagne</div>
-        <div class="card-sub">Agrège les reportings complets de toutes les semaines de cette campagne, et regroupe tous les PDF d'émargement dans un dossier (sous-dossiers "1er passage" / "2nd passage").</div>
-        <button class="btn-generate" id="btnGenConsolide" onclick="genererRapportConsolide()">Générer le rapport consolidé</button>
-        <div class="result-box" id="resultBoxConsolide">
-          <div class="r-title">Rapport consolidé généré</div>
-          <div class="r-stats" id="resultStatsConsolide"></div>
-          <a class="btn-download" id="dlZipConsolide" href="#" download>Télécharger le dossier PDF</a>
-          <a class="btn-download" id="dlXlsxConsolide" href="#" download>Télécharger le reporting Excel</a>
-        </div>
-        <div class="error-box" id="errorBoxConsolide"></div>
+      <div class="camp-tabs-row" id="campTabsRow">
+        <div class="camp-tab active" data-camp-tab="1" onclick="selectCampTab(1)"><span class="card-num">1</span><div><div class="step-title">Planification</div><div class="step-sub">À venir</div></div></div>
+        <div class="camp-tab" data-camp-tab="2" onclick="selectCampTab(2)"><span class="card-num">2</span><div><div class="step-title">Gestion documentation</div><div class="step-sub">Plannings, avis, convocations</div></div></div>
+        <div class="camp-tab" data-camp-tab="3" onclick="selectCampTab(3)"><span class="card-num">3</span><div><div class="step-title">Gestion rapport</div><div class="step-sub">Semaines, push Kizeo, reporting</div></div></div>
       </div>
 
-      <div class="section-sep">Semaines</div>
-      <div class="semaines-grid" id="semainesGrid"></div>
-      <div class="empty-state" id="semainesEmpty" style="display:none;">Aucune semaine. Crée-en une pour commencer le 1er passage.</div>
+      <!-- ONGLET 1 : PLANIFICATION -->
+      <div class="camp-tab-panel" id="campTabPanel1">
+        <div class="empty-state">Planification — à venir.</div>
+      </div>
+
+      <!-- ONGLET 2 : GESTION DOCUMENTATION -->
+      <div class="camp-tab-panel" id="campTabPanel2" style="display:none;">
+        <div class="empty-state">Gestion documentation — à venir.</div>
+      </div>
+
+      <!-- ONGLET 3 : GESTION RAPPORT (ex-contenu existant : rapport consolidé + semaines) -->
+      <div class="camp-tab-panel" id="campTabPanel3" style="display:none;">
+        <div class="page-header-row">
+          <div></div>
+          <button class="btn-add" onclick="openSemaineModal()">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Nouvelle semaine
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Rapport consolidé de la campagne</div>
+          <div class="card-sub">Agrège les reportings complets de toutes les semaines de cette campagne, et regroupe tous les PDF d'émargement dans un dossier (sous-dossiers "1er passage" / "2nd passage").</div>
+          <button class="btn-generate" id="btnGenConsolide" onclick="genererRapportConsolide()">Générer le rapport consolidé</button>
+          <div class="result-box" id="resultBoxConsolide">
+            <div class="r-title">Rapport consolidé généré</div>
+            <div class="r-stats" id="resultStatsConsolide"></div>
+            <a class="btn-download" id="dlZipConsolide" href="#" download>Télécharger le dossier PDF</a>
+            <a class="btn-download" id="dlXlsxConsolide" href="#" download>Télécharger le reporting Excel</a>
+          </div>
+          <div class="error-box" id="errorBoxConsolide"></div>
+        </div>
+
+        <div class="section-sep">Semaines</div>
+        <div class="semaines-grid" id="semainesGrid"></div>
+        <div class="empty-state" id="semainesEmpty" style="display:none;">Aucune semaine. Crée-en une pour commencer le 1er passage.</div>
+      </div>
     </div>
 
     <!-- ═══ VUE 3 : DÉTAIL D'UNE SEMAINE (4 étapes) ═══ -->
@@ -486,7 +531,7 @@ window.saveCampagne = async function() {
   const kizeoFormId2 = document.getElementById("mForm2").value.trim();
   if (!nom || !client || !kizeoFormId1 || !kizeoFormId2) { showToast("Tous les champs sont requis"); return; }
   const now = new Date().toISOString();
-  const ref = await addDoc(collection(db, "gestion-campagnes"), { nom, client, kizeoFormId1, kizeoFormId2, statut: "ouverte", createdAt: now, updatedAt: now });
+  const ref = await addDoc(collection(db, "gestion-campagnes"), { nom, client, kizeoFormId1, kizeoFormId2, campagneDateDebut: "", campagneDateFin: "", statut: "ouverte", createdAt: now, updatedAt: now });
   closeCampagneModal();
   await loadCampagnes();
   openCampagne(ref.id);
@@ -512,7 +557,41 @@ window.openCampagne = async function(campagneId) {
   document.getElementById("viewCampagneDetail").style.display = "block";
   document.getElementById("resultBoxConsolide").style.display = "none";
   document.getElementById("errorBoxConsolide").style.display = "none";
+  renderPeriode(c);
+  selectCampTab(1);
   await loadSemaines();
+};
+function renderPeriode(c) {
+  document.getElementById("campPeriodEdit").style.display = "none";
+  document.getElementById("campPeriodView").style.display = "flex";
+  const txt = (c.campagneDateDebut && c.campagneDateFin)
+    ? `${fmtDate(c.campagneDateDebut)} → ${fmtDate(c.campagneDateFin)}`
+    : "Période non définie";
+  document.getElementById("campPeriodText").textContent = txt;
+}
+window.openPeriodeEdit = function() {
+  const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
+  document.getElementById("campDateDebut").value = c.campagneDateDebut || "";
+  document.getElementById("campDateFin").value = c.campagneDateFin || "";
+  document.getElementById("campPeriodView").style.display = "none";
+  document.getElementById("campPeriodEdit").style.display = "flex";
+};
+window.cancelPeriodeEdit = function() {
+  const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
+  renderPeriode(c);
+};
+window.savePeriode = async function() {
+  const campagneDateDebut = document.getElementById("campDateDebut").value;
+  const campagneDateFin = document.getElementById("campDateFin").value;
+  await setDoc(doc(db, "gestion-campagnes", _currentCampagneId), { campagneDateDebut, campagneDateFin, updatedAt: new Date().toISOString() }, { merge: true });
+  const c = _campagnes.find(x => x.id === _currentCampagneId);
+  if (c) { c.campagneDateDebut = campagneDateDebut; c.campagneDateFin = campagneDateFin; }
+  renderPeriode(c || {});
+  showToast("Période mise à jour");
+};
+window.selectCampTab = function(n) {
+  document.querySelectorAll("#campTabsRow .camp-tab").forEach(el => el.classList.toggle("active", Number(el.dataset.campTab) === n));
+  [1, 2, 3].forEach(i => { document.getElementById("campTabPanel" + i).style.display = (i === n) ? "block" : "none"; });
 };
 window.backToCampagnes = function() {
   _currentCampagneId = null;
