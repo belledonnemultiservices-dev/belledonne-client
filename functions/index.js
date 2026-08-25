@@ -2952,74 +2952,106 @@ function dateLimiteAffichage(dateStr, joursAvant) {
   return formatDateFrancaise(d2);
 }
 
-// ── Page "Planning d'affichage" (1 bloc par jour : date prévue / date limite / adresses+commentaire) ──
-async function buildPlanningAffichageBodyXml(joursMap, joursAvant) {
-  const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, ShadingType, BorderStyle } = require("docx");
-  const BORDER = { style: BorderStyle.SINGLE, size: 4, color: "D9E2EA" };
-  const BORDERS = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
-  const cell = (text, opts = {}) => new TableCell({
-    width: opts.width ? { size: opts.width, type: WidthType.PERCENTAGE } : undefined,
-    shading: opts.shade ? { type: ShadingType.CLEAR, fill: opts.shade } : undefined,
-    borders: BORDERS,
-    margins: { top: 80, bottom: 80, left: 120, right: 120 },
-    children: [new Paragraph({ children: [new TextRun({ text: text || "", bold: !!opts.bold, size: opts.size || 20, color: opts.color })] })],
+exports.campagneGenererAvisPassage = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId, storagePath, nom, templateStoragePath } = req.body || {};
+    if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+
+    try {
+      const ExcelJS = require("exceljs");
+      const PizZip = require("pizzip");
+      const Docxtemplater = require("docxtemplater");
+      const path = require("path");
+      const fs = require("fs");
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const [buffer] = await bucket.file(storagePath).download();
+
+      const srcWb = new ExcelJS.Workbook();
+      await srcWb.xlsx.load(buffer);
+      const srcWs = srcWb.worksheets[0];
+      if (!srcWs) { res.status(400).json({ error: "Feuille source introuvable" }); return; }
+
+      const toutesLignes = lirePlanningSource(srcWs);
+      if (!toutesLignes.length) { res.status(400).json({ error: "Aucune adresse trouvée dans le fichier source" }); return; }
+      const vues = new Set();
+      const lignes = toutesLignes.filter(l => { if (vues.has(l.adresse)) return false; vues.add(l.adresse); return true; });
+
+      let templateBytes;
+      if (templateStoragePath) {
+        const [tplBuffer] = await bucket.file(templateStoragePath).download();
+        templateBytes = tplBuffer;
+      } else {
+        templateBytes = fs.readFileSync(path.join(__dirname, "templates", "Template-Avis-de passage.docx"));
+      }
+
+      const zip = new PizZip(templateBytes);
+      const rawXml = zip.file("word/document.xml").asText();
+      zip.file("word/document.xml", envelopperBouclePages(rawXml));
+      const docxtpl = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+      const pages = lignes.map((l, i) => ({
+        "Adresse": l.adresse,
+        "date-heure": l.date1 ? `${l.date1} entre ${l.heure1}` : "",
+        break: i > 0,
+      }));
+      docxtpl.render({ pages });
+      const outBytes = docxtpl.getZip().generate({ type: "nodebuffer" });
+
+      const safeNom = sanitizeNomFichier(nom);
+      const outPath = `campagnes-documents/${campagneId}/avis-passage/avis-passage.docx`;
+      const outFileName = `${safeNom} - Avis de passage.docx`;
+      const token = crypto.randomUUID();
+      await bucket.file(outPath).save(outBytes, {
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        metadata: { contentDisposition: contentDispositionHeader(outFileName), metadata: { firebaseStorageDownloadTokens: token } },
+      });
+      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
+
+      const nowIso = new Date().toISOString();
+      const statsText = `${lignes.length} avis (${lignes.length} page(s))`;
+      await db.collection("campagnes-documents-generes").doc(`${campagneId}__avis-passage`).set({
+        campagneId, type: "avis-passage", fileName: outFileName, url, storagePath: outPath, statsText, createdAt: nowIso,
+      });
+
+      res.status(200).json({ success: true, url, fileName: outFileName, statsText });
+    } catch(e) {
+      console.error("campagneGenererAvisPassage:", e);
+      res.status(500).json({ error: e.message });
+    }
   });
 
-  const children = [
-    new Paragraph({ children: [new TextRun({ text: "Planning d'affichage des avis de passage", bold: true, size: 32 })] }),
-    new Paragraph({ text: "" }),
-  ];
-  for (const [jour, adresses] of joursMap) {
-    const limite = dateLimiteAffichage(jour, joursAvant);
-    children.push(new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE }, borders: BORDERS, rows: [
-        new TableRow({ children: [
-          cell("Désinsectisation prévue : " + jour, { shade: "0D1B2A", bold: true, width: 50, color: "FFFFFF" }),
-          cell("Date limite d'affichage : " + limite, { shade: "E74C3C", bold: true, width: 50, color: "FFFFFF" }),
-        ] }),
-      ],
-    }));
-    children.push(new Paragraph({ text: "" }));
-    const rows = [new TableRow({ children: [cell("Adresse", { shade: "EFEFEF", bold: true, width: 60 }), cell("Commentaire", { shade: "EFEFEF", bold: true, width: 40 })] })];
-    adresses.forEach(a => rows.push(new TableRow({ children: [cell(a, { width: 60 }), cell("", { width: 40 })] })));
-    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: BORDERS, rows }));
-    children.push(new Paragraph({ text: "" }));
-  }
-  const doc = new Document({ sections: [{ children }] });
-  const buffer = await Packer.toBuffer(doc);
+// ══════════════════════════════════════════════════════════════════
+// PLANNING D'AFFICHAGE (docx indépendant) : template = 1 tableau à 3
+// lignes (date prévue+limite / labels Adresse-Commentaire / ligne modèle
+// ##adresse), balises ##dateprévue / ##datelimite / ##adresse. Le
+// générateur duplique ce tableau une fois par journée de désinsectisation
+// (avec autant de lignes ##adresse que d'adresses ce jour-là).
+// ══════════════════════════════════════════════════════════════════
 
-  const PizZip = require("pizzip");
-  const zip = new PizZip(buffer);
-  const xml = zip.file("word/document.xml").asText();
-  const bodyMatch = xml.match(/<w:body>([\s\S]*)<\/w:body>/);
-  const body = bodyMatch[1];
-  const sectIdx = body.lastIndexOf("<w:sectPr");
-  const bodyNoSect = sectIdx !== -1 ? body.slice(0, sectIdx) : body;
-  return mergeBreakIntoLastParagraph(bodyNoSect);
+function genererTableauJour(tblPrXml, tblGridXml, rowDateXml, rowLabelsXml, rowAdresseXml, jour, adresses, joursAvant) {
+  const limite = dateLimiteAffichage(jour, joursAvant);
+  const rowDate = rowDateXml
+    .replace(/##datepr[ée]vue/gi, escapeXml(jour))
+    .replace(/##datelimite/gi, escapeXml(limite));
+  const rowsAdresses = adresses.map(a => rowAdresseXml.replace(/##adresse/gi, escapeXml(a))).join("");
+  return `<w:tbl>${tblPrXml}${tblGridXml}${rowDate}${rowLabelsXml}${rowsAdresses}</w:tbl>`;
+}
+function escapeXml(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Fusionne un saut de page dans le DERNIER paragraphe d'un fragment de body plutôt que
-// d'en ajouter un séparé (double saut de page sinon, cf. envelopperBouclePages). La
-// librairie "docx" termine ses paragraphes vides par un <w:p/> auto-fermant (pas
-// <w:p>...</w:p>), à gérer séparément du cas des templates Word classiques.
-function mergeBreakIntoLastParagraph(bodyXml) {
-  const BREAK_RUN = '<w:r><w:br w:type="page"/></w:r>';
-  const selfClose = bodyXml.lastIndexOf("<w:p/>");
-  const openSpace = bodyXml.lastIndexOf("<w:p ");
-  const openPlain = bodyXml.lastIndexOf("<w:p>");
-  const kind = (selfClose >= openSpace && selfClose >= openPlain) ? "self" : (openSpace >= openPlain ? "space" : "plain");
-  const idx = kind === "self" ? selfClose : (kind === "space" ? openSpace : openPlain);
-  if (idx === -1) return bodyXml + `<w:p>${BREAK_RUN}</w:p>`;
-  if (kind === "self") {
-    return bodyXml.slice(0, idx) + `<w:p>${BREAK_RUN}</w:p>` + bodyXml.slice(idx + "<w:p/>".length);
-  }
-  const closeIdx = bodyXml.indexOf("</w:p>", idx) + "</w:p>".length;
-  const para = bodyXml.slice(idx, closeIdx);
-  const merged = para.replace("</w:p>", `${BREAK_RUN}</w:p>`);
-  return bodyXml.slice(0, idx) + merged + bodyXml.slice(closeIdx);
-}
-
-exports.campagneGenererAvisPassage = functions
+exports.campagneGenererPlanningAffichage = functions
   .region("europe-west1")
   .runWith({ timeoutSeconds: 300 })
   .https.onRequest(async (req, res) => {
@@ -3038,7 +3070,6 @@ exports.campagneGenererAvisPassage = functions
     try {
       const ExcelJS = require("exceljs");
       const PizZip = require("pizzip");
-      const Docxtemplater = require("docxtemplater");
       const path = require("path");
       const fs = require("fs");
       const { getFirestore } = require("firebase-admin/firestore");
@@ -3067,32 +3098,44 @@ exports.campagneGenererAvisPassage = functions
         const [tplBuffer] = await bucket.file(templateStoragePath).download();
         templateBytes = tplBuffer;
       } else {
-        templateBytes = fs.readFileSync(path.join(__dirname, "templates", "Template-Avis-de passage.docx"));
+        templateBytes = fs.readFileSync(path.join(__dirname, "templates", "Template-planning-affichage.docx"));
       }
 
       const zip = new PizZip(templateBytes);
-      const rawXml = zip.file("word/document.xml").asText();
-      zip.file("word/document.xml", envelopperBouclePages(rawXml));
-      const docxtpl = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+      const xml = zip.file("word/document.xml").asText();
+      const tblStart = xml.indexOf("<w:tbl>");
+      const tblEnd = xml.indexOf("</w:tbl>") + "</w:tbl>".length;
+      if (tblStart === -1 || tblEnd === -1) { res.status(400).json({ error: "Template invalide : aucun tableau trouvé" }); return; }
+      const tblXml = xml.slice(tblStart, tblEnd);
+      const tblPrMatch = tblXml.match(/<w:tblPr>[\s\S]*?<\/w:tblPr>/);
+      // w:tblGrid peut contenir un w:tblGridChange imbriqué avec son PROPRE w:tblGrid
+      // interne (historique Google Docs) : on prend tout jusqu'au 1er <w:tr, pas jusqu'à
+      // la 1ère fermeture </w:tblGrid> (qui serait celle, imbriquée, de trop tôt).
+      const tblGridStart = tblXml.indexOf("<w:tblGrid>");
+      const firstTrIdx = tblXml.indexOf("<w:tr");
+      const tblGridXml = (tblGridStart !== -1 && firstTrIdx !== -1) ? tblXml.slice(tblGridStart, firstTrIdx) : "";
+      const rows = tblXml.match(/<w:tr\b[\s\S]*?<\/w:tr>/g) || [];
+      const rowDateXml = rows.find(r => /##datepr[ée]vue/i.test(r));
+      const rowAdresseXml = rows.find(r => /##adresse/i.test(r));
+      const rowLabelsXml = rows.find(r => r !== rowDateXml && r !== rowAdresseXml);
+      if (!tblPrMatch || !tblGridXml || !rowDateXml || !rowAdresseXml || !rowLabelsXml) {
+        res.status(400).json({ error: "Template invalide : structure attendue (3 lignes : dates / labels / ##adresse) introuvable" });
+        return;
+      }
 
-      const pages = lignes.map((l, i) => ({
-        "Adresse": l.adresse,
-        "date-heure": l.date1 ? `${l.date1} entre ${l.heure1}` : "",
-        break: i > 0,
-      }));
-      docxtpl.render({ pages });
-      const outZip = docxtpl.getZip();
+      const spacer = "<w:p/>";
+      let tables = "";
+      for (const [jour, adresses] of joursMap) {
+        tables += genererTableauJour(tblPrMatch[0], tblGridXml, rowDateXml, rowLabelsXml, rowAdresseXml, jour, adresses, nbJoursAvant) + spacer;
+      }
 
-      // Préfixe une page "Planning d'affichage" (1 bloc par jour : date prévue,
-      // date limite d'affichage, adresses du jour + colonne commentaire vide).
-      const planningBodyXml = await buildPlanningAffichageBodyXml(joursMap, nbJoursAvant);
-      const finalXml = outZip.file("word/document.xml").asText().replace("<w:body>", "<w:body>" + planningBodyXml);
-      outZip.file("word/document.xml", finalXml);
-      const outBytes = outZip.generate({ type: "nodebuffer" });
+      const finalXml = xml.slice(0, tblStart) + tables + xml.slice(tblEnd);
+      zip.file("word/document.xml", finalXml);
+      const outBytes = zip.generate({ type: "nodebuffer" });
 
       const safeNom = sanitizeNomFichier(nom);
-      const outPath = `campagnes-documents/${campagneId}/avis-passage/avis-passage.docx`;
-      const outFileName = `${safeNom} - Avis de passage.docx`;
+      const outPath = `campagnes-documents/${campagneId}/planning-affichage/planning-affichage.docx`;
+      const outFileName = `${safeNom} - Planning d'affichage.docx`;
       const token = crypto.randomUUID();
       await bucket.file(outPath).save(outBytes, {
         contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -3101,14 +3144,14 @@ exports.campagneGenererAvisPassage = functions
       const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
 
       const nowIso = new Date().toISOString();
-      const statsText = `${lignes.length} avis + 1 page de planning d'affichage (${joursMap.size} jour(s), affichage ${nbJoursAvant}j avant)`;
-      await db.collection("campagnes-documents-generes").doc(`${campagneId}__avis-passage`).set({
-        campagneId, type: "avis-passage", fileName: outFileName, url, storagePath: outPath, statsText, createdAt: nowIso,
+      const statsText = `${joursMap.size} jour(s), ${lignes.length} adresse(s), affichage ${nbJoursAvant}j avant`;
+      await db.collection("campagnes-documents-generes").doc(`${campagneId}__planning-affichage`).set({
+        campagneId, type: "planning-affichage", fileName: outFileName, url, storagePath: outPath, statsText, createdAt: nowIso,
       });
 
       res.status(200).json({ success: true, url, fileName: outFileName, statsText });
     } catch(e) {
-      console.error("campagneGenererAvisPassage:", e);
+      console.error("campagneGenererPlanningAffichage:", e);
       res.status(500).json({ error: e.message });
     }
   });
