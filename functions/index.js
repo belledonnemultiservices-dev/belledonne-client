@@ -1141,7 +1141,7 @@ exports.pushKizeoForm = functions
     if (req.method === "OPTIONS") { res.status(204).send(""); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { suiviId, numPassage, kizeoFormDocId, recipientUserId, libelle } = req.body || {};
+    const { suiviId, numPassage, passageId, kizeoFormDocId, recipientUserId, libelle } = req.body || {};
     if (!suiviId || !numPassage || !kizeoFormDocId) { res.status(400).json({ error: "suiviId, numPassage et kizeoFormDocId requis" }); return; }
     const recipient = parseInt(recipientUserId, 10);
     if (!recipient) { res.status(400).json({ error: "Technicien Kizeo (recipientUserId) manquant ou invalide" }); return; }
@@ -1162,9 +1162,17 @@ exports.pushKizeoForm = functions
     if (!sSnap.exists) { res.status(404).json({ error: "Intervention introuvable" }); return; }
     const s = sSnap.data();
     const passages = Array.isArray(s.passages) ? s.passages : [];
-    const passage = passages.find(p => String(p.num) === String(numPassage)) || {};
+    // Un même numéro de passage peut exister en double (contrat récurrent relancé) :
+    // on cible en priorité par passageId (identifiant stable envoyé par le front),
+    // avec repli sur num pour les anciens passages sans passageId.
+    const passage = (passageId && passages.find(p => p.passageId === passageId))
+      || passages.find(p => String(p.num) === String(numPassage))
+      || {};
     const dateVal = (passage.debut ? String(passage.debut).split("T")[0] : (s.dateEmission || ""));
     const reference = s.bc || s.pl || s.devis || "";
+    // Format figé par le contrat externe Kizeo (webhook attend suiviId::numPassage, cf. regex
+    // de réception) : ne pas y injecter passageId, qui ne sert qu'à cibler la bonne occurrence
+    // ci-dessus quand plusieurs passages partagent le même num (contrat récurrent relancé).
     const refInterne = `${suiviId}::${numPassage}`;
 
     // Ligne existante pour ce passage (même en attente, déjà reçue, envoyée...) :
@@ -1251,6 +1259,7 @@ exports.pushKizeoForm = functions
         renvois,
         origine: "app",
         suiviId,
+        passageId: passageId || null,
         client: s.client || "",
         bc: reference,
         numPassage: parseInt(numPassage, 10),
@@ -1275,9 +1284,13 @@ exports.pushKizeoForm = functions
     // cohérent que le renvoi ait été déclenché depuis le Suivi ou depuis Gestion rapports.
     try {
       const nowIso = new Date().toISOString();
-      const updatedPassages = passages.map(p => String(p.num) === String(numPassage)
-        ? { ...p, kizeoPush: { at: nowIso, technicien, formNom: form.nom || "", libelle: baseLibelle, kizeoFormDocId: String(kizeoFormDocId), recipientUserId: String(recipientUserId) } }
-        : p);
+      const targetPassageId = passageId || passage.passageId || null;
+      const updatedPassages = passages.map(p => {
+        const isTarget = targetPassageId ? p.passageId === targetPassageId : String(p.num) === String(numPassage);
+        return isTarget
+          ? { ...p, kizeoPush: { at: nowIso, technicien, formNom: form.nom || "", libelle: baseLibelle, kizeoFormDocId: String(kizeoFormDocId), recipientUserId: String(recipientUserId) } }
+          : p;
+      });
       await db.collection("suivi").doc(String(suiviId)).update({ passages: updatedPassages });
     } catch(e) {
       console.error("Kizeo push : mise à jour du badge Suivi échouée:", e.message);

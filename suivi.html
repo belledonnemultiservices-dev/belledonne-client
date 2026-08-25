@@ -1474,6 +1474,7 @@ function getPassagesFromDOM() {
     try { manualRapport = JSON.parse(div.dataset.manualRapport || 'null'); } catch(e) { manualRapport = null; }
     passages.push({
       num: parseInt(document.getElementById('fPassageNum' + n)?.value) || null,
+      passageId: div.dataset.passageId || null,
       debut: document.getElementById('fDateDebut' + n)?.value || '',
       fin: document.getElementById('fDateFin' + n)?.value || '',
       titre: document.getElementById('fTitre' + n)?.value || '',
@@ -1623,7 +1624,7 @@ function renderPassageCalButtons(n, calEventMap) {
 function addPassage(value = '', calEventId = '') {
   passageCount++;
   const n = passageCount;
-  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null, savedStatut = '', savedManualRapport = null;
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null, savedStatut = '', savedManualRapport = null, savedPassageId = null;
   if (value && typeof value === 'object') {
     debut = value.debut || '';
     fin = value.fin || '';
@@ -1635,6 +1636,7 @@ function addPassage(value = '', calEventId = '') {
     savedKizeoPush = value.kizeoPush || null;
     savedStatut = value.statut || '';
     savedManualRapport = value.manualRapport || null;
+    savedPassageId = value.passageId || null;
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   }
@@ -1645,6 +1647,7 @@ function addPassage(value = '', calEventId = '') {
   const container = document.getElementById('passagesContainer');
   const div = document.createElement('div');
   div.id = 'passage_' + n;
+  div.dataset.passageId = savedPassageId || (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '_' + Math.random().toString(36).slice(2)));
   div.dataset.calEventId = JSON.stringify(calMap);
   div.dataset.kizeoPush = JSON.stringify(savedKizeoPush);
   div.dataset.statutPassage = savedStatut;
@@ -1809,6 +1812,7 @@ function buildKizeoControl(n) {
 }
 window.genererRapportKizeo = async function(n) {
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
+  const passageId = document.getElementById('passage_' + n)?.dataset.passageId || null;
   const kizeoFormDocId = document.getElementById('kzForm' + n)?.value;
   const recipientUserId = document.getElementById('kzTech' + n)?.value;
   const libelle = (document.getElementById('kzLabel' + n)?.value || '').trim();
@@ -1828,7 +1832,7 @@ window.genererRapportKizeo = async function(n) {
     const resp = await fetch("https://europe-west1-belledonne-client.cloudfunctions.net/pushKizeoForm", {
       method: 'POST',
       headers: await window._authHeaders(),
-      body: JSON.stringify({ suiviId: editId, numPassage: num, kizeoFormDocId, recipientUserId, libelle }),
+      body: JSON.stringify({ suiviId: editId, numPassage: num, passageId, kizeoFormDocId, recipientUserId, libelle }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
@@ -3498,6 +3502,7 @@ function getPassagesFromDOMT() {
     try { kizeoPush = JSON.parse(div.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }
     passages.push({
       num: parseInt(document.getElementById('fPassageNumT' + n)?.value) || null,
+      passageId: div.dataset.passageId || null,
       debut: document.getElementById('fDateDebutT' + n)?.value || '',
       fin: document.getElementById('fDateFinT' + n)?.value || '',
       titre: document.getElementById('fTitreT' + n)?.value || '',
@@ -3825,6 +3830,7 @@ function buildKizeoControlT(n) {
 }
 window.genererRapportKizeoT = async function(n) {
   const num = parseInt(document.getElementById('fPassageNumT' + n)?.value) || n;
+  const passageId = document.getElementById('passageT_' + n)?.dataset.passageId || null;
   const kizeoFormDocId = document.getElementById('kzFormT' + n)?.value;
   const recipientUserId = document.getElementById('kzTechT' + n)?.value;
   const libelle = (document.getElementById('kzLabelT' + n)?.value || '').trim();
@@ -3844,7 +3850,7 @@ window.genererRapportKizeoT = async function(n) {
     const resp = await fetch("https://europe-west1-belledonne-client.cloudfunctions.net/pushKizeoForm", {
       method: 'POST',
       headers: await window._authHeaders(),
-      body: JSON.stringify({ suiviId: editIdT, numPassage: num, kizeoFormDocId, recipientUserId, libelle }),
+      body: JSON.stringify({ suiviId: editIdT, numPassage: num, passageId, kizeoFormDocId, recipientUserId, libelle }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
@@ -3869,11 +3875,12 @@ window.refreshAllRapportZonesT = function() {
 function addPassageT(value = '', calEventId = '') {
   passageCountT++;
   const n = passageCountT;
-  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null, savedStatut = '';
+  let debut = '', fin = '', savedTitre = '', savedDesc = '', savedAdresse = '', savedTechs = [], savedNum = null, savedKizeoPush = null, savedStatut = '', savedPassageId = null;
   if (value && typeof value === 'object') {
     debut = value.debut || ''; fin = value.fin || ''; savedTitre = value.titre || ''; savedDesc = value.desc || '';
     savedAdresse = value.adresse || ''; savedTechs = Array.isArray(value.techs) ? value.techs : (value.tech ? [value.tech] : []);
     savedNum = value.num || null; savedKizeoPush = value.kizeoPush || null; savedStatut = value.statut || '';
+    savedPassageId = value.passageId || null;
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
   }
@@ -3884,6 +3891,7 @@ function addPassageT(value = '', calEventId = '') {
   const container = document.getElementById('passagesContainerT');
   const div = document.createElement('div');
   div.id = 'passageT_' + n;
+  div.dataset.passageId = savedPassageId || (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '_' + Math.random().toString(36).slice(2)));
   div.dataset.calEventId = JSON.stringify(calMap);
   div.dataset.kizeoPush = JSON.stringify(savedKizeoPush);
   div.dataset.statutPassage = savedStatut;
