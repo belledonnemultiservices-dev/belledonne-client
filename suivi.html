@@ -1525,25 +1525,46 @@ async function addPassageToCalendar(n) {
   } else { container.innerHTML = origHTML; }
 }
 async function updatePassageInCalendar(n) {
-  const calMap = getPassageCalMap(n);
-  const techsWithEvents = Object.entries(calMap).filter(([,id])=>id);
-  if (!techsWithEvents.length) { showToast('Aucun événement agenda lié à ce passage.', true); return; }
+  const calMap = {...getPassageCalMap(n)};
+  const currentTechs = getPassageTechsFromDOM(n);
+  if (!currentTechs.length) { showToast('Aucun événement agenda lié à ce passage.', true); return; }
   const debut = document.getElementById('fDateDebut' + n)?.value || '';
   const fin = document.getElementById('fDateFin' + n)?.value || '';
   const container = document.getElementById('calBtns' + n);
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Mise à jour...</span>';
+  // Technicien retiré du passage depuis la création de l'événement : on retire son
+  // événement de son agenda (sinon il reste un événement fantôme).
+  let removed = 0;
+  for (const techName of Object.keys(calMap)) {
+    if (currentTechs.includes(techName) || !calMap[techName]) continue;
+    const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    if (tech?.email) {
+      try { await _calendarRequest({ technicienEmail: tech.email, operation: 'delete', calEventId: calMap[techName] }); }
+      catch(err) { showToast('Erreur suppression agenda (' + techName + ') : ' + err.message, true); }
+    }
+    delete calMap[techName];
+    removed++;
+  }
   let updated = 0;
-  for (const [techName, calEventId] of techsWithEvents) {
+  for (const techName of currentTechs) {
     const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
     if (!tech?.email) continue;
+    const existingEventId = calMap[techName];
     try {
-      const result = await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitre'+n)?.value||'', customDescription: document.getElementById('fDesc'+n)?.value||'', adresse: document.getElementById('fAdresseCal'+n)?.value||'', colorId: tech.calendarColorId||null });
-      if (result.success || result.created > 0) updated++;
-      else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
+      // Technicien déjà présent au moment de la création : mise à jour de son événement.
+      // Technicien ajouté depuis (pas encore d'eventId) : création d'un nouvel événement,
+      // sinon il n'apparaissait jamais dans son agenda (bug corrigé).
+      const result = existingEventId
+        ? await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], operation: 'update', calEventId: existingEventId, customSummary: document.getElementById('fTitre'+n)?.value||'', customDescription: document.getElementById('fDesc'+n)?.value||'', adresse: document.getElementById('fAdresseCal'+n)?.value||'', colorId: tech.calendarColorId||null })
+        : await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], customSummary: document.getElementById('fTitre'+n)?.value||'', customDescription: document.getElementById('fDesc'+n)?.value||'', adresse: document.getElementById('fAdresseCal'+n)?.value||'', colorId: tech.calendarColorId||null });
+      if (result.success || result.created > 0) {
+        if (!existingEventId) calMap[techName] = result.results?.[0]?.eventId || '';
+        updated++;
+      } else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
     } catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }
   }
-  if (updated > 0) { showToast('✅ Agenda mis à jour'); renderPassageCalButtons(n, calMap); refreshCalendarFrame(debut); }
+  if (updated > 0 || removed > 0) { showToast('✅ Agenda mis à jour'); renderPassageCalButtons(n, calMap); await _saveCalEventId(n, calMap); refreshCalendarFrame(debut); }
   else container.innerHTML = origHTML;
 }
 async function removePassageFromCalendar(n) {
@@ -3550,25 +3571,42 @@ async function addPassageToCalendarT(n) {
   } else { container.innerHTML = origHTML; }
 }
 async function updatePassageInCalendarT(n) {
-  const calMap = getPassageCalMapT(n);
-  const techsWithEvents = Object.entries(calMap).filter(([,id])=>id);
-  if (!techsWithEvents.length) { showToast('Aucun événement agenda lié à ce passage.', true); return; }
+  const calMap = {...getPassageCalMapT(n)};
+  const currentTechs = getPassageTechsFromDOMT(n);
+  if (!currentTechs.length) { showToast('Aucun événement agenda lié à ce passage.', true); return; }
   const debut = document.getElementById('fDateDebutT' + n)?.value || '';
   const fin = document.getElementById('fDateFinT' + n)?.value || '';
   const container = document.getElementById('calBtnsT' + n);
   const origHTML = container.innerHTML;
   container.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Mise à jour...</span>';
+  let removed = 0;
+  for (const techName of Object.keys(calMap)) {
+    if (currentTechs.includes(techName) || !calMap[techName]) continue;
+    const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
+    if (tech?.email) {
+      try { await _calendarRequest({ technicienEmail: tech.email, operation: 'delete', calEventId: calMap[techName] }); }
+      catch(err) { showToast('Erreur suppression agenda (' + techName + ') : ' + err.message, true); }
+    }
+    delete calMap[techName];
+    removed++;
+  }
   let updated = 0;
-  for (const [techName, calEventId] of techsWithEvents) {
+  for (const techName of currentTechs) {
     const tech = (window._techniciens||[]).find(t=>t.nomComplet===techName||t.nom===techName);
     if (!tech?.email) continue;
+    const existingEventId = calMap[techName];
     try {
-      const result = await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], operation: 'update', calEventId, customSummary: document.getElementById('fTitreT'+n)?.value||'', customDescription: document.getElementById('fDescT'+n)?.value||'', adresse: document.getElementById('fAdresseCalT'+n)?.value||'', colorId: tech.calendarColorId||null });
-      if (result.success || result.created > 0) updated++;
-      else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
+      // Technicien ajouté depuis la création de l'événement : on le crée au lieu de l'ignorer.
+      const result = existingEventId
+        ? await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], operation: 'update', calEventId: existingEventId, customSummary: document.getElementById('fTitreT'+n)?.value||'', customDescription: document.getElementById('fDescT'+n)?.value||'', adresse: document.getElementById('fAdresseCalT'+n)?.value||'', colorId: tech.calendarColorId||null })
+        : await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], customSummary: document.getElementById('fTitreT'+n)?.value||'', customDescription: document.getElementById('fDescT'+n)?.value||'', adresse: document.getElementById('fAdresseCalT'+n)?.value||'', colorId: tech.calendarColorId||null });
+      if (result.success || result.created > 0) {
+        if (!existingEventId) calMap[techName] = result.results?.[0]?.eventId || '';
+        updated++;
+      } else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
     } catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }
   }
-  if (updated > 0) { showToast('✅ Agenda mis à jour'); renderPassageCalButtonsT(n, calMap); if (typeof refreshCalendarFrame === 'function') refreshCalendarFrame(debut); }
+  if (updated > 0 || removed > 0) { showToast('✅ Agenda mis à jour'); renderPassageCalButtonsT(n, calMap); await _saveCalEventIdT(n, calMap); if (typeof refreshCalendarFrame === 'function') refreshCalendarFrame(debut); }
   else container.innerHTML = origHTML;
 }
 async function removePassageFromCalendarT(n) {
