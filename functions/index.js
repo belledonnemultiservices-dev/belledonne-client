@@ -2613,7 +2613,7 @@ exports.campagneGenererPlanningClient = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId, storagePath, nom } = req.body || {};
+    const { campagneId, storagePath, nom, templateStoragePath } = req.body || {};
     if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
 
     try {
@@ -2638,9 +2638,14 @@ exports.campagneGenererPlanningClient = functions
         return true;
       });
 
-      const tplPath = path.join(__dirname, "templates", "Template-Planning-client.xlsx");
       const wb = new ExcelJS.Workbook();
-      await wb.xlsx.readFile(tplPath);
+      if (templateStoragePath) {
+        const [tplBuffer] = await bucket.file(templateStoragePath).download();
+        await wb.xlsx.load(tplBuffer);
+      } else {
+        const tplPath = path.join(__dirname, "templates", "Template-Planning-client.xlsx");
+        await wb.xlsx.readFile(tplPath);
+      }
       const ws = wb.worksheets[0];
 
       ws.getCell("A1").value = nom;

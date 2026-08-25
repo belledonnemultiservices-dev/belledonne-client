@@ -48,6 +48,11 @@ service firebase.storage {
     match /campagnes-reception/{file=**}   { allow read, write: if isAdmin(); }
     match /campagnes-reportings/{file=**}  { allow read, write: if isAdmin(); }
 
+    // campagnes-documents : fichier source + documents générés (Gestion documentation), admin only
+    match /campagnes-documents/{file=**}   { allow read, write: if isAdmin(); }
+    // campagnes-templates : templates uploadés manuellement (Planning client/technicien, Avis, Convocation), admin only
+    match /campagnes-templates/{file=**}   { allow read, write: if isAdmin(); }
+
     // Tout le reste : refusé
     match /{path=**}                     { allow read, write: if false; }
   }

@@ -74,6 +74,10 @@
   .camp-period{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-mid);margin-top:2px;}
   .camp-period input{border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-mid);background:var(--bg);}
   .camp-period .btn-icon{width:22px;height:22px;}
+  .tpl-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+  .btn-tpl{height:32px;padding:0 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--text-mid);cursor:pointer;white-space:nowrap;}
+  .btn-tpl:hover{background:#E5EAF0;}
+  .tpl-fname{font-size:12px;color:var(--text-muted);}
   .step-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;}
   .step-sub{font-size:11px;color:var(--text-muted);}
   .empty-state{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;}
@@ -243,6 +247,11 @@
         <div class="card">
           <div class="card-title">Planning client</div>
           <div class="card-sub">Génère un planning Excel par adresse (1er passage / 2nd passage), à partir du fichier source et du template.</div>
+          <div class="tpl-row" id="tplRow-planningClient">
+            <button class="btn-tpl" onclick="document.getElementById('tplInput-planningClient').click()">Charger le template (.xlsx)</button>
+            <span class="tpl-fname" id="tplFname-planningClient">Template par défaut</span>
+          </div>
+          <input type="file" id="tplInput-planningClient" accept=".xlsx,.xls" style="display:none" onchange="onTemplateSelected(event,'planningClient')">
           <div class="form-group" style="max-width:400px;">
             <label class="form-label">Nom (sert aussi de nom de fichier)</label>
             <input class="form-input" type="text" id="pcNom" placeholder="ex: Planning ACTIS TMR - Octobre 2026">
@@ -646,10 +655,35 @@ window.selectCampTab = function(n) {
 // ═══════════════════════════════════════════════════════════════
 // ONGLET GESTION DOCUMENTATION
 // ═══════════════════════════════════════════════════════════════
+const TEMPLATE_KEYS = ["planningClient"]; // étendu plus tard : planningTechnicien, avisPassage, convocation
 function renderDocSourceState() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
   document.getElementById("docFileName").textContent = c.docSourceNom || "";
+  TEMPLATE_KEYS.forEach(key => {
+    const el = document.getElementById("tplFname-" + key);
+    if (el) el.textContent = c["tpl_" + key + "_Nom"] || "Template par défaut";
+  });
 }
+window.onTemplateSelected = async function(event, key) {
+  const file = event.target.files[0];
+  if (!file || !_currentCampagneId) return;
+  try {
+    const storagePath = `campagnes-templates/${_currentCampagneId}/${key}_${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+    const storageRef = ref(storage, storagePath);
+    await new Promise((resolve, reject) => {
+      const task = uploadBytesResumable(storageRef, file);
+      task.on("state_changed", () => {}, reject, resolve);
+    });
+    const patch = {}; patch["tpl_" + key + "_StoragePath"] = storagePath; patch["tpl_" + key + "_Nom"] = file.name; patch.updatedAt = new Date().toISOString();
+    await setDoc(doc(db, "gestion-campagnes", _currentCampagneId), patch, { merge: true });
+    const c = _campagnes.find(x => x.id === _currentCampagneId);
+    if (c) Object.assign(c, patch);
+    document.getElementById("tplFname-" + key).textContent = file.name;
+    showToast("Template mis à jour");
+  } catch(e) {
+    showToast("Erreur upload template : " + e.message);
+  }
+};
 window.onDocFileSelected = async function(event) {
   const file = event.target.files[0];
   if (!file || !_currentCampagneId) return;
@@ -690,7 +724,7 @@ window.genererPlanningClient = async function() {
     const resp = await fetch(FN_DOC_PLANNING_CLIENT, {
       method: "POST",
       headers: await authHeaders(),
-      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom }),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_planningClient_StoragePath || null }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
