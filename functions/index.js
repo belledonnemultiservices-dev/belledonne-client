@@ -2931,6 +2931,94 @@ function envelopperBouclePages(xml) {
   return out;
 }
 
+// ── Dates françaises longues ("Lundi 5 octobre 2026") : parsing + calcul ──
+const JOURS_SEMAINE = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+const MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+function parseDateFrancaise(str) {
+  const m = String(str || "").trim().match(/^\S+\s+(\d{1,2})\s+(\S+)\s+(\d{4})$/);
+  if (!m) return null;
+  const monthIdx = MOIS_FR.indexOf(m[2].toLowerCase());
+  if (monthIdx === -1) return null;
+  return new Date(parseInt(m[3], 10), monthIdx, parseInt(m[1], 10));
+}
+function formatDateFrancaise(date) {
+  return `${JOURS_SEMAINE[date.getDay()]} ${date.getDate()} ${MOIS_FR[date.getMonth()]} ${date.getFullYear()}`;
+}
+function dateLimiteAffichage(dateStr, joursAvant) {
+  const d = parseDateFrancaise(dateStr);
+  if (!d) return "";
+  const d2 = new Date(d);
+  d2.setDate(d2.getDate() - joursAvant);
+  return formatDateFrancaise(d2);
+}
+
+// ── Page "Planning d'affichage" (1 bloc par jour : date prévue / date limite / adresses+commentaire) ──
+async function buildPlanningAffichageBodyXml(joursMap, joursAvant) {
+  const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, ShadingType, BorderStyle } = require("docx");
+  const BORDER = { style: BorderStyle.SINGLE, size: 4, color: "D9E2EA" };
+  const BORDERS = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
+  const cell = (text, opts = {}) => new TableCell({
+    width: opts.width ? { size: opts.width, type: WidthType.PERCENTAGE } : undefined,
+    shading: opts.shade ? { type: ShadingType.CLEAR, fill: opts.shade } : undefined,
+    borders: BORDERS,
+    margins: { top: 80, bottom: 80, left: 120, right: 120 },
+    children: [new Paragraph({ children: [new TextRun({ text: text || "", bold: !!opts.bold, size: opts.size || 20, color: opts.color })] })],
+  });
+
+  const children = [
+    new Paragraph({ children: [new TextRun({ text: "Planning d'affichage des avis de passage", bold: true, size: 32 })] }),
+    new Paragraph({ text: "" }),
+  ];
+  for (const [jour, adresses] of joursMap) {
+    const limite = dateLimiteAffichage(jour, joursAvant);
+    children.push(new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE }, borders: BORDERS, rows: [
+        new TableRow({ children: [
+          cell("Désinsectisation prévue : " + jour, { shade: "0D1B2A", bold: true, width: 50, color: "FFFFFF" }),
+          cell("Date limite d'affichage : " + limite, { shade: "E74C3C", bold: true, width: 50, color: "FFFFFF" }),
+        ] }),
+      ],
+    }));
+    children.push(new Paragraph({ text: "" }));
+    const rows = [new TableRow({ children: [cell("Adresse", { shade: "EFEFEF", bold: true, width: 60 }), cell("Commentaire", { shade: "EFEFEF", bold: true, width: 40 })] })];
+    adresses.forEach(a => rows.push(new TableRow({ children: [cell(a, { width: 60 }), cell("", { width: 40 })] })));
+    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: BORDERS, rows }));
+    children.push(new Paragraph({ text: "" }));
+  }
+  const doc = new Document({ sections: [{ children }] });
+  const buffer = await Packer.toBuffer(doc);
+
+  const PizZip = require("pizzip");
+  const zip = new PizZip(buffer);
+  const xml = zip.file("word/document.xml").asText();
+  const bodyMatch = xml.match(/<w:body>([\s\S]*)<\/w:body>/);
+  const body = bodyMatch[1];
+  const sectIdx = body.lastIndexOf("<w:sectPr");
+  const bodyNoSect = sectIdx !== -1 ? body.slice(0, sectIdx) : body;
+  return mergeBreakIntoLastParagraph(bodyNoSect);
+}
+
+// Fusionne un saut de page dans le DERNIER paragraphe d'un fragment de body plutôt que
+// d'en ajouter un séparé (double saut de page sinon, cf. envelopperBouclePages). La
+// librairie "docx" termine ses paragraphes vides par un <w:p/> auto-fermant (pas
+// <w:p>...</w:p>), à gérer séparément du cas des templates Word classiques.
+function mergeBreakIntoLastParagraph(bodyXml) {
+  const BREAK_RUN = '<w:r><w:br w:type="page"/></w:r>';
+  const selfClose = bodyXml.lastIndexOf("<w:p/>");
+  const openSpace = bodyXml.lastIndexOf("<w:p ");
+  const openPlain = bodyXml.lastIndexOf("<w:p>");
+  const kind = (selfClose >= openSpace && selfClose >= openPlain) ? "self" : (openSpace >= openPlain ? "space" : "plain");
+  const idx = kind === "self" ? selfClose : (kind === "space" ? openSpace : openPlain);
+  if (idx === -1) return bodyXml + `<w:p>${BREAK_RUN}</w:p>`;
+  if (kind === "self") {
+    return bodyXml.slice(0, idx) + `<w:p>${BREAK_RUN}</w:p>` + bodyXml.slice(idx + "<w:p/>".length);
+  }
+  const closeIdx = bodyXml.indexOf("</w:p>", idx) + "</w:p>".length;
+  const para = bodyXml.slice(idx, closeIdx);
+  const merged = para.replace("</w:p>", `${BREAK_RUN}</w:p>`);
+  return bodyXml.slice(0, idx) + merged + bodyXml.slice(closeIdx);
+}
+
 exports.campagneGenererAvisPassage = functions
   .region("europe-west1")
   .runWith({ timeoutSeconds: 300 })
@@ -2942,8 +3030,10 @@ exports.campagneGenererAvisPassage = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId, storagePath, nom, templateStoragePath } = req.body || {};
+    const { campagneId, storagePath, nom, templateStoragePath, joursAvant } = req.body || {};
     if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+    const nbJoursAvant = parseInt(joursAvant, 10);
+    if (!nbJoursAvant || nbJoursAvant < 1) { res.status(400).json({ error: "joursAvant requis (nombre de jours avant la désinsectisation)" }); return; }
 
     try {
       const ExcelJS = require("exceljs");
@@ -2966,6 +3056,12 @@ exports.campagneGenererAvisPassage = functions
       const vues = new Set();
       const lignes = toutesLignes.filter(l => { if (vues.has(l.adresse)) return false; vues.add(l.adresse); return true; });
 
+      const joursMap = new Map();
+      lignes.forEach(l => {
+        if (!joursMap.has(l.date1)) joursMap.set(l.date1, []);
+        joursMap.get(l.date1).push(l.adresse);
+      });
+
       let templateBytes;
       if (templateStoragePath) {
         const [tplBuffer] = await bucket.file(templateStoragePath).download();
@@ -2985,7 +3081,14 @@ exports.campagneGenererAvisPassage = functions
         break: i > 0,
       }));
       docxtpl.render({ pages });
-      const outBytes = docxtpl.getZip().generate({ type: "nodebuffer" });
+      const outZip = docxtpl.getZip();
+
+      // Préfixe une page "Planning d'affichage" (1 bloc par jour : date prévue,
+      // date limite d'affichage, adresses du jour + colonne commentaire vide).
+      const planningBodyXml = await buildPlanningAffichageBodyXml(joursMap, nbJoursAvant);
+      const finalXml = outZip.file("word/document.xml").asText().replace("<w:body>", "<w:body>" + planningBodyXml);
+      outZip.file("word/document.xml", finalXml);
+      const outBytes = outZip.generate({ type: "nodebuffer" });
 
       const safeNom = sanitizeNomFichier(nom);
       const outPath = `campagnes-documents/${campagneId}/avis-passage/avis-passage.docx`;
@@ -2998,7 +3101,7 @@ exports.campagneGenererAvisPassage = functions
       const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
 
       const nowIso = new Date().toISOString();
-      const statsText = `${lignes.length} avis (${lignes.length} page(s))`;
+      const statsText = `${lignes.length} avis + 1 page de planning d'affichage (${joursMap.size} jour(s), affichage ${nbJoursAvant}j avant)`;
       await db.collection("campagnes-documents-generes").doc(`${campagneId}__avis-passage`).set({
         campagneId, type: "avis-passage", fileName: outFileName, url, storagePath: outPath, statsText, createdAt: nowIso,
       });

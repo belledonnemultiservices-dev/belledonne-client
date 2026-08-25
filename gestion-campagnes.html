@@ -303,9 +303,15 @@
           </div>
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Le template est un .docx normal, une seule page, avec les balises {Adresse} et {date-heure}. Pas besoin d'ajouter de boucle ni de saut de page, c'est géré automatiquement.</div>
           <input type="file" id="tplInput-avisPassage" accept=".docx" style="display:none" onchange="onTemplateSelected(event,'avisPassage')">
-          <div class="form-group" style="max-width:400px;">
-            <label class="form-label">Nom (sert aussi de nom de fichier)</label>
-            <input class="form-input" type="text" id="apNom" placeholder="ex: Avis de passage ACTIS TMR - Octobre 2026">
+          <div class="form-row">
+            <div class="form-group" style="max-width:400px;">
+              <label class="form-label">Nom (sert aussi de nom de fichier)</label>
+              <input class="form-input" type="text" id="apNom" placeholder="ex: Avis de passage ACTIS TMR - Octobre 2026">
+            </div>
+            <div class="form-group" style="max-width:220px;">
+              <label class="form-label">Jours avant (date limite d'affichage)</label>
+              <input class="form-input" type="number" id="apJoursAvant" value="10" min="1" max="60">
+            </div>
           </div>
           <button class="btn-generate" id="btnGenAvisPassage" onclick="genererAvisPassage()">Générer les avis de passage</button>
           <div class="result-box" id="resultBoxAvisPassage">
@@ -837,18 +843,20 @@ window.genererPlanningTechnicien = async function() {
 window.genererAvisPassage = async function() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
   const nom = document.getElementById("apNom").value.trim();
+  const joursAvant = parseInt(document.getElementById("apJoursAvant").value, 10);
   const box = document.getElementById("resultBoxAvisPassage");
   const err = document.getElementById("errorBoxAvisPassage");
   box.style.display = "none"; err.style.display = "none";
   if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
   if (!nom) { showToast("Donne un nom aux avis de passage"); return; }
+  if (!joursAvant || joursAvant < 1) { showToast("Indique un nombre de jours avant valide"); return; }
   const btn = document.getElementById("btnGenAvisPassage");
   btn.disabled = true; btn.textContent = "Génération en cours...";
   try {
     const resp = await fetch(FN_DOC_AVIS_PASSAGE, {
       method: "POST",
       headers: await authHeaders(),
-      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_avisPassage_StoragePath || null }),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_avisPassage_StoragePath || null, joursAvant }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
