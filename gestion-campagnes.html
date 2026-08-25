@@ -266,7 +266,7 @@
           <div class="result-box" id="resultBoxPlanningClient">
             <div class="r-title">Planning client généré</div>
             <div class="r-stats" id="resultStatsPlanningClient"></div>
-            <a class="btn-download" id="dlPlanningClient" href="#" download>Télécharger le fichier</a>
+            <a class="btn-download" id="dlPlanningClient" href="#" onclick="return false;">Télécharger le fichier</a>
           </div>
           <div class="error-box" id="errorBoxPlanningClient"></div>
         </div>
@@ -662,6 +662,24 @@ window.selectCampTab = function(n) {
   if (n === 2) { renderDocSourceState(); loadDocumentsGeneres(); }
 };
 
+// Safari ignore l'attribut "download" HTML sur les URLs cross-origin (Firebase
+// Storage != domaine de l'app) et dérive le nom du fichier depuis l'URL brute.
+// On contourne en récupérant le fichier en mémoire puis en le sauvant en local.
+window.downloadBlob = async function(url, filename) {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl; a.download = filename || "fichier";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  } catch(e) {
+    showToast("Erreur téléchargement : " + e.message);
+  }
+};
+
 const DOC_TYPE_LABELS = { "planning-client": "Planning client", "planning-technicien": "Planning technicien", "avis-passage": "Avis de passage", "convocation": "Convocation" };
 async function loadDocumentsGeneres() {
   const list = document.getElementById("docsGeneresList");
@@ -678,7 +696,7 @@ async function loadDocumentsGeneres() {
         <span class="doc-name">${d.fileName || "—"}</span>
         <span class="doc-date">${d.createdAt ? new Date(d.createdAt).toLocaleString("fr-FR") : ""}</span>
       </div>
-      <a class="btn-download" href="${d.url}" download="${d.fileName || ""}" style="margin:0;">Télécharger</a>
+      <a class="btn-download" href="#" onclick="downloadBlob('${d.url}','${(d.fileName || "fichier").replace(/'/g, "\\'")}');return false;" style="margin:0;">Télécharger</a>
     </div>
   `).join("");
 }
@@ -760,8 +778,8 @@ window.genererPlanningClient = async function() {
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
     document.getElementById("resultStatsPlanningClient").textContent = `${data.nbAdresses} adresse(s)`;
-    document.getElementById("dlPlanningClient").href = data.url;
-    document.getElementById("dlPlanningClient").setAttribute("download", data.fileName || "planning-client.xlsx");
+    const dlBtn = document.getElementById("dlPlanningClient");
+    dlBtn.onclick = () => { downloadBlob(data.url, data.fileName || "planning-client.xlsx"); return false; };
     box.style.display = "block";
     await loadDocumentsGeneres();
   } catch(e) {
