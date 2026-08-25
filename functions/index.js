@@ -2598,6 +2598,15 @@ function lirePlanningSource(ws) {
   return lignes;
 }
 
+// "08H00 - 16H00" -> "Lundi 19 octobre 2026 - 08H00 entre 16H00"
+// (le mot "entre" remplace le tiret entre les deux horaires, pas entre la date et l'horaire)
+function formaterDateHeure2ndPassage(date2, heure2) {
+  if (!date2) return "";
+  const parts = String(heure2 || "").split(" - ");
+  const heureTxt = parts.length === 2 ? `${parts[0]} entre ${parts[1]}` : (heure2 || "");
+  return heureTxt ? `${date2} - ${heureTxt}` : date2;
+}
+
 function sanitizeNomFichier(nom) {
   return String(nom || "").replace(/[^a-zA-Z0-9\-_ àâäéèêëïîôöùûüçÀÂÄÉÈÊËÏÎÔÖÙÛÜÇ]/g, "_").trim() || "document";
 }
@@ -2801,15 +2810,15 @@ exports.campagneGenererPlanningTechnicien = functions
         const pAdresse = placeholders["##adresse"];
         const pHoraire = placeholders["##horaire"];
         const pNbLog = placeholders["##nblogements"];
-        const pRemarque = placeholders["##remarque"];
-        if (!pJour || !pAdresse || !pHoraire || !pNbLog || !pRemarque) {
-          res.status(400).json({ error: "Template invalide : placeholders ##Jour-date/##Adresse/##Horaire/##NbLogements/##Remarque introuvables" });
+        const pDateHeure2 = placeholders["##dateheure2ndpassage"];
+        if (!pJour || !pAdresse || !pHoraire || !pNbLog || !pDateHeure2) {
+          res.status(400).json({ error: "Template invalide : placeholders ##Jour-date/##Adresse/##Horaire/##NbLogements/##DateHeure2ndPassage introuvables" });
           return;
         }
 
         if (pNom) ws.getRow(pNom.row).getCell(pNom.col).value = `${nom} - ${tech}`;
 
-        const minCol = pAdresse.col, maxCol = pRemarque.col;
+        const minCol = pAdresse.col, maxCol = pDateHeure2.col;
         const bannerStyle = ws.getRow(pJour.row).getCell(pJour.col).style;
         const bannerHeight = ws.getRow(pJour.row).height;
         const headerRowNumber = pJour.row + 1;
@@ -2821,7 +2830,7 @@ exports.campagneGenererPlanningTechnicien = functions
           adresse: ws.getRow(pAdresse.row).getCell(pAdresse.col).style,
           horaire: ws.getRow(pHoraire.row).getCell(pHoraire.col).style,
           nbLog: ws.getRow(pNbLog.row).getCell(pNbLog.col).style,
-          remarque: ws.getRow(pRemarque.row).getCell(pRemarque.col).style,
+          dateHeure2: ws.getRow(pDateHeure2.row).getCell(pDateHeure2.col).style,
         };
 
         // Vide le bloc modèle d'origine (banner + en-têtes + ligne de données) pour repartir propre.
@@ -2850,7 +2859,7 @@ exports.campagneGenererPlanningTechnicien = functions
             dRow.getCell(pAdresse.col).value = l.adresse; dRow.getCell(pAdresse.col).style = dataStyles.adresse;
             dRow.getCell(pHoraire.col).value = l.heure1; dRow.getCell(pHoraire.col).style = dataStyles.horaire;
             dRow.getCell(pNbLog.col).value = l.nbLogements || ""; dRow.getCell(pNbLog.col).style = dataStyles.nbLog;
-            dRow.getCell(pRemarque.col).value = l.remarque || ""; dRow.getCell(pRemarque.col).style = dataStyles.remarque;
+            dRow.getCell(pDateHeure2.col).value = formaterDateHeure2ndPassage(l.date2, l.heure2); dRow.getCell(pDateHeure2.col).style = dataStyles.dateHeure2;
             cursor++;
           });
           cursor++; // ligne d'espacement entre jours
