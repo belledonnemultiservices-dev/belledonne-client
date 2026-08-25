@@ -227,7 +227,53 @@
 
       <!-- ONGLET 2 : GESTION DOCUMENTATION -->
       <div class="camp-tab-panel" id="campTabPanel2" style="display:none;">
-        <div class="empty-state">Gestion documentation — à venir.</div>
+
+        <div class="card">
+          <div class="card-title">Fichier source</div>
+          <div class="card-sub">Le planning Excel (format "Planning Désinsectisation") servant de base à tous les documents générés ci-dessous. Un nouvel envoi remplace le précédent.</div>
+          <div class="file-drop" id="docFileDrop" onclick="document.getElementById('docFileInput').click()">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            <div>Cliquez pour choisir le fichier Excel source (.xlsx)</div>
+            <div class="fname" id="docFileName"></div>
+          </div>
+          <input type="file" id="docFileInput" accept=".xlsx,.xls" style="display:none" onchange="onDocFileSelected(event)">
+          <div class="progress-bar" id="docProgressBar"><div class="progress-fill" id="docProgressFill"></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Planning client</div>
+          <div class="card-sub">Génère un planning Excel par adresse (1er passage / 2nd passage), à partir du fichier source et du template.</div>
+          <div class="form-group" style="max-width:400px;">
+            <label class="form-label">Nom (sert aussi de nom de fichier)</label>
+            <input class="form-input" type="text" id="pcNom" placeholder="ex: Planning ACTIS TMR - Octobre 2026">
+          </div>
+          <button class="btn-generate" id="btnGenPlanningClient" onclick="genererPlanningClient()">Générer le planning client</button>
+          <div class="result-box" id="resultBoxPlanningClient">
+            <div class="r-title">Planning client généré</div>
+            <div class="r-stats" id="resultStatsPlanningClient"></div>
+            <a class="btn-download" id="dlPlanningClient" href="#" download>Télécharger le fichier</a>
+          </div>
+          <div class="error-box" id="errorBoxPlanningClient"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Planning technicien</div>
+          <div class="card-sub">Un fichier Excel par technicien, avec un bloc par jour (adresses, horaires, nombre de logements).</div>
+          <button class="btn-generate" disabled>Bientôt disponible</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Avis de passage</div>
+          <div class="card-sub">Un avis PDF par adresse pour le 1er passage.</div>
+          <button class="btn-generate" disabled>Bientôt disponible</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Convocations 2nd passage</div>
+          <div class="card-sub">Convocations PDF pour le 2nd passage, avec un pourcentage de logements à convoquer par adresse.</div>
+          <button class="btn-generate" disabled>Bientôt disponible</button>
+        </div>
+
       </div>
 
       <!-- ONGLET 3 : GESTION RAPPORT (ex-contenu existant : rapport consolidé + semaines) -->
@@ -448,6 +494,7 @@ const FN_PUSH2 = "https://europe-west1-belledonne-client.cloudfunctions.net/push
 const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportsSemaine";
 const FN_GEN_COMPLET = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportComplet";
 const FN_GEN_CONSOLIDE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportConsolide";
+const FN_DOC_PLANNING_CLIENT = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningClient";
 
 let _user = null;
 let _techniciens = [];
@@ -456,6 +503,7 @@ let _semaines = [];
 let _currentCampagneId = null;
 let _currentSemaineId = null;
 let _selectedFile = null;
+let _docSourceFile = null;
 
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = "login.html"; return; }
@@ -592,6 +640,68 @@ window.savePeriode = async function() {
 window.selectCampTab = function(n) {
   document.querySelectorAll("#campTabsRow .camp-tab").forEach(el => el.classList.toggle("active", Number(el.dataset.campTab) === n));
   [1, 2, 3].forEach(i => { document.getElementById("campTabPanel" + i).style.display = (i === n) ? "block" : "none"; });
+  if (n === 2) renderDocSourceState();
+};
+
+// ═══════════════════════════════════════════════════════════════
+// ONGLET GESTION DOCUMENTATION
+// ═══════════════════════════════════════════════════════════════
+function renderDocSourceState() {
+  const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
+  document.getElementById("docFileName").textContent = c.docSourceNom || "";
+}
+window.onDocFileSelected = async function(event) {
+  const file = event.target.files[0];
+  if (!file || !_currentCampagneId) return;
+  _docSourceFile = file;
+  const bar = document.getElementById("docProgressBar");
+  const fill = document.getElementById("docProgressFill");
+  bar.style.display = "block"; fill.style.width = "0%";
+  try {
+    const storagePath = `campagnes-documents/${_currentCampagneId}/source/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+    const storageRef = ref(storage, storagePath);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+    await new Promise((resolve, reject) => {
+      uploadTask.on("state_changed", (snap) => { fill.style.width = Math.round((snap.bytesTransferred / snap.totalBytes) * 100) + "%"; }, reject, resolve);
+    });
+    await setDoc(doc(db, "gestion-campagnes", _currentCampagneId), { docSourceStoragePath: storagePath, docSourceNom: file.name, updatedAt: new Date().toISOString() }, { merge: true });
+    const c = _campagnes.find(x => x.id === _currentCampagneId);
+    if (c) { c.docSourceStoragePath = storagePath; c.docSourceNom = file.name; }
+    document.getElementById("docFileName").textContent = file.name;
+    showToast("Fichier source enregistré");
+  } catch(e) {
+    showToast("Erreur upload : " + e.message);
+  } finally {
+    bar.style.display = "none";
+  }
+};
+
+window.genererPlanningClient = async function() {
+  const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
+  const nom = document.getElementById("pcNom").value.trim();
+  const box = document.getElementById("resultBoxPlanningClient");
+  const err = document.getElementById("errorBoxPlanningClient");
+  box.style.display = "none"; err.style.display = "none";
+  if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
+  if (!nom) { showToast("Donne un nom au planning"); return; }
+  const btn = document.getElementById("btnGenPlanningClient");
+  btn.disabled = true; btn.textContent = "Génération en cours...";
+  try {
+    const resp = await fetch(FN_DOC_PLANNING_CLIENT, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    document.getElementById("resultStatsPlanningClient").textContent = `${data.nbAdresses} adresse(s)`;
+    document.getElementById("dlPlanningClient").href = data.url;
+    box.style.display = "block";
+  } catch(e) {
+    err.textContent = "Erreur : " + e.message; err.style.display = "block";
+  } finally {
+    btn.disabled = false; btn.textContent = "Générer le planning client";
+  }
 };
 window.backToCampagnes = function() {
   _currentCampagneId = null;

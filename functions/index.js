@@ -2565,3 +2565,113 @@ exports.pushCampagnePassage2Kizeo = functions
     console.log(`pushCampagnePassage2Kizeo: ${nbEnvoyes2} envoyés, ${nbErreurs2} erreurs/ignorés sur ${results2.length} bâtiments`);
     res.status(200).json({ results: results2, nbEnvoyes: nbEnvoyes2, nbErreurs: nbErreurs2 });
   });
+
+// ══════════════════════════════════════════════════════════════════
+// GESTION DOCUMENTATION (campagnes) : lecture du planning source (format
+// fixe "Planning_Desinsectisation" : en-têtes ligne 4, données à partir
+// de la ligne 5, colonnes A=Jour B=Date1 C=Heure1 D=Tech E=Adresse
+// F=NbLogements G=Remarque H=Date2 I=Heure2) + génération de documents
+// à partir de templates bundlés dans functions/templates/.
+// ══════════════════════════════════════════════════════════════════
+
+// Lit le fichier source et retourne une ligne par ligne de données (pas
+// de déduplication par adresse : certaines adresses sont scindées entre
+// plusieurs techniciens, on garde l'ordre et le contenu bruts du fichier).
+function lirePlanningSource(ws) {
+  const lignes = [];
+  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber < 5) return;
+    const adresse = String(row.getCell(5).value || "").trim();
+    if (!adresse || adresse.toUpperCase() === "LIBRE") return;
+    lignes.push({
+      jour: row.getCell(1).value,
+      date1: String(row.getCell(2).value || "").trim(),
+      heure1: String(row.getCell(3).value || "").trim(),
+      tech: String(row.getCell(4).value || "").trim(),
+      adresse,
+      nbLogements: Number(row.getCell(6).value) || 0,
+      remarque: String(row.getCell(7).value || "").trim(),
+      date2: String(row.getCell(8).value || "").trim(),
+      heure2: String(row.getCell(9).value || "").trim(),
+    });
+  });
+  return lignes;
+}
+
+function sanitizeNomFichier(nom) {
+  return String(nom || "").replace(/[^a-zA-Z0-9\-_ àâäéèêëïîôöùûüçÀÂÄÉÈÊËÏÎÔÖÙÛÜÇ]/g, "_").trim() || "document";
+}
+
+exports.campagneGenererPlanningClient = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId, storagePath, nom } = req.body || {};
+    if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+
+    try {
+      const ExcelJS = require("exceljs");
+      const path = require("path");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const [buffer] = await bucket.file(storagePath).download();
+
+      const srcWb = new ExcelJS.Workbook();
+      await srcWb.xlsx.load(buffer);
+      const srcWs = srcWb.worksheets[0];
+      if (!srcWs) { res.status(400).json({ error: "Feuille source introuvable" }); return; }
+
+      const toutesLignes = lirePlanningSource(srcWs);
+      if (!toutesLignes.length) { res.status(400).json({ error: "Aucune adresse trouvée dans le fichier source" }); return; }
+      // Une adresse peut être scindée entre plusieurs techniciens (même horaire) :
+      // on ne garde que la 1ère occurrence par adresse, dans l'ordre du fichier.
+      const vues = new Set();
+      const lignes = toutesLignes.filter(l => {
+        if (vues.has(l.adresse)) return false;
+        vues.add(l.adresse);
+        return true;
+      });
+
+      const tplPath = path.join(__dirname, "templates", "Template-Planning-client.xlsx");
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.readFile(tplPath);
+      const ws = wb.worksheets[0];
+
+      ws.getCell("A1").value = nom;
+
+      const modelRowNumber = 6;
+      const modelStyles = [1, 2, 3].map(c => ws.getRow(modelRowNumber).getCell(c).style);
+
+      lignes.forEach((l, i) => {
+        const r = ws.getRow(modelRowNumber + i);
+        r.getCell(1).value = l.adresse;
+        r.getCell(2).value = l.date1 ? `${l.date1} - ${l.heure1}` : "";
+        r.getCell(3).value = l.date2 ? `${l.date2} - ${l.heure2}` : "";
+        r.getCell(1).style = modelStyles[0];
+        r.getCell(2).style = modelStyles[1];
+        r.getCell(3).style = modelStyles[2];
+        r.commit();
+      });
+
+      const outBuffer = await wb.xlsx.writeBuffer();
+      const safeNom = sanitizeNomFichier(nom);
+      const outPath = `campagnes-documents/${campagneId}/planning-client/${Date.now()}_${safeNom}.xlsx`;
+      const token = crypto.randomUUID();
+      await bucket.file(outPath).save(Buffer.from(outBuffer), {
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        metadata: { metadata: { firebaseStorageDownloadTokens: token } },
+      });
+      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
+
+      res.status(200).json({ success: true, url, nbAdresses: lignes.length, fileName: `${safeNom}.xlsx` });
+    } catch(e) {
+      console.error("campagneGenererPlanningClient:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
