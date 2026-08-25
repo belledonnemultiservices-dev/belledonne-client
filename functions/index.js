@@ -2689,7 +2689,9 @@ exports.campagneGenererPlanningClient = functions
 
       const outBuffer = await wb.xlsx.writeBuffer();
       const safeNom = sanitizeNomFichier(nom);
-      const outPath = `campagnes-documents/${campagneId}/planning-client/${Date.now()}_${safeNom}.xlsx`;
+      // Chemin/ID fixes (pas d'horodatage) : une régénération écrase le fichier
+      // précédent au lieu d'en accumuler un nouveau à chaque clic.
+      const outPath = `campagnes-documents/${campagneId}/planning-client/planning-client.xlsx`;
       const token = crypto.randomUUID();
       await bucket.file(outPath).save(Buffer.from(outBuffer), {
         contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -2698,7 +2700,7 @@ exports.campagneGenererPlanningClient = functions
       const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
 
       const nowIso = new Date().toISOString();
-      await db.collection("campagnes-documents-generes").add({
+      await db.collection("campagnes-documents-generes").doc(`${campagneId}__planning-client`).set({
         campagneId, type: "planning-client", fileName: `${safeNom}.xlsx`, url, storagePath: outPath,
         nbAdresses: lignes.length, createdAt: nowIso,
       });

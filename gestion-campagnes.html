@@ -266,6 +266,7 @@
           <div class="result-box" id="resultBoxPlanningClient">
             <div class="r-title">Planning client généré</div>
             <div class="r-stats" id="resultStatsPlanningClient"></div>
+            <div class="doc-date" id="resultDatePlanningClient" style="margin-bottom:8px;"></div>
             <a class="btn-download" id="dlPlanningClient" href="#" onclick="return false;">Télécharger le fichier</a>
           </div>
           <div class="error-box" id="errorBoxPlanningClient"></div>
@@ -289,9 +290,6 @@
           <button class="btn-generate" disabled>Bientôt disponible</button>
         </div>
 
-        <div class="section-sep">Documents générés</div>
-        <div class="doc-list" id="docsGeneresList"></div>
-        <div class="empty-state" id="docsGeneresEmpty" style="display:none;">Aucun document généré pour l'instant.</div>
 
       </div>
 
@@ -659,7 +657,7 @@ window.savePeriode = async function() {
 window.selectCampTab = function(n) {
   document.querySelectorAll("#campTabsRow .camp-tab").forEach(el => el.classList.toggle("active", Number(el.dataset.campTab) === n));
   [1, 2, 3].forEach(i => { document.getElementById("campTabPanel" + i).style.display = (i === n) ? "block" : "none"; });
-  if (n === 2) { renderDocSourceState(); loadDocumentsGeneres(); }
+  if (n === 2) { renderDocSourceState(); loadGeneratedDoc("planning-client", "PlanningClient"); }
 };
 
 // Safari ignore l'attribut "download" HTML sur les URLs cross-origin (Firebase
@@ -680,25 +678,28 @@ window.downloadBlob = async function(url, filename) {
   }
 };
 
-const DOC_TYPE_LABELS = { "planning-client": "Planning client", "planning-technicien": "Planning technicien", "avis-passage": "Avis de passage", "convocation": "Convocation" };
-async function loadDocumentsGeneres() {
-  const list = document.getElementById("docsGeneresList");
-  const empty = document.getElementById("docsGeneresEmpty");
-  const q = query(collection(db, "campagnes-documents-generes"), where("campagneId", "==", _currentCampagneId));
-  const snap = await getDocs(q);
-  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-  if (!docs.length) { list.innerHTML = ""; empty.style.display = ""; return; }
-  empty.style.display = "none";
-  list.innerHTML = docs.map(d => `
-    <div class="doc-row">
-      <div class="doc-row-left">
-        <span class="doc-type-badge">${DOC_TYPE_LABELS[d.type] || d.type}</span>
-        <span class="doc-name">${d.fileName || "—"}</span>
-        <span class="doc-date">${d.createdAt ? new Date(d.createdAt).toLocaleString("fr-FR") : ""}</span>
-      </div>
-      <a class="btn-download" href="#" onclick="downloadBlob('${d.url}','${(d.fileName || "fichier").replace(/'/g, "\\'")}');return false;" style="margin:0;">Télécharger</a>
-    </div>
-  `).join("");
+// Charge (si elle existe) la dernière génération d'un type de document pour la
+// campagne courante, et l'affiche dans le result-box du bloc correspondant
+// (un seul fichier par type/campagne : la régénération l'écrase).
+async function loadGeneratedDoc(type, suffix) {
+  if (!_currentCampagneId) return;
+  const box = document.getElementById("resultBox" + suffix);
+  if (!box) return;
+  try {
+    const snap = await getDoc(doc(db, "campagnes-documents-generes", `${_currentCampagneId}__${type}`));
+    if (!snap.exists()) { box.style.display = "none"; return; }
+    const d = snap.data();
+    renderGeneratedDoc(suffix, d);
+  } catch(e) { /* pas de doc existant, on laisse le bloc masqué */ }
+}
+function renderGeneratedDoc(suffix, d) {
+  const statsEl = document.getElementById("resultStats" + suffix);
+  const dateEl = document.getElementById("resultDate" + suffix);
+  const dlEl = document.getElementById("dl" + suffix);
+  if (statsEl) statsEl.textContent = d.nbAdresses != null ? `${d.nbAdresses} adresse(s)` : "";
+  if (dateEl) dateEl.textContent = d.createdAt ? "Généré le " + new Date(d.createdAt).toLocaleString("fr-FR") : "";
+  if (dlEl) dlEl.onclick = () => { downloadBlob(d.url, d.fileName || "fichier"); return false; };
+  document.getElementById("resultBox" + suffix).style.display = "block";
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -777,11 +778,7 @@ window.genererPlanningClient = async function() {
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
-    document.getElementById("resultStatsPlanningClient").textContent = `${data.nbAdresses} adresse(s)`;
-    const dlBtn = document.getElementById("dlPlanningClient");
-    dlBtn.onclick = () => { downloadBlob(data.url, data.fileName || "planning-client.xlsx"); return false; };
-    box.style.display = "block";
-    await loadDocumentsGeneres();
+    renderGeneratedDoc("PlanningClient", { nbAdresses: data.nbAdresses, url: data.url, fileName: data.fileName, createdAt: new Date().toISOString() });
   } catch(e) {
     err.textContent = "Erreur : " + e.message; err.style.display = "block";
   } finally {
