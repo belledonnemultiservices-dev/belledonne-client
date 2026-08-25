@@ -2723,3 +2723,164 @@ exports.campagneGenererPlanningClient = functions
       res.status(500).json({ error: e.message });
     }
   });
+
+// Repère les placeholders "##..." où qu'ils soient dans la feuille (position libre,
+// le template peut varier). Retourne { "##xxx": {row, col} }.
+function trouverPlaceholders(ws) {
+  const placeholders = {};
+  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      const v = String(cell.value || "").trim().toLowerCase();
+      if (v.startsWith("##")) placeholders[v] = { row: rowNumber, col: colNumber };
+    });
+  });
+  return placeholders;
+}
+
+exports.campagneGenererPlanningTechnicien = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId, storagePath, nom, templateStoragePath } = req.body || {};
+    if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+
+    try {
+      const ExcelJS = require("exceljs");
+      const path = require("path");
+      const fs = require("fs");
+      const JSZip = require("jszip");
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const [buffer] = await bucket.file(storagePath).download();
+
+      const srcWb = new ExcelJS.Workbook();
+      await srcWb.xlsx.load(buffer);
+      const srcWs = srcWb.worksheets[0];
+      if (!srcWs) { res.status(400).json({ error: "Feuille source introuvable" }); return; }
+
+      const toutesLignes = lirePlanningSource(srcWs);
+      if (!toutesLignes.length) { res.status(400).json({ error: "Aucune adresse trouvée dans le fichier source" }); return; }
+
+      // Regroupe par technicien puis par jour, dans l'ordre d'apparition du fichier.
+      const parTech = new Map();
+      const ordreTech = [];
+      toutesLignes.forEach(l => {
+        const tech = l.tech || "Sans technicien";
+        if (!parTech.has(tech)) { parTech.set(tech, new Map()); ordreTech.push(tech); }
+        const jours = parTech.get(tech);
+        if (!jours.has(l.date1)) jours.set(l.date1, []);
+        jours.get(l.date1).push(l);
+      });
+
+      let templateBuffer;
+      if (templateStoragePath) {
+        const [tplBuffer] = await bucket.file(templateStoragePath).download();
+        templateBuffer = tplBuffer;
+      } else {
+        templateBuffer = fs.readFileSync(path.join(__dirname, "templates", "Template-Planning-technicien.xlsx"));
+      }
+
+      const zip = new JSZip();
+
+      for (const tech of ordreTech) {
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(templateBuffer);
+        const ws = wb.worksheets[0];
+
+        const placeholders = trouverPlaceholders(ws);
+        const pNom = placeholders["##nom-fichier"];
+        const pJour = placeholders["##jour-date"];
+        const pAdresse = placeholders["##adresse"];
+        const pHoraire = placeholders["##horaire"];
+        const pNbLog = placeholders["##nblogements"];
+        const pRemarque = placeholders["##remarque"];
+        if (!pJour || !pAdresse || !pHoraire || !pNbLog || !pRemarque) {
+          res.status(400).json({ error: "Template invalide : placeholders ##Jour-date/##Adresse/##Horaire/##NbLogements/##Remarque introuvables" });
+          return;
+        }
+
+        if (pNom) ws.getRow(pNom.row).getCell(pNom.col).value = `${nom} - ${tech}`;
+
+        const minCol = pAdresse.col, maxCol = pRemarque.col;
+        const bannerStyle = ws.getRow(pJour.row).getCell(pJour.col).style;
+        const bannerHeight = ws.getRow(pJour.row).height;
+        const headerRowNumber = pJour.row + 1;
+        const headerCells = [];
+        for (let c = minCol; c <= maxCol; c++) {
+          headerCells.push({ value: ws.getRow(headerRowNumber).getCell(c).value, style: ws.getRow(headerRowNumber).getCell(c).style });
+        }
+        const dataStyles = {
+          adresse: ws.getRow(pAdresse.row).getCell(pAdresse.col).style,
+          horaire: ws.getRow(pHoraire.row).getCell(pHoraire.col).style,
+          nbLog: ws.getRow(pNbLog.row).getCell(pNbLog.col).style,
+          remarque: ws.getRow(pRemarque.row).getCell(pRemarque.col).style,
+        };
+
+        // Vide le bloc modèle d'origine (banner + en-têtes + ligne de données) pour repartir propre.
+        for (let r = pJour.row; r <= pAdresse.row; r++) {
+          for (let c = 1; c <= maxCol; c++) ws.getRow(r).getCell(c).value = null;
+        }
+
+        const jours = parTech.get(tech);
+        let cursor = pJour.row;
+        let premierBloc = true;
+        for (const [jour, lignesJour] of jours) {
+          const bRow = ws.getRow(cursor);
+          bRow.getCell(minCol).value = jour;
+          bRow.getCell(minCol).style = bannerStyle;
+          if (bannerHeight) bRow.height = bannerHeight;
+          if (!premierBloc) ws.mergeCells(cursor, minCol, cursor, maxCol); // 1er bloc déjà fusionné par le template
+          premierBloc = false;
+          cursor++;
+
+          const hRow = ws.getRow(cursor);
+          headerCells.forEach((hc, i) => { hRow.getCell(minCol + i).value = hc.value; hRow.getCell(minCol + i).style = hc.style; });
+          cursor++;
+
+          lignesJour.forEach(l => {
+            const dRow = ws.getRow(cursor);
+            dRow.getCell(pAdresse.col).value = l.adresse; dRow.getCell(pAdresse.col).style = dataStyles.adresse;
+            dRow.getCell(pHoraire.col).value = l.heure1; dRow.getCell(pHoraire.col).style = dataStyles.horaire;
+            dRow.getCell(pNbLog.col).value = l.nbLogements || ""; dRow.getCell(pNbLog.col).style = dataStyles.nbLog;
+            dRow.getCell(pRemarque.col).value = l.remarque || ""; dRow.getCell(pRemarque.col).style = dataStyles.remarque;
+            cursor++;
+          });
+          cursor++; // ligne d'espacement entre jours
+        }
+
+        const outBuffer = await wb.xlsx.writeBuffer();
+        zip.file(`${sanitizeNomFichier(tech)}.xlsx`, outBuffer);
+      }
+
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+      const safeNom = sanitizeNomFichier(nom);
+      const outPath = `campagnes-documents/${campagneId}/planning-technicien/planning-technicien.zip`;
+      const zipFileName = `${safeNom} - Plannings techniciens.zip`;
+      const token = crypto.randomUUID();
+      await bucket.file(outPath).save(zipBuffer, {
+        contentType: "application/zip",
+        metadata: { contentDisposition: contentDispositionHeader(zipFileName), metadata: { firebaseStorageDownloadTokens: token } },
+      });
+      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
+
+      const nowIso = new Date().toISOString();
+      const statsText = `${ordreTech.length} technicien(s)`;
+      await db.collection("campagnes-documents-generes").doc(`${campagneId}__planning-technicien`).set({
+        campagneId, type: "planning-technicien", fileName: zipFileName, url, storagePath: outPath,
+        statsText, createdAt: nowIso,
+      });
+
+      res.status(200).json({ success: true, url, fileName: zipFileName, statsText });
+    } catch(e) {
+      console.error("campagneGenererPlanningTechnicien:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });

@@ -274,8 +274,24 @@
 
         <div class="card">
           <div class="card-title">Planning technicien</div>
-          <div class="card-sub">Un fichier Excel par technicien, avec un bloc par jour (adresses, horaires, nombre de logements).</div>
-          <button class="btn-generate" disabled>Bientôt disponible</button>
+          <div class="card-sub">Un fichier Excel par technicien (zippés ensemble), avec un bloc par jour : adresses, horaires, nombre de logements.</div>
+          <div class="tpl-row" id="tplRow-planningTechnicien">
+            <button class="btn-tpl" onclick="document.getElementById('tplInput-planningTechnicien').click()">Charger le template (.xlsx)</button>
+            <span class="tpl-fname" id="tplFname-planningTechnicien">Template par défaut</span>
+          </div>
+          <input type="file" id="tplInput-planningTechnicien" accept=".xlsx,.xls" style="display:none" onchange="onTemplateSelected(event,'planningTechnicien')">
+          <div class="form-group" style="max-width:400px;">
+            <label class="form-label">Nom (préfixe du planning de chaque technicien)</label>
+            <input class="form-input" type="text" id="ptNom" placeholder="ex: Planning ACTIS TMR - Octobre 2026">
+          </div>
+          <button class="btn-generate" id="btnGenPlanningTechnicien" onclick="genererPlanningTechnicien()">Générer les plannings techniciens</button>
+          <div class="result-box" id="resultBoxPlanningTechnicien">
+            <div class="r-title">Plannings techniciens générés</div>
+            <div class="r-stats" id="resultStatsPlanningTechnicien"></div>
+            <div class="doc-date" id="resultDatePlanningTechnicien" style="margin-bottom:8px;"></div>
+            <a class="btn-download" id="dlPlanningTechnicien" href="#">Télécharger le zip</a>
+          </div>
+          <div class="error-box" id="errorBoxPlanningTechnicien"></div>
         </div>
 
         <div class="card">
@@ -512,6 +528,7 @@ const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.ne
 const FN_GEN_COMPLET = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportComplet";
 const FN_GEN_CONSOLIDE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportConsolide";
 const FN_DOC_PLANNING_CLIENT = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningClient";
+const FN_DOC_PLANNING_TECHNICIEN = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningTechnicien";
 
 let _user = null;
 let _techniciens = [];
@@ -657,7 +674,11 @@ window.savePeriode = async function() {
 window.selectCampTab = function(n) {
   document.querySelectorAll("#campTabsRow .camp-tab").forEach(el => el.classList.toggle("active", Number(el.dataset.campTab) === n));
   [1, 2, 3].forEach(i => { document.getElementById("campTabPanel" + i).style.display = (i === n) ? "block" : "none"; });
-  if (n === 2) { renderDocSourceState(); loadGeneratedDoc("planning-client", "PlanningClient"); }
+  if (n === 2) {
+    renderDocSourceState();
+    loadGeneratedDoc("planning-client", "PlanningClient");
+    loadGeneratedDoc("planning-technicien", "PlanningTechnicien");
+  }
 };
 
 // Charge (si elle existe) la dernière génération d'un type de document pour la
@@ -678,7 +699,7 @@ function renderGeneratedDoc(suffix, d) {
   const statsEl = document.getElementById("resultStats" + suffix);
   const dateEl = document.getElementById("resultDate" + suffix);
   const dlEl = document.getElementById("dl" + suffix);
-  if (statsEl) statsEl.textContent = d.nbAdresses != null ? `${d.nbAdresses} adresse(s)` : "";
+  if (statsEl) statsEl.textContent = d.statsText || (d.nbAdresses != null ? `${d.nbAdresses} adresse(s)` : "");
   if (dateEl) dateEl.textContent = d.createdAt ? "Généré le " + new Date(d.createdAt).toLocaleString("fr-FR") : "";
   if (dlEl) dlEl.href = d.url;
   document.getElementById("resultBox" + suffix).style.display = "block";
@@ -687,7 +708,7 @@ function renderGeneratedDoc(suffix, d) {
 // ═══════════════════════════════════════════════════════════════
 // ONGLET GESTION DOCUMENTATION
 // ═══════════════════════════════════════════════════════════════
-const TEMPLATE_KEYS = ["planningClient"]; // étendu plus tard : planningTechnicien, avisPassage, convocation
+const TEMPLATE_KEYS = ["planningClient", "planningTechnicien"]; // étendu plus tard : avisPassage, convocation
 function renderDocSourceState() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
   document.getElementById("docFileName").textContent = c.docSourceNom || "";
@@ -765,6 +786,32 @@ window.genererPlanningClient = async function() {
     err.textContent = "Erreur : " + e.message; err.style.display = "block";
   } finally {
     btn.disabled = false; btn.textContent = "Générer le planning client";
+  }
+};
+
+window.genererPlanningTechnicien = async function() {
+  const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
+  const nom = document.getElementById("ptNom").value.trim();
+  const box = document.getElementById("resultBoxPlanningTechnicien");
+  const err = document.getElementById("errorBoxPlanningTechnicien");
+  box.style.display = "none"; err.style.display = "none";
+  if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
+  if (!nom) { showToast("Donne un nom aux plannings"); return; }
+  const btn = document.getElementById("btnGenPlanningTechnicien");
+  btn.disabled = true; btn.textContent = "Génération en cours...";
+  try {
+    const resp = await fetch(FN_DOC_PLANNING_TECHNICIEN, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_planningTechnicien_StoragePath || null }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    renderGeneratedDoc("PlanningTechnicien", { statsText: data.statsText, url: data.url, fileName: data.fileName, createdAt: new Date().toISOString() });
+  } catch(e) {
+    err.textContent = "Erreur : " + e.message; err.style.display = "block";
+  } finally {
+    btn.disabled = false; btn.textContent = "Générer les plannings techniciens";
   }
 };
 window.backToCampagnes = function() {
