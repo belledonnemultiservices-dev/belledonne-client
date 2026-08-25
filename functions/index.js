@@ -2619,6 +2619,8 @@ exports.campagneGenererPlanningClient = functions
     try {
       const ExcelJS = require("exceljs");
       const path = require("path");
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
       const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
       const [buffer] = await bucket.file(storagePath).download();
 
@@ -2648,19 +2650,40 @@ exports.campagneGenererPlanningClient = functions
       }
       const ws = wb.worksheets[0];
 
-      ws.getCell("A1").value = nom;
+      // Localise les placeholders où qu'ils soient dans le fichier (le template
+      // peut varier d'un client à l'autre) plutôt que de supposer une position fixe.
+      const placeholders = {}; // "##adresse" -> {row, col}
+      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+          const v = String(cell.value || "").trim().toLowerCase();
+          if (v.startsWith("##")) placeholders[v] = { row: rowNumber, col: colNumber };
+        });
+      });
+      const pNomFichier = placeholders["##nom-fichier"];
+      const pAdresse = placeholders["##adresse"];
+      const p1erPassage = placeholders["##1er-passage"];
+      const p2ndPassage = placeholders["##2nd-passage"];
+      if (!pAdresse || !p1erPassage || !p2ndPassage) {
+        res.status(400).json({ error: "Template invalide : placeholders ##Adresse / ##1er-passage / ##2nd-passage introuvables" });
+        return;
+      }
+      if (pNomFichier) ws.getRow(pNomFichier.row).getCell(pNomFichier.col).value = nom;
 
-      const modelRowNumber = 6;
-      const modelStyles = [1, 2, 3].map(c => ws.getRow(modelRowNumber).getCell(c).style);
+      const modelRowNumber = pAdresse.row;
+      const modelStyles = {
+        adresse: ws.getRow(modelRowNumber).getCell(pAdresse.col).style,
+        p1: ws.getRow(modelRowNumber).getCell(p1erPassage.col).style,
+        p2: ws.getRow(modelRowNumber).getCell(p2ndPassage.col).style,
+      };
 
       lignes.forEach((l, i) => {
         const r = ws.getRow(modelRowNumber + i);
-        r.getCell(1).value = l.adresse;
-        r.getCell(2).value = l.date1 ? `${l.date1} - ${l.heure1}` : "";
-        r.getCell(3).value = l.date2 ? `${l.date2} - ${l.heure2}` : "";
-        r.getCell(1).style = modelStyles[0];
-        r.getCell(2).style = modelStyles[1];
-        r.getCell(3).style = modelStyles[2];
+        r.getCell(pAdresse.col).value = l.adresse;
+        r.getCell(pAdresse.col).style = modelStyles.adresse;
+        r.getCell(p1erPassage.col).value = l.date1 ? `${l.date1} - ${l.heure1}` : "";
+        r.getCell(p1erPassage.col).style = modelStyles.p1;
+        r.getCell(p2ndPassage.col).value = l.date2 ? `${l.date2} - ${l.heure2}` : "";
+        r.getCell(p2ndPassage.col).style = modelStyles.p2;
         r.commit();
       });
 
@@ -2673,6 +2696,12 @@ exports.campagneGenererPlanningClient = functions
         metadata: { metadata: { firebaseStorageDownloadTokens: token } },
       });
       const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
+
+      const nowIso = new Date().toISOString();
+      await db.collection("campagnes-documents-generes").add({
+        campagneId, type: "planning-client", fileName: `${safeNom}.xlsx`, url, storagePath: outPath,
+        nbAdresses: lignes.length, createdAt: nowIso,
+      });
 
       res.status(200).json({ success: true, url, nbAdresses: lignes.length, fileName: `${safeNom}.xlsx` });
     } catch(e) {

@@ -78,6 +78,12 @@
   .btn-tpl{height:32px;padding:0 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--text-mid);cursor:pointer;white-space:nowrap;}
   .btn-tpl:hover{background:#E5EAF0;}
   .tpl-fname{font-size:12px;color:var(--text-muted);}
+  .doc-list{display:flex;flex-direction:column;gap:8px;margin-bottom:24px;}
+  .doc-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;}
+  .doc-row-left{display:flex;align-items:center;gap:10px;}
+  .doc-type-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;padding:3px 9px;border-radius:10px;background:var(--green-pale);color:var(--green-dark);white-space:nowrap;}
+  .doc-name{font-size:13px;font-weight:600;color:var(--text);}
+  .doc-date{font-size:11px;color:var(--text-muted);}
   .step-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;}
   .step-sub{font-size:11px;color:var(--text-muted);}
   .empty-state{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;}
@@ -282,6 +288,10 @@
           <div class="card-sub">Convocations PDF pour le 2nd passage, avec un pourcentage de logements à convoquer par adresse.</div>
           <button class="btn-generate" disabled>Bientôt disponible</button>
         </div>
+
+        <div class="section-sep">Documents générés</div>
+        <div class="doc-list" id="docsGeneresList"></div>
+        <div class="empty-state" id="docsGeneresEmpty" style="display:none;">Aucun document généré pour l'instant.</div>
 
       </div>
 
@@ -649,8 +659,29 @@ window.savePeriode = async function() {
 window.selectCampTab = function(n) {
   document.querySelectorAll("#campTabsRow .camp-tab").forEach(el => el.classList.toggle("active", Number(el.dataset.campTab) === n));
   [1, 2, 3].forEach(i => { document.getElementById("campTabPanel" + i).style.display = (i === n) ? "block" : "none"; });
-  if (n === 2) renderDocSourceState();
+  if (n === 2) { renderDocSourceState(); loadDocumentsGeneres(); }
 };
+
+const DOC_TYPE_LABELS = { "planning-client": "Planning client", "planning-technicien": "Planning technicien", "avis-passage": "Avis de passage", "convocation": "Convocation" };
+async function loadDocumentsGeneres() {
+  const list = document.getElementById("docsGeneresList");
+  const empty = document.getElementById("docsGeneresEmpty");
+  const q = query(collection(db, "campagnes-documents-generes"), where("campagneId", "==", _currentCampagneId));
+  const snap = await getDocs(q);
+  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  if (!docs.length) { list.innerHTML = ""; empty.style.display = ""; return; }
+  empty.style.display = "none";
+  list.innerHTML = docs.map(d => `
+    <div class="doc-row">
+      <div class="doc-row-left">
+        <span class="doc-type-badge">${DOC_TYPE_LABELS[d.type] || d.type}</span>
+        <span class="doc-name">${d.fileName || "—"}</span>
+        <span class="doc-date">${d.createdAt ? new Date(d.createdAt).toLocaleString("fr-FR") : ""}</span>
+      </div>
+      <a class="btn-download" href="${d.url}" download="${d.fileName || ""}" style="margin:0;">Télécharger</a>
+    </div>
+  `).join("");
+}
 
 // ═══════════════════════════════════════════════════════════════
 // ONGLET GESTION DOCUMENTATION
@@ -732,6 +763,7 @@ window.genererPlanningClient = async function() {
     document.getElementById("dlPlanningClient").href = data.url;
     document.getElementById("dlPlanningClient").setAttribute("download", data.fileName || "planning-client.xlsx");
     box.style.display = "block";
+    await loadDocumentsGeneres();
   } catch(e) {
     err.textContent = "Erreur : " + e.message; err.style.display = "block";
   } finally {

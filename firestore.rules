@@ -58,6 +58,7 @@ service cloud.firestore {
     match /campagnes-reportings-semaine/{doc}   { allow read, write: if isAdmin(); }
     match /campagnes-reportings-complet/{doc}   { allow read, write: if isAdmin(); }
     match /campagnes-reportings-consolide/{doc} { allow read, write: if isAdmin(); }
+    match /campagnes-documents-generes/{doc}  { allow read, write: if isAdmin(); }
 
     // ── config : lecture par tout utilisateur connecté (couleurs, coordonnées,
     //    templates), écriture admin only ──
