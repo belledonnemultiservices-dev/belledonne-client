@@ -267,7 +267,7 @@
             <div class="r-title">Planning client généré</div>
             <div class="r-stats" id="resultStatsPlanningClient"></div>
             <div class="doc-date" id="resultDatePlanningClient" style="margin-bottom:8px;"></div>
-            <a class="btn-download" id="dlPlanningClient" href="#" onclick="return false;">Télécharger le fichier</a>
+            <a class="btn-download" id="dlPlanningClient" href="#">Télécharger le fichier</a>
           </div>
           <div class="error-box" id="errorBoxPlanningClient"></div>
         </div>
@@ -660,24 +660,6 @@ window.selectCampTab = function(n) {
   if (n === 2) { renderDocSourceState(); loadGeneratedDoc("planning-client", "PlanningClient"); }
 };
 
-// Safari ignore l'attribut "download" HTML sur les URLs cross-origin (Firebase
-// Storage != domaine de l'app) et dérive le nom du fichier depuis l'URL brute.
-// On contourne en récupérant le fichier en mémoire puis en le sauvant en local.
-window.downloadBlob = async function(url, filename) {
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    const blob = await resp.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl; a.download = filename || "fichier";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-  } catch(e) {
-    showToast("Erreur téléchargement : " + e.message);
-  }
-};
-
 // Charge (si elle existe) la dernière génération d'un type de document pour la
 // campagne courante, et l'affiche dans le result-box du bloc correspondant
 // (un seul fichier par type/campagne : la régénération l'écrase).
@@ -698,7 +680,7 @@ function renderGeneratedDoc(suffix, d) {
   const dlEl = document.getElementById("dl" + suffix);
   if (statsEl) statsEl.textContent = d.nbAdresses != null ? `${d.nbAdresses} adresse(s)` : "";
   if (dateEl) dateEl.textContent = d.createdAt ? "Généré le " + new Date(d.createdAt).toLocaleString("fr-FR") : "";
-  if (dlEl) dlEl.onclick = () => { downloadBlob(d.url, d.fileName || "fichier"); return false; };
+  if (dlEl) dlEl.href = d.url;
   document.getElementById("resultBox" + suffix).style.display = "block";
 }
 

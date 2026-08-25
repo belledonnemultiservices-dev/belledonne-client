@@ -2602,6 +2602,14 @@ function sanitizeNomFichier(nom) {
   return String(nom || "").replace(/[^a-zA-Z0-9\-_ àâäéèêëïîôöùûüçÀÂÄÉÈÊËÏÎÔÖÙÛÜÇ]/g, "_").trim() || "document";
 }
 
+// Force le nom de fichier via l'en-tête HTTP (fonctionne sur un lien direct,
+// contrairement à l'attribut HTML "download" que Safari ignore sur les URLs
+// cross-origin). asciiName = repli sans accents pour les vieux clients.
+function contentDispositionHeader(fileName) {
+  const asciiName = fileName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7E]/g, "_");
+  return `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+}
+
 exports.campagneGenererPlanningClient = functions
   .region("europe-west1")
   .runWith({ timeoutSeconds: 300 })
@@ -2693,19 +2701,23 @@ exports.campagneGenererPlanningClient = functions
       // précédent au lieu d'en accumuler un nouveau à chaque clic.
       const outPath = `campagnes-documents/${campagneId}/planning-client/planning-client.xlsx`;
       const token = crypto.randomUUID();
+      const outFileName = `${safeNom}.xlsx`;
       await bucket.file(outPath).save(Buffer.from(outBuffer), {
         contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        metadata: { metadata: { firebaseStorageDownloadTokens: token } },
+        metadata: {
+          contentDisposition: contentDispositionHeader(outFileName),
+          metadata: { firebaseStorageDownloadTokens: token },
+        },
       });
       const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
 
       const nowIso = new Date().toISOString();
       await db.collection("campagnes-documents-generes").doc(`${campagneId}__planning-client`).set({
-        campagneId, type: "planning-client", fileName: `${safeNom}.xlsx`, url, storagePath: outPath,
+        campagneId, type: "planning-client", fileName: outFileName, url, storagePath: outPath,
         nbAdresses: lignes.length, createdAt: nowIso,
       });
 
-      res.status(200).json({ success: true, url, nbAdresses: lignes.length, fileName: `${safeNom}.xlsx` });
+      res.status(200).json({ success: true, url, nbAdresses: lignes.length, fileName: outFileName });
     } catch(e) {
       console.error("campagneGenererPlanningClient:", e);
       res.status(500).json({ error: e.message });
