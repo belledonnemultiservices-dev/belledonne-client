@@ -376,6 +376,16 @@
         </div>
 
         <div class="card">
+          <div class="card-title">Configuration Kizeo</div>
+          <div class="card-sub">Formulaires Kizeo utilisés pour le push 1er/2ème passage de cette campagne. Les 2 formulaires du client doivent avoir la même structure de champs (ref_interne, signature_technicien, adresse, secteur, technicien, passage, tableau...).</div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">ID formulaire Kizeo — 1er passage</label><input class="form-input" type="text" id="cfgKizeoForm1" placeholder="ex: 1148587"></div>
+            <div class="form-group"><label class="form-label">ID formulaire Kizeo — 2ème passage</label><input class="form-input" type="text" id="cfgKizeoForm2" placeholder="ex: 1165672"></div>
+          </div>
+          <button class="btn-save" onclick="saveKizeoConfig()">Enregistrer</button>
+        </div>
+
+        <div class="card">
           <div class="card-title">Rapport consolidé de la campagne</div>
           <div class="card-sub">Agrège les reportings complets de toutes les semaines de cette campagne, et regroupe tous les PDF d'émargement dans un dossier (sous-dossiers "1er passage" / "2nd passage").</div>
           <button class="btn-generate" id="btnGenConsolide" onclick="genererRapportConsolide()">Générer le rapport consolidé</button>
@@ -525,9 +535,11 @@
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Nom de la campagne</label><input class="form-input" type="text" id="mNom" placeholder="ex: Campagne désinsectisation été 2026"></div>
       <div class="form-group"><label class="form-label">Client</label><input class="form-input" type="text" id="mClient" placeholder="ex: ACTIS"></div>
-      <div class="form-group"><label class="form-label">ID formulaire Kizeo — 1er passage</label><input class="form-input" type="text" id="mForm1" placeholder="ex: 1148587"></div>
-      <div class="form-group"><label class="form-label">ID formulaire Kizeo — 2ème passage</label><input class="form-input" type="text" id="mForm2" placeholder="ex: 1165672"></div>
-      <div style="font-size:11px;color:var(--text-muted);">Les 2 formulaires Kizeo du client doivent avoir la même structure de champs (ref_interne, signature_technicien, adresse, secteur, technicien, passage, tableau...).</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Date début</label><input class="form-input" type="date" id="mDateDebutCamp"></div>
+        <div class="form-group"><label class="form-label">Date fin</label><input class="form-input" type="date" id="mDateFinCamp"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);">Le formulaire Kizeo (1er/2ème passage) se configure ensuite dans l'onglet Gestion rapport de la campagne.</div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeCampagneModal()">Annuler</button>
@@ -660,19 +672,19 @@ function renderCampagnes() {
 window.openCampagneModal = function() {
   document.getElementById("mNom").value = "";
   document.getElementById("mClient").value = "";
-  document.getElementById("mForm1").value = "";
-  document.getElementById("mForm2").value = "";
+  document.getElementById("mDateDebutCamp").value = "";
+  document.getElementById("mDateFinCamp").value = "";
   document.getElementById("modalCampagne").style.display = "flex";
 };
 window.closeCampagneModal = function() { document.getElementById("modalCampagne").style.display = "none"; };
 window.saveCampagne = async function() {
   const nom = document.getElementById("mNom").value.trim();
   const client = document.getElementById("mClient").value.trim();
-  const kizeoFormId1 = document.getElementById("mForm1").value.trim();
-  const kizeoFormId2 = document.getElementById("mForm2").value.trim();
-  if (!nom || !client || !kizeoFormId1 || !kizeoFormId2) { showToast("Tous les champs sont requis"); return; }
+  const campagneDateDebut = document.getElementById("mDateDebutCamp").value;
+  const campagneDateFin = document.getElementById("mDateFinCamp").value;
+  if (!nom || !client) { showToast("Nom et client sont requis"); return; }
   const now = new Date().toISOString();
-  const ref = await addDoc(collection(db, "gestion-campagnes"), { nom, client, kizeoFormId1, kizeoFormId2, campagneDateDebut: "", campagneDateFin: "", statut: "ouverte", createdAt: now, updatedAt: now });
+  const ref = await addDoc(collection(db, "gestion-campagnes"), { nom, client, kizeoFormId1: "", kizeoFormId2: "", campagneDateDebut, campagneDateFin, statut: "ouverte", createdAt: now, updatedAt: now });
   closeCampagneModal();
   await loadCampagnes();
   openCampagne(ref.id);
@@ -741,6 +753,19 @@ window.selectCampTab = function(n) {
     loadGeneratedDoc("planning-affichage", "PlanningAffichage");
     loadGeneratedDoc("convocations", "Convocations");
   }
+  if (n === 3) {
+    const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
+    document.getElementById("cfgKizeoForm1").value = c.kizeoFormId1 || "";
+    document.getElementById("cfgKizeoForm2").value = c.kizeoFormId2 || "";
+  }
+};
+window.saveKizeoConfig = async function() {
+  const kizeoFormId1 = document.getElementById("cfgKizeoForm1").value.trim();
+  const kizeoFormId2 = document.getElementById("cfgKizeoForm2").value.trim();
+  await setDoc(doc(db, "gestion-campagnes", _currentCampagneId), { kizeoFormId1, kizeoFormId2, updatedAt: new Date().toISOString() }, { merge: true });
+  const c = _campagnes.find(x => x.id === _currentCampagneId);
+  if (c) { c.kizeoFormId1 = kizeoFormId1; c.kizeoFormId2 = kizeoFormId2; }
+  showToast("Configuration Kizeo enregistrée");
 };
 
 // Charge (si elle existe) la dernière génération d'un type de document pour la
