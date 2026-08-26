@@ -3236,8 +3236,10 @@ exports.campagneGenererConvocations = functions
 
       const toutesLignes = lirePlanningSource(srcWs);
       if (!toutesLignes.length) { res.status(400).json({ error: "Aucune adresse trouvée dans le fichier source" }); return; }
-      const vues = new Set();
-      const lignes = toutesLignes.filter(l => { if (vues.has(l.adresse)) return false; vues.add(l.adresse); return true; });
+      // Pas de dédup par adresse ici (contrairement au Planning client) : une adresse
+      // scindée entre 2 techniciens doit générer les convocations des DEUX, chacun dans
+      // son propre fichier jour. Dédupliquer aurait fait disparaître les lignes du 2e
+      // technicien pour ce jour (bug constaté : jours manquants pour certains techniciens).
 
       let templateBytes;
       if (templateStoragePath) {
@@ -3288,7 +3290,7 @@ exports.campagneGenererConvocations = functions
       // le zip demandé doit correspondre à qui doit distribuer/déposer quelles convocations, et quand.
       const parTech = new Map();
       const ordreTech = [];
-      lignes.forEach(l => {
+      toutesLignes.forEach(l => {
         const tech = l.tech || "Sans technicien";
         if (!parTech.has(tech)) { parTech.set(tech, new Map()); ordreTech.push(tech); }
         const jours = parTech.get(tech);
