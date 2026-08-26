@@ -2757,8 +2757,8 @@ exports.campagneGenererPlanningTechnicien = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId, storagePath, nom, templateStoragePath } = req.body || {};
-    if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+    const { campagneId, storagePath, templateStoragePath } = req.body || {};
+    if (!campagneId || !storagePath) { res.status(400).json({ error: "campagneId et storagePath requis" }); return; }
 
     try {
       const ExcelJS = require("exceljs");
@@ -2816,7 +2816,7 @@ exports.campagneGenererPlanningTechnicien = functions
           return;
         }
 
-        if (pNom) ws.getRow(pNom.row).getCell(pNom.col).value = `${nom} - ${tech}`;
+        if (pNom) ws.getRow(pNom.row).getCell(pNom.col).value = `Planning technicien - ${tech}`;
 
         const minCol = pAdresse.col, maxCol = pDateHeure2.col;
         const bannerStyle = ws.getRow(pJour.row).getCell(pJour.col).style;
@@ -2866,13 +2866,12 @@ exports.campagneGenererPlanningTechnicien = functions
         }
 
         const outBuffer = await wb.xlsx.writeBuffer();
-        zip.file(`${sanitizeNomFichier(tech)}.xlsx`, outBuffer);
+        zip.folder("Planning technicien").file(`${sanitizeNomFichier(tech)}.xlsx`, outBuffer);
       }
 
       const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
-      const safeNom = sanitizeNomFichier(nom);
       const outPath = `campagnes-documents/${campagneId}/planning-technicien/planning-technicien.zip`;
-      const zipFileName = `${safeNom} - Plannings techniciens.zip`;
+      const zipFileName = "Planning technicien.zip";
       const token = crypto.randomUUID();
       await bucket.file(outPath).save(zipBuffer, {
         contentType: "application/zip",
@@ -2963,8 +2962,8 @@ exports.campagneGenererAvisPassage = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId, storagePath, nom, templateStoragePath } = req.body || {};
-    if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+    const { campagneId, storagePath, templateStoragePath } = req.body || {};
+    if (!campagneId || !storagePath) { res.status(400).json({ error: "campagneId et storagePath requis" }); return; }
 
     try {
       const ExcelJS = require("exceljs");
@@ -3008,9 +3007,8 @@ exports.campagneGenererAvisPassage = functions
       docxtpl.render({ pages });
       const outBytes = docxtpl.getZip().generate({ type: "nodebuffer" });
 
-      const safeNom = sanitizeNomFichier(nom);
       const outPath = `campagnes-documents/${campagneId}/avis-passage/avis-passage.docx`;
-      const outFileName = `${safeNom} - Avis de passage.docx`;
+      const outFileName = "avis-passage.docx";
       const token = crypto.randomUUID();
       await bucket.file(outPath).save(outBytes, {
         contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -3062,8 +3060,8 @@ exports.campagneGenererPlanningAffichage = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId, storagePath, nom, templateStoragePath, joursAvant } = req.body || {};
-    if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+    const { campagneId, storagePath, templateStoragePath, joursAvant } = req.body || {};
+    if (!campagneId || !storagePath) { res.status(400).json({ error: "campagneId et storagePath requis" }); return; }
     const nbJoursAvant = parseInt(joursAvant, 10);
     if (!nbJoursAvant || nbJoursAvant < 1) { res.status(400).json({ error: "joursAvant requis (nombre de jours avant la désinsectisation)" }); return; }
 
@@ -3133,9 +3131,8 @@ exports.campagneGenererPlanningAffichage = functions
       zip.file("word/document.xml", finalXml);
       const outBytes = zip.generate({ type: "nodebuffer" });
 
-      const safeNom = sanitizeNomFichier(nom);
       const outPath = `campagnes-documents/${campagneId}/planning-affichage/planning-affichage.docx`;
-      const outFileName = `${safeNom} - Planning d'affichage.docx`;
+      const outFileName = "planning-affichage.docx";
       const token = crypto.randomUUID();
       await bucket.file(outPath).save(outBytes, {
         contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -3214,8 +3211,8 @@ exports.campagneGenererConvocations = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId, storagePath, nom, templateStoragePath, pourcentage } = req.body || {};
-    if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+    const { campagneId, storagePath, templateStoragePath, pourcentage } = req.body || {};
+    if (!campagneId || !storagePath) { res.status(400).json({ error: "campagneId et storagePath requis" }); return; }
     const pct = parseFloat(pourcentage);
     if (!pct || pct <= 0 || pct > 100) { res.status(400).json({ error: "pourcentage requis (entre 1 et 100)" }); return; }
 
@@ -3302,9 +3299,10 @@ exports.campagneGenererConvocations = functions
       const outZip = new JSZip();
       let totalConvocations = 0;
       let nbFichiers = 0;
+      const convocationsFolder = outZip.folder("Convocations");
       for (const tech of ordreTech) {
         const jours = parTech.get(tech);
-        const folder = outZip.folder(sanitizeNomFichier(tech));
+        const folder = convocationsFolder.folder(sanitizeNomFichier(tech));
         for (const [jour, sousLignes] of jours) {
           const result = genererDocxConvocations(sousLignes);
           if (!result) continue;
@@ -3318,9 +3316,8 @@ exports.campagneGenererConvocations = functions
 
       const outBytes = await outZip.generateAsync({ type: "nodebuffer" });
 
-      const safeNom = sanitizeNomFichier(nom);
       const outPath = `campagnes-documents/${campagneId}/convocations/convocations.zip`;
-      const outFileName = `${safeNom} - Convocations.zip`;
+      const outFileName = "Convocations.zip";
       const token = crypto.randomUUID();
       await bucket.file(outPath).save(outBytes, {
         contentType: "application/zip",

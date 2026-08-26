@@ -867,19 +867,17 @@ window.genererPlanningClient = async function() {
 
 window.genererPlanningTechnicien = async function() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  const nom = document.getElementById("pcNom").value.trim();
   const box = document.getElementById("resultBoxPlanningTechnicien");
   const err = document.getElementById("errorBoxPlanningTechnicien");
   box.style.display = "none"; err.style.display = "none";
   if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
-  if (!nom) { showToast("Renseigne le nom dans le bloc Planning client ci-dessus"); return; }
   const btn = document.getElementById("btnGenPlanningTechnicien");
   btn.disabled = true; btn.textContent = "Génération en cours...";
   try {
     const resp = await fetch(FN_DOC_PLANNING_TECHNICIEN, {
       method: "POST",
       headers: await authHeaders(),
-      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_planningTechnicien_StoragePath || null }),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, templateStoragePath: c.tpl_planningTechnicien_StoragePath || null }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
@@ -893,19 +891,17 @@ window.genererPlanningTechnicien = async function() {
 
 window.genererAvisPassage = async function() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  const nom = document.getElementById("pcNom").value.trim();
   const box = document.getElementById("resultBoxAvisPassage");
   const err = document.getElementById("errorBoxAvisPassage");
   box.style.display = "none"; err.style.display = "none";
   if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
-  if (!nom) { showToast("Renseigne le nom dans le bloc Planning client ci-dessus"); return; }
   const btn = document.getElementById("btnGenAvisPassage");
   btn.disabled = true; btn.textContent = "Génération en cours...";
   try {
     const resp = await fetch(FN_DOC_AVIS_PASSAGE, {
       method: "POST",
       headers: await authHeaders(),
-      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_avisPassage_StoragePath || null }),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, templateStoragePath: c.tpl_avisPassage_StoragePath || null }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
@@ -919,13 +915,11 @@ window.genererAvisPassage = async function() {
 
 window.genererPlanningAffichage = async function() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  const nom = document.getElementById("pcNom").value.trim();
   const joursAvant = parseInt(document.getElementById("paJoursAvant").value, 10);
   const box = document.getElementById("resultBoxPlanningAffichage");
   const err = document.getElementById("errorBoxPlanningAffichage");
   box.style.display = "none"; err.style.display = "none";
   if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
-  if (!nom) { showToast("Renseigne le nom dans le bloc Planning client ci-dessus"); return; }
   if (!joursAvant || joursAvant < 1) { showToast("Indique un nombre de jours avant valide"); return; }
   const btn = document.getElementById("btnGenPlanningAffichage");
   btn.disabled = true; btn.textContent = "Génération en cours...";
@@ -933,7 +927,7 @@ window.genererPlanningAffichage = async function() {
     const resp = await fetch(FN_DOC_PLANNING_AFFICHAGE, {
       method: "POST",
       headers: await authHeaders(),
-      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_planningAffichage_StoragePath || null, joursAvant }),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, templateStoragePath: c.tpl_planningAffichage_StoragePath || null, joursAvant }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
@@ -947,13 +941,11 @@ window.genererPlanningAffichage = async function() {
 
 window.genererConvocations = async function() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  const nom = document.getElementById("pcNom").value.trim();
   const pourcentage = parseFloat(document.getElementById("cvPourcentage").value);
   const box = document.getElementById("resultBoxConvocations");
   const err = document.getElementById("errorBoxConvocations");
   box.style.display = "none"; err.style.display = "none";
   if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
-  if (!nom) { showToast("Renseigne le nom dans le bloc Planning client ci-dessus"); return; }
   if (!pourcentage || pourcentage <= 0 || pourcentage > 100) { showToast("Indique un pourcentage valide (1-100)"); return; }
   const btn = document.getElementById("btnGenConvocations");
   btn.disabled = true; btn.textContent = "Génération en cours...";
@@ -961,7 +953,7 @@ window.genererConvocations = async function() {
     const resp = await fetch(FN_DOC_CONVOCATIONS, {
       method: "POST",
       headers: await authHeaders(),
-      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_convocations_StoragePath || null, pourcentage }),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, templateStoragePath: c.tpl_convocations_StoragePath || null, pourcentage }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
