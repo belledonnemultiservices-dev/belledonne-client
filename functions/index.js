@@ -2954,7 +2954,7 @@ function dateLimiteAffichage(dateStr, joursAvant) {
 
 exports.campagneGenererAvisPassage = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 300 })
+  .runWith({ timeoutSeconds: 300, memory: "1GB" })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -3205,7 +3205,7 @@ function decouperTemplateConvocation(xml) {
 
 exports.campagneGenererConvocations = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 300 })
+  .runWith({ timeoutSeconds: 300, memory: "1GB" })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
