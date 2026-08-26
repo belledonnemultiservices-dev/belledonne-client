@@ -78,6 +78,8 @@
   .btn-tpl{height:32px;padding:0 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--text-mid);cursor:pointer;white-space:nowrap;}
   .btn-tpl:hover{background:#E5EAF0;}
   .tpl-fname{font-size:12px;color:var(--text-muted);}
+  .btn-tpl-exemple{font-size:11px;color:var(--green-dark);text-decoration:none;margin-left:auto;white-space:nowrap;}
+  .btn-tpl-exemple:hover{text-decoration:underline;}
   .doc-list{display:flex;flex-direction:column;gap:8px;margin-bottom:24px;}
   .doc-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;}
   .doc-row-left{display:flex;align-items:center;gap:10px;}
@@ -244,10 +246,14 @@
           <div class="file-drop" id="docFileDrop" onclick="document.getElementById('docFileInput').click()">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
             <div>Cliquez pour choisir le fichier Excel source (.xlsx)</div>
-            <div class="fname" id="docFileName"></div>
           </div>
           <input type="file" id="docFileInput" accept=".xlsx,.xls" style="display:none" onchange="onDocFileSelected(event)">
           <div class="progress-bar" id="docProgressBar"><div class="progress-fill" id="docProgressFill"></div></div>
+          <div class="result-box" id="resultBoxDocSource">
+            <div class="r-title">Fichier source enregistré</div>
+            <div class="r-stats" id="resultStatsDocSource"></div>
+            <a class="btn-download" id="dlDocSource" href="#">Télécharger le fichier</a>
+          </div>
         </div>
 
         <div class="card">
@@ -256,10 +262,11 @@
           <div class="tpl-row" id="tplRow-planningClient">
             <button class="btn-tpl" onclick="document.getElementById('tplInput-planningClient').click()">Charger le template (.xlsx)</button>
             <span class="tpl-fname" id="tplFname-planningClient">Template par défaut</span>
+            <a class="btn-tpl-exemple" href="templates-exemples/Template-Planning-client.xlsx" download>Télécharger un exemple vierge</a>
           </div>
           <input type="file" id="tplInput-planningClient" accept=".xlsx,.xls" style="display:none" onchange="onTemplateSelected(event,'planningClient')">
           <div class="form-group" style="max-width:400px;">
-            <label class="form-label">Nom (sert aussi de nom de fichier)</label>
+            <label class="form-label">Nom (sert aussi de nom de fichier pour tous les documents ci-dessous)</label>
             <input class="form-input" type="text" id="pcNom" placeholder="ex: Planning ACTIS TMR - Octobre 2026">
           </div>
           <button class="btn-generate" id="btnGenPlanningClient" onclick="genererPlanningClient()">Générer le planning client</button>
@@ -278,12 +285,9 @@
           <div class="tpl-row" id="tplRow-planningTechnicien">
             <button class="btn-tpl" onclick="document.getElementById('tplInput-planningTechnicien').click()">Charger le template (.xlsx)</button>
             <span class="tpl-fname" id="tplFname-planningTechnicien">Template par défaut</span>
+            <a class="btn-tpl-exemple" href="templates-exemples/Template-Planning-technicien.xlsx" download>Télécharger un exemple vierge</a>
           </div>
           <input type="file" id="tplInput-planningTechnicien" accept=".xlsx,.xls" style="display:none" onchange="onTemplateSelected(event,'planningTechnicien')">
-          <div class="form-group" style="max-width:400px;">
-            <label class="form-label">Nom (préfixe du planning de chaque technicien)</label>
-            <input class="form-input" type="text" id="ptNom" placeholder="ex: Planning ACTIS TMR - Octobre 2026">
-          </div>
           <button class="btn-generate" id="btnGenPlanningTechnicien" onclick="genererPlanningTechnicien()">Générer les plannings techniciens</button>
           <div class="result-box" id="resultBoxPlanningTechnicien">
             <div class="r-title">Plannings techniciens générés</div>
@@ -300,13 +304,9 @@
           <div class="tpl-row" id="tplRow-avisPassage">
             <button class="btn-tpl" onclick="document.getElementById('tplInput-avisPassage').click()">Charger le template (.docx)</button>
             <span class="tpl-fname" id="tplFname-avisPassage">Template par défaut</span>
+            <a class="btn-tpl-exemple" href="templates-exemples/Template-Avis-de passage.docx" download>Télécharger un exemple vierge</a>
           </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Le template est un .docx normal, une seule page, avec les balises {Adresse} et {date-heure}. Pas besoin d'ajouter de boucle ni de saut de page, c'est géré automatiquement.</div>
           <input type="file" id="tplInput-avisPassage" accept=".docx" style="display:none" onchange="onTemplateSelected(event,'avisPassage')">
-          <div class="form-group" style="max-width:400px;">
-            <label class="form-label">Nom (sert aussi de nom de fichier)</label>
-            <input class="form-input" type="text" id="apNom" placeholder="ex: Avis de passage ACTIS TMR - Octobre 2026">
-          </div>
           <button class="btn-generate" id="btnGenAvisPassage" onclick="genererAvisPassage()">Générer les avis de passage</button>
           <div class="result-box" id="resultBoxAvisPassage">
             <div class="r-title">Avis de passage générés</div>
@@ -323,18 +323,12 @@
           <div class="tpl-row" id="tplRow-planningAffichage">
             <button class="btn-tpl" onclick="document.getElementById('tplInput-planningAffichage').click()">Charger le template (.docx)</button>
             <span class="tpl-fname" id="tplFname-planningAffichage">Template par défaut</span>
+            <a class="btn-tpl-exemple" href="templates-exemples/Template-planning-affichage.docx" download>Télécharger un exemple vierge</a>
           </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Le template est un .docx avec un tableau à 3 lignes : date prévue/limite ({dateprévue}/{datelimite}), en-têtes Adresse/Commentaire, puis une ligne modèle {adresse}.</div>
           <input type="file" id="tplInput-planningAffichage" accept=".docx" style="display:none" onchange="onTemplateSelected(event,'planningAffichage')">
-          <div class="form-row">
-            <div class="form-group" style="max-width:400px;">
-              <label class="form-label">Nom (sert aussi de nom de fichier)</label>
-              <input class="form-input" type="text" id="paNom" placeholder="ex: Planning affichage ACTIS TMR - Octobre 2026">
-            </div>
-            <div class="form-group" style="max-width:220px;">
-              <label class="form-label">Jours avant (date limite d'affichage)</label>
-              <input class="form-input" type="number" id="paJoursAvant" value="10" min="1" max="60">
-            </div>
+          <div class="form-group" style="max-width:220px;">
+            <label class="form-label">Jours avant (date limite d'affichage)</label>
+            <input class="form-input" type="number" id="paJoursAvant" value="10" min="1" max="60">
           </div>
           <button class="btn-generate" id="btnGenPlanningAffichage" onclick="genererPlanningAffichage()">Générer le planning d'affichage</button>
           <div class="result-box" id="resultBoxPlanningAffichage">
@@ -352,18 +346,12 @@
           <div class="tpl-row" id="tplRow-convocations">
             <button class="btn-tpl" onclick="document.getElementById('tplInput-convocations').click()">Charger le template (.docx)</button>
             <span class="tpl-fname" id="tplFname-convocations">Template par défaut</span>
+            <a class="btn-tpl-exemple" href="templates-exemples/Template-convocation.docx" download>Télécharger un exemple vierge</a>
           </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Le template doit garder ses 3 blocs identiques par page, avec ##Adresse et ##date-heure dans chaque bloc.</div>
           <input type="file" id="tplInput-convocations" accept=".docx" style="display:none" onchange="onTemplateSelected(event,'convocations')">
-          <div class="form-row">
-            <div class="form-group" style="max-width:400px;">
-              <label class="form-label">Nom (sert aussi de nom de fichier)</label>
-              <input class="form-input" type="text" id="cvNom" placeholder="ex: Convocations ACTIS TMR - Octobre 2026">
-            </div>
-            <div class="form-group" style="max-width:220px;">
-              <label class="form-label">% de logements à convoquer</label>
-              <input class="form-input" type="number" id="cvPourcentage" value="50" min="1" max="100">
-            </div>
+          <div class="form-group" style="max-width:220px;">
+            <label class="form-label">% de logements à convoquer</label>
+            <input class="form-input" type="number" id="cvPourcentage" value="50" min="1" max="100">
           </div>
           <button class="btn-generate" id="btnGenConvocations" onclick="genererConvocations()">Générer les convocations</button>
           <div class="result-box" id="resultBoxConvocations">
@@ -374,7 +362,6 @@
           </div>
           <div class="error-box" id="errorBoxConvocations"></div>
         </div>
-
 
       </div>
 
@@ -576,7 +563,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -784,9 +771,23 @@ function renderGeneratedDoc(suffix, d) {
 // ONGLET GESTION DOCUMENTATION
 // ═══════════════════════════════════════════════════════════════
 const TEMPLATE_KEYS = ["planningClient", "planningTechnicien", "avisPassage", "planningAffichage", "convocations"];
-function renderDocSourceState() {
+async function renderDocSourceState() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  document.getElementById("docFileName").textContent = c.docSourceNom || "";
+  const box = document.getElementById("resultBoxDocSource");
+  if (c.docSourceStoragePath && c.docSourceNom) {
+    document.getElementById("resultStatsDocSource").textContent = c.docSourceNom;
+    const dl = document.getElementById("dlDocSource");
+    dl.href = c.docSourceUrl || "#";
+    if (!c.docSourceUrl) {
+      try {
+        c.docSourceUrl = await getDownloadURL(ref(storage, c.docSourceStoragePath));
+        dl.href = c.docSourceUrl;
+      } catch(e) { /* ignore */ }
+    }
+    box.style.display = "block";
+  } else {
+    box.style.display = "none";
+  }
   TEMPLATE_KEYS.forEach(key => {
     const el = document.getElementById("tplFname-" + key);
     if (el) el.textContent = c["tpl_" + key + "_Nom"] || "Template par défaut";
@@ -828,8 +829,8 @@ window.onDocFileSelected = async function(event) {
     });
     await setDoc(doc(db, "gestion-campagnes", _currentCampagneId), { docSourceStoragePath: storagePath, docSourceNom: file.name, updatedAt: new Date().toISOString() }, { merge: true });
     const c = _campagnes.find(x => x.id === _currentCampagneId);
-    if (c) { c.docSourceStoragePath = storagePath; c.docSourceNom = file.name; }
-    document.getElementById("docFileName").textContent = file.name;
+    if (c) { c.docSourceStoragePath = storagePath; c.docSourceNom = file.name; c.docSourceUrl = null; }
+    await renderDocSourceState();
     showToast("Fichier source enregistré");
   } catch(e) {
     showToast("Erreur upload : " + e.message);
@@ -866,12 +867,12 @@ window.genererPlanningClient = async function() {
 
 window.genererPlanningTechnicien = async function() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  const nom = document.getElementById("ptNom").value.trim();
+  const nom = document.getElementById("pcNom").value.trim();
   const box = document.getElementById("resultBoxPlanningTechnicien");
   const err = document.getElementById("errorBoxPlanningTechnicien");
   box.style.display = "none"; err.style.display = "none";
   if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
-  if (!nom) { showToast("Donne un nom aux plannings"); return; }
+  if (!nom) { showToast("Renseigne le nom dans le bloc Planning client ci-dessus"); return; }
   const btn = document.getElementById("btnGenPlanningTechnicien");
   btn.disabled = true; btn.textContent = "Génération en cours...";
   try {
@@ -892,12 +893,12 @@ window.genererPlanningTechnicien = async function() {
 
 window.genererAvisPassage = async function() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  const nom = document.getElementById("apNom").value.trim();
+  const nom = document.getElementById("pcNom").value.trim();
   const box = document.getElementById("resultBoxAvisPassage");
   const err = document.getElementById("errorBoxAvisPassage");
   box.style.display = "none"; err.style.display = "none";
   if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
-  if (!nom) { showToast("Donne un nom aux avis de passage"); return; }
+  if (!nom) { showToast("Renseigne le nom dans le bloc Planning client ci-dessus"); return; }
   const btn = document.getElementById("btnGenAvisPassage");
   btn.disabled = true; btn.textContent = "Génération en cours...";
   try {
@@ -918,13 +919,13 @@ window.genererAvisPassage = async function() {
 
 window.genererPlanningAffichage = async function() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  const nom = document.getElementById("paNom").value.trim();
+  const nom = document.getElementById("pcNom").value.trim();
   const joursAvant = parseInt(document.getElementById("paJoursAvant").value, 10);
   const box = document.getElementById("resultBoxPlanningAffichage");
   const err = document.getElementById("errorBoxPlanningAffichage");
   box.style.display = "none"; err.style.display = "none";
   if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
-  if (!nom) { showToast("Donne un nom au planning d'affichage"); return; }
+  if (!nom) { showToast("Renseigne le nom dans le bloc Planning client ci-dessus"); return; }
   if (!joursAvant || joursAvant < 1) { showToast("Indique un nombre de jours avant valide"); return; }
   const btn = document.getElementById("btnGenPlanningAffichage");
   btn.disabled = true; btn.textContent = "Génération en cours...";
@@ -946,13 +947,13 @@ window.genererPlanningAffichage = async function() {
 
 window.genererConvocations = async function() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  const nom = document.getElementById("cvNom").value.trim();
+  const nom = document.getElementById("pcNom").value.trim();
   const pourcentage = parseFloat(document.getElementById("cvPourcentage").value);
   const box = document.getElementById("resultBoxConvocations");
   const err = document.getElementById("errorBoxConvocations");
   box.style.display = "none"; err.style.display = "none";
   if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
-  if (!nom) { showToast("Donne un nom aux convocations"); return; }
+  if (!nom) { showToast("Renseigne le nom dans le bloc Planning client ci-dessus"); return; }
   if (!pourcentage || pourcentage <= 0 || pourcentage > 100) { showToast("Indique un pourcentage valide (1-100)"); return; }
   const btn = document.getElementById("btnGenConvocations");
   btn.disabled = true; btn.textContent = "Génération en cours...";
