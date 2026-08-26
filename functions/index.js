@@ -3247,53 +3247,87 @@ exports.campagneGenererConvocations = functions
         templateBytes = fs.readFileSync(path.join(__dirname, "templates", "Template-convocation.docx"));
       }
 
-      const zip = new PizZip(templateBytes);
-      const xml = zip.file("word/document.xml").asText();
+      const tplZip = new PizZip(templateBytes);
+      const xml = tplZip.file("word/document.xml").asText();
       const parts = decouperTemplateConvocation(xml);
       if (!parts) { res.status(400).json({ error: "Template invalide : 3 blocs (tableaux) attendus" }); return; }
 
-      const PAGE_BREAK = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
-      let totalConvocations = 0;
-      let body = parts.preamble;
-      let firstGroup = true;
-      for (const l of lignes) {
-        const dateHeure = l.date2 ? `${l.date2} entre ${l.heure2}` : "";
-        const nbConvocations = Math.ceil((l.nbLogements || 0) * pct / 100);
-        if (nbConvocations <= 0) continue;
-        totalConvocations += nbConvocations;
-        const items = [];
-        for (let i = 0; i < nbConvocations; i++) items.push({ adresse: l.adresse, dateHeure });
-        while (items.length % 3 !== 0) items.push({ adresse: "", dateHeure: "" });
+      // Génère un .docx (convocations, 3 blocs/page) pour un sous-ensemble de lignes.
+      // Retourne null si aucune convocation pour ce sous-ensemble (jour sans logement à convoquer).
+      function genererDocxConvocations(sousLignes) {
+        const PAGE_BREAK = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+        let total = 0;
+        let body = parts.preamble;
+        let firstGroup = true;
+        for (const l of sousLignes) {
+          const dateHeure = l.date2 ? `${l.date2} entre ${l.heure2}` : "";
+          const nbConvocations = Math.ceil((l.nbLogements || 0) * pct / 100);
+          if (nbConvocations <= 0) continue;
+          total += nbConvocations;
+          const items = [];
+          for (let i = 0; i < nbConvocations; i++) items.push({ adresse: l.adresse, dateHeure });
+          while (items.length % 3 !== 0) items.push({ adresse: "", dateHeure: "" });
+          for (let i = 0; i < items.length; i += 3) {
+            if (!firstGroup) body += PAGE_BREAK;
+            firstGroup = false;
+            body += remplirBlocConvocation(parts.block1, items[i].adresse, items[i].dateHeure);
+            body += parts.gap1;
+            body += remplirBlocConvocation(parts.block2, items[i + 1].adresse, items[i + 1].dateHeure);
+            body += parts.gap2;
+            body += remplirBlocConvocation(parts.block3, items[i + 2].adresse, items[i + 2].dateHeure);
+          }
+        }
+        if (total === 0) return null;
+        body += parts.postamble + parts.sectPr;
+        const docZip = new PizZip(templateBytes);
+        docZip.file("word/document.xml", body);
+        return { buffer: docZip.generate({ type: "nodebuffer" }), total };
+      }
 
-        for (let i = 0; i < items.length; i += 3) {
-          if (!firstGroup) body += PAGE_BREAK;
-          firstGroup = false;
-          body += remplirBlocConvocation(parts.block1, items[i].adresse, items[i].dateHeure);
-          body += parts.gap1;
-          body += remplirBlocConvocation(parts.block2, items[i + 1].adresse, items[i + 1].dateHeure);
-          body += parts.gap2;
-          body += remplirBlocConvocation(parts.block3, items[i + 2].adresse, items[i + 2].dateHeure);
+      // Regroupe par technicien puis par jour (1er passage), même logique que le Planning technicien :
+      // le zip demandé doit correspondre à qui doit distribuer/déposer quelles convocations, et quand.
+      const parTech = new Map();
+      const ordreTech = [];
+      lignes.forEach(l => {
+        const tech = l.tech || "Sans technicien";
+        if (!parTech.has(tech)) { parTech.set(tech, new Map()); ordreTech.push(tech); }
+        const jours = parTech.get(tech);
+        if (!jours.has(l.date1)) jours.set(l.date1, []);
+        jours.get(l.date1).push(l);
+      });
+
+      const JSZip = require("jszip");
+      const outZip = new JSZip();
+      let totalConvocations = 0;
+      let nbFichiers = 0;
+      for (const tech of ordreTech) {
+        const jours = parTech.get(tech);
+        const folder = outZip.folder(sanitizeNomFichier(tech));
+        for (const [jour, sousLignes] of jours) {
+          const result = genererDocxConvocations(sousLignes);
+          if (!result) continue;
+          totalConvocations += result.total;
+          nbFichiers++;
+          folder.file(`${sanitizeNomFichier(jour)}.docx`, result.buffer);
         }
       }
-      body += parts.postamble + parts.sectPr;
 
       if (totalConvocations === 0) { res.status(400).json({ error: "Aucune convocation à générer (vérifie le nombre de logements et le pourcentage)" }); return; }
 
-      zip.file("word/document.xml", body);
-      const outBytes = zip.generate({ type: "nodebuffer" });
+      const outBytes = await outZip.generateAsync({ type: "nodebuffer" });
 
       const safeNom = sanitizeNomFichier(nom);
-      const outPath = `campagnes-documents/${campagneId}/convocations/convocations.docx`;
-      const outFileName = `${safeNom} - Convocations.docx`;
+      const outPath = `campagnes-documents/${campagneId}/convocations/convocations.zip`;
+      const outFileName = `${safeNom} - Convocations.zip`;
       const token = crypto.randomUUID();
       await bucket.file(outPath).save(outBytes, {
-        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        contentType: "application/zip",
         metadata: { contentDisposition: contentDispositionHeader(outFileName), metadata: { firebaseStorageDownloadTokens: token } },
       });
       const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
 
       const nowIso = new Date().toISOString();
-      const statsText = `${totalConvocations} convocation(s) (${pct}% des logements), ${Math.ceil(totalConvocations / 3)} page(s)`;
+      const statsText = `${totalConvocations} convocation(s) (${pct}%), ${nbFichiers} fichier(s), ${ordreTech.length} technicien(s)`;
       await db.collection("campagnes-documents-generes").doc(`${campagneId}__convocations`).set({
         campagneId, type: "convocations", fileName: outFileName, url, storagePath: outPath, statsText, createdAt: nowIso,
       });
