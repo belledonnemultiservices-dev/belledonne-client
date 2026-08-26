@@ -3155,3 +3155,152 @@ exports.campagneGenererPlanningAffichage = functions
       res.status(500).json({ error: e.message });
     }
   });
+
+// ══════════════════════════════════════════════════════════════════
+// CONVOCATIONS 2ND PASSAGE (docx indépendant) : template = 3 blocs
+// identiques par page (##Adresse + ##date-heure, avec un espace variable
+// dans ce dernier selon le fichier d'origine). Nombre de convocations par
+// adresse = arrondi supérieur(nbLogements × pourcentage/100) ; réparties
+// par groupes de 3 par page, dernière page d'une adresse jamais partagée
+// avec l'adresse suivante (cases vides plutôt que mélangées).
+// ══════════════════════════════════════════════════════════════════
+
+function remplirBlocConvocation(blockXml, adresse, dateHeure) {
+  return blockXml
+    .replace(/##Adresse/g, escapeXml(adresse))
+    .replace(/##date-\s*heure\s*/g, escapeXml(dateHeure));
+}
+// Découpe le XML du template en {preamble, block1, gap1, block2, gap2, block3, postamble, sectPr}
+// en repérant les 3 tableaux de premier niveau (chacun = 1 bloc convocation).
+function decouperTemplateConvocation(xml) {
+  let depth = 0, idx = 0;
+  const blocks = [];
+  while (true) {
+    const o = xml.indexOf("<w:tbl>", idx);
+    const c = xml.indexOf("</w:tbl>", idx);
+    if (o === -1 && c === -1) break;
+    if (o !== -1 && (o < c || c === -1)) {
+      depth++;
+      if (depth === 1) blocks.push({ start: o });
+      idx = o + 7;
+    } else {
+      depth--;
+      if (depth === 0) blocks[blocks.length - 1].end = c;
+      idx = c + 8;
+    }
+  }
+  if (blocks.length !== 3) return null;
+  const sectIdx = xml.indexOf("<w:sectPr");
+  return {
+    preamble: xml.slice(0, blocks[0].start),
+    block1: xml.slice(blocks[0].start, blocks[0].end + 8),
+    gap1: xml.slice(blocks[0].end + 8, blocks[1].start),
+    block2: xml.slice(blocks[1].start, blocks[1].end + 8),
+    gap2: xml.slice(blocks[1].end + 8, blocks[2].start),
+    block3: xml.slice(blocks[2].start, blocks[2].end + 8),
+    postamble: xml.slice(blocks[2].end + 8, sectIdx),
+    sectPr: xml.slice(sectIdx),
+  };
+}
+
+exports.campagneGenererConvocations = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId, storagePath, nom, templateStoragePath, pourcentage } = req.body || {};
+    if (!campagneId || !storagePath || !nom) { res.status(400).json({ error: "campagneId, storagePath et nom requis" }); return; }
+    const pct = parseFloat(pourcentage);
+    if (!pct || pct <= 0 || pct > 100) { res.status(400).json({ error: "pourcentage requis (entre 1 et 100)" }); return; }
+
+    try {
+      const ExcelJS = require("exceljs");
+      const PizZip = require("pizzip");
+      const path = require("path");
+      const fs = require("fs");
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const [buffer] = await bucket.file(storagePath).download();
+
+      const srcWb = new ExcelJS.Workbook();
+      await srcWb.xlsx.load(buffer);
+      const srcWs = srcWb.worksheets[0];
+      if (!srcWs) { res.status(400).json({ error: "Feuille source introuvable" }); return; }
+
+      const toutesLignes = lirePlanningSource(srcWs);
+      if (!toutesLignes.length) { res.status(400).json({ error: "Aucune adresse trouvée dans le fichier source" }); return; }
+      const vues = new Set();
+      const lignes = toutesLignes.filter(l => { if (vues.has(l.adresse)) return false; vues.add(l.adresse); return true; });
+
+      let templateBytes;
+      if (templateStoragePath) {
+        const [tplBuffer] = await bucket.file(templateStoragePath).download();
+        templateBytes = tplBuffer;
+      } else {
+        templateBytes = fs.readFileSync(path.join(__dirname, "templates", "Template-convocation.docx"));
+      }
+
+      const zip = new PizZip(templateBytes);
+      const xml = zip.file("word/document.xml").asText();
+      const parts = decouperTemplateConvocation(xml);
+      if (!parts) { res.status(400).json({ error: "Template invalide : 3 blocs (tableaux) attendus" }); return; }
+
+      const PAGE_BREAK = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+      let totalConvocations = 0;
+      let body = parts.preamble;
+      let firstGroup = true;
+      for (const l of lignes) {
+        const dateHeure = l.date2 ? `${l.date2} entre ${l.heure2}` : "";
+        const nbConvocations = Math.ceil((l.nbLogements || 0) * pct / 100);
+        if (nbConvocations <= 0) continue;
+        totalConvocations += nbConvocations;
+        const items = [];
+        for (let i = 0; i < nbConvocations; i++) items.push({ adresse: l.adresse, dateHeure });
+        while (items.length % 3 !== 0) items.push({ adresse: "", dateHeure: "" });
+
+        for (let i = 0; i < items.length; i += 3) {
+          if (!firstGroup) body += PAGE_BREAK;
+          firstGroup = false;
+          body += remplirBlocConvocation(parts.block1, items[i].adresse, items[i].dateHeure);
+          body += parts.gap1;
+          body += remplirBlocConvocation(parts.block2, items[i + 1].adresse, items[i + 1].dateHeure);
+          body += parts.gap2;
+          body += remplirBlocConvocation(parts.block3, items[i + 2].adresse, items[i + 2].dateHeure);
+        }
+      }
+      body += parts.postamble + parts.sectPr;
+
+      if (totalConvocations === 0) { res.status(400).json({ error: "Aucune convocation à générer (vérifie le nombre de logements et le pourcentage)" }); return; }
+
+      zip.file("word/document.xml", body);
+      const outBytes = zip.generate({ type: "nodebuffer" });
+
+      const safeNom = sanitizeNomFichier(nom);
+      const outPath = `campagnes-documents/${campagneId}/convocations/convocations.docx`;
+      const outFileName = `${safeNom} - Convocations.docx`;
+      const token = crypto.randomUUID();
+      await bucket.file(outPath).save(outBytes, {
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        metadata: { contentDisposition: contentDispositionHeader(outFileName), metadata: { firebaseStorageDownloadTokens: token } },
+      });
+      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
+
+      const nowIso = new Date().toISOString();
+      const statsText = `${totalConvocations} convocation(s) (${pct}% des logements), ${Math.ceil(totalConvocations / 3)} page(s)`;
+      await db.collection("campagnes-documents-generes").doc(`${campagneId}__convocations`).set({
+        campagneId, type: "convocations", fileName: outFileName, url, storagePath: outPath, statsText, createdAt: nowIso,
+      });
+
+      res.status(200).json({ success: true, url, fileName: outFileName, statsText });
+    } catch(e) {
+      console.error("campagneGenererConvocations:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });

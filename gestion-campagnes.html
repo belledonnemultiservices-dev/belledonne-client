@@ -348,8 +348,31 @@
 
         <div class="card">
           <div class="card-title">Convocations 2nd passage</div>
-          <div class="card-sub">Convocations PDF pour le 2nd passage, avec un pourcentage de logements à convoquer par adresse.</div>
-          <button class="btn-generate" disabled>Bientôt disponible</button>
+          <div class="card-sub">Document Word (3 convocations par page) pour le 2nd passage. Nombre de convocations par adresse = nb logements × pourcentage (arrondi supérieur), groupées par 3, jamais mélangées entre adresses.</div>
+          <div class="tpl-row" id="tplRow-convocations">
+            <button class="btn-tpl" onclick="document.getElementById('tplInput-convocations').click()">Charger le template (.docx)</button>
+            <span class="tpl-fname" id="tplFname-convocations">Template par défaut</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Le template doit garder ses 3 blocs identiques par page, avec ##Adresse et ##date-heure dans chaque bloc.</div>
+          <input type="file" id="tplInput-convocations" accept=".docx" style="display:none" onchange="onTemplateSelected(event,'convocations')">
+          <div class="form-row">
+            <div class="form-group" style="max-width:400px;">
+              <label class="form-label">Nom (sert aussi de nom de fichier)</label>
+              <input class="form-input" type="text" id="cvNom" placeholder="ex: Convocations ACTIS TMR - Octobre 2026">
+            </div>
+            <div class="form-group" style="max-width:220px;">
+              <label class="form-label">% de logements à convoquer</label>
+              <input class="form-input" type="number" id="cvPourcentage" value="50" min="1" max="100">
+            </div>
+          </div>
+          <button class="btn-generate" id="btnGenConvocations" onclick="genererConvocations()">Générer les convocations</button>
+          <div class="result-box" id="resultBoxConvocations">
+            <div class="r-title">Convocations générées</div>
+            <div class="r-stats" id="resultStatsConvocations"></div>
+            <div class="doc-date" id="resultDateConvocations" style="margin-bottom:8px;"></div>
+            <a class="btn-download" id="dlConvocations" href="#">Télécharger le Word</a>
+          </div>
+          <div class="error-box" id="errorBoxConvocations"></div>
         </div>
 
 
@@ -577,6 +600,7 @@ const FN_DOC_PLANNING_CLIENT = "https://europe-west1-belledonne-client.cloudfunc
 const FN_DOC_PLANNING_TECHNICIEN = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningTechnicien";
 const FN_DOC_AVIS_PASSAGE = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererAvisPassage";
 const FN_DOC_PLANNING_AFFICHAGE = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningAffichage";
+const FN_DOC_CONVOCATIONS = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererConvocations";
 
 let _user = null;
 let _techniciens = [];
@@ -728,6 +752,7 @@ window.selectCampTab = function(n) {
     loadGeneratedDoc("planning-technicien", "PlanningTechnicien");
     loadGeneratedDoc("avis-passage", "AvisPassage");
     loadGeneratedDoc("planning-affichage", "PlanningAffichage");
+    loadGeneratedDoc("convocations", "Convocations");
   }
 };
 
@@ -758,7 +783,7 @@ function renderGeneratedDoc(suffix, d) {
 // ═══════════════════════════════════════════════════════════════
 // ONGLET GESTION DOCUMENTATION
 // ═══════════════════════════════════════════════════════════════
-const TEMPLATE_KEYS = ["planningClient", "planningTechnicien", "avisPassage", "planningAffichage"]; // étendu plus tard : convocation
+const TEMPLATE_KEYS = ["planningClient", "planningTechnicien", "avisPassage", "planningAffichage", "convocations"];
 function renderDocSourceState() {
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
   document.getElementById("docFileName").textContent = c.docSourceNom || "";
@@ -916,6 +941,34 @@ window.genererPlanningAffichage = async function() {
     err.textContent = "Erreur : " + e.message; err.style.display = "block";
   } finally {
     btn.disabled = false; btn.textContent = "Générer le planning d'affichage";
+  }
+};
+
+window.genererConvocations = async function() {
+  const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
+  const nom = document.getElementById("cvNom").value.trim();
+  const pourcentage = parseFloat(document.getElementById("cvPourcentage").value);
+  const box = document.getElementById("resultBoxConvocations");
+  const err = document.getElementById("errorBoxConvocations");
+  box.style.display = "none"; err.style.display = "none";
+  if (!c.docSourceStoragePath) { showToast("Charge d'abord le fichier source"); return; }
+  if (!nom) { showToast("Donne un nom aux convocations"); return; }
+  if (!pourcentage || pourcentage <= 0 || pourcentage > 100) { showToast("Indique un pourcentage valide (1-100)"); return; }
+  const btn = document.getElementById("btnGenConvocations");
+  btn.disabled = true; btn.textContent = "Génération en cours...";
+  try {
+    const resp = await fetch(FN_DOC_CONVOCATIONS, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ campagneId: _currentCampagneId, storagePath: c.docSourceStoragePath, nom, templateStoragePath: c.tpl_convocations_StoragePath || null, pourcentage }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    renderGeneratedDoc("Convocations", { statsText: data.statsText, url: data.url, fileName: data.fileName, createdAt: new Date().toISOString() });
+  } catch(e) {
+    err.textContent = "Erreur : " + e.message; err.style.display = "block";
+  } finally {
+    btn.disabled = false; btn.textContent = "Générer les convocations";
   }
 };
 
