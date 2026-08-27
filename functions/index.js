@@ -1775,6 +1775,17 @@ exports.pushGarantieKizeo = functions
 
     for (const ligne of lignes) {
       const refInterne = `garantie::${semaineId}::${blocId}::${ligne.id}`;
+
+      // Ne jamais re-pousser une ligne dont le rapport est déjà "archive"
+      // (agrégé + envoyé au client) : évite un double envoi Kizeo au
+      // technicien ET l'écrasement accidentel du rapport archivé.
+      const existingSnap = await db.collection("garanties-rapports").where("refInterne", "==", refInterne).limit(1).get();
+      const existingDoc = existingSnap.empty ? null : existingSnap.docs[0];
+      if (existingDoc && existingDoc.data().statut === "archive") {
+        errorsList.push({ ligneId: ligne.id, nom: ligne.nom, status: "skipped", detail: "Rapport déjà archivé (agrégé/envoyé) — non renvoyé. Supprimez/réinitialisez l'agrégé existant si vous voulez vraiment le refaire." });
+        continue;
+      }
+
       const values = {
         refInterne,
         libelle: (ligne.nom || "") + libelleSuffix,
@@ -1838,7 +1849,9 @@ exports.pushGarantieKizeo = functions
     try { await ref.update({ blocs, updatedAt: new Date().toISOString() }); }
     catch(e) { console.error("pushGarantieKizeo: mise à jour du bloc échouée:", e.message); }
 
-    res.status(200).json({ pushed, errors: errorsList.length, errorsList });
+    const skippedList = errorsList.filter(e => e.status === "skipped");
+    const realErrorsList = errorsList.filter(e => e.status !== "skipped");
+    res.status(200).json({ pushed, skipped: skippedList.length, skippedList, errors: realErrorsList.length, errorsList: realErrorsList });
   });
 
 // ── GARANTIES : GÉNÉRER LES RAPPORTS AGRÉGÉS PAR CLIENT (semaine) ──

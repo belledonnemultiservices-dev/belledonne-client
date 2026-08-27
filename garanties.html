@@ -1387,7 +1387,7 @@ window.doPushKizeo = async function(blocId) {
   const b = getBloc(blocId);
   const nb = (b.lignes || []).length;
   const msg = b.kizeoSentAt
-    ? "Supprimer les anciens rapports dans Kizeo.\n\nContinuer et régénérer les rapports du bloc ?"
+    ? "Ceci renvoie un NOUVEAU formulaire Kizeo au technicien pour chaque locataire du bloc (les anciens envois ne sont pas supprimés côté Kizeo, à faire manuellement si besoin).\n\nLes locataires déjà archivés (rapport agrégé déjà envoyé au client) seront automatiquement ignorés et ne seront pas renvoyés.\n\nContinuer et régénérer les rapports du bloc ?"
     : `Vérifiez que les ${nb} locataire(s) de ce bloc ont bien un nom, une adresse, un code postal et une ville correctement renseignés avant l'envoi.\n\nContinuer et générer les rapports Kizeo ?`;
   if (!confirm(msg)) return;
   const btn = event.currentTarget; btn.disabled = true; const orig = btn.textContent; btn.textContent = "Envoi...";
@@ -1395,7 +1395,10 @@ window.doPushKizeo = async function(blocId) {
     const resp = await fetch(FN_PUSH_KIZEO, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId, blocId }) });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || "Échec de l'envoi Kizeo");
-    showToast(`${data.pushed || 0} rapport(s) envoyé(s)` + (data.errors ? `, ${data.errors} erreur(s)` : ""));
+    let toastMsg = `${data.pushed || 0} rapport(s) envoyé(s)`;
+    if (data.skipped) toastMsg += `, ${data.skipped} déjà archivé(s) ignoré(s)`;
+    if (data.errors) toastMsg += `, ${data.errors} erreur(s)`;
+    showToast(toastMsg);
   } catch (e) {
     alert("Erreur Kizeo : " + e.message);
   }
