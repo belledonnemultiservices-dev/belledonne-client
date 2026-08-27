@@ -291,6 +291,7 @@
           <tr>
             <th>Client</th>
             <th>N° BC</th>
+            <th>N° PL</th>
             <th>N° Devis</th>
             <th>N° Chorus</th>
             <th>Nature</th>
@@ -304,7 +305,7 @@
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="12"><div class="empty-state"><p>Chargement...</p></div></td></tr>
+          <tr><td colspan="13"><div class="empty-state"><p>Chargement...</p></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -534,7 +535,7 @@ function getFilteredFacts() {
   const from = document.getElementById('dateFrom').value;
   const to   = document.getElementById('dateTo').value;
   return factures.filter(function(f) {
-    const mq = !q || [f.client,f.bc,f.numFacture,f.nature,f.chorus].some(function(v){return (v||'').toLowerCase().includes(q);});
+    const mq = !q || [f.client,f.bc,f.pl,f.numFacture,f.nature,f.chorus].some(function(v){return (v||'').toLowerCase().includes(q);});
     const ms = !statut || f.statut === statut;
     const mc = !client || f.client === client;
     let md = true;
@@ -593,7 +594,7 @@ function renderTable(list) {
   const body = document.getElementById('tableBody');
   document.getElementById('resultsCount').textContent = list.length + ' facture' + (list.length!==1?'s':'');
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="12"><div class="empty-state"><p>Aucune ligne de facturation.</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="13"><div class="empty-state"><p>Aucune ligne de facturation.</p></div></td></tr>';
     return;
   }
   let html = '';
@@ -604,9 +605,15 @@ function renderTable(list) {
     if (item.bc) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + item.bc + '</span>';
     if (item.bcUrl) html += pdfBtn(item.bcUrl, 'BC');
     html += '</div></td>';
-    const _devisInfo = (item.suiviId && window._suiviDevisMap && window._suiviDevisMap[item.suiviId]) || {};
-    const _devis    = item.devis    || _devisInfo.devis    || '';
-    const _devisUrl = item.devisUrl || _devisInfo.devisUrl || '';
+    const _suiviInfo = (item.suiviId && window._suiviDevisMap && window._suiviDevisMap[item.suiviId]) || {};
+    const _pl    = item.pl    || _suiviInfo.pl    || '';
+    const _plUrl = item.plUrl || _suiviInfo.plUrl || '';
+    html += '<td><div style="display:flex;flex-direction:column;gap:4px;">';
+    if (_pl) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + _pl + '</span>';
+    if (_plUrl) html += pdfBtn(_plUrl, 'PL');
+    html += '</div></td>';
+    const _devis    = item.devis    || _suiviInfo.devis    || '';
+    const _devisUrl = item.devisUrl || _suiviInfo.devisUrl || '';
     html += '<td><div style="display:flex;flex-direction:column;gap:4px;">';
     if (_devis) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + _devis + '</span>';
     html += pdfBtn(_devisUrl, 'Devis') + '</div></td>';
@@ -655,7 +662,7 @@ function filterTable() {
   const statut = document.getElementById('filterStatut').value;
   const client = document.getElementById('filterClient').value;
   const filtered = factures.filter(function(f) {
-    const mq = !q || [f.client,f.bc,f.numFacture,f.nature,f.chorus].some(function(v){return (v||'').toLowerCase().includes(q);});
+    const mq = !q || [f.client,f.bc,f.pl,f.numFacture,f.nature,f.chorus].some(function(v){return (v||'').toLowerCase().includes(q);});
     const ms = !statut || f.statut === statut;
     const mc = !client || f.client === client;
     return mq && ms && mc;
@@ -1312,7 +1319,7 @@ onAuthStateChanged(auth, async (user) => {
   try {
     const suiviSnap = await getDocs(query(collection(db, 'suivi'), where('enFacturation', '==', true)));
     window._suiviDevisMap = {};
-    suiviSnap.docs.forEach(d => { const s = d.data(); window._suiviDevisMap[d.id] = {devis: s.devis||'', devisUrl: s.devisUrl||''}; });
+    suiviSnap.docs.forEach(d => { const s = d.data(); window._suiviDevisMap[d.id] = {devis: s.devis||'', devisUrl: s.devisUrl||'', pl: s.pl||'', plUrl: s.plUrl||''}; });
   } catch(e) { console.warn('suiviDevisMap:', e); }
 
   // Facturation en temps réel
