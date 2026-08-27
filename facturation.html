@@ -878,9 +878,18 @@ window.genererFactureAxonaut = async function() {
     });
     // Report sur la ligne uniquement pour une vraie facture
     if (MODE === 'facture') {
-      const totalHT = (window._factLignes || []).reduce((s, l) => s + (Number(l.qte) || 0) * (Number(l.pu) || 0), 0);
+      // Calculé + sauvegardé à partir des lignes réellement envoyées à Axonaut (filtrées),
+      // pas du tableau brut : une ligne avec quantité vide/à 0 comptait pour 0€ alors que
+      // Axonaut applique une quantité par défaut, d'où un montantHT à 0 malgré une vraie facture.
+      const totalHT = lignes.reduce((s, l) => s + (Number(l.qte) || 1) * (Number(l.pu) || 0), 0);
       const today = new Date().toISOString().slice(0, 10);
-      const changes = { statut: 'Facturé', numFacture: r.number || '', factureUrl: r.pdfUrl || '', axonautId: r.id || '', montantHT: totalHT, dateFacture: today };
+      const changes = {
+        statut: 'Facturé', numFacture: r.number || '', factureUrl: r.pdfUrl || '', axonautId: r.id || '',
+        montantHT: totalHT, dateFacture: today,
+        // Persiste aussi la composition, sinon ré-ouvrir "Modifier" plus tard repart d'une
+        // ligne vide et un simple clic sur "Enregistrer" écrase montantHT à 0.
+        factLignes: lignes.map(l => ({ designation: (l.designation || '').trim(), qte: Number(l.qte) || 1, pu: Number(l.pu) || 0, tva: Number(l.tva) || 0 })),
+      };
       try {
         await window._updateFacture(editFactId, changes);
         const idx = factures.findIndex(f => f.id === editFactId);
