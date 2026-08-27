@@ -412,6 +412,10 @@
           <button type="button" onclick="resetFactLigne()" style="height:32px;padding:0 12px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-mid);">Réinitialiser la facturation</button>
           <span id="axonautMsg" style="font-size:12px;color:var(--text-muted);"></span>
         </div>
+        <div id="factHistoriqueSection" style="display:none;margin-top:14px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:8px;">Factures remplacées sur cette ligne</div>
+          <div id="factHistoriqueList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
       </div>
 
       <div class="form-section">
@@ -699,7 +703,27 @@ function openModalFact(id) {
   if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer'; }
 
   loadFactComposition(item);
+  renderFactHistorique(item);
   document.getElementById('modalFact').classList.add('open');
+}
+
+// ── Historique des factures remplacées sur cette ligne (régénération Axonaut) ──
+function renderFactHistorique(item) {
+  const section = document.getElementById('factHistoriqueSection');
+  const list = document.getElementById('factHistoriqueList');
+  const hist = Array.isArray(item.factHistorique) ? item.factHistorique : [];
+  if (!hist.length) { section.style.display = 'none'; list.innerHTML = ''; return; }
+  section.style.display = '';
+  list.innerHTML = hist.slice().reverse().map(h => {
+    const quand = h.remplaceeLe ? new Date(h.remplaceeLe).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+    return '<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 8px;background:#fff;border:1px solid var(--border);border-radius:6px;">' +
+      '<span style="font-family:monospace;font-weight:600;">' + (h.numFacture || '—') + '</span>' +
+      '<span style="color:var(--text-muted);">' + fmtMontant(h.montantHT) + '</span>' +
+      (h.factureUrl ? '<a href="' + h.factureUrl + '" target="_blank" style="color:var(--navy);text-decoration:underline;">PDF</a>' : '') +
+      '<span style="color:var(--text-muted);margin-left:auto;">remplacée le ' + quand + '</span>' +
+      (h.motif ? '<span style="width:100%;color:var(--text-mid);font-style:italic;">' + h.motif.replace(/</g,'&lt;') + '</span>' : '') +
+      '</div>';
+  }).join('');
 }
 
 function closeModalFact() {
@@ -863,7 +887,12 @@ window.genererFactureAxonaut = async function() {
   if (!client.nom) { msg.style.color = 'var(--red)'; msg.textContent = 'Renseigne le nom du client.'; return; }
   const lignes = (window._factLignes || []).filter(l => (l.designation || '').trim() && Number(l.pu) > 0);
   if (!lignes.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Ajoute au moins une ligne (désignation + prix).'; return; }
-  if ((item.axonautId || item.factureUrl) && !confirm('Une facture existe déjà pour cette ligne (' + (item.numFacture || '') + ').\nEn créer une nouvelle dans Axonaut ?')) return;
+  const remplaceUneFacture = !!(item.axonautId || item.factureUrl);
+  let motifRemplacement = '';
+  if (remplaceUneFacture) {
+    if (!confirm('Une facture existe déjà pour cette ligne (' + (item.numFacture || '') + ').\nEn créer une nouvelle dans Axonaut ?')) return;
+    motifRemplacement = (prompt('Motif du remplacement (ex: erreur de montant, avoir fait dans Axonaut...) — optionnel, gardé dans l\'historique de la ligne :', '') || '').trim();
+  }
   // MODE : 'facture' en production. (window._factMode='devis' en console pour un test.)
   const MODE = window._factMode || 'facture';
   const btn = document.getElementById('btnGenAxonaut'); btn.disabled = true;
@@ -890,10 +919,30 @@ window.genererFactureAxonaut = async function() {
         // ligne vide et un simple clic sur "Enregistrer" écrase montantHT à 0.
         factLignes: lignes.map(l => ({ designation: (l.designation || '').trim(), qte: Number(l.qte) || 1, pu: Number(l.pu) || 0, tva: Number(l.tva) || 0 })),
       };
+      // Régénération sur une ligne déjà facturée : l'ancienne facture n'est ni
+      // supprimée ni annulée côté Axonaut (juste remplacée dans l'app), donc on
+      // garde une trace consultable dans le modal avant de l'écraser.
+      let historyEntry = null;
+      if (remplaceUneFacture) {
+        historyEntry = {
+          numFacture: item.numFacture || '', factureUrl: item.factureUrl || '', axonautId: item.axonautId || '',
+          montantHT: item.montantHT || 0, dateFacture: item.dateFacture || '',
+          remplaceeLe: new Date().toISOString(), motif: motifRemplacement,
+        };
+        changes.factHistorique = arrayUnion(historyEntry);
+      }
       try {
         await window._updateFacture(editFactId, changes);
         const idx = factures.findIndex(f => f.id === editFactId);
-        if (idx !== -1) Object.assign(factures[idx], changes);
+        if (idx !== -1) {
+          Object.assign(factures[idx], changes);
+          // Object.assign ci-dessus écrase factHistorique par le sentinel arrayUnion(),
+          // pas un vrai tableau : on répare la valeur locale avant le prochain rendu.
+          if (historyEntry) {
+            factures[idx].factHistorique = [...(item.factHistorique || []), historyEntry];
+            renderFactHistorique(factures[idx]);
+          }
+        }
         applyFilters();
       } catch(e) { console.error('report ligne:', e); }
     }
@@ -1248,7 +1297,7 @@ document.getElementById('modalFact').addEventListener('click', e => {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, doc, query, orderBy, where, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
