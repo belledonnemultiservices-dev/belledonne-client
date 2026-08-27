@@ -227,7 +227,7 @@
 <div class="modal-overlay" id="modalSemaine">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Nouvelle semaine garantie</div>
+      <div class="modal-title" id="sModalTitle">Nouvelle semaine garantie</div>
       <button class="btn-close" onclick="closeSemaineModal()">×</button>
     </div>
     <div class="modal-body">
@@ -244,7 +244,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeSemaineModal()">Annuler</button>
-      <button class="btn-save" onclick="saveSemaine()">Créer la semaine</button>
+      <button class="btn-save" id="sModalSaveBtn" onclick="saveSemaine()">Créer la semaine</button>
     </div>
   </div>
 </div>
@@ -257,6 +257,7 @@
         <div class="modal-title" id="dTitle">Semaine garantie</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-secondary" onclick="openEditSemaine()">Modifier la période</button>
         <button class="btn-secondary" style="background:rgba(231,76,60,0.08);color:var(--red);" onclick="deleteSemaine()">Supprimer la semaine</button>
         <button class="btn-close" onclick="closeDetailModal()">×</button>
       </div>
@@ -961,19 +962,47 @@ window.genererRapportsParClient = async function() {
   btn.disabled = false; btn.textContent = orig;
 };
 
-// ── Créer une semaine ──
+// ── Créer / modifier la période d'une semaine ──
+let _editSemaineId = null;
 window.openNewSemaine = function() {
+  _editSemaineId = null;
+  document.getElementById("sModalTitle").textContent = "Nouvelle semaine garantie";
+  document.getElementById("sModalSaveBtn").textContent = "Créer la semaine";
   document.getElementById("sDateDebut").value = "";
   document.getElementById("sDateFin").value = "";
   document.getElementById("modalSemaine").classList.add("open");
 };
-window.closeSemaineModal = function() { document.getElementById("modalSemaine").classList.remove("open"); };
+window.openEditSemaine = function() {
+  if (!_currentSemaine || !_currentSemaineId) return;
+  _editSemaineId = _currentSemaineId;
+  document.getElementById("sModalTitle").textContent = "Modifier la période";
+  document.getElementById("sModalSaveBtn").textContent = "Enregistrer";
+  document.getElementById("sDateDebut").value = _currentSemaine.dateDebut || "";
+  document.getElementById("sDateFin").value = _currentSemaine.dateFin || "";
+  document.getElementById("modalSemaine").classList.add("open");
+};
+window.closeSemaineModal = function() { document.getElementById("modalSemaine").classList.remove("open"); _editSemaineId = null; };
 window.saveSemaine = async function() {
   const dateDebut = document.getElementById("sDateDebut").value;
   const dateFin = document.getElementById("sDateFin").value;
   if (!dateDebut || !dateFin) { alert("Renseignez la date de début et de fin."); return; }
   if (dateFin < dateDebut) { alert("La date de fin doit être après la date de début."); return; }
   const now = new Date().toISOString();
+
+  if (_editSemaineId) {
+    const s = semaines.find(x => x.id === _editSemaineId);
+    const blocs = s ? (s.blocs || []) : [];
+    const horsPlage = blocs.filter(b => b.date && (b.date < dateDebut || b.date > dateFin));
+    if (horsPlage.length) {
+      alert(`Impossible : ${horsPlage.length} bloc(s) ont une date en dehors de la nouvelle période (${horsPlage.map(b => fmtDate(b.date)).join(", ")}).\n\nModifiez ou supprimez d'abord ces blocs, ou choisissez une période qui les couvre.`);
+      return;
+    }
+    await updateDoc(doc(db, "garanties-semaines", _editSemaineId), { dateDebut, dateFin, updatedAt: now });
+    closeSemaineModal();
+    showToast("Période mise à jour");
+    return;
+  }
+
   await addDoc(collection(db, "garanties-semaines"), { dateDebut, dateFin, blocs: [], createdAt: now, updatedAt: now });
   closeSemaineModal();
   showToast("Semaine créée");
