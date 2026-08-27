@@ -43,11 +43,13 @@
   .btn-add:hover{background:var(--green-dark);color:#fff;}
   .btn-add svg{width:16px;height:16px;}
 
-  .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start;}
+  .two-cols-headers{display:grid;grid-template-columns:1fr 1fr;gap:28px;}
+  .two-cols-search{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start;margin-bottom:16px;}
   .col-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:12px;}
-  .semaines-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+  .pairs-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px;align-items:stretch;}
   .s-card{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--pair-accent,var(--border));border-radius:var(--radius);padding:18px 20px;cursor:pointer;transition:box-shadow 0.15s;min-height:112px;display:flex;flex-direction:column;justify-content:space-between;}
   .s-card:hover{box-shadow:0 4px 16px rgba(13,27,42,0.08);}
+  .s-card-empty{background:transparent;border:1px dashed var(--border);border-radius:var(--radius);padding:18px 20px;min-height:112px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-muted);}
   .s-date{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px;}
   .s-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-mid);}
   .r-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;}
@@ -199,27 +201,24 @@
       </button>
     </div>
 
-    <div class="two-cols">
-      <div class="col">
-        <div class="col-title">Semaines garantie</div>
-        <div style="position:relative;margin-bottom:12px;">
-          <input class="form-input" type="text" id="garantieSearch" placeholder="Rechercher un nom ou une adresse..." oninput="onGarantieSearch()" autocomplete="off">
-          <div id="garantieSearchResults" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);max-height:320px;overflow-y:auto;z-index:50;"></div>
-        </div>
-        <div class="semaines-grid" id="semainesGrid"></div>
-        <div class="empty-state" id="emptyState" style="display:none;">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
-          <p>Aucune semaine garantie créée pour le moment.</p>
-        </div>
+    <div class="two-cols-headers">
+      <div class="col-title">Semaines garantie</div>
+      <div class="col-title">Gestion rapports</div>
+    </div>
+    <div class="two-cols-search">
+      <div style="position:relative;">
+        <input class="form-input" type="text" id="garantieSearch" placeholder="Rechercher un nom ou une adresse..." oninput="onGarantieSearch()" autocomplete="off">
+        <div id="garantieSearchResults" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);max-height:320px;overflow-y:auto;z-index:50;"></div>
       </div>
-      <div class="col">
-        <div class="col-title">Gestion rapports</div>
-        <div class="semaines-grid" id="rapportsGrid"></div>
-        <div class="empty-state" id="emptyRapports" style="display:none;">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-          <p>Aucun rapport pour le moment (générez des rapports Kizeo depuis un bloc).</p>
-        </div>
+      <div style="position:relative;">
+        <input class="form-input" type="text" id="rapportsSearch" placeholder="Rechercher un nom ou une adresse..." oninput="onRapportsSearch()" autocomplete="off">
+        <div id="rapportsSearchResults" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);max-height:320px;overflow-y:auto;z-index:50;"></div>
       </div>
+    </div>
+    <div class="pairs-grid" id="pairsGrid"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+      <p>Aucune semaine garantie créée pour le moment.</p>
     </div>
   </div>
 </div>
@@ -498,8 +497,7 @@ onAuthStateChanged(auth, (user) => {
   if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
   onSnapshot(collection(db, "garanties-semaines"), (snap) => {
     semaines = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.dateDebut || "").localeCompare(a.dateDebut || ""));
-    renderSemaines();
-    renderRapportsGrid();
+    renderPairs();
     if (_currentSemaineId) {
       const s = semaines.find(x => x.id === _currentSemaineId);
       if (s) { _currentSemaine = s; renderBlocs(); }
@@ -507,7 +505,7 @@ onAuthStateChanged(auth, (user) => {
   });
   onSnapshot(collection(db, "garanties-rapports"), (snap) => {
     rapports = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderRapportsGrid();
+    renderPairs();
     if (document.getElementById("modalRapports").classList.contains("open")) renderRapportsList();
   });
   onSnapshot(collection(db, "garanties-rapports-agreges"), (snap) => {
@@ -560,19 +558,67 @@ function isSemaineTerminee(semaineId) {
 }
 
 // ── Liste des semaines ──
-function renderSemaines() {
-  const grid = document.getElementById("semainesGrid");
+// ── Rendu apparié : chaque semaine à gauche, sa carte rapports correspondante
+// à droite sur la même ligne (une seule carte par ligne de chaque côté). ──
+function renderPairs() {
+  const grid = document.getElementById("pairsGrid");
   const empty = document.getElementById("emptyState");
-  if (!semaines.length) { grid.innerHTML = ""; empty.style.display = ""; return; }
+  const bySemaine = {};
+  rapports.forEach(r => { if (!r.semaineId) return; (bySemaine[r.semaineId] = bySemaine[r.semaineId] || []).push(r); });
+
+  if (!semaines.length && !Object.keys(bySemaine).length) { grid.innerHTML = ""; empty.style.display = ""; return; }
   empty.style.display = "none";
-  grid.innerHTML = semaines.map(s => {
+
+  const rows = semaines.map(s => {
     const blocs = s.blocs || [];
     const nbLignes = blocs.reduce((sum, b) => sum + (b.lignes || []).length, 0);
-    return `<div class="s-card" style="--pair-accent:${accentForSemaine(s.id)};" onclick="openDetailModal('${s.id}')">
+    const left = `<div class="s-card" style="--pair-accent:${accentForSemaine(s.id)};" onclick="openDetailModal('${s.id}')">
       <div class="s-date">${fmtDate(s.dateDebut)} → ${fmtDate(s.dateFin)} ${isSemaineTerminee(s.id) ? `<span class="r-badge r-badge-ok">✓ Terminé</span>` : ""}</div>
       <div class="s-row"><span>${blocs.length} bloc${blocs.length > 1 ? "s" : ""}</span><span>${nbLignes} locataire${nbLignes > 1 ? "s" : ""}</span></div>
     </div>`;
-  }).join("");
+
+    const list = bySemaine[s.id];
+    let right;
+    if (list && list.length) {
+      const aTraiter = list.filter(r => r.statut === "a-traiter").length;
+      const retard = list.filter(isOverdueRapport).length;
+      right = `<div class="s-card" style="position:relative;--pair-accent:${accentForSemaine(s.id)};" onclick="openRapportsModal('${s.id}')">
+        <button class="btn-icon danger" style="position:absolute;top:8px;right:8px;" title="Supprimer tous les rapports de cette semaine" onclick="event.stopPropagation();deleteRapportsSemaine('${s.id}')"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+        <div class="s-date">${fmtDate(s.dateDebut)} → ${fmtDate(s.dateFin)}</div>
+        <div class="s-row" style="margin-bottom:6px;"><span>${list.length} rapport${list.length > 1 ? "s" : ""}</span></div>
+        <div class="s-row" style="gap:6px;">
+          ${isSemaineTerminee(s.id) ? `<span class="r-badge r-badge-ok">✓ Terminé</span>` : ""}
+          ${aTraiter ? `<span class="r-badge r-badge-traiter">${aTraiter} à traiter</span>` : ""}
+          ${retard ? `<span class="r-badge r-badge-retard">${retard} non reçu</span>` : ""}
+          ${!isSemaineTerminee(s.id) && !aTraiter && !retard ? `<span class="r-badge r-badge-ok">À jour</span>` : ""}
+        </div>
+      </div>`;
+      delete bySemaine[s.id];
+    } else {
+      right = `<div class="s-card-empty">Aucun rapport</div>`;
+    }
+    return left + right;
+  });
+
+  // Rapports dont la semaine a été supprimée entre-temps : affichés en bas, avec une carte de gauche vide.
+  Object.keys(bySemaine).forEach(sid => {
+    const list = bySemaine[sid];
+    const aTraiter = list.filter(r => r.statut === "a-traiter").length;
+    const retard = list.filter(isOverdueRapport).length;
+    const left = `<div class="s-card-empty">Semaine supprimée</div>`;
+    const right = `<div class="s-card" style="position:relative;" onclick="openRapportsModal('${sid}')">
+      <button class="btn-icon danger" style="position:absolute;top:8px;right:8px;" title="Supprimer tous les rapports de cette semaine" onclick="event.stopPropagation();deleteRapportsSemaine('${sid}')"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+      <div class="s-date">Semaine supprimée</div>
+      <div class="s-row" style="margin-bottom:6px;"><span>${list.length} rapport${list.length > 1 ? "s" : ""}</span></div>
+      <div class="s-row" style="gap:6px;">
+        ${aTraiter ? `<span class="r-badge r-badge-traiter">${aTraiter} à traiter</span>` : ""}
+        ${retard ? `<span class="r-badge r-badge-retard">${retard} non reçu</span>` : ""}
+      </div>
+    </div>`;
+    rows.push(left + right);
+  });
+
+  grid.innerHTML = rows.join("");
 }
 
 // ── Recherche textuelle (nom / adresse) à travers toutes les semaines ──
@@ -624,34 +670,52 @@ window.openDetailModalToBloc = function(semaineId, blocId) {
   }, 100);
 };
 
-// ── Colonne droite : Gestion rapports (une carte par semaine ayant des rapports) ──
-function renderRapportsGrid() {
-  const grid = document.getElementById("rapportsGrid");
-  const empty = document.getElementById("emptyRapports");
-  const bySemaine = {};
-  rapports.forEach(r => { if (!r.semaineId) return; (bySemaine[r.semaineId] = bySemaine[r.semaineId] || []).push(r); });
-  const semaineIds = Object.keys(bySemaine);
-  if (!semaineIds.length) { grid.innerHTML = ""; empty.style.display = ""; return; }
-  empty.style.display = "none";
-  grid.innerHTML = semaineIds.map(sid => {
-    const list = bySemaine[sid];
-    const s = semaines.find(x => x.id === sid);
-    const label = s ? `${fmtDate(s.dateDebut)} → ${fmtDate(s.dateFin)}` : "Semaine supprimée";
-    const aTraiter = list.filter(r => r.statut === "a-traiter").length;
-    const retard = list.filter(isOverdueRapport).length;
-    return `<div class="s-card" style="position:relative;--pair-accent:${accentForSemaine(sid)};" onclick="openRapportsModal('${sid}')">
-      <button class="btn-icon danger" style="position:absolute;top:8px;right:8px;" title="Supprimer tous les rapports de cette semaine" onclick="event.stopPropagation();deleteRapportsSemaine('${sid}')"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
-      <div class="s-date">${label}</div>
-      <div class="s-row" style="margin-bottom:6px;"><span>${list.length} rapport${list.length > 1 ? "s" : ""}</span></div>
-      <div class="s-row" style="gap:6px;">
-        ${isSemaineTerminee(sid) ? `<span class="r-badge r-badge-ok">✓ Terminé</span>` : ""}
-        ${aTraiter ? `<span class="r-badge r-badge-traiter">${aTraiter} à traiter</span>` : ""}
-        ${retard ? `<span class="r-badge r-badge-retard">${retard} non reçu</span>` : ""}
-        ${!isSemaineTerminee(sid) && !aTraiter && !retard ? `<span class="r-badge r-badge-ok">À jour</span>` : ""}
-      </div>
+// ── Recherche textuelle (nom / client) à travers tous les rapports ──
+window.onRapportsSearch = function() {
+  const term = normalizeSearch(document.getElementById("rapportsSearch").value.trim());
+  const resultsEl = document.getElementById("rapportsSearchResults");
+  if (!term) { resultsEl.style.display = "none"; resultsEl.innerHTML = ""; return; }
+  const STATUT_LABEL = { "en-attente": "En attente", "a-traiter": "À traiter", "archive": "Archivé" };
+  const matches = rapports.filter(r => normalizeSearch((r.nomLocataire || "") + " " + (r.client || "")).includes(term));
+  if (!matches.length) {
+    resultsEl.innerHTML = `<div style="padding:12px;font-size:13px;color:var(--text-muted);">Aucun résultat.</div>`;
+    resultsEl.style.display = "";
+    return;
+  }
+  resultsEl.innerHTML = matches.slice(0, 30).map(r => {
+    const s = semaines.find(x => x.id === r.semaineId);
+    const label = s ? `Semaine du ${fmtDate(s.dateDebut)} au ${fmtDate(s.dateFin)}` : "Semaine supprimée";
+    return `<div onclick="openRapportsSearchResult('${r.id}')" style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+      <div style="font-size:13px;font-weight:600;color:var(--text);">${r.nomLocataire || "—"} <span style="font-weight:400;color:var(--text-muted);">(${r.client || "—"})</span></div>
+      <div style="font-size:12px;color:var(--text-muted);">${label} · ${STATUT_LABEL[r.statut] || r.statut}</div>
     </div>`;
   }).join("");
-}
+  resultsEl.style.display = "";
+};
+document.addEventListener("click", (e) => {
+  const wrap = document.getElementById("rapportsSearch");
+  const resultsEl = document.getElementById("rapportsSearchResults");
+  if (!wrap || !resultsEl) return;
+  if (e.target !== wrap && !resultsEl.contains(e.target)) resultsEl.style.display = "none";
+});
+window.openRapportsSearchResult = function(rapportId) {
+  document.getElementById("rapportsSearchResults").style.display = "none";
+  document.getElementById("rapportsSearch").value = "";
+  const r = rapports.find(x => x.id === rapportId);
+  if (!r) return;
+  const filterValue = r.statut === "a-traiter" ? "a-traiter" : (r.statut === "archive" ? "archive" : (isOverdueRapport(r) ? "en-retard" : "en-attente"));
+  openRapportsModal(r.semaineId);
+  document.getElementById("rFilterStatut").value = filterValue;
+  renderRapportsList();
+  setTimeout(() => {
+    const el = document.querySelector(`.rap-row[data-rapport-id="${rapportId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.style.transition = "box-shadow 0.3s";
+    el.style.boxShadow = "0 0 0 3px #4338CA";
+    setTimeout(() => { el.style.boxShadow = ""; }, 2000);
+  }, 100);
+};
 
 let _currentRapportsSemaineId = null;
 window.openRapportsModal = function(semaineId) {
@@ -694,7 +758,7 @@ window.renderRapportsList = function() {
   container.innerHTML = list.map(r => {
     const bloc = (() => { const s = semaines.find(x => x.id === r.semaineId); return s ? (s.blocs || []).find(b => b.id === r.blocId) : null; })();
     const retard = isOverdueRapport(r);
-    return `<div class="rap-row">
+    return `<div class="rap-row" data-rapport-id="${r.id}">
       <div class="rap-info">
         <div class="rap-nom">${r.nomLocataire || "—"} <span style="font-weight:400;color:var(--text-muted);">(${r.client || "—"})</span></div>
         <div class="rap-sub">${bloc ? fmtDate(bloc.date) + " · " + (bloc.heureDebut || "") + "-" + (bloc.heureFin || "") : ""} ${r.technicien ? "· " + r.technicien : ""}</div>
