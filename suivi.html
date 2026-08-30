@@ -2603,6 +2603,9 @@ function switchNotifTab(tab) {
   if (tab === 'locataire' && window._loadProtocolesForClient) {
     window._loadProtocolesForClient(window._nsCurrentClient || '');
   }
+  if (tab === 'bailleur' && window._loadClientPjList) {
+    window._loadClientPjList(window._nsCurrentClient || '', window._nsCurrentItem || null);
+  }
   if (tab === 'rappel') { populateRappelPanel(); }
 }
 
@@ -2622,6 +2625,39 @@ function addPhoneField(value = '') {
 function removePhone(n) {
   const el = document.getElementById('phone_' + n);
   if (el) el.remove();
+}
+
+// ── CONTENU CONFIRMATION RDV (template Bailleur par défaut, ou template Client dédié si le client y est associé) ──
+function buildClientRdvContent(client, bc, pl, devis, passagesStr, adresse, nature) {
+  const plStr = pl ? ' / PL N°' + pl : '';
+  const reference = [bc ? 'BC N°' + bc : '', pl ? 'PL N°' + pl : '', devis ? 'Devis N°' + devis : ''].filter(Boolean).join(' / ') || '—';
+  const clientTpl = window._suiviRdvClientTemplate;
+  const useClientTpl = clientTpl && Array.isArray(clientTpl.clients) && clientTpl.clients.includes(client);
+  const tpl = useClientTpl ? clientTpl : (window._suiviRdvTemplate || {});
+  const subject = (tpl.subject || 'Confirmation de rendez-vous — BC N°{{bc}}')
+    .replace('{{bc}}', bc).replace('{{pl}}', pl).replace('{{reference}}', reference);
+  const body = (tpl.body || `Bonjour,
+
+Nous vous confirmons que l'intervention concernant {{nature}} est prévue aux créneaux suivants :
+
+{{passages}}
+
+Adresse : {{adresse}}
+
+Référence : BC N°{{bc}}{{pl}}
+
+Merci de vous assurer d\'être présent(e) aux horaires indiqués. En cas d\'empêchement, merci de nous contacter dans les plus brefs délais.
+
+Cordialement,
+Belledonne Multiservices
+📞 06 95 67 26 03`)
+    .replace('{{bc}}', bc)
+    .replace('{{pl}}', plStr)
+    .replace('{{passages}}', passagesStr)
+    .replace('{{adresse}}', adresse)
+    .replace('{{nature}}', nature)
+    .replace('{{reference}}', reference);
+  return { subject, body };
 }
 
 // ── NOTIFICATION SUIVI RDV ──
@@ -2644,29 +2680,11 @@ window.openNotifFromItem = async function(item) {
   }).join('\n');
   const bc = item.bc || '';
   const pl = item.pl || '';
+  const devis = item.devis || '';
   const adresse = item.adresse || '';
   const nature = item.nature || '';
-  const plStr = pl ? ' / PL N°' + pl : '';
-  const tpl = window._suiviRdvTemplate || {};
-  const subject = (tpl.subject || 'Confirmation de rendez-vous — BC N°{{bc}}')
-    .replace('{{bc}}', bc).replace('{{pl}}', pl);
-  const body = (tpl.body || `Bonjour,
-
-Nous vous confirmons que l'intervention concernant {{nature}} est prévue aux créneaux suivants :
-
-{{passages}}
-
-Adresse : {{adresse}}
-
-Référence : BC N°{{bc}}{{pl}}
-
-Merci de vous assurer d\'être présent(e) aux horaires indiqués. En cas d\'empêchement, merci de nous contacter dans les plus brefs délais.
-
-Cordialement,
-Belledonne Multiservices
-📞 06 95 67 26 03`)
-    .replace('{{bc}}', bc).replace('{{pl}}', plStr)
-    .replace('{{passages}}', passagesStr).replace('{{adresse}}', adresse).replace('{{nature}}', nature);
+  window._nsCurrentItem = item;
+  const { subject, body } = buildClientRdvContent(client, bc, pl, devis, passagesStr, adresse, nature);
   document.getElementById('nsSubject').value = subject;
   document.getElementById('nsBody').value = body;
   document.getElementById('nsSuccess').style.display = 'none';
@@ -2742,34 +2760,12 @@ window.openNotifSuivi = async function() {
 
   const bc = document.getElementById('fBC')?.value || '';
   const pl = document.getElementById('fPL')?.value || '';
+  const devis = document.getElementById('fDevis')?.value || document.getElementById('fDevisE')?.value || '';
   const adresse = document.getElementById('fAdresse')?.value || '';
   const nature = document.getElementById('fNature')?.value || '';
-  const plStr = pl ? ' / PL N°' + pl : '';
+  window._nsCurrentItem = (window.interventions || []).find(i => i.id === editId) || null;
 
-  // Load template from Firestore
-  const tpl = window._suiviRdvTemplate || {};
-  const subject = (tpl.subject || 'Confirmation de rendez-vous — BC N°{{bc}}')
-    .replace('{{bc}}', bc).replace('{{pl}}', pl);
-  const body = (tpl.body || `Bonjour,
-
-Nous vous confirmons que l'intervention concernant {{nature}} est prévue aux créneaux suivants :
-
-{{passages}}
-
-Adresse : {{adresse}}
-
-Référence : BC N°{{bc}}{{pl}}
-
-Merci de vous assurer d\'être présent(e) aux horaires indiqués. En cas d\'empêchement, merci de nous contacter dans les plus brefs délais.
-
-Cordialement,
-Belledonne Multiservices
-📞 06 95 67 26 03`)
-    .replace('{{bc}}', bc)
-    .replace('{{pl}}', plStr)
-    .replace('{{passages}}', passagesStr)
-    .replace('{{adresse}}', adresse)
-    .replace('{{nature}}', nature);
+  const { subject, body } = buildClientRdvContent(client, bc, pl, devis, passagesStr, adresse, nature);
 
   document.getElementById('nsSubject').value = subject;
   document.getElementById('nsBody').value = body;
@@ -3001,10 +2997,14 @@ window.sendNotifSuivi = async function() {
   const subject = document.getElementById(subjectId).value.trim();
   const body = document.getElementById(bodyId).value.trim();
   if (!subject || !body) { alert('Objet et message requis.'); return; }
-  // Collect selected PJ (locataire only)
+  // Collect selected PJ
   const attachments = [];
   if (isLoc) {
     document.querySelectorAll('#nsPjList input[type=checkbox]:checked').forEach(cb => {
+      attachments.push({ url: cb.dataset.url, filename: cb.dataset.name });
+    });
+  } else if (_currentNotifTab === 'bailleur') {
+    document.querySelectorAll('#nsPjListClient input[type=checkbox]:checked').forEach(cb => {
       attachments.push({ url: cb.dataset.url, filename: cb.dataset.name });
     });
   }
@@ -4575,6 +4575,9 @@ onAuthStateChanged(auth, async (user) => {
     if (tplDoc && tplDoc.data().suiviRdv) {
       window._suiviRdvTemplate = tplDoc.data().suiviRdv;
     }
+    if (tplDoc && tplDoc.data().suiviRdvClient) {
+      window._suiviRdvClientTemplate = tplDoc.data().suiviRdvClient;
+    }
     if (tplDoc && tplDoc.data().suiviRdvLocataire) {
       window._suiviRdvLocataireTemplate = tplDoc.data().suiviRdvLocataire;
     }
@@ -4632,6 +4635,46 @@ window._loadProtocolesForClient = async function(client) {
     }).join('');
   } catch(e) {
     list.innerHTML = '<div style="font-size:12px;color:#E74C3C;">Erreur chargement protocoles</div>';
+    console.error(e);
+  }
+};
+
+// ── PROTOCOLES + BC/PL/DEVIS POUR PJ ONGLET CLIENT ──
+window._loadClientPjList = async function(client, item) {
+  const list = document.getElementById('nsPjListClient');
+  const none = document.getElementById('nsPjNoneClient');
+  if (!list) return;
+  list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Chargement...</div>';
+  try {
+    const snap = await getDocs(collection(db, 'protocoles'));
+    const protos = snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(p => p.pdfUrl && (!p.client || p.client === client || p.client === '__tous__'));
+    let html = protos.map(p => {
+      const fname = p.titre ? p.titre.replace(/[^a-zA-Z0-9\-_\.]/g,'_') + '.pdf' : 'protocole.pdf';
+      return '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px;">' +
+        '<input type="checkbox" data-url="' + p.pdfUrl + '" data-name="' + fname + '" style="width:14px;height:14px;">' +
+        '<span style="flex:1;font-weight:500;color:var(--text);">' + (p.titre||'Protocole') + '</span>' +
+        (p.type ? '<span style="font-size:10px;background:#EBF0F5;color:#1A2E42;padding:2px 7px;border-radius:10px;">' + p.type + '</span>' : '') +
+        '</label>';
+    }).join('');
+    const docs = [];
+    if (item) {
+      if (item.bcUrl) docs.push({ url: item.bcUrl, label: 'BC N°' + (item.bc || ''), name: 'BC_' + (item.bc || 'doc') + '.pdf' });
+      if (item.plUrl) docs.push({ url: item.plUrl, label: 'PL N°' + (item.pl || ''), name: 'PL_' + (item.pl || 'doc') + '.pdf' });
+      if (item.devisUrl) docs.push({ url: item.devisUrl, label: 'Devis N°' + (item.devis || ''), name: 'Devis_' + (item.devis || 'doc') + '.pdf' });
+    }
+    html += docs.map(d =>
+      '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px;">' +
+      '<input type="checkbox" data-url="' + d.url + '" data-name="' + d.name + '" style="width:14px;height:14px;">' +
+      '<span style="flex:1;font-weight:500;color:var(--text);">' + d.label + '</span>' +
+      '<span style="font-size:10px;background:#FEF3E2;color:#996600;padding:2px 7px;border-radius:10px;">Ligne suivi</span>' +
+      '</label>'
+    ).join('');
+    if (!html) { list.innerHTML = ''; if (none) none.style.display = 'block'; return; }
+    if (none) none.style.display = 'none';
+    list.innerHTML = html;
+  } catch(e) {
+    list.innerHTML = '<div style="font-size:12px;color:#E74C3C;">Erreur chargement pièces jointes</div>';
     console.error(e);
   }
 };
@@ -4847,7 +4890,7 @@ window.resetStatusColors = function() {
       <!-- TABS -->
       <div style="display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;">
         <button id="nsTabBailleur" onclick="switchNotifTab('bailleur')" style="flex:1;padding:10px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--navy);color:#fff;border-radius:0;transition:all 0.15s;">
-          🏢 Bailleur
+          🏢 Client
         </button>
         <button id="nsTabLocataire" onclick="switchNotifTab('locataire')" style="flex:1;padding:10px;border:none;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-mid);border-radius:0;transition:all 0.15s;">
           🏠 Locataire
@@ -4863,7 +4906,7 @@ window.resetStatusColors = function() {
       <!-- BAILLEUR PANEL -->
       <div id="nsPanelBailleur">
         <div style="margin-bottom:16px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataires bailleur <span style="font-weight:400;text-transform:none;">(coche ceux à notifier)</span></div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Destinataires client <span style="font-weight:400;text-transform:none;">(coche ceux à notifier)</span></div>
           <div id="nsBailleurContacts" style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto;"></div>
           <button type="button" onclick="toggleNewContactNs()" style="margin-top:10px;display:inline-flex;align-items:center;gap:5px;background:var(--green-pale);color:var(--green-dark);border:1px dashed var(--green);padding:7px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
             <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -4881,6 +4924,11 @@ window.resetStatusColors = function() {
             </div>
             <button type="button" id="nsAddContactBtn" onclick="addNsContact()" style="background:var(--green);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Ajouter le contact</button>
           </div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Pièce jointe <span style="font-weight:400;text-transform:none;color:var(--text-muted);">(optionnel — protocoles du client + BC/PL/Devis de cette ligne)</span></div>
+          <div id="nsPjListClient" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto;"></div>
+          <div id="nsPjNoneClient" style="font-size:12px;color:var(--text-muted);font-style:italic;display:none;">Aucune pièce jointe disponible pour ce client/cette ligne.</div>
         </div>
         <div style="margin-bottom:16px;">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:8px;">Objet</div>

@@ -399,6 +399,17 @@ function downloadFile(url) {
   });
 }
 
+function guessContentType(filename) {
+  const ext = (filename || "").split(".").pop().toLowerCase();
+  const map = {
+    pdf: "application/pdf",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png"
+  };
+  return map[ext] || "application/octet-stream";
+}
+
 exports.sendNotification = functions
   .region("europe-west1")
   .runWith({ timeoutSeconds: 120, memory: "512MB", secrets: [GMAIL_USER, GMAIL_PASS] })
@@ -423,9 +434,9 @@ exports.sendNotification = functions
           try {
             const buffer = await downloadFile(att.url);
             mailAttachments.push({
-              filename: att.filename || "rapport.xlsx",
+              filename: att.filename || "document.pdf",
               content: buffer,
-              contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              contentType: guessContentType(att.filename)
             });
           } catch(e) {
             console.error("Erreur PJ:", att.url, e.message);
