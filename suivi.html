@@ -2285,6 +2285,20 @@ async function confirmerValidation() {
 async function basculerEnFacturation(id) {
   const item = (window.interventions||[]).find(i => i.id === id);
   if (!item) return;
+
+  const hasPL    = !!(item.pl && item.pl.trim() && item.plUrl);
+  const hasBC    = !!(item.bc && item.bc.trim() && item.bcUrl);
+  const hasDevis = !!(item.devis && item.devis.trim() && item.devisUrl);
+  const hasAdresse = !!(item.adresse && item.adresse.trim());
+
+  if (!(hasPL || hasBC || hasDevis) || !hasAdresse) {
+    const manque = [];
+    if (!(hasPL || hasBC || hasDevis)) manque.push('- Aucune association complète : il faut au moins un numéro PL + PDF, OU un numéro BC + PDF, OU un numéro Devis + PDF');
+    if (!hasAdresse) manque.push('- Adresse manquante');
+    alert('Impossible de facturer, il manque :\n' + manque.join('\n'));
+    return;
+  }
+
   try {
     await window._createFacture({
       suiviId: id,
