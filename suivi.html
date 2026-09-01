@@ -2131,11 +2131,12 @@ function resetForm() {
 }
 
 // ── SAVE ──
-async function saveIntervention() {
+async function saveIntervention(silent) {
   const client = getClientValue();
-  if (!client) { alert('Le champ Client est obligatoire.'); return; }
+  if (!client) { if (!silent) alert('Le champ Client est obligatoire.'); return; }
+  if (silent && !editId) return; // pas d'auto-save tant que la fiche n'a jamais été créée
   const btn = document.getElementById('btnSave');
-  btn.disabled = true; btn.textContent = 'Enregistrement...';
+  if (!silent) { btn.disabled = true; btn.textContent = 'Enregistrement...'; }
 
   // Sync local interventions array from window (populated by module)
   if (window.interventions && window.interventions.length) interventions = window.interventions;
@@ -2145,13 +2146,15 @@ async function saveIntervention() {
     let bcUrl    = editId ? (interventions.find(i=>i.id===editId)?.bcUrl    || '') : '';
     let devisUrl = editId ? (interventions.find(i=>i.id===editId)?.devisUrl || '') : '';
 
-    // Upload PDFs to Firebase Storage
-    const filePL    = document.getElementById('filePL').files[0];
-    const fileBC    = document.getElementById('fileBC').files[0];
-    const fileDevis = document.getElementById('fileDevis').files[0];
-    if (filePL)    plUrl    = await window._uploadPdf(filePL,    `suivi/pl/${Date.now()}_${filePL.name}`);
-    if (fileBC)    bcUrl    = await window._uploadPdf(fileBC,    `suivi/bc/${Date.now()}_${fileBC.name}`);
-    if (fileDevis) devisUrl = await window._uploadPdf(fileDevis, `suivi/devis/${Date.now()}_${fileDevis.name}`);
+    if (!silent) {
+      // Upload PDFs to Firebase Storage (pas en auto-save, pour éviter les ré-uploads répétés)
+      const filePL    = document.getElementById('filePL').files[0];
+      const fileBC    = document.getElementById('fileBC').files[0];
+      const fileDevis = document.getElementById('fileDevis').files[0];
+      if (filePL)    plUrl    = await window._uploadPdf(filePL,    `suivi/pl/${Date.now()}_${filePL.name}`);
+      if (fileBC)    bcUrl    = await window._uploadPdf(fileBC,    `suivi/bc/${Date.now()}_${fileBC.name}`);
+      if (fileDevis) devisUrl = await window._uploadPdf(fileDevis, `suivi/devis/${Date.now()}_${fileDevis.name}`);
+    }
 
     const passages = getPassageDates();
     const data = {
@@ -2191,15 +2194,19 @@ async function saveIntervention() {
       await window._addSuivi(data);
     }
 
-    closeModal();
-    filterTable();
-    showToast(editId ? 'Intervention mise à jour !' : 'Intervention enregistrée !');
+    if (silent) {
+      filterTable();
+      showAutosaveIndicator('btnSave');
+    } else {
+      closeModal();
+      filterTable();
+      showToast(editId ? 'Intervention mise à jour !' : 'Intervention enregistrée !');
+    }
   } catch(e) {
     console.error(e);
-    alert('Erreur lors de l\'enregistrement : ' + e.message);
+    if (!silent) alert('Erreur lors de l\'enregistrement : ' + e.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = editId ? 'Mettre à jour' : 'Enregistrer';
+    if (!silent) { btn.disabled = false; btn.textContent = editId ? 'Mettre à jour' : 'Enregistrer'; }
   }
 }
 
@@ -3320,6 +3327,35 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
+// ── AUTO-SAVE ──
+// Indicateur discret (texte du bouton) au lieu du toast bloquant, pour ne pas gêner la saisie.
+function showAutosaveIndicator(btnId) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  const original = btn.textContent;
+  btn.textContent = 'Enregistré ✓';
+  clearTimeout(btn._autosaveResetTimer);
+  btn._autosaveResetTimer = setTimeout(() => { btn.textContent = original === 'Enregistré ✓' ? 'Mettre à jour' : original; }, 1500);
+}
+function debounce(fn, delay) {
+  let timer = null;
+  return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), delay); };
+}
+const autosaveContrat     = debounce(() => saveIntervention(true), 1200);
+const autosaveParticulier = debounce(() => saveInterventionParticulier(true), 1200);
+const autosaveEntreprise  = debounce(() => saveInterventionEntreprise(true), 1200);
+const autosaveTache       = debounce(() => saveInterventionTache(true), 1200);
+function wireAutosave(modalId, handler) {
+  const el = document.getElementById(modalId);
+  if (!el) return;
+  el.addEventListener('input', handler);
+  el.addEventListener('change', handler);
+}
+wireAutosave('modal', autosaveContrat);
+wireAutosave('modalParticulier', autosaveParticulier);
+wireAutosave('modalEntreprise', autosaveEntreprise);
+wireAutosave('modalTache', autosaveTache);
+
 // Close modal on overlay click
 document.getElementById('modal').addEventListener('click', e => { if(e.target===document.getElementById('modal')) closeModal(); });
 // Init one phone field on load
@@ -4120,11 +4156,12 @@ function resetFormParticulier() {
   ['secContactPBody','secNotesPBody'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
   ['chevronContactP','chevronNotesP'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.transform='rotate(-90deg)';});
 }
-async function saveInterventionParticulier() {
+async function saveInterventionParticulier(silent) {
   const client=(document.getElementById('fNomP')?.value||'').trim();
-  if(!client){alert('Le nom est obligatoire.');return;}
+  if(!client){if(!silent)alert('Le nom est obligatoire.');return;}
+  if (silent && !editIdP) return;
   const btn=document.getElementById('btnSaveP');
-  btn.disabled=true; btn.textContent='Enregistrement...';
+  if(!silent){btn.disabled=true; btn.textContent='Enregistrement...';}
   try {
     const data={
       client, clientType:'particulier',
@@ -4149,10 +4186,10 @@ async function saveInterventionParticulier() {
       data.createdAt=new Date().toISOString();
       await window._addSuivi(data);
     }
-    closeModalParticulier(); filterTable();
-    showToast(editIdP?'Intervention mise à jour !':'Intervention enregistrée !');
-  } catch(e){console.error(e);alert('Erreur : '+e.message);}
-  finally{btn.disabled=false;btn.textContent=editIdP?'Mettre à jour':'Enregistrer';}
+    if (silent) { filterTable(); showAutosaveIndicator('btnSaveP'); }
+    else { closeModalParticulier(); filterTable(); showToast(editIdP?'Intervention mise à jour !':'Intervention enregistrée !'); }
+  } catch(e){console.error(e);if(!silent)alert('Erreur : '+e.message);}
+  finally{if(!silent){btn.disabled=false;btn.textContent=editIdP?'Mettre à jour':'Enregistrer';}}
 }
 
 // ── MODAL ENTREPRISE ──
@@ -4203,18 +4240,21 @@ function resetFormEntreprise() {
   ['secContactEBody','secNotesEBody'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
   ['chevronContactE','chevronNotesE'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.transform='rotate(-90deg)';});
 }
-async function saveInterventionEntreprise() {
+async function saveInterventionEntreprise(silent) {
   const client=(document.getElementById('fNomE')?.value||'').trim();
-  if(!client){alert("Le nom de l'entreprise est obligatoire.");return;}
+  if(!client){if(!silent)alert("Le nom de l'entreprise est obligatoire.");return;}
+  if (silent && !editIdE) return;
   const btn=document.getElementById('btnSaveE');
-  btn.disabled=true; btn.textContent='Enregistrement...';
+  if(!silent){btn.disabled=true; btn.textContent='Enregistrement...';}
   try {
     let bcUrl=editIdE?((window.interventions||[]).find(i=>i.id===editIdE)?.bcUrl||''):'';
     let devisUrl=editIdE?((window.interventions||[]).find(i=>i.id===editIdE)?.devisUrl||''):'';
-    const fileBCE=document.getElementById('fileBCE')?.files[0];
-    const fileDevisE=document.getElementById('fileDevisE')?.files[0];
-    if(fileBCE) bcUrl=await window._uploadPdf(fileBCE,`suivi/bc/${Date.now()}_${fileBCE.name}`);
-    if(fileDevisE) devisUrl=await window._uploadPdf(fileDevisE,`suivi/devis/${Date.now()}_${fileDevisE.name}`);
+    if (!silent) {
+      const fileBCE=document.getElementById('fileBCE')?.files[0];
+      const fileDevisE=document.getElementById('fileDevisE')?.files[0];
+      if(fileBCE) bcUrl=await window._uploadPdf(fileBCE,`suivi/bc/${Date.now()}_${fileBCE.name}`);
+      if(fileDevisE) devisUrl=await window._uploadPdf(fileDevisE,`suivi/devis/${Date.now()}_${fileDevisE.name}`);
+    }
     const data={
       client, clientType:'entreprise',
       siret:(document.getElementById('fSiretE')?.value||'').trim(),
@@ -4241,10 +4281,10 @@ async function saveInterventionEntreprise() {
       data.createdAt=new Date().toISOString();
       await window._addSuivi(data);
     }
-    closeModalEntreprise(); filterTable();
-    showToast(editIdE?'Intervention mise à jour !':'Intervention enregistrée !');
-  } catch(e){console.error(e);alert('Erreur : '+e.message);}
-  finally{btn.disabled=false;btn.textContent=editIdE?'Mettre à jour':'Enregistrer';}
+    if (silent) { filterTable(); showAutosaveIndicator('btnSaveE'); }
+    else { closeModalEntreprise(); filterTable(); showToast(editIdE?'Intervention mise à jour !':'Intervention enregistrée !'); }
+  } catch(e){console.error(e);if(!silent)alert('Erreur : '+e.message);}
+  finally{if(!silent){btn.disabled=false;btn.textContent=editIdE?'Mettre à jour':'Enregistrer';}}
 }
 
 // ── MODAL TÂCHES ──
@@ -4300,10 +4340,11 @@ function resetFormTache() {
   window._rapportsMapT = {};
   window._pendingRapportMapT = {};
 }
-window.saveInterventionTache = async function() {
+window.saveInterventionTache = async function(silent) {
   const typeIntervention = document.getElementById('fTypeTache')?.value||'devis';
+  if (silent && !editIdT) return;
   const btn=document.getElementById('btnSaveT');
-  btn.disabled=true; btn.textContent='Enregistrement...';
+  if(!silent){btn.disabled=true; btn.textContent='Enregistrement...';}
   try {
     const data={
       client:(document.getElementById('fClientT')?.value||'').trim(), clientType:'tache',
@@ -4331,10 +4372,10 @@ window.saveInterventionTache = async function() {
       const id=await window._addSuivi(data);
       editIdT = id; // pour permettre de générer un rapport Kizeo juste après création sans rouvrir
     }
-    closeModalTache(); filterTable();
-    showToast(editIdT?'Tâche mise à jour !':'Tâche enregistrée !');
-  } catch(e){console.error(e);alert('Erreur : '+e.message);}
-  finally{btn.disabled=false;btn.textContent=editIdT?'Mettre à jour':'Enregistrer';}
+    if (silent) { filterTable(); showAutosaveIndicator('btnSaveT'); }
+    else { closeModalTache(); filterTable(); showToast(editIdT?'Tâche mise à jour !':'Tâche enregistrée !'); }
+  } catch(e){console.error(e);if(!silent)alert('Erreur : '+e.message);}
+  finally{if(!silent){btn.disabled=false;btn.textContent=editIdT?'Mettre à jour':'Enregistrer';}}
 };
 function renderTableTache(list) {
   const body = document.getElementById('tableBodyTache');
