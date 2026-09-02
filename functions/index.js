@@ -2496,6 +2496,78 @@ exports.pushCampagnePassage1Kizeo = functions
     }
   });
 
+// ── RENVOI D'UN FORMULAIRE 1ER PASSAGE (campagne) — reprend les données déjà
+// stockées sur le bâtiment (mêmes logements, secteur, adresse, technicien) et
+// pousse un nouveau formulaire Kizeo. L'ancien envoi n'est pas supprimé côté
+// Kizeo (à faire manuellement dans l'interface), seul kizeoDataId est mis à jour.
+exports.resendCampagnePassage1Kizeo = functions
+  .region("europe-west1")
+  .runWith({ secrets: [KIZEO_API_TOKEN], timeoutSeconds: 60 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { batimentId } = req.body || {};
+    if (!batimentId) { res.status(400).json({ error: "batimentId requis" }); return; }
+
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+    const batimentSnap = await db.collection("campagnes-batiments").doc(batimentId).get();
+    if (!batimentSnap.exists) { res.status(404).json({ error: "Bâtiment introuvable" }); return; }
+    const batiment = batimentSnap.data();
+    const p1 = batiment.passage1;
+    if (!p1) { res.status(400).json({ error: "Aucun 1er passage enregistré pour ce bâtiment" }); return; }
+
+    const campagneSnap = await db.collection("gestion-campagnes").doc(batiment.campagneId).get();
+    if (!campagneSnap.exists) { res.status(404).json({ error: "Campagne introuvable" }); return; }
+    const kizeoFormId = campagneSnap.data().kizeoFormId1;
+    if (!kizeoFormId) { res.status(400).json({ error: "ID du formulaire Kizeo 1er passage non configuré pour cette campagne" }); return; }
+
+    try {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, "0");
+      const dateHeure = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      const refInterne = `campagne::${batiment.semaineId}::1::${batimentId}`;
+      const fields = {
+        ref_interne: { value: refInterne },
+        secteur: { value: batiment.secteur || "" },
+        technicien: { value: p1.technicienNom || "" },
+        passage: { value: "N°1" },
+        adresse_address: { value: batiment.adresseRue || "" },
+        adresse_zip: { value: batiment.codePostal || "" },
+        adresse_city: { value: batiment.ville || "" },
+        date_et_heure_1er_passage: { value: dateHeure },
+        tableau: {
+          value: (p1.logements || []).map(log => ({
+            nom: { value: log.nom },
+            numero_logement: { value: log.numero },
+            etage: { value: log.etage },
+          })),
+        },
+      };
+      const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", `/forms/${encodeURIComponent(kizeoFormId)}/push`, {
+        recipient_user_id: Number(p1.technicienKizeoUserId),
+        fields,
+      });
+      if (r.status < 200 || r.status >= 300) { res.status(502).json({ error: `Kizeo a répondu ${r.status}` }); return; }
+      let dataId = null;
+      try { dataId = JSON.parse(r.body).data.data_id; } catch(e) {}
+      const nowIso = new Date().toISOString();
+      await batimentSnap.ref.set({
+        passage1: { ...p1, statut: "en-attente", kizeoDataId: dataId ? String(dataId) : null, pushedAt: nowIso },
+        updatedAt: nowIso,
+      }, { merge: true });
+      res.status(200).json({ ok: true, dataId });
+    } catch (e) {
+      console.error("resendCampagnePassage1Kizeo:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 // ── PUSH CAMPAGNE 2ÈME PASSAGE — ENVOI DIRECT VIA L'API KIZEO ───────
 // Reprend, pour chaque bâtiment sélectionné, uniquement les logements
 // marqués "Absent" au 1er passage (passage1.resultats), et pousse un

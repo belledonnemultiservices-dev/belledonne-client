@@ -128,6 +128,9 @@
   .batiment-row:last-child{border-bottom:none;}
   .batiment-row .b-adresse{flex:1;font-weight:500;}
   .batiment-row .b-info{color:var(--text-muted);font-size:12px;}
+  .p1-toolbar{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:var(--bg);border:1px solid var(--border);border-bottom:none;border-radius:var(--radius-sm) var(--radius-sm) 0 0;}
+  .btn-row-resend{height:28px;padding:0 12px;border:1px solid var(--border);background:var(--bg);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--text-mid);cursor:pointer;white-space:nowrap;}
+  .btn-row-resend:hover{background:#E5EAF0;}
   .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);transform:translateY(80px);opacity:0;transition:all 0.3s ease;z-index:999;}
   .toast.show{transform:translateY(0);opacity:1;}
   .toast svg{width:16px;height:16px;color:var(--green);}
@@ -473,6 +476,12 @@
       <div class="card step-card" id="stepCard2" style="display:none;">
         <div class="card-title"><span class="card-num">2</span>Rapports de la période (1er passage)</div>
         <div class="card-sub">Rapports reçus des techniciens pour le 1er passage de cette période.</div>
+        <div class="p1-toolbar" id="p1Toolbar" style="display:none;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-mid);cursor:pointer;">
+            <input type="checkbox" id="p1CheckAll" onchange="toggleAllP1(this.checked)"> <span id="p1SelCount">0 sélectionné(s)</span>
+          </label>
+          <button class="btn-row-remove" id="btnDeleteP1" style="width:auto;padding:0 14px;" onclick="deleteSelectedPassage1()" disabled>Supprimer la sélection</button>
+        </div>
         <div class="batiments-list" id="listPassage1"></div>
         <button class="btn-generate" id="btnGenSemaine" onclick="genererRapportsSemaine()">Créer le dossier PDF + reporting Excel</button>
         <div class="result-box" id="resultBoxSemaine">
@@ -587,6 +596,7 @@ const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 const storage = getStorage(app);
 const FN_PUSH1 = "https://europe-west1-belledonne-client.cloudfunctions.net/pushCampagnePassage1Kizeo";
+const FN_RESEND_P1 = "https://europe-west1-belledonne-client.cloudfunctions.net/resendCampagnePassage1Kizeo";
 const FN_PUSH2 = "https://europe-west1-belledonne-client.cloudfunctions.net/pushCampagnePassage2Kizeo";
 const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportsSemaine";
 const FN_GEN_COMPLET = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportComplet";
@@ -1177,18 +1187,63 @@ function statutBadge(statut) {
   return "";
 }
 
+let _selectedP1 = new Set();
 function renderListPassage1() {
   const el = document.getElementById("listPassage1");
-  if (!_batiments.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment poussé pour cette semaine.</div>`; return; }
+  _selectedP1.forEach(id => { if (!_batiments.some(b => b.id === id)) _selectedP1.delete(id); });
+  document.getElementById("p1Toolbar").style.display = _batiments.length ? "flex" : "none";
+  if (!_batiments.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment poussé pour cette période.</div>`; updateP1Toolbar(); return; }
   el.innerHTML = _batiments.map(b => {
     const p1 = b.passage1 || {};
     return `<div class="batiment-row">
+      <input type="checkbox" class="p1-check" data-id="${b.id}" ${_selectedP1.has(b.id) ? "checked" : ""} onchange="toggleP1Row('${b.id}', this.checked)">
       <span class="b-adresse">${b.adresseRue || "—"}</span>
       <span class="b-info">${p1.technicienNom || "—"}</span>
       ${statutBadge(p1.statut)}
+      <button class="btn-row-resend" onclick="renvoyerPassage1('${b.id}')">Renvoyer</button>
     </div>`;
   }).join("");
+  updateP1Toolbar();
 }
+window.toggleP1Row = function(id, checked) {
+  if (checked) _selectedP1.add(id); else _selectedP1.delete(id);
+  updateP1Toolbar();
+};
+window.toggleAllP1 = function(checked) {
+  _selectedP1 = new Set(checked ? _batiments.map(b => b.id) : []);
+  renderListPassage1();
+};
+function updateP1Toolbar() {
+  const count = _selectedP1.size;
+  document.getElementById("p1SelCount").textContent = `${count} sélectionné(s)`;
+  document.getElementById("btnDeleteP1").disabled = count === 0;
+  const checkAll = document.getElementById("p1CheckAll");
+  if (checkAll) checkAll.checked = _batiments.length > 0 && count === _batiments.length;
+}
+window.deleteSelectedPassage1 = async function() {
+  if (!_selectedP1.size) return;
+  const n = _selectedP1.size;
+  if (!confirm(`Supprimer ${n} bâtiment(s) de cette liste ?\n\nCeci retire uniquement le suivi côté app : pensez à supprimer ${n > 1 ? "les formulaires correspondants" : "le formulaire correspondant"} dans l'interface Kizeo (https://forms.kizeo.com/data/history/) s'ils n'ont pas encore été traités.`)) return;
+  const btn = document.getElementById("btnDeleteP1");
+  btn.disabled = true; btn.textContent = "Suppression...";
+  try {
+    for (const id of _selectedP1) { await deleteDoc(doc(db, "campagnes-batiments", id)); }
+    _selectedP1.clear();
+    await loadBatiments();
+    showToast("Bâtiment(s) supprimé(s)");
+  } catch(e) { showToast("Erreur : " + e.message); }
+  finally { btn.disabled = false; btn.textContent = "Supprimer la sélection"; }
+};
+window.renvoyerPassage1 = async function(batimentId) {
+  if (!confirm("Renvoyer un nouveau formulaire au technicien pour ce bâtiment ?\n\nSupprimez l'ancien formulaire non répondu depuis l'interface Kizeo (https://forms.kizeo.com/data/history/).")) return;
+  try {
+    const resp = await fetch(FN_RESEND_P1, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ batimentId }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    showToast("Formulaire renvoyé au technicien");
+    await loadBatiments();
+  } catch(e) { showToast("Erreur : " + e.message); }
+};
 
 function renderListPassage2Source() {
   const el = document.getElementById("listPassage2Source");
