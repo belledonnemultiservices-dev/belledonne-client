@@ -1226,6 +1226,7 @@ window.renderListPassage1 = function renderListPassage1() {
       <span class="b-adresse">${b.adresseRue || "—"}</span>
       <span class="b-info">${p1.technicienNom || "—"}</span>
       ${statutBadge(p1.statut)}
+      ${p1.fileUrlPdf ? `<a class="btn-row-resend" href="${p1.fileUrlPdf}" target="_blank" rel="noopener">Voir</a>` : ""}
       <button class="btn-row-resend" onclick="renvoyerPassage1('${b.id}')">Renvoyer</button>
     </div>`;
   }).join("");
