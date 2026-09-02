@@ -456,6 +456,9 @@
         <div id="envoisList"></div>
         <button type="button" class="btn-tpl" onclick="addEnvoiRow()" style="margin-bottom:16px;">+ Ajouter un envoi</button>
 
+        <div id="dernierFichierInfo" style="display:none;margin-bottom:10px;font-size:12px;color:var(--text-mid);">
+          Dernier fichier envoyé : <a id="dernierFichierLien" href="#" target="_blank" rel="noopener" style="color:var(--green-dark);font-weight:600;"></a>
+        </div>
         <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
           <div>Cliquez pour choisir un fichier Excel (.xlsx)</div>
@@ -1141,6 +1144,18 @@ function loadConfigFromSemaine(s) {
   const envois = (s.config && s.config.envois) || [];
   if (envois.length) envois.forEach(e => addEnvoiRow(e.nomFeuille, e.destinataireKizeoUserId));
   else addEnvoiRow();
+
+  // Fichier Excel du dernier envoi, gardé accessible/téléchargeable.
+  const df = s.config && s.config.dernierFichier;
+  const dfInfo = document.getElementById("dernierFichierInfo");
+  const dfLien = document.getElementById("dernierFichierLien");
+  if (df && df.url) {
+    dfLien.href = df.url;
+    dfLien.textContent = df.nom || "fichier.xlsx";
+    dfInfo.style.display = "block";
+  } else {
+    dfInfo.style.display = "none";
+  }
 }
 
 window.addEnvoiRow = function(nomFeuille, destinataireKizeoUserId) {
@@ -1381,12 +1396,18 @@ window.pushPremierPassage = async function() {
     ).join("");
     resultBox.style.display = "block";
 
-    // Mémorise les feuilles/techniciens utilisés pour préremplir la prochaine fois.
+    // Mémorise les feuilles/techniciens utilisés (préremplissage la prochaine fois)
+    // et garde le fichier Excel envoyé accessible/téléchargeable depuis cette carte.
     try {
-      const config = { ...((_semaines.find(x=>x.id===_currentSemaineId)||{}).config||{}), envois };
+      const fileUrl = await getDownloadURL(storageRef);
+      const dernierFichier = { url: fileUrl, nom: _selectedFile.name, uploadedAt: new Date().toISOString() };
+      const config = { ...((_semaines.find(x=>x.id===_currentSemaineId)||{}).config||{}), envois, dernierFichier };
       await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { config, updatedAt: new Date().toISOString() }, { merge: true });
       const s = _semaines.find(x => x.id === _currentSemaineId);
       if (s) s.config = config;
+      const dfInfo = document.getElementById("dernierFichierInfo");
+      const dfLien = document.getElementById("dernierFichierLien");
+      dfLien.href = fileUrl; dfLien.textContent = dernierFichier.nom; dfInfo.style.display = "block";
     } catch(e) { /* non bloquant */ }
 
     await loadBatiments();
