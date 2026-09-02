@@ -476,6 +476,7 @@
       <div class="card step-card" id="stepCard2" style="display:none;">
         <div class="card-title"><span class="card-num">2</span>Rapports de la période (1er passage)</div>
         <div class="card-sub">Rapports reçus des techniciens pour le 1er passage de cette période.</div>
+        <input class="form-input" type="text" id="searchP1" placeholder="Filtrer par adresse ou technicien..." oninput="renderListPassage1()" style="margin-bottom:14px;">
         <div class="p1-toolbar" id="p1Toolbar" style="display:none;">
           <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-mid);cursor:pointer;">
             <input type="checkbox" id="p1CheckAll" onchange="toggleAllP1(this.checked)"> <span id="p1SelCount">0 sélectionné(s)</span>
@@ -483,7 +484,8 @@
           <button class="btn-row-remove" id="btnDeleteP1" style="width:auto;padding:0 14px;" onclick="deleteSelectedPassage1()" disabled>Supprimer la sélection</button>
         </div>
         <div class="batiments-list" id="listPassage1"></div>
-        <button class="btn-generate" id="btnGenSemaine" onclick="genererRapportsSemaine()">Créer le dossier PDF + reporting Excel</button>
+        <button class="btn-generate" id="btnGenSemaine" onclick="genererRapportsSemaine()" disabled>Créer le dossier PDF + reporting Excel</button>
+        <div class="card-sub" id="btnGenSemaineHint" style="margin-top:8px;margin-bottom:0;"></div>
         <div class="result-box" id="resultBoxSemaine">
           <div class="r-title">Reporting généré</div>
           <div class="r-stats" id="resultStatsSemaine"></div>
@@ -1078,6 +1080,9 @@ window.openSemaine = async function(semaineId) {
   loadConfigFromSemaine(s);
   _openStep = null;
   selectStep(1);
+  _selectedP1 = new Set();
+  const searchP1 = document.getElementById("searchP1");
+  if (searchP1) searchP1.value = "";
   await loadBatiments();
 };
 window.backToCampagneDetail = function() {
@@ -1188,12 +1193,24 @@ function statutBadge(statut) {
 }
 
 let _selectedP1 = new Set();
+function filteredBatimentsP1() {
+  const q = (document.getElementById("searchP1")?.value || "").trim().toLowerCase();
+  if (!q) return _batiments;
+  return _batiments.filter(b => {
+    const adresse = (b.adresseRue || "").toLowerCase();
+    const technicien = ((b.passage1 || {}).technicienNom || "").toLowerCase();
+    return adresse.includes(q) || technicien.includes(q);
+  });
+}
 function renderListPassage1() {
   const el = document.getElementById("listPassage1");
   _selectedP1.forEach(id => { if (!_batiments.some(b => b.id === id)) _selectedP1.delete(id); });
   document.getElementById("p1Toolbar").style.display = _batiments.length ? "flex" : "none";
-  if (!_batiments.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment poussé pour cette période.</div>`; updateP1Toolbar(); return; }
-  el.innerHTML = _batiments.map(b => {
+  updateBtnGenSemaine();
+  const visibles = filteredBatimentsP1();
+  if (!_batiments.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment poussé pour cette période.</div>`; updateP1Toolbar(visibles); return; }
+  if (!visibles.length) { el.innerHTML = `<div class="empty-state">Aucun résultat pour ce filtre.</div>`; updateP1Toolbar(visibles); return; }
+  el.innerHTML = visibles.map(b => {
     const p1 = b.passage1 || {};
     return `<div class="batiment-row">
       <input type="checkbox" class="p1-check" data-id="${b.id}" ${_selectedP1.has(b.id) ? "checked" : ""} onchange="toggleP1Row('${b.id}', this.checked)">
@@ -1203,22 +1220,33 @@ function renderListPassage1() {
       <button class="btn-row-resend" onclick="renvoyerPassage1('${b.id}')">Renvoyer</button>
     </div>`;
   }).join("");
-  updateP1Toolbar();
+  updateP1Toolbar(visibles);
 }
 window.toggleP1Row = function(id, checked) {
   if (checked) _selectedP1.add(id); else _selectedP1.delete(id);
-  updateP1Toolbar();
+  updateP1Toolbar(filteredBatimentsP1());
 };
 window.toggleAllP1 = function(checked) {
-  _selectedP1 = new Set(checked ? _batiments.map(b => b.id) : []);
+  const visibles = filteredBatimentsP1();
+  visibles.forEach(b => { if (checked) _selectedP1.add(b.id); else _selectedP1.delete(b.id); });
   renderListPassage1();
 };
-function updateP1Toolbar() {
+function updateP1Toolbar(visibles) {
   const count = _selectedP1.size;
   document.getElementById("p1SelCount").textContent = `${count} sélectionné(s)`;
   document.getElementById("btnDeleteP1").disabled = count === 0;
   const checkAll = document.getElementById("p1CheckAll");
-  if (checkAll) checkAll.checked = _batiments.length > 0 && count === _batiments.length;
+  const list = visibles || filteredBatimentsP1();
+  if (checkAll) checkAll.checked = list.length > 0 && list.every(b => _selectedP1.has(b.id));
+}
+function updateBtnGenSemaine() {
+  const btn = document.getElementById("btnGenSemaine");
+  const hint = document.getElementById("btnGenSemaineHint");
+  if (!btn) return;
+  const enAttente = _batiments.filter(b => (b.passage1 || {}).statut === "en-attente").length;
+  const pret = _batiments.length > 0 && enAttente === 0;
+  btn.disabled = !pret;
+  if (hint) hint.textContent = pret ? "" : (_batiments.length ? `${enAttente} rapport(s) encore en attente.` : "");
 }
 window.deleteSelectedPassage1 = async function() {
   if (!_selectedP1.size) return;
