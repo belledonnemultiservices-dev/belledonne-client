@@ -504,7 +504,8 @@
           <select class="form-input" id="push2Destinataire"><option value="">— choisir —</option></select>
         </div>
         <div class="batiments-list" id="listPassage2Source"></div>
-        <button class="btn-generate" id="btnPush2" onclick="pushDeuxiemePassage()">Envoyer le 2ème passage via Kizeo</button>
+        <button class="btn-generate" id="btnPush2" onclick="pushDeuxiemePassage()" disabled>Envoyer le 2ème passage via Kizeo</button>
+        <div class="card-sub" id="btnPush2Hint" style="margin-top:8px;margin-bottom:0;"></div>
         <div class="result-box" id="resultBoxPush2">
           <div class="r-title">Push 2ème passage envoyé</div>
           <div class="r-stats" id="resultStatsPush2"></div>
@@ -1281,13 +1282,23 @@ window.renvoyerPassage1 = async function(batimentId) {
   } catch(e) { showToast("Erreur : " + e.message); }
 };
 
+function updateBtnPush2() {
+  const btn = document.getElementById("btnPush2");
+  const hint = document.getElementById("btnPush2Hint");
+  if (!btn) return;
+  const enAttente = _batiments.filter(b => (b.passage1 || {}).statut === "en-attente" || (b.passage1 || {}).statut === "a-traiter").length;
+  const pret = _batiments.length > 0 && enAttente === 0;
+  btn.disabled = !pret;
+  if (hint) hint.textContent = pret ? "" : (_batiments.length ? `${enAttente} rapport(s) encore en attente ou pas encore intégré(s) au dossier (carte 2).` : "");
+}
 function renderListPassage2Source() {
   const el = document.getElementById("listPassage2Source");
-  // Éligible dès que le 1er passage a des résultats avec au moins un absent, que le
-  // reporting semaine (carte 2) l'ait déjà archivé ou non — l'archivage ne signifie
-  // pas "rien à faire", juste "reporting généré".
-  const candidats = _batiments.filter(b => b.passage1 && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
-  if (!candidats.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment avec des absents à repasser (génère d'abord les rapports en carte 2).</div>`; return; }
+  updateBtnPush2();
+  // Éligible seulement une fois le rapport de la période généré (statut "archive")
+  // et avec au moins un absent. Un bâtiment renvoyé (retour "en-attente" après
+  // correction) sort de cette liste tant qu'un nouveau reporting n'a pas été refait.
+  const candidats = _batiments.filter(b => b.passage1 && b.passage1.statut === "archive" && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
+  if (!candidats.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment avec des absents à repasser (génère d'abord le dossier en carte 2, une fois tous les rapports reçus).</div>`; return; }
   el.innerHTML = candidats.map(b => {
     const nbAbsents = (b.passage1.resultats || []).filter(l => l.statut === "Absent").length;
     const dejaEnvoye = b.passage2 ? `<span class="r-badge r-badge-ok" style="margin-left:8px;">Déjà envoyé</span>` : "";
