@@ -581,7 +581,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, getDocs, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -1005,6 +1005,8 @@ window.genererConvocations = async function() {
 };
 
 window.backToCampagnes = function() {
+  if (_unsubBatiments) { _unsubBatiments(); _unsubBatiments = null; }
+  _currentSemaineId = null;
   _currentCampagneId = null;
   document.getElementById("topBreadcrumb").innerHTML = `<span>Admin</span><span>›</span><span>Gestion campagnes</span>`;
   document.getElementById("viewCampagneDetail").style.display = "none";
@@ -1086,6 +1088,7 @@ window.openSemaine = async function(semaineId) {
   await loadBatiments();
 };
 window.backToCampagneDetail = function() {
+  if (_unsubBatiments) { _unsubBatiments(); _unsubBatiments = null; }
   _currentSemaineId = null;
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
   document.getElementById("topBreadcrumb").innerHTML = `<a onclick="backToCampagnes()">Gestion campagnes</a><span>›</span><span>${c.nom || "—"}</span>`;
@@ -1175,14 +1178,19 @@ window.saveConfig = async function() {
 };
 
 // ── Bâtiments de la semaine active ──
+// Écoute en temps réel (onSnapshot) : les rapports Kizeo reçus en arrière-plan
+// (webhook/pull) mettent à jour la liste automatiquement, sans rechargement manuel.
 let _batiments = [];
-async function loadBatiments() {
+let _unsubBatiments = null;
+function loadBatiments() {
+  if (_unsubBatiments) { _unsubBatiments(); _unsubBatiments = null; }
   const q = query(collection(db, "campagnes-batiments"), where("semaineId", "==", _currentSemaineId));
-  const snap = await getDocs(q);
-  _batiments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderListPassage1();
-  renderListPassage2Source();
-  renderListPassage2();
+  _unsubBatiments = onSnapshot(q, (snap) => {
+    _batiments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderListPassage1();
+    renderListPassage2Source();
+    renderListPassage2();
+  }, (e) => console.error("loadBatiments (onSnapshot):", e));
 }
 
 function statutBadge(statut) {
