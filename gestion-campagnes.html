@@ -192,7 +192,7 @@
       <div class="page-header-row">
         <div>
           <div class="page-title">Gestion campagnes</div>
-          <div class="page-sub">Une campagne par client. Chaque campagne contient plusieurs semaines (push 1er passage, rapports, push 2ème passage, reporting).</div>
+          <div class="page-sub">Une campagne par client. Chaque campagne contient plusieurs périodes (push 1er passage, rapports, push 2ème passage, reporting).</div>
         </div>
         <button class="btn-add" onclick="openCampagneModal()">
           <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -229,7 +229,7 @@
       <div class="camp-tabs-row" id="campTabsRow">
         <div class="camp-tab active" data-camp-tab="1" onclick="selectCampTab(1)"><span class="card-num">1</span><div><div class="step-title">Planification</div><div class="step-sub">À venir</div></div></div>
         <div class="camp-tab" data-camp-tab="2" onclick="selectCampTab(2)"><span class="card-num">2</span><div><div class="step-title">Gestion documentation</div><div class="step-sub">Plannings, avis, convocations</div></div></div>
-        <div class="camp-tab" data-camp-tab="3" onclick="selectCampTab(3)"><span class="card-num">3</span><div><div class="step-title">Gestion rapport</div><div class="step-sub">Semaines, push Kizeo, reporting</div></div></div>
+        <div class="camp-tab" data-camp-tab="3" onclick="selectCampTab(3)"><span class="card-num">3</span><div><div class="step-title">Gestion rapport</div><div class="step-sub">Périodes, push Kizeo, reporting</div></div></div>
       </div>
 
       <!-- ONGLET 1 : PLANIFICATION -->
@@ -387,7 +387,7 @@
 
         <div class="card">
           <div class="card-title">Rapport consolidé de la campagne</div>
-          <div class="card-sub">Agrège les reportings complets de toutes les semaines de cette campagne, et regroupe tous les PDF d'émargement dans un dossier (sous-dossiers "1er passage" / "2nd passage").</div>
+          <div class="card-sub">Agrège les reportings complets de toutes les périodes de cette campagne, et regroupe tous les PDF d'émargement dans un dossier (sous-dossiers "1er passage" / "2nd passage").</div>
           <button class="btn-generate" id="btnGenConsolide" onclick="genererRapportConsolide()">Générer le rapport consolidé</button>
           <div class="result-box" id="resultBoxConsolide">
             <div class="r-title">Rapport consolidé généré</div>
@@ -398,9 +398,9 @@
           <div class="error-box" id="errorBoxConsolide"></div>
         </div>
 
-        <div class="section-sep">Semaines</div>
+        <div class="section-sep">Périodes</div>
         <div class="semaines-grid" id="semainesGrid"></div>
-        <div class="empty-state" id="semainesEmpty" style="display:none;">Aucune semaine. Crée-en une pour commencer le 1er passage.</div>
+        <div class="empty-state" id="semainesEmpty" style="display:none;">Aucune période. Crée-en une pour commencer le 1er passage.</div>
       </div>
     </div>
 
@@ -416,7 +416,7 @@
 
       <div class="steps-row" id="stepsRow">
         <div class="step-box active" data-step="1" onclick="selectStep(1)"><span class="card-num">1</span><div><div class="step-title">Push 1er passage</div><div class="step-sub">Envoi vers Kizeo</div></div></div>
-        <div class="step-box" data-step="2" onclick="selectStep(2)"><span class="card-num">2</span><div><div class="step-title">Rapports semaine</div><div class="step-sub">Retour 1er passage</div></div></div>
+        <div class="step-box" data-step="2" onclick="selectStep(2)"><span class="card-num">2</span><div><div class="step-title">Rapports période</div><div class="step-sub">Retour 1er passage</div></div></div>
         <div class="step-box" data-step="3" onclick="selectStep(3)"><span class="card-num">3</span><div><div class="step-title">Push 2ème passage</div><div class="step-sub">Absents uniquement</div></div></div>
         <div class="step-box" data-step="4" onclick="selectStep(4)"><span class="card-num">4</span><div><div class="step-title">Reporting complet</div><div class="step-sub">Fusion des 2 passages</div></div></div>
       </div>
@@ -475,8 +475,8 @@
 
       <!-- CARTE 2 : RAPPORTS DE LA SEMAINE -->
       <div class="card step-card" id="stepCard2" style="display:none;">
-        <div class="card-title"><span class="card-num">2</span>Rapports de la semaine (1er passage)</div>
-        <div class="card-sub">Rapports reçus des techniciens pour le 1er passage de cette semaine.</div>
+        <div class="card-title"><span class="card-num">2</span>Rapports de la période (1er passage)</div>
+        <div class="card-sub">Rapports reçus des techniciens pour le 1er passage de cette période.</div>
         <div class="batiments-list" id="listPassage1"></div>
         <button class="btn-generate" id="btnGenSemaine" onclick="genererRapportsSemaine()">Créer le dossier PDF + reporting Excel</button>
         <div class="result-box" id="resultBoxSemaine">
@@ -508,7 +508,7 @@
 
       <!-- CARTE 4 : REPORTING COMPLET -->
       <div class="card step-card" id="stepCard4" style="display:none;">
-        <div class="card-title"><span class="card-num">4</span>Reporting complet de la semaine</div>
+        <div class="card-title"><span class="card-num">4</span>Reporting complet de la période</div>
         <div class="card-sub">Récupère les rapports du 2ème passage et fusionne avec le 1er passage.</div>
         <div class="batiments-list" id="listPassage2"></div>
         <button class="btn-generate" id="btnGenComplet" onclick="genererRapportComplet()">Créer le dossier PDF + reporting complet</button>
@@ -690,7 +690,7 @@ window.saveCampagne = async function() {
   openCampagne(ref.id);
 };
 window.deleteCampagne = async function(campagneId) {
-  if (!confirm("Supprimer cette campagne ? Les semaines et bâtiments déjà créés resteront en base mais ne seront plus accessibles depuis cette page.")) return;
+  if (!confirm("Supprimer cette campagne ? Les périodes et bâtiments déjà créés resteront en base mais ne seront plus accessibles depuis cette page.")) return;
   await deleteDoc(doc(db, "gestion-campagnes", campagneId));
   await loadCampagnes();
   showToast("Campagne supprimée");
@@ -1044,7 +1044,7 @@ window.genererRapportConsolide = async function() {
     const resp = await fetch(FN_GEN_CONSOLIDE, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ campagneId: _currentCampagneId }) });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
-    document.getElementById("resultStatsConsolide").textContent = `${data.nbBatiments} bâtiment(s) agrégé(s), toutes semaines confondues`;
+    document.getElementById("resultStatsConsolide").textContent = `${data.nbBatiments} bâtiment(s) agrégé(s), toutes périodes confondues`;
     document.getElementById("dlZipConsolide").href = data.zipUrl;
     document.getElementById("dlXlsxConsolide").href = data.xlsxUrl;
     box.style.display = "block";
@@ -1059,7 +1059,7 @@ window.openSemaine = async function(semaineId) {
   _currentSemaineId = semaineId;
   const s = _semaines.find(x => x.id === semaineId) || {};
   const c = _campagnes.find(x => x.id === _currentCampagneId) || {};
-  document.getElementById("semaineTitle").textContent = `Semaine du ${fmtDate(s.dateDebut)} au ${fmtDate(s.dateFin)}`;
+  document.getElementById("semaineTitle").textContent = `Période du ${fmtDate(s.dateDebut)} au ${fmtDate(s.dateFin)}`;
   document.getElementById("topBreadcrumb").innerHTML = `<a onclick="backToCampagnes()">Gestion campagnes</a><span>›</span><a onclick="backToCampagneDetail()">${c.nom || "—"}</a><span>›</span><span>${fmtDate(s.dateDebut)}</span>`;
   document.getElementById("viewCampagneDetail").style.display = "none";
   document.getElementById("viewSemaineDetail").style.display = "block";
