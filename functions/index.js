@@ -2561,7 +2561,11 @@ exports.resendCampagnePassage1Kizeo = functions
         recipient_user_id: Number(p1.technicienKizeoUserId),
         fields,
       });
-      if (r.status < 200 || r.status >= 300) { res.status(502).json({ error: `Kizeo a répondu ${r.status}` }); return; }
+      if (r.status < 200 || r.status >= 300) {
+        console.error("resendCampagnePassage1Kizeo: push échoué", r.status, (r.body || r.error || "").slice(0, 1000), "fields envoyés:", JSON.stringify(fields).slice(0, 1000));
+        res.status(502).json({ error: `Kizeo a répondu ${r.status}`, detail: (r.body || "").slice(0, 300) });
+        return;
+      }
       let dataId = null;
       try { dataId = JSON.parse(r.body).data.data_id; } catch(e) {}
       const nowIso = new Date().toISOString();

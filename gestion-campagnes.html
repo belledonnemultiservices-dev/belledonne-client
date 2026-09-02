@@ -1275,9 +1275,9 @@ window.renvoyerPassage1 = async function(batimentId) {
   try {
     const resp = await fetch(FN_RESEND_P1, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ batimentId }) });
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    if (!resp.ok) throw new Error((data.error || ("HTTP " + resp.status)) + (data.detail ? " — " + data.detail : ""));
     showToast("Formulaire renvoyé au technicien");
-    await loadBatiments();
+    loadBatiments();
   } catch(e) { showToast("Erreur : " + e.message); }
 };
 
