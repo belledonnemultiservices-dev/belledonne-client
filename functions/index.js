@@ -2612,11 +2612,14 @@ exports.pushCampagnePassage2Kizeo = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { semaineId, destinataireKizeoUserId, batimentIds } = req.body || {};
+    const { semaineId, envois } = req.body || {};
     if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
-    const recipient2 = String(destinataireKizeoUserId || "").trim();
-    if (!recipient2) { res.status(400).json({ error: "destinataireKizeoUserId requis" }); return; }
-    if (!Array.isArray(batimentIds) || !batimentIds.length) { res.status(400).json({ error: "batimentIds requis" }); return; }
+    if (!Array.isArray(envois) || !envois.length) { res.status(400).json({ error: "envois requis (batimentId + destinataireKizeoUserId)" }); return; }
+    for (const e of envois) {
+      if (!e || !e.batimentId || !String(e.destinataireKizeoUserId || "").trim()) {
+        res.status(400).json({ error: "Chaque envoi doit avoir un batimentId ET un destinataireKizeoUserId" }); return;
+      }
+    }
 
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
@@ -2627,23 +2630,32 @@ exports.pushCampagnePassage2Kizeo = functions
     const kizeoFormId2 = campagneSnap.data().kizeoFormId2;
     if (!kizeoFormId2) { res.status(400).json({ error: "ID du formulaire Kizeo 2ème passage non configuré pour cette campagne" }); return; }
 
-    let technicienNom2 = "";
-    try {
-      const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", recipient2).limit(1).get();
-      if (!tSnap.empty) {
-        const t = tSnap.docs[0].data();
-        technicienNom2 = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
-      }
-    } catch(e) { console.error("pushCampagnePassage2Kizeo: lookup technicien échoué:", e.message); }
+    // Cache des noms techniciens (un envoi peut réutiliser le même destinataire).
+    const nomsTechniciens = new Map();
+    async function nomTechnicien(kizeoUserId) {
+      if (nomsTechniciens.has(kizeoUserId)) return nomsTechniciens.get(kizeoUserId);
+      let nom = "";
+      try {
+        const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", kizeoUserId).limit(1).get();
+        if (!tSnap.empty) {
+          const t = tSnap.docs[0].data();
+          nom = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+        }
+      } catch(e) { console.error("pushCampagnePassage2Kizeo: lookup technicien échoué:", e.message); }
+      nomsTechniciens.set(kizeoUserId, nom);
+      return nom;
+    }
 
     const now2 = new Date();
     const pad2 = n => String(n).padStart(2, "0");
     const dateHeure2 = `${now2.getFullYear()}-${pad2(now2.getMonth() + 1)}-${pad2(now2.getDate())} ${pad2(now2.getHours())}:${pad2(now2.getMinutes())}`;
 
     const results2 = [];
-    for (const batimentId of batimentIds) {
+    for (const envoi of envois) {
+      const batimentId = String(envoi.batimentId);
+      const recipient2 = String(envoi.destinataireKizeoUserId).trim();
       try {
-        const bRef = db.collection("campagnes-batiments").doc(String(batimentId));
+        const bRef = db.collection("campagnes-batiments").doc(batimentId);
         const bSnap = await bRef.get();
         if (!bSnap.exists) { results2.push({ batimentId, success: false, error: "Bâtiment introuvable" }); continue; }
         const b = bSnap.data();
@@ -2652,6 +2664,7 @@ exports.pushCampagnePassage2Kizeo = functions
         const absents = resultats1.filter(l => l.statut === "Absent").map(l => ({ nom: l.nom, numero: l.numero, etage: l.etage }));
         if (!absents.length) { results2.push({ batimentId, adresse: b.adresseRue, success: false, error: "Aucun absent, rien à repasser" }); continue; }
 
+        const technicienNom2 = await nomTechnicien(recipient2);
         const refInterne2 = `campagne::${semaineId}::2::${batimentId}`;
         const fields2 = {
           ref_interne: { value: refInterne2 },
@@ -2689,7 +2702,7 @@ exports.pushCampagnePassage2Kizeo = functions
             },
             updatedAt: nowIso2,
           }, { merge: true });
-          results2.push({ batimentId, adresse: b.adresseRue, nbAbsents: absents.length, success: true, dataId: dataId2 });
+          results2.push({ batimentId, adresse: b.adresseRue, technicien: technicienNom2, nbAbsents: absents.length, success: true, dataId: dataId2 });
         } else {
           results2.push({ batimentId, adresse: b.adresseRue, success: false, error: `Kizeo a répondu ${r.status}` });
         }

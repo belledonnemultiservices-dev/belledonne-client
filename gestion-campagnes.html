@@ -502,10 +502,15 @@
       <!-- CARTE 3 : PUSH 2EME PASSAGE -->
       <div class="card step-card" id="stepCard3" style="display:none;">
         <div class="card-title"><span class="card-num">3</span>Push 2ème passage</div>
-        <div class="card-sub">Repousse uniquement les logements marqués Absent au 1er passage.</div>
-        <div class="form-group" style="max-width:320px;">
-          <label class="form-label">Technicien destinataire</label>
-          <select class="form-input" id="push2Destinataire"><option value="">— choisir —</option></select>
+        <div class="card-sub">Repousse uniquement les logements marqués Absent au 1er passage, par défaut au même technicien qu'au 1er passage.</div>
+        <div class="p1-toolbar" id="push2Toolbar" style="display:none;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-mid);cursor:pointer;">
+            <input type="checkbox" id="push2CheckAll" onchange="toggleAllPush2(this.checked)"> <span id="push2SelCount">0 sélectionné(s)</span>
+          </label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <select class="form-input" id="push2BulkTech" style="height:32px;font-size:12px;"><option value="">Réassigner à…</option></select>
+            <button type="button" class="btn-tpl" onclick="appliquerTechSelection()">Appliquer à la sélection</button>
+          </div>
         </div>
         <div class="batiments-list" id="listPassage2Source"></div>
         <button class="btn-generate" id="btnPush2" onclick="pushDeuxiemePassage()" disabled>Envoyer le 2ème passage via Kizeo</button>
@@ -656,8 +661,8 @@ async function loadTechniciens() {
   _techniciens = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .filter(t => (t.kizeoUserId || "").trim())
     .map(t => ({ id: t.id, label: t.nomComplet || `${t.prenom||""} ${t.nom||""}`.trim(), kizeoUserId: t.kizeoUserId.trim() }));
-  document.getElementById("push2Destinataire").innerHTML = techOptionsHtml();
-  document.querySelectorAll("#envoisList select[data-role='technicien']").forEach(sel => {
+  document.getElementById("push2BulkTech").innerHTML = '<option value="">Réassigner à…</option>' + _techniciens.map(t => `<option value="${t.kizeoUserId}">${t.label}</option>`).join("");
+  document.querySelectorAll("#envoisList select[data-role='technicien'], .push2-tech").forEach(sel => {
     const current = sel.value;
     sel.innerHTML = techOptionsHtml();
     sel.value = current;
@@ -1336,19 +1341,48 @@ function renderListPassage2Source() {
   // et avec au moins un absent. Un bâtiment renvoyé (retour "en-attente" après
   // correction) sort de cette liste tant qu'un nouveau reporting n'a pas été refait.
   const candidats = _batiments.filter(b => b.passage1 && b.passage1.statut === "archive" && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
-  if (!candidats.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment avec des absents à repasser (génère d'abord le dossier en carte 2, une fois tous les rapports reçus).</div>`; return; }
+  document.getElementById("push2Toolbar").style.display = candidats.length ? "flex" : "none";
+  if (!candidats.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment avec des absents à repasser (génère d'abord le dossier en carte 2, une fois tous les rapports reçus).</div>`; updatePush2SelCount(); return; }
   el.innerHTML = candidats.map(b => {
     const nbAbsents = (b.passage1.resultats || []).filter(l => l.statut === "Absent").length;
     const dejaEnvoye = b.passage2 ? `<span class="r-badge r-badge-ok" style="margin-left:8px;">Déjà envoyé</span>` : "";
+    const technicien1 = b.passage1.technicienNom || "—";
+    const defaultKizeoId = b.passage1.technicienKizeoUserId || "";
     return `<div class="batiment-row">
       <label style="display:flex;align-items:center;gap:10px;flex:1;">
-        <input type="checkbox" class="push2-check" value="${b.id}" ${b.passage2 ? "" : "checked"}>
+        <input type="checkbox" class="push2-check" value="${b.id}" onchange="updatePush2SelCount()" ${b.passage2 ? "" : "checked"}>
         <span class="b-adresse">${b.adresseRue || "—"}</span>${dejaEnvoye}
       </label>
+      <span class="b-info">1er passage : ${technicien1}</span>
       <span class="b-info">${nbAbsents} absent(s)</span>
+      <select class="form-input push2-tech" data-id="${b.id}" style="height:32px;font-size:12px;width:auto;">${techOptionsHtml()}</select>
     </div>`;
   }).join("");
+  document.querySelectorAll(".push2-tech").forEach(sel => {
+    const b = candidats.find(x => x.id === sel.dataset.id);
+    if (b && b.passage1.technicienKizeoUserId) sel.value = b.passage1.technicienKizeoUserId;
+  });
+  updatePush2SelCount();
 }
+function updatePush2SelCount() {
+  const count = document.querySelectorAll(".push2-check:checked").length;
+  const el = document.getElementById("push2SelCount");
+  if (el) el.textContent = `${count} sélectionné(s)`;
+  const checkAll = document.getElementById("push2CheckAll");
+  const total = document.querySelectorAll(".push2-check").length;
+  if (checkAll) checkAll.checked = total > 0 && count === total;
+}
+window.toggleAllPush2 = function(checked) {
+  document.querySelectorAll(".push2-check").forEach(el => { el.checked = checked; });
+  updatePush2SelCount();
+};
+window.appliquerTechSelection = function() {
+  const kizeoUserId = document.getElementById("push2BulkTech").value;
+  if (!kizeoUserId) { showToast("Choisis un technicien à appliquer"); return; }
+  const ids = new Set(Array.from(document.querySelectorAll(".push2-check:checked")).map(el => el.value));
+  if (!ids.size) { showToast("Sélectionne au moins une ligne"); return; }
+  document.querySelectorAll(".push2-tech").forEach(sel => { if (ids.has(sel.dataset.id)) sel.value = kizeoUserId; });
+};
 
 function renderListPassage2() {
   const el = document.getElementById("listPassage2");
@@ -1473,22 +1507,26 @@ window.genererRapportsSemaine = async function(force) {
 
 // ── Carte 3 : push 2ème passage ──
 window.pushDeuxiemePassage = async function() {
-  const destinataireKizeoUserId = document.getElementById("push2Destinataire").value;
-  if (!destinataireKizeoUserId) { showToast("Choisis le technicien destinataire"); return; }
-  const batimentIds = Array.from(document.querySelectorAll(".push2-check:checked")).map(el => el.value);
-  if (!batimentIds.length) { showToast("Sélectionne au moins un bâtiment"); return; }
+  const checked = Array.from(document.querySelectorAll(".push2-check:checked")).map(el => el.value);
+  if (!checked.length) { showToast("Sélectionne au moins un bâtiment"); return; }
+  const envois = checked.map(id => {
+    const sel = document.querySelector(`.push2-tech[data-id="${id}"]`);
+    return { batimentId: id, destinataireKizeoUserId: sel ? sel.value : "" };
+  });
+  const sansTech = envois.find(e => !e.destinataireKizeoUserId);
+  if (sansTech) { showToast("Chaque bâtiment sélectionné doit avoir un technicien destinataire"); return; }
   const btn = document.getElementById("btnPush2");
   const box = document.getElementById("resultBoxPush2");
   const err = document.getElementById("errorBoxPush2");
   box.style.display = "none"; err.style.display = "none";
   btn.disabled = true; btn.textContent = "Envoi en cours...";
   try {
-    const resp = await fetch(FN_PUSH2, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId, destinataireKizeoUserId, batimentIds }) });
+    const resp = await fetch(FN_PUSH2, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId, envois }) });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
     document.getElementById("resultStatsPush2").textContent = `${data.nbEnvoyes} envoyé(s) · ${data.nbErreurs} erreur(s)/ignoré(s)`;
     document.getElementById("resultDetailPush2").innerHTML = (data.results || []).map(r =>
-      `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "⚠️"} ${r.adresse || r.batimentId} ${r.nbAbsents ? `— ${r.nbAbsents} absent(s)` : ""} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
+      `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "⚠️"} ${r.adresse || r.batimentId} ${r.technicien ? `→ ${r.technicien}` : ""} ${r.nbAbsents ? `— ${r.nbAbsents} absent(s)` : ""} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
     ).join("");
     box.style.display = "block";
     await loadBatiments();
