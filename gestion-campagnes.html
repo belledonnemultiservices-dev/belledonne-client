@@ -1211,7 +1211,7 @@ function filteredBatimentsP1() {
     return adresse.includes(q) || technicien.includes(q);
   });
 }
-function renderListPassage1() {
+window.renderListPassage1 = function renderListPassage1() {
   const el = document.getElementById("listPassage1");
   _selectedP1.forEach(id => { if (!_batiments.some(b => b.id === id)) _selectedP1.delete(id); });
   document.getElementById("p1Toolbar").style.display = _batiments.length ? "flex" : "none";
