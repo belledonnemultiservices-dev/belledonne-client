@@ -2532,7 +2532,38 @@ exports.resendCampagnePassage1Kizeo = functions
       const pad = n => String(n).padStart(2, "0");
       const dateHeure = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
       const refInterne = `campagne::${batiment.semaineId}::1::${batimentId}`;
-      const fields = {
+
+      // Reprend la soumission précédente TELLE QUELLE (mêmes clés/formats que Kizeo
+      // a lui-même renvoyés) plutôt que de reconstruire le tableau à la main : évite
+      // de mal deviner le format attendu pour les champs liste/choix multiple.
+      const fields = {};
+      if (p1.kizeoDataId) {
+        try {
+          const prev = await kizeoRequest(KIZEO_API_TOKEN.value(), "GET", `/forms/${encodeURIComponent(kizeoFormId)}/data/${encodeURIComponent(p1.kizeoDataId)}`);
+          if (prev.status === 200) {
+            const prevParsed = JSON.parse(prev.body);
+            const prevFields = (prevParsed.data || prevParsed).fields || {};
+            const SKIP_TYPES = new Set(["section", "photo", "image", "signature", "video", "audio", "drawing", "barcode", "gps"]);
+            Object.keys(prevFields).forEach(fid => {
+              const f = prevFields[fid];
+              if (!f || SKIP_TYPES.has(f.type) || f.value === undefined || f.value === "") return;
+              fields[fid] = { value: f.value };
+            });
+          }
+        } catch(e) { console.error("resendCampagnePassage1Kizeo: reprise soumission précédente échouée:", e.message); }
+      }
+      // Formulaire jamais répondu (ou reprise échouée) : tableau vierge d'origine.
+      if (!fields.tableau) {
+        fields.tableau = {
+          value: (p1.logements || []).map(log => ({
+            nom: { value: log.nom },
+            numero_logement: { value: log.numero },
+            etage: { value: log.etage },
+          })),
+        };
+      }
+      // Les champs pilotés par l'app priment sur ce qui a été repris.
+      Object.assign(fields, {
         ref_interne: { value: refInterne },
         secteur: { value: batiment.secteur || "" },
         technicien: { value: p1.technicienNom || "" },
@@ -2541,22 +2572,7 @@ exports.resendCampagnePassage1Kizeo = functions
         adresse_zip: { value: batiment.codePostal || "" },
         adresse_city: { value: batiment.ville || "" },
         date_et_heure_1er_passage: { value: dateHeure },
-        // Si le technicien a déjà répondu (resultats présents), on repart de ses
-        // réponses (statut, niveau d'infestation) pour qu'il n'ait qu'à corriger.
-        // Sinon on repart du formulaire vierge d'origine (logements).
-        tableau: {
-          value: (p1.resultats && p1.resultats.length ? p1.resultats : (p1.logements || [])).map(log => {
-            const row = {
-              nom: { value: log.nom },
-              numero_logement: { value: log.numero },
-              etage: { value: log.etage },
-            };
-            if (log.statut) row.statut_1er_passage = { value: log.statut };
-            if (Array.isArray(log.niveauInfestation) && log.niveauInfestation.length) row.niveau_infestation = { value: log.niveauInfestation };
-            return row;
-          }),
-        },
-      };
+      });
       const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", `/forms/${encodeURIComponent(kizeoFormId)}/push`, {
         recipient_user_id: Number(p1.technicienKizeoUserId),
         fields,
