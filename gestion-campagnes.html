@@ -95,6 +95,9 @@
   .card-sub{font-size:12px;color:var(--text-muted);margin-bottom:18px;}
   .form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
   .form-group{margin-bottom:14px;}
+  .envoi-row{display:grid;grid-template-columns:1fr 1fr 32px;gap:10px;align-items:center;margin-bottom:10px;}
+  .btn-row-remove{width:32px;height:40px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);color:var(--text-mid);cursor:pointer;font-size:16px;line-height:1;}
+  .btn-row-remove:hover{background:#FBE9E9;border-color:#E5A3A3;color:#B33;}
   .form-label{font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;}
   .form-input{width:100%;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--bg);outline:none;transition:border-color 0.15s;}
   .form-input:focus{border-color:var(--green);background:#fff;}
@@ -426,13 +429,6 @@
         <div class="card-title"><span class="card-num">1</span>Push 1er passage</div>
         <div class="card-sub">Uploadez l'export Excel (une feuille = un technicien) : un enregistrement pré-rempli est envoyé par bâtiment, directement sur l'app Kizeo du technicien choisi.</div>
 
-        <div class="section-sep">Configuration de l'export</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Nom de la feuille</label>
-            <input class="form-input" type="text" id="cfgNomFeuille" placeholder="ex: T4C">
-          </div>
-        </div>
         <div class="section-sep">Colonnes de l'export (lettre Excel, ex: A, B, C...)</div>
         <div class="form-row">
           <div class="form-group"><label class="form-label">Secteur</label><input class="form-input col-letter" type="text" maxlength="2" placeholder="ex: A" id="colSecteur"></div>
@@ -452,11 +448,11 @@
           <button class="btn-save" id="btnSaveConfig" onclick="saveConfig()">Enregistrer la configuration</button>
         </div>
 
-        <div class="section-sep">Envoi</div>
-        <div class="form-group">
-          <label class="form-label">Technicien destinataire</label>
-          <select class="form-input" id="pushDestinataire"><option value="">— choisir —</option></select>
-        </div>
+        <div class="section-sep">Envois (une feuille = un technicien)</div>
+        <div class="card-sub" style="margin-top:-8px;">Le fichier Excel peut contenir plusieurs feuilles, une par technicien. Associe chaque feuille à son destinataire ci-dessous, tout part en un seul envoi.</div>
+        <div id="envoisList"></div>
+        <button type="button" class="btn-tpl" onclick="addEnvoiRow()" style="margin-bottom:16px;">+ Ajouter un envoi</button>
+
         <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
           <div>Cliquez pour choisir un fichier Excel (.xlsx)</div>
@@ -643,9 +639,15 @@ async function loadTechniciens() {
   _techniciens = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .filter(t => (t.kizeoUserId || "").trim())
     .map(t => ({ id: t.id, label: t.nomComplet || `${t.prenom||""} ${t.nom||""}`.trim(), kizeoUserId: t.kizeoUserId.trim() }));
-  const opts = '<option value="">— choisir —</option>' + _techniciens.map(t => `<option value="${t.kizeoUserId}">${t.label}</option>`).join("");
-  document.getElementById("pushDestinataire").innerHTML = opts;
-  document.getElementById("push2Destinataire").innerHTML = opts;
+  document.getElementById("push2Destinataire").innerHTML = techOptionsHtml();
+  document.querySelectorAll("#envoisList select[data-role='technicien']").forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = techOptionsHtml();
+    sel.value = current;
+  });
+}
+function techOptionsHtml() {
+  return '<option value="">— choisir —</option>' + _techniciens.map(t => `<option value="${t.kizeoUserId}">${t.label}</option>`).join("");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1104,7 +1106,6 @@ COL_FIELDS.forEach(id => {
 
 function loadConfigFromSemaine(s) {
   const col = (s.config && s.config.colonnes) || {};
-  document.getElementById("cfgNomFeuille").value = (s.config && s.config.nomFeuille) || "";
   document.getElementById("colSecteur").value = indexToLetter(col.secteur);
   document.getElementById("colNumeroRue").value = indexToLetter(col.numeroRue);
   document.getElementById("colNomRue").value = indexToLetter(col.nomRue);
@@ -1113,7 +1114,27 @@ function loadConfigFromSemaine(s) {
   document.getElementById("colLocataire").value = indexToLetter(col.locataire);
   document.getElementById("colReference").value = indexToLetter(col.referenceLogement);
   document.getElementById("colEtage").value = indexToLetter(col.etage);
+
+  // Réinitialise la liste des envois : reprend les feuilles/techniciens de la dernière
+  // configuration enregistrée si dispo, sinon une ligne vide.
+  const envoisList = document.getElementById("envoisList");
+  envoisList.innerHTML = "";
+  const envois = (s.config && s.config.envois) || [];
+  if (envois.length) envois.forEach(e => addEnvoiRow(e.nomFeuille, e.destinataireKizeoUserId));
+  else addEnvoiRow();
 }
+
+window.addEnvoiRow = function(nomFeuille, destinataireKizeoUserId) {
+  const row = document.createElement("div");
+  row.className = "envoi-row";
+  row.innerHTML = `
+    <input class="form-input" type="text" data-role="feuille" placeholder="ex: T1" value="${nomFeuille ? String(nomFeuille).replace(/"/g,'&quot;') : ""}">
+    <select class="form-input" data-role="technicien">${techOptionsHtml()}</select>
+    <button type="button" class="btn-row-remove" onclick="this.closest('.envoi-row').remove()">×</button>
+  `;
+  document.getElementById("envoisList").appendChild(row);
+  if (destinataireKizeoUserId) row.querySelector("select[data-role='technicien']").value = destinataireKizeoUserId;
+};
 
 window.saveConfig = async function() {
   if (!_currentSemaineId) return;
@@ -1125,15 +1146,14 @@ window.saveConfig = async function() {
     if (idx === null) { showToast(`Colonne manquante ou invalide : ${id}`); return; }
     colonnes[key] = idx;
   }
-  if (!document.getElementById("cfgNomFeuille").value.trim()) { showToast("Nom de la feuille requis"); return; }
   btn.disabled = true; btn.textContent = "Enregistrement...";
   try {
-    const config = { nomFeuille: document.getElementById("cfgNomFeuille").value.trim(), colonnes };
+    const config = { colonnes };
     await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), {
       config, updatedAt: new Date().toISOString(),
     }, { merge: true });
     const s = _semaines.find(x => x.id === _currentSemaineId);
-    if (s) s.config = config;
+    if (s) s.config = { ...(s.config||{}), colonnes };
     showToast("Configuration enregistrée");
   } catch(e) { showToast("Erreur : " + e.message); }
   finally { btn.disabled = false; btn.textContent = "Enregistrer la configuration"; }
@@ -1215,10 +1235,24 @@ window.onFileSelected = function(event) {
   document.getElementById("errorBox").style.display = "none";
 };
 
+function collectEnvois() {
+  const rows = Array.from(document.querySelectorAll("#envoisList .envoi-row"));
+  const envois = rows.map(row => ({
+    nomFeuille: row.querySelector("[data-role='feuille']").value.trim(),
+    destinataireKizeoUserId: row.querySelector("[data-role='technicien']").value,
+  })).filter(e => e.nomFeuille || e.destinataireKizeoUserId);
+  return envois;
+}
+
 window.pushPremierPassage = async function() {
   if (!_selectedFile || !_currentSemaineId) return;
-  const destinataireKizeoUserId = document.getElementById("pushDestinataire").value;
-  if (!destinataireKizeoUserId) { showToast("Choisis le technicien destinataire"); return; }
+  const envois = collectEnvois();
+  if (!envois.length) { showToast("Ajoute au moins un envoi (feuille + technicien)"); return; }
+  const incomplet = envois.find(e => !e.nomFeuille || !e.destinataireKizeoUserId);
+  if (incomplet) { showToast("Chaque envoi doit avoir une feuille ET un technicien"); return; }
+  const noms = envois.map(e => e.nomFeuille.toLowerCase());
+  if (new Set(noms).size !== noms.length) { showToast("Deux envois utilisent la même feuille"); return; }
+
   const btn = document.getElementById("btnGenerate");
   const progressBar = document.getElementById("progressBar");
   const progressFill = document.getElementById("progressFill");
@@ -1234,15 +1268,24 @@ window.pushPremierPassage = async function() {
     await new Promise((resolve, reject) => {
       uploadTask.on("state_changed", (snap) => { progressFill.style.width = Math.round((snap.bytesTransferred / snap.totalBytes) * 100) + "%"; }, reject, resolve);
     });
-    btn.textContent = "Envoi vers Kizeo en cours...";
-    const resp = await fetch(FN_PUSH1, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ storagePath, destinataireKizeoUserId, semaineId: _currentSemaineId }) });
+    btn.textContent = `Envoi vers Kizeo en cours (${envois.length} feuille${envois.length>1?"s":""})...`;
+    const resp = await fetch(FN_PUSH1, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ storagePath, envois, semaineId: _currentSemaineId }) });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
-    document.getElementById("resultStats").textContent = `${data.nbEnvoyes} envoyé(s) · ${data.nbErreurs} erreur(s) sur ${data.nbBatiments} bâtiment(s)`;
+    document.getElementById("resultStats").textContent = `${data.nbEnvoyes} envoyé(s) · ${data.nbErreurs} erreur(s) sur ${data.nbBatiments} bâtiment(s), ${envois.length} feuille(s)`;
     document.getElementById("resultDetail").innerHTML = (data.results || []).map(r =>
-      `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "❌"} ${r.adresse} — ${r.technicien || "?"} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
+      `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "❌"} [${r.nomFeuille || "?"}] ${r.adresse} — ${r.technicien || "?"} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
     ).join("");
     resultBox.style.display = "block";
+
+    // Mémorise les feuilles/techniciens utilisés pour préremplir la prochaine fois.
+    try {
+      const config = { ...((_semaines.find(x=>x.id===_currentSemaineId)||{}).config||{}), envois };
+      await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { config, updatedAt: new Date().toISOString() }, { merge: true });
+      const s = _semaines.find(x => x.id === _currentSemaineId);
+      if (s) s.config = config;
+    } catch(e) { /* non bloquant */ }
+
     await loadBatiments();
   } catch(e) {
     errorBox.textContent = "Erreur : " + e.message; errorBox.style.display = "block";

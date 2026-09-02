@@ -2342,10 +2342,14 @@ exports.pushCampagnePassage1Kizeo = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { storagePath, destinataireKizeoUserId, semaineId } = req.body || {};
+    const { storagePath, envois, semaineId } = req.body || {};
     if (!storagePath) { res.status(400).json({ error: "storagePath requis" }); return; }
-    const recipient = String(destinataireKizeoUserId || "").trim();
-    if (!recipient) { res.status(400).json({ error: "destinataireKizeoUserId requis" }); return; }
+    if (!Array.isArray(envois) || !envois.length) { res.status(400).json({ error: "envois requis (au moins un couple feuille + technicien)" }); return; }
+    for (const e of envois) {
+      if (!e || !String(e.nomFeuille || "").trim() || !String(e.destinataireKizeoUserId || "").trim()) {
+        res.status(400).json({ error: "Chaque envoi doit avoir une feuille ET un technicien" }); return;
+      }
+    }
     if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
 
     const { getFirestore } = require("firebase-admin/firestore");
@@ -2359,20 +2363,7 @@ exports.pushCampagnePassage1Kizeo = functions
     const kizeoFormId = campagneSnap.data().kizeoFormId1;
     if (!kizeoFormId) { res.status(400).json({ error: "ID du formulaire Kizeo 1er passage non configuré pour cette campagne" }); return; }
     const config = semaine.config || {};
-    if (!config.nomFeuille) { res.status(400).json({ error: "Configuration absente : réglez d'abord les colonnes dans la carte 1 pour cette semaine." }); return; }
     const colonnes = config.colonnes || {};
-    const nomFeuille = config.nomFeuille || "";
-
-    // Nom affiché sur la fiche Kizeo : celui du technicien réellement sélectionné
-    // dans l'app (fiche Techniciens), pas le nom brut de la colonne Excel.
-    let technicienNom = "";
-    try {
-      const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", recipient).limit(1).get();
-      if (!tSnap.empty) {
-        const t = tSnap.docs[0].data();
-        technicienNom = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
-      }
-    } catch(e) { console.error("pushCampagnePassage1Kizeo: lookup technicien échoué:", e.message); }
 
     try {
       const ExcelJS = require("exceljs");
@@ -2381,101 +2372,124 @@ exports.pushCampagnePassage1Kizeo = functions
 
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(buffer);
-      const ws = workbook.getWorksheet(nomFeuille);
-      if (!ws) {
-        const dispo = workbook.worksheets.map(s => s.name).join(", ");
-        res.status(400).json({ error: `Feuille '${nomFeuille}' introuvable. Feuilles disponibles : ${dispo}` });
-        return;
-      }
-
-      const batiments = new Map();
-      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-        if (rowNumber === 1) return;
-        try {
-          const secteurBrut = cellStr(row, colonnes.secteur);
-          const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
-          const nomRue = cellStr(row, colonnes.nomRue);
-          const codePostal = nettoyerNombre(cellStr(row, colonnes.codePostal));
-          const ville = cellStr(row, colonnes.ville);
-          if (!nomRue) return;
-          const secteur = formaterSecteur(secteurBrut);
-          const adresseRue = `${numeroRue} ${nomRue}`.trim();
-          const cle = `${secteur}|${numeroRue}|${nomRue}|${codePostal}|${ville}`;
-          const nomLocataire = cellStr(row, colonnes.locataire);
-          const reference = cellStr(row, colonnes.referenceLogement);
-          const etage = cellStr(row, colonnes.etage);
-          const numeroCourt = extraire4DerniersChiffres(reference);
-
-          if (!batiments.has(cle)) {
-            batiments.set(cle, { secteur, adresse_rue: adresseRue, code_postal: codePostal, ville, logements: [] });
-          }
-          batiments.get(cle).logements.push({ nom: nomLocataire, numero: numeroCourt, etage });
-        } catch (e) { /* ligne ignorée, cohérent avec le script Python */ }
-      });
-
-      if (batiments.size === 0) { res.status(400).json({ error: "Aucune donnée trouvée" }); return; }
 
       const now = new Date();
       const pad = n => String(n).padStart(2, "0");
       const dateHeure = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
       const results = [];
-      for (const data of batiments.values()) {
-        const batimentRef = db.collection("campagnes-batiments").doc();
-        const refInterne = `campagne::${semaineId}::1::${batimentRef.id}`;
-        const fields = {
-          ref_interne: { value: refInterne },
-          secteur: { value: data.secteur },
-          technicien: { value: technicienNom },
-          passage: { value: "N°1" },
-          adresse_address: { value: data.adresse_rue },
-          adresse_zip: { value: data.code_postal },
-          adresse_city: { value: data.ville },
-          date_et_heure_1er_passage: { value: dateHeure },
-          tableau: {
-            value: data.logements.map(log => ({
-              nom: { value: log.nom },
-              numero_logement: { value: log.numero },
-              etage: { value: log.etage },
-            })),
-          },
-        };
-        const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", `/forms/${encodeURIComponent(kizeoFormId)}/push`, {
-          recipient_user_id: Number(recipient),
-          fields,
+      let totalBatiments = 0;
+
+      for (const envoi of envois) {
+        const nomFeuille = String(envoi.nomFeuille).trim();
+        const recipient = String(envoi.destinataireKizeoUserId).trim();
+
+        const ws = workbook.getWorksheet(nomFeuille);
+        if (!ws) {
+          const dispo = workbook.worksheets.map(s => s.name).join(", ");
+          results.push({ nomFeuille, success: false, error: `Feuille introuvable. Feuilles disponibles : ${dispo}` });
+          continue;
+        }
+
+        // Nom affiché sur la fiche Kizeo : celui du technicien réellement sélectionné
+        // dans l'app (fiche Techniciens), pas le nom brut de la colonne Excel.
+        let technicienNom = "";
+        try {
+          const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", recipient).limit(1).get();
+          if (!tSnap.empty) {
+            const t = tSnap.docs[0].data();
+            technicienNom = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+          }
+        } catch(e) { console.error("pushCampagnePassage1Kizeo: lookup technicien échoué:", e.message); }
+
+        const batiments = new Map();
+        ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+          if (rowNumber === 1) return;
+          try {
+            const secteurBrut = cellStr(row, colonnes.secteur);
+            const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
+            const nomRue = cellStr(row, colonnes.nomRue);
+            const codePostal = nettoyerNombre(cellStr(row, colonnes.codePostal));
+            const ville = cellStr(row, colonnes.ville);
+            if (!nomRue) return;
+            const secteur = formaterSecteur(secteurBrut);
+            const adresseRue = `${numeroRue} ${nomRue}`.trim();
+            const cle = `${secteur}|${numeroRue}|${nomRue}|${codePostal}|${ville}`;
+            const nomLocataire = cellStr(row, colonnes.locataire);
+            const reference = cellStr(row, colonnes.referenceLogement);
+            const etage = cellStr(row, colonnes.etage);
+            const numeroCourt = extraire4DerniersChiffres(reference);
+
+            if (!batiments.has(cle)) {
+              batiments.set(cle, { secteur, adresse_rue: adresseRue, code_postal: codePostal, ville, logements: [] });
+            }
+            batiments.get(cle).logements.push({ nom: nomLocataire, numero: numeroCourt, etage });
+          } catch (e) { /* ligne ignorée, cohérent avec le script Python */ }
         });
-        if (r.status >= 200 && r.status < 300) {
-          let dataId = null;
-          try { dataId = JSON.parse(r.body).data.data_id; } catch(e) {}
-          const nowIso = new Date().toISOString();
-          await batimentRef.set({
-            campagneId,
-            semaineId,
-            secteur: data.secteur,
-            adresseRue: data.adresse_rue,
-            codePostal: data.code_postal,
-            ville: data.ville,
-            passage1: {
-              technicienKizeoUserId: recipient,
-              technicienNom,
-              logements: data.logements,
-              statut: "en-attente",
-              kizeoDataId: dataId ? String(dataId) : null,
-              pushedAt: nowIso,
+
+        if (batiments.size === 0) {
+          results.push({ nomFeuille, technicien: technicienNom, success: false, error: "Aucune donnée trouvée dans cette feuille" });
+          continue;
+        }
+        totalBatiments += batiments.size;
+
+        for (const data of batiments.values()) {
+          const batimentRef = db.collection("campagnes-batiments").doc();
+          const refInterne = `campagne::${semaineId}::1::${batimentRef.id}`;
+          const fields = {
+            ref_interne: { value: refInterne },
+            secteur: { value: data.secteur },
+            technicien: { value: technicienNom },
+            passage: { value: "N°1" },
+            adresse_address: { value: data.adresse_rue },
+            adresse_zip: { value: data.code_postal },
+            adresse_city: { value: data.ville },
+            date_et_heure_1er_passage: { value: dateHeure },
+            tableau: {
+              value: data.logements.map(log => ({
+                nom: { value: log.nom },
+                numero_logement: { value: log.numero },
+                etage: { value: log.etage },
+              })),
             },
-            createdAt: nowIso,
-            updatedAt: nowIso,
+          };
+          const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", `/forms/${encodeURIComponent(kizeoFormId)}/push`, {
+            recipient_user_id: Number(recipient),
+            fields,
           });
-          results.push({ adresse: data.adresse_rue, technicien: technicienNom, success: true, dataId, batimentId: batimentRef.id });
-        } else {
-          results.push({ adresse: data.adresse_rue, technicien: technicienNom, success: false, error: `Kizeo a répondu ${r.status}` });
+          if (r.status >= 200 && r.status < 300) {
+            let dataId = null;
+            try { dataId = JSON.parse(r.body).data.data_id; } catch(e) {}
+            const nowIso = new Date().toISOString();
+            await batimentRef.set({
+              campagneId,
+              semaineId,
+              secteur: data.secteur,
+              adresseRue: data.adresse_rue,
+              codePostal: data.code_postal,
+              ville: data.ville,
+              passage1: {
+                technicienKizeoUserId: recipient,
+                technicienNom,
+                logements: data.logements,
+                statut: "en-attente",
+                kizeoDataId: dataId ? String(dataId) : null,
+                pushedAt: nowIso,
+              },
+              createdAt: nowIso,
+              updatedAt: nowIso,
+            });
+            results.push({ nomFeuille, adresse: data.adresse_rue, technicien: technicienNom, success: true, dataId, batimentId: batimentRef.id });
+          } else {
+            results.push({ nomFeuille, adresse: data.adresse_rue, technicien: technicienNom, success: false, error: `Kizeo a répondu ${r.status}` });
+          }
         }
       }
 
       const nbEnvoyes = results.filter(r => r.success).length;
       const nbErreurs = results.length - nbEnvoyes;
-      console.log(`pushCampagnePassage1Kizeo: ${nbEnvoyes} envoyés, ${nbErreurs} erreurs sur ${results.length} bâtiments`);
-      res.status(200).json({ results, nbEnvoyes, nbErreurs, nbBatiments: batiments.size });
+      console.log(`pushCampagnePassage1Kizeo: ${nbEnvoyes} envoyés, ${nbErreurs} erreurs sur ${results.length} bâtiments, ${envois.length} feuille(s)`);
+      res.status(200).json({ results, nbEnvoyes, nbErreurs, nbBatiments: totalBatiments });
     } catch (e) {
       console.error("pushCampagnePassage1Kizeo:", e);
       res.status(500).json({ error: e.message });
