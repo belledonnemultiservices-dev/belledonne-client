@@ -510,6 +510,7 @@
           <div style="display:flex;align-items:center;gap:8px;">
             <select class="form-input" id="push2BulkTech" style="height:32px;font-size:12px;"><option value="">Réassigner à…</option></select>
             <button type="button" class="btn-tpl" onclick="appliquerTechSelection()">Appliquer à la sélection</button>
+            <button type="button" class="btn-tpl" onclick="renvoyerPassage2Selection()">Renvoyer la sélection</button>
           </div>
         </div>
         <div class="batiments-list" id="listPassage2Source"></div>
@@ -1356,6 +1357,7 @@ function renderListPassage2Source() {
       <span class="b-info">1er passage : ${technicien1}</span>
       <span class="b-info">${nbAbsents} absent(s)</span>
       <select class="form-input push2-tech" data-id="${b.id}" style="height:32px;font-size:12px;width:auto;">${techOptionsHtml()}</select>
+      <button type="button" class="btn-row-resend" onclick="renvoyerPassage2Ligne('${b.id}')">Renvoyer</button>
     </div>`;
   }).join("");
   document.querySelectorAll(".push2-tech").forEach(sel => {
@@ -1506,20 +1508,17 @@ window.genererRapportsSemaine = async function(force) {
 };
 
 // ── Carte 3 : push 2ème passage ──
-window.pushDeuxiemePassage = async function() {
-  const checked = Array.from(document.querySelectorAll(".push2-check:checked")).map(el => el.value);
-  if (!checked.length) { showToast("Sélectionne au moins un bâtiment"); return; }
-  const envois = checked.map(id => {
+async function envoyerPassage2(batimentIds, btn, labelBusy, labelIdle) {
+  const envois = batimentIds.map(id => {
     const sel = document.querySelector(`.push2-tech[data-id="${id}"]`);
     return { batimentId: id, destinataireKizeoUserId: sel ? sel.value : "" };
   });
   const sansTech = envois.find(e => !e.destinataireKizeoUserId);
   if (sansTech) { showToast("Chaque bâtiment sélectionné doit avoir un technicien destinataire"); return; }
-  const btn = document.getElementById("btnPush2");
   const box = document.getElementById("resultBoxPush2");
   const err = document.getElementById("errorBoxPush2");
   box.style.display = "none"; err.style.display = "none";
-  btn.disabled = true; btn.textContent = "Envoi en cours...";
+  if (btn) { btn.disabled = true; btn.textContent = labelBusy; }
   try {
     const resp = await fetch(FN_PUSH2, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId, envois }) });
     const data = await resp.json();
@@ -1529,9 +1528,24 @@ window.pushDeuxiemePassage = async function() {
       `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "⚠️"} ${r.adresse || r.batimentId} ${r.technicien ? `→ ${r.technicien}` : ""} ${r.nbAbsents ? `— ${r.nbAbsents} absent(s)` : ""} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
     ).join("");
     box.style.display = "block";
-    await loadBatiments();
+    loadBatiments();
   } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
-  finally { btn.disabled = false; btn.textContent = "Envoyer le 2ème passage via Kizeo"; }
+  finally { if (btn) { btn.disabled = false; btn.textContent = labelIdle; } }
+}
+window.pushDeuxiemePassage = async function() {
+  const checked = Array.from(document.querySelectorAll(".push2-check:checked")).map(el => el.value);
+  if (!checked.length) { showToast("Sélectionne au moins un bâtiment"); return; }
+  await envoyerPassage2(checked, document.getElementById("btnPush2"), "Envoi en cours...", "Envoyer le 2ème passage via Kizeo");
+};
+window.renvoyerPassage2Ligne = async function(batimentId) {
+  if (!confirm("Renvoyer un nouveau formulaire 2ème passage au technicien pour ce bâtiment ?\n\nPensez à supprimer l'ancien formulaire depuis l'interface Kizeo (https://forms.kizeo.com/data/history/).")) return;
+  await envoyerPassage2([batimentId]);
+};
+window.renvoyerPassage2Selection = async function() {
+  const checked = Array.from(document.querySelectorAll(".push2-check:checked")).map(el => el.value);
+  if (!checked.length) { showToast("Sélectionne au moins une ligne"); return; }
+  if (!confirm(`Renvoyer un nouveau formulaire 2ème passage pour ${checked.length} bâtiment(s) ?\n\nPensez à supprimer les anciens formulaires non traités depuis l'interface Kizeo (https://forms.kizeo.com/data/history/).`)) return;
+  await envoyerPassage2(checked);
 };
 
 // ── Carte 4 : reporting complet ──
