@@ -3045,6 +3045,148 @@ exports.campagneGenererPlanningTechnicien = functions
     }
   });
 
+const MOIS_FR_IDX = { janvier: 0, fevrier: 1, mars: 2, avril: 3, mai: 4, juin: 5, juillet: 6, aout: 7, septembre: 8, octobre: 9, novembre: 10, decembre: 11 };
+// "Lundi 19 octobre 2026" -> Date triable. Retourne null si non parsable.
+function parseDateJourFr(str) {
+  const s = String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const m = s.match(/(\d{1,2})\s+([a-z]+)\s+(\d{4})/);
+  if (!m) return null;
+  const mois = MOIS_FR_IDX[m[2]];
+  if (mois === undefined) return null;
+  return new Date(Number(m[3]), mois, Number(m[1]));
+}
+// Adresse batiment ("8 RUE CLAUDE KOGAN") vs adresse planning source ("8 Rue Claude Kogan, 38100 Grenoble") :
+// compare la partie avant la 1ère virgule, normalisée (accents/casse).
+function normaliserAdresseComparaison(adresse) {
+  return String(adresse || "").split(",")[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+}
+
+// ── PLANNING 2ÈME PASSAGE PAR TECHNICIEN ────────────────────────────
+// Croise les bâtiments déjà repassés (passage2 renseigné, donc déjà pushés
+// vers Kizeo) avec le fichier planning source de la campagne (date/horaire
+// du 2nd passage par adresse, déjà utilisé pour Gestion documentation).
+// Groupe par le technicien RÉELLEMENT utilisé au push (passage2.technicienNom),
+// pas celui du 1er passage : une réassignation est donc bien prise en compte.
+exports.campagneGenererPlanningPassage2 = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { semaineId } = req.body || {};
+    if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
+
+    try {
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const semaineSnap = await db.collection("campagnes-semaines").doc(semaineId).get();
+      if (!semaineSnap.exists) { res.status(404).json({ error: "Semaine introuvable" }); return; }
+      const campagneId = semaineSnap.data().campagneId;
+      const campagneSnap = await db.collection("gestion-campagnes").doc(campagneId).get();
+      if (!campagneSnap.exists) { res.status(404).json({ error: "Campagne introuvable" }); return; }
+      const docSourceStoragePath = campagneSnap.data().docSourceStoragePath;
+      if (!docSourceStoragePath) { res.status(400).json({ error: "Fichier source planning (Gestion documentation) non configuré pour cette campagne" }); return; }
+
+      const bSnap = await db.collection("campagnes-batiments").where("semaineId", "==", semaineId).get();
+      const batiments = bSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const candidats = batiments.filter(b => b.passage1 && b.passage1.statut === "archive" && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
+      if (!candidats.length) { res.status(400).json({ error: "Aucun bâtiment avec des absents pour cette période" }); return; }
+      const sansPush2 = candidats.filter(b => !b.passage2);
+      if (sansPush2.length) {
+        res.status(400).json({ error: `${sansPush2.length} bâtiment(s) n'ont pas encore reçu leur push 2ème passage. Termine d'abord tous les envois.` });
+        return;
+      }
+
+      const ExcelJS = require("exceljs");
+      const JSZip = require("jszip");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const [srcBuffer] = await bucket.file(docSourceStoragePath).download();
+      const srcWb = new ExcelJS.Workbook();
+      await srcWb.xlsx.load(srcBuffer);
+      const srcWs = srcWb.worksheets[0];
+      if (!srcWs) { res.status(400).json({ error: "Feuille source introuvable" }); return; }
+      const lignesSource = lirePlanningSource(srcWs);
+      const dateHeureParAdresse = new Map();
+      lignesSource.forEach(l => {
+        const cle = normaliserAdresseComparaison(l.adresse);
+        if (!dateHeureParAdresse.has(cle)) dateHeureParAdresse.set(cle, { date2: l.date2, heure2: l.heure2 });
+      });
+
+      let nbSansDate = 0;
+      const parTech = new Map(); // tech -> [{adresse, horaire, nbLogements, dateTri}]
+      const ordreTech = [];
+      candidats.forEach(b => {
+        const tech = (b.passage2.technicienNom || "").trim() || "Sans technicien";
+        if (!parTech.has(tech)) { parTech.set(tech, []); ordreTech.push(tech); }
+        const cle = normaliserAdresseComparaison(b.adresseRue);
+        const infosDate = dateHeureParAdresse.get(cle);
+        if (!infosDate || !infosDate.date2) nbSansDate++;
+        parTech.get(tech).push({
+          adresse: b.adresseRue,
+          horaire: (infosDate && infosDate.heure2) || "",
+          nbLogements: (b.passage2.logements || []).length,
+          jour: (infosDate && infosDate.date2) || "Date non trouvée",
+          dateTri: infosDate ? parseDateJourFr(infosDate.date2) : null,
+        });
+      });
+
+      const zip = new JSZip();
+      for (const tech of ordreTech) {
+        const lignes = parTech.get(tech);
+        // Groupe par jour (ordre chronologique quand la date est parsable, sinon ordre d'arrivée).
+        lignes.sort((a, b2) => {
+          if (a.dateTri && b2.dateTri) return a.dateTri - b2.dateTri;
+          if (a.dateTri) return -1;
+          if (b2.dateTri) return 1;
+          return 0;
+        });
+        const parJour = new Map();
+        lignes.forEach(l => { if (!parJour.has(l.jour)) parJour.set(l.jour, []); parJour.get(l.jour).push(l); });
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet("Planning");
+        ws.getColumn(1).width = 42; ws.getColumn(2).width = 18; ws.getColumn(3).width = 14;
+        const titleRow = ws.addRow([`Planning technicien - ${tech} - 2ème passage`]);
+        titleRow.font = { bold: true, size: 14 };
+        ws.addRow(["Belledonne Multiservices"]);
+        ws.addRow([]);
+        for (const [jour, lignesJour] of parJour) {
+          const bannerRow = ws.addRow([jour]);
+          bannerRow.font = { bold: true, size: 12 };
+          bannerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDDEEDD" } };
+          const headerRow = ws.addRow(["Adresse", "Horaire", "Nb logements"]);
+          headerRow.font = { bold: true };
+          lignesJour.forEach(l => { ws.addRow([l.adresse, l.horaire, l.nbLogements]); });
+          ws.addRow([]);
+        }
+
+        const outBuffer = await wb.xlsx.writeBuffer();
+        zip.folder("Planning 2eme passage").file(`${sanitizeNomFichier(tech)}.xlsx`, outBuffer);
+      }
+
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+      const outPath = `campagnes-documents/${campagneId}/planning-passage2/${semaineId}_${Date.now()}.zip`;
+      const zipFileName = "Planning 2eme passage.zip";
+      const token = crypto.randomUUID();
+      await bucket.file(outPath).save(zipBuffer, {
+        contentType: "application/zip",
+        metadata: { contentDisposition: contentDispositionHeader(zipFileName), metadata: { firebaseStorageDownloadTokens: token } },
+      });
+      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
+      const statsText = `${ordreTech.length} technicien(s), ${candidats.length} bâtiment(s)` + (nbSansDate ? `, ${nbSansDate} sans date trouvée` : "");
+
+      res.status(200).json({ success: true, url, fileName: zipFileName, statsText, nbSansDate });
+    } catch(e) {
+      console.error("campagneGenererPlanningPassage2:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 // ══════════════════════════════════════════════════════════════════
 // AVIS DE PASSAGE (docx) : le template reste un .docx normal, une seule
 // page, avec des balises {Adresse} / {date-heure} (syntaxe docxtemplater).

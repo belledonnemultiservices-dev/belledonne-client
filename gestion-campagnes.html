@@ -515,6 +515,7 @@
         </div>
         <div class="batiments-list" id="listPassage2Source"></div>
         <button class="btn-generate" id="btnPush2" onclick="pushDeuxiemePassage()" disabled>Envoyer le 2ème passage via Kizeo</button>
+        <button type="button" class="btn-tpl" id="btnPlanningPassage2" onclick="genererPlanningPassage2()" disabled style="margin-left:10px;" title="Actif une fois que tous les bâtiments ont reçu leur push 2ème passage">Générer planning 2ème passage</button>
         <div class="card-sub" id="btnPush2Hint" style="margin-top:8px;margin-bottom:0;"></div>
         <div class="result-box" id="resultBoxPush2">
           <div class="r-title">Push 2ème passage envoyé</div>
@@ -522,6 +523,12 @@
           <div id="resultDetailPush2" style="margin-top:10px;font-size:12px;color:var(--text-mid);max-height:200px;overflow-y:auto;"></div>
         </div>
         <div class="error-box" id="errorBoxPush2"></div>
+        <div class="result-box" id="resultBoxPlanningPassage2">
+          <div class="r-title">Planning 2ème passage généré</div>
+          <div class="r-stats" id="resultStatsPlanningPassage2"></div>
+          <a class="btn-download" id="dlPlanningPassage2" href="#" target="_blank" rel="noopener">Télécharger le zip</a>
+        </div>
+        <div class="error-box" id="errorBoxPlanningPassage2"></div>
       </div>
 
       <!-- CARTE 4 : REPORTING COMPLET -->
@@ -611,6 +618,7 @@ const storage = getStorage(app);
 const FN_PUSH1 = "https://europe-west1-belledonne-client.cloudfunctions.net/pushCampagnePassage1Kizeo";
 const FN_RESEND_P1 = "https://europe-west1-belledonne-client.cloudfunctions.net/resendCampagnePassage1Kizeo";
 const FN_PUSH2 = "https://europe-west1-belledonne-client.cloudfunctions.net/pushCampagnePassage2Kizeo";
+const FN_PLANNING_PASSAGE2 = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningPassage2";
 const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportsSemaine";
 const FN_GEN_COMPLET = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportComplet";
 const FN_GEN_CONSOLIDE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportConsolide";
@@ -1175,6 +1183,17 @@ function loadConfigFromSemaine(s) {
   } else {
     boxSemaine.style.display = "none";
   }
+
+  // Réaffiche le dernier planning 2ème passage généré (carte 3), s'il y en a un.
+  const pp2 = s.planningPassage2;
+  const boxPlanning2 = document.getElementById("resultBoxPlanningPassage2");
+  if (pp2 && pp2.url) {
+    document.getElementById("resultStatsPlanningPassage2").textContent = pp2.statsText || "";
+    document.getElementById("dlPlanningPassage2").href = pp2.url;
+    boxPlanning2.style.display = "block";
+  } else {
+    boxPlanning2.style.display = "none";
+  }
 }
 
 window.addEnvoiRow = function(nomFeuille, destinataireKizeoUserId) {
@@ -1334,6 +1353,19 @@ function updateBtnPush2() {
   const pret = _batiments.length > 0 && enAttente === 0;
   btn.disabled = !pret;
   if (hint) hint.textContent = pret ? "" : (_batiments.length ? `${enAttente} rapport(s) encore en attente ou pas encore intégré(s) au dossier (carte 2).` : "");
+
+  // Planning 2ème passage : actif seulement quand tous les bâtiments à repasser
+  // ont déjà reçu leur push (passage2 renseigné). Reste actif ensuite pour permettre
+  // une régénération (fichier perdu, renvoi à un autre technicien...).
+  const btnPlanning = document.getElementById("btnPlanningPassage2");
+  if (btnPlanning) {
+    const candidats = _batiments.filter(b => b.passage1 && b.passage1.statut === "archive" && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
+    const sansPush2 = candidats.filter(b => !b.passage2).length;
+    btnPlanning.disabled = candidats.length === 0 || sansPush2 > 0;
+    btnPlanning.title = btnPlanning.disabled
+      ? (candidats.length === 0 ? "Aucun bâtiment à repasser pour cette période" : `${sansPush2} bâtiment(s) sans push 2ème passage envoyé`)
+      : "Régénère le planning à partir des derniers envois 2ème passage";
+  }
 }
 function renderListPassage2Source() {
   const el = document.getElementById("listPassage2Source");
@@ -1546,6 +1578,31 @@ window.renvoyerPassage2Selection = async function() {
   if (!checked.length) { showToast("Sélectionne au moins une ligne"); return; }
   if (!confirm(`Renvoyer un nouveau formulaire 2ème passage pour ${checked.length} bâtiment(s) ?\n\nPensez à supprimer les anciens formulaires non traités depuis l'interface Kizeo (https://forms.kizeo.com/data/history/).`)) return;
   await envoyerPassage2(checked);
+};
+
+window.genererPlanningPassage2 = async function() {
+  const btn = document.getElementById("btnPlanningPassage2");
+  const box = document.getElementById("resultBoxPlanningPassage2");
+  const err = document.getElementById("errorBoxPlanningPassage2");
+  box.style.display = "none"; err.style.display = "none";
+  btn.disabled = true; btn.textContent = "Génération en cours...";
+  try {
+    const resp = await fetch(FN_PLANNING_PASSAGE2, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    document.getElementById("resultStatsPlanningPassage2").textContent = data.statsText || "";
+    document.getElementById("dlPlanningPassage2").href = data.url;
+    box.style.display = "block";
+
+    // Garde le planning accessible même après avoir quitté/rouvert la période.
+    try {
+      const planningPassage2 = { url: data.url, statsText: data.statsText, generatedAt: new Date().toISOString() };
+      await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { planningPassage2, updatedAt: new Date().toISOString() }, { merge: true });
+      const s = _semaines.find(x => x.id === _currentSemaineId);
+      if (s) s.planningPassage2 = planningPassage2;
+    } catch(e) { /* non bloquant */ }
+  } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
+  finally { btn.textContent = "Générer planning 2ème passage"; updateBtnPush2(); }
 };
 
 // ── Carte 4 : reporting complet ──
