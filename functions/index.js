@@ -2541,12 +2541,20 @@ exports.resendCampagnePassage1Kizeo = functions
         adresse_zip: { value: batiment.codePostal || "" },
         adresse_city: { value: batiment.ville || "" },
         date_et_heure_1er_passage: { value: dateHeure },
+        // Si le technicien a déjà répondu (resultats présents), on repart de ses
+        // réponses (statut, niveau d'infestation) pour qu'il n'ait qu'à corriger.
+        // Sinon on repart du formulaire vierge d'origine (logements).
         tableau: {
-          value: (p1.logements || []).map(log => ({
-            nom: { value: log.nom },
-            numero_logement: { value: log.numero },
-            etage: { value: log.etage },
-          })),
+          value: (p1.resultats && p1.resultats.length ? p1.resultats : (p1.logements || [])).map(log => {
+            const row = {
+              nom: { value: log.nom },
+              numero_logement: { value: log.numero },
+              etage: { value: log.etage },
+            };
+            if (log.statut) row.statut_1er_passage = { value: log.statut };
+            if (Array.isArray(log.niveauInfestation) && log.niveauInfestation.length) row.niveau_infestation = { value: log.niveauInfestation };
+            return row;
+          }),
         },
       };
       const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", `/forms/${encodeURIComponent(kizeoFormId)}/push`, {
