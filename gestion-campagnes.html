@@ -1156,6 +1156,18 @@ function loadConfigFromSemaine(s) {
   } else {
     dfInfo.style.display = "none";
   }
+
+  // Réaffiche le dernier dossier PDF + reporting Excel généré (carte 2), s'il y en a un.
+  const rs = s.reportingSemaine;
+  const boxSemaine = document.getElementById("resultBoxSemaine");
+  if (rs && rs.zipUrl) {
+    document.getElementById("resultStatsSemaine").textContent = `${rs.nbBatiments} bâtiment(s) traité(s)`;
+    document.getElementById("dlZipSemaine").href = rs.zipUrl;
+    document.getElementById("dlXlsxSemaine").href = rs.xlsxUrl;
+    boxSemaine.style.display = "block";
+  } else {
+    boxSemaine.style.display = "none";
+  }
 }
 
 window.addEnvoiRow = function(nomFeuille, destinataireKizeoUserId) {
@@ -1433,6 +1445,15 @@ window.genererRapportsSemaine = async function() {
     document.getElementById("dlZipSemaine").href = data.zipUrl;
     document.getElementById("dlXlsxSemaine").href = data.xlsxUrl;
     box.style.display = "block";
+
+    // Garde le dossier généré accessible même après avoir quitté/rouvert la période.
+    try {
+      const reportingSemaine = { nbBatiments: data.nbBatiments, zipUrl: data.zipUrl, xlsxUrl: data.xlsxUrl, generatedAt: new Date().toISOString() };
+      await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { reportingSemaine, updatedAt: new Date().toISOString() }, { merge: true });
+      const s = _semaines.find(x => x.id === _currentSemaineId);
+      if (s) s.reportingSemaine = reportingSemaine;
+    } catch(e) { /* non bloquant */ }
+
     await loadBatiments();
   } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
   finally { btn.disabled = false; btn.textContent = "Créer le dossier PDF + reporting Excel"; }
