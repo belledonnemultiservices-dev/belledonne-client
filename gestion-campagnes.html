@@ -487,7 +487,8 @@
           <button class="btn-row-remove" id="btnDeleteP1" style="width:auto;padding:0 14px;" onclick="deleteSelectedPassage1()" disabled>Supprimer la sélection</button>
         </div>
         <div class="batiments-list" id="listPassage1"></div>
-        <button class="btn-generate" id="btnGenSemaine" onclick="genererRapportsSemaine()" disabled>Créer le dossier PDF + reporting Excel</button>
+        <button class="btn-generate" id="btnGenSemaine" onclick="genererRapportsSemaine(false)" disabled>Créer le dossier PDF + reporting Excel</button>
+        <button type="button" class="btn-tpl" id="btnRegenSemaine" onclick="genererRapportsSemaine(true)" title="Reprend tous les rapports déjà reçus, utile si les fichiers générés ont été perdus" style="margin-left:10px;">Régénérer quand même</button>
         <div class="card-sub" id="btnGenSemaineHint" style="margin-top:8px;margin-bottom:0;"></div>
         <div class="result-box" id="resultBoxSemaine">
           <div class="r-title">Reporting généré</div>
@@ -1282,6 +1283,7 @@ function updateBtnGenSemaine() {
   if (!btn) return;
   const enAttente = _batiments.filter(b => (b.passage1 || {}).statut === "en-attente").length;
   const aTraiter = _batiments.filter(b => (b.passage1 || {}).statut === "a-traiter").length;
+  const archive = _batiments.filter(b => (b.passage1 || {}).statut === "archive").length;
   const pret = _batiments.length > 0 && enAttente === 0 && aTraiter > 0;
   btn.disabled = !pret;
   if (hint) {
@@ -1290,6 +1292,8 @@ function updateBtnGenSemaine() {
     else if (_batiments.length && aTraiter === 0) hint.textContent = "Dossier déjà à jour, rien de nouveau à ajouter.";
     else hint.textContent = "";
   }
+  const btnRegen = document.getElementById("btnRegenSemaine");
+  if (btnRegen) btnRegen.disabled = (aTraiter + archive) === 0;
 }
 window.deleteSelectedPassage1 = async function() {
   if (!_selectedP1.size) return;
@@ -1437,14 +1441,16 @@ window.pushPremierPassage = async function() {
 };
 
 // ── Carte 2 : reporting semaine ──
-window.genererRapportsSemaine = async function() {
-  const btn = document.getElementById("btnGenSemaine");
+window.genererRapportsSemaine = async function(force) {
+  const btn = force ? document.getElementById("btnRegenSemaine") : document.getElementById("btnGenSemaine");
+  const btnOther = force ? document.getElementById("btnGenSemaine") : document.getElementById("btnRegenSemaine");
   const box = document.getElementById("resultBoxSemaine");
   const err = document.getElementById("errorBoxSemaine");
   box.style.display = "none"; err.style.display = "none";
-  btn.disabled = true; btn.textContent = "Génération en cours...";
+  const label = btn.textContent;
+  btn.disabled = true; btnOther.disabled = true; btn.textContent = "Génération en cours...";
   try {
-    const resp = await fetch(FN_GEN_SEMAINE, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId }) });
+    const resp = await fetch(FN_GEN_SEMAINE, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId: _currentSemaineId, force: !!force }) });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
     document.getElementById("resultStatsSemaine").textContent = `${data.nbBatiments} bâtiment(s) traité(s)`;
@@ -1460,9 +1466,9 @@ window.genererRapportsSemaine = async function() {
       if (s) s.reportingSemaine = reportingSemaine;
     } catch(e) { /* non bloquant */ }
 
-    await loadBatiments();
+    loadBatiments(); // recalcule aussi l'état des boutons via updateBtnGenSemaine
   } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
-  finally { btn.disabled = false; btn.textContent = "Créer le dossier PDF + reporting Excel"; }
+  finally { btn.textContent = label; btnOther.disabled = false; updateBtnGenSemaine(); }
 };
 
 // ── Carte 3 : push 2ème passage ──

@@ -1924,17 +1924,18 @@ exports.generateCampagneRapportsSemaine = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { semaineId } = req.body || {};
+    const { semaineId, force } = req.body || {};
     if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
 
     try {
       const { getFirestore } = require("firebase-admin/firestore");
       const db = getFirestore(admin.app(), "belledonne-client");
-      const snap = await db.collection("campagnes-batiments")
-        .where("semaineId", "==", semaineId)
-        .where("passage1.statut", "==", "a-traiter")
-        .get();
-      if (snap.empty) { res.status(400).json({ error: "Aucun rapport 'à traiter' pour cette semaine" }); return; }
+      // force=true : régénère à partir de TOUS les rapports déjà reçus (a-traiter + archive),
+      // utile si les fichiers générés ont été perdus. Sinon, seulement les nouveaux ("a-traiter").
+      const snap = force
+        ? await db.collection("campagnes-batiments").where("semaineId", "==", semaineId).where("passage1.statut", "in", ["a-traiter", "archive"]).get()
+        : await db.collection("campagnes-batiments").where("semaineId", "==", semaineId).where("passage1.statut", "==", "a-traiter").get();
+      if (snap.empty) { res.status(400).json({ error: force ? "Aucun rapport reçu pour cette période" : "Aucun rapport 'à traiter' pour cette semaine" }); return; }
       const batiments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       const JSZip = require("jszip");
