@@ -1281,9 +1281,15 @@ function updateBtnGenSemaine() {
   const hint = document.getElementById("btnGenSemaineHint");
   if (!btn) return;
   const enAttente = _batiments.filter(b => (b.passage1 || {}).statut === "en-attente").length;
-  const pret = _batiments.length > 0 && enAttente === 0;
+  const aTraiter = _batiments.filter(b => (b.passage1 || {}).statut === "a-traiter").length;
+  const pret = _batiments.length > 0 && enAttente === 0 && aTraiter > 0;
   btn.disabled = !pret;
-  if (hint) hint.textContent = pret ? "" : (_batiments.length ? `${enAttente} rapport(s) encore en attente.` : "");
+  if (hint) {
+    if (pret) hint.textContent = "";
+    else if (enAttente > 0) hint.textContent = `${enAttente} rapport(s) encore en attente.`;
+    else if (_batiments.length && aTraiter === 0) hint.textContent = "Dossier déjà à jour, rien de nouveau à ajouter.";
+    else hint.textContent = "";
+  }
 }
 window.deleteSelectedPassage1 = async function() {
   if (!_selectedP1.size) return;
