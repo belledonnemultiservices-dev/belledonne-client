@@ -543,6 +543,7 @@
           <div class="r-stats" id="resultStatsComplet"></div>
           <a class="btn-download" id="dlZipComplet" href="#" download>Télécharger le zip des rapports</a>
           <a class="btn-download" id="dlXlsxComplet" href="#" download>Télécharger le reporting complet</a>
+          <div style="margin-top:10px;"><a href="#" onclick="reinitialiserReportingComplet();return false;" style="font-size:12px;color:var(--text-muted);">Réinitialiser (efface ce dossier, pour retester)</a></div>
         </div>
         <div class="error-box" id="errorBoxComplet"></div>
       </div>
@@ -1633,6 +1634,17 @@ window.genererPlanningPassage2 = async function() {
 };
 
 // ── Carte 4 : reporting complet ──
+window.reinitialiserReportingComplet = async function() {
+  if (!_currentSemaineId) return;
+  if (!confirm("Effacer le dossier reporting complet mémorisé pour cette période ? (les fichiers restent dans Storage, seul le lien affiché ici est retiré)")) return;
+  try {
+    await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { reportingComplet: null, updatedAt: new Date().toISOString() }, { merge: true });
+    const s = _semaines.find(x => x.id === _currentSemaineId);
+    if (s) s.reportingComplet = null;
+    document.getElementById("resultBoxComplet").style.display = "none";
+    showToast("Reporting complet réinitialisé");
+  } catch(e) { showToast("Erreur : " + e.message); }
+};
 window.genererRapportComplet = async function() {
   const btn = document.getElementById("btnGenComplet");
   const box = document.getElementById("resultBoxComplet");
