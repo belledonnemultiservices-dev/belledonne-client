@@ -1443,10 +1443,13 @@ function renderListPassage2() {
   if (!avecP2.length) { el.innerHTML = `<div class="empty-state">Aucun push 2ème passage envoyé pour l'instant.</div>`; return; }
   el.innerHTML = avecP2.map(b => {
     const p2 = b.passage2 || {};
+    const resetBtn = p2.statut !== "en-attente"
+      ? `<button type="button" class="btn-row-resend" onclick="reinitialiserPassage2Ligne('${b.id}')" title="Remet ce bâtiment en attente de réception, sans renvoyer de formulaire">Réinitialiser</button>` : "";
     return `<div class="batiment-row">
       <span class="b-adresse">${b.adresseRue || "—"}</span>
       <span class="b-info">${p2.technicienNom || "—"}</span>
       ${statutBadge(p2.statut)}
+      ${resetBtn}
     </div>`;
   }).join("");
 }
