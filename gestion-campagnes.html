@@ -601,7 +601,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, getDocs, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, deleteField, collection, getDocs, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -1395,6 +1395,8 @@ function renderListPassage2Source() {
     const dejaEnvoye = b.passage2 ? `<span class="r-badge r-badge-ok" style="margin-left:8px;">Déjà envoyé</span>` : "";
     const technicien1 = b.passage1.technicienNom || "—";
     const defaultKizeoId = b.passage1.technicienKizeoUserId || "";
+    const resetBtn = (b.passage2 && b.passage2.statut !== "en-attente")
+      ? `<button type="button" class="btn-row-resend" onclick="reinitialiserPassage2Ligne('${b.id}')" title="Remet ce bâtiment en attente de réception, sans renvoyer de formulaire">Réinitialiser</button>` : "";
     return `<div class="batiment-row">
       <label style="display:flex;align-items:center;gap:10px;flex:1;">
         <input type="checkbox" class="push2-check" value="${b.id}" onchange="updatePush2SelCount()" ${b.passage2 ? "" : "checked"}>
@@ -1402,8 +1404,10 @@ function renderListPassage2Source() {
       </label>
       <span class="b-info">1er passage : ${technicien1}</span>
       <span class="b-info">${nbAbsents} absent(s)</span>
+      ${b.passage2 ? statutBadge(b.passage2.statut) : ""}
       <select class="form-input push2-tech" data-id="${b.id}" style="height:32px;font-size:12px;width:auto;">${techOptionsHtml()}</select>
       <button type="button" class="btn-row-resend" onclick="renvoyerPassage2Ligne('${b.id}')">Renvoyer</button>
+      ${resetBtn}
     </div>`;
   }).join("");
   document.querySelectorAll(".push2-tech").forEach(sel => {
@@ -1596,6 +1600,17 @@ window.pushDeuxiemePassage = async function() {
   const checked = Array.from(document.querySelectorAll(".push2-check:checked")).map(el => el.value);
   if (!checked.length) { showToast("Sélectionne au moins un bâtiment"); return; }
   await envoyerPassage2(checked, document.getElementById("btnPush2"), "Envoi en cours...", "Envoyer le 2ème passage via Kizeo");
+};
+window.reinitialiserPassage2Ligne = async function(batimentId) {
+  if (!confirm("Remettre ce bâtiment en attente de réception (2ème passage) ?\n\nLe push déjà envoyé reste actif côté Kizeo, seul le statut et les réponses éventuellement reçues côté app sont effacés, pour pouvoir retester la réception.")) return;
+  try {
+    await setDoc(doc(db, "campagnes-batiments", batimentId), {
+      passage2: { statut: "en-attente", resultats: deleteField(), fileUrlPdf: deleteField(), fileUrlExcel: deleteField(), receivedAt: deleteField() },
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    showToast("Bâtiment remis en attente");
+    loadBatiments();
+  } catch(e) { showToast("Erreur : " + e.message); }
 };
 window.renvoyerPassage2Ligne = async function(batimentId) {
   if (!confirm("Renvoyer un nouveau formulaire 2ème passage au technicien pour ce bâtiment ?\n\nPensez à supprimer l'ancien formulaire depuis l'interface Kizeo (https://forms.kizeo.com/data/history/).")) return;
