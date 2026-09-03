@@ -536,7 +536,8 @@
         <div class="card-title"><span class="card-num">4</span>Reporting complet de la période</div>
         <div class="card-sub">Récupère les rapports du 2ème passage et fusionne avec le 1er passage.</div>
         <div class="batiments-list" id="listPassage2"></div>
-        <button class="btn-generate" id="btnGenComplet" onclick="genererRapportComplet()">Créer le dossier PDF + reporting complet</button>
+        <button class="btn-generate" id="btnGenComplet" onclick="genererRapportComplet()" disabled>Créer le dossier PDF + reporting complet</button>
+        <div class="card-sub" id="btnGenCompletHint" style="margin-top:8px;margin-bottom:0;"></div>
         <div class="result-box" id="resultBoxComplet">
           <div class="r-title">Reporting complet généré</div>
           <div class="r-stats" id="resultStatsComplet"></div>
@@ -1194,6 +1195,18 @@ function loadConfigFromSemaine(s) {
   } else {
     boxPlanning2.style.display = "none";
   }
+
+  // Réaffiche le dernier reporting complet généré (carte 4), s'il y en a un.
+  const rc = s.reportingComplet;
+  const boxComplet = document.getElementById("resultBoxComplet");
+  if (rc && rc.zipUrl) {
+    document.getElementById("resultStatsComplet").textContent = `${rc.nbBatiments} bâtiment(s) traité(s)`;
+    document.getElementById("dlZipComplet").href = rc.zipUrl;
+    document.getElementById("dlXlsxComplet").href = rc.xlsxUrl;
+    boxComplet.style.display = "block";
+  } else {
+    boxComplet.style.display = "none";
+  }
 }
 
 window.addEnvoiRow = function(nomFeuille, destinataireKizeoUserId) {
@@ -1420,6 +1433,7 @@ window.appliquerTechSelection = function() {
 
 function renderListPassage2() {
   const el = document.getElementById("listPassage2");
+  updateBtnGenComplet();
   const avecP2 = _batiments.filter(b => b.passage2);
   if (!avecP2.length) { el.innerHTML = `<div class="empty-state">Aucun push 2ème passage envoyé pour l'instant.</div>`; return; }
   el.innerHTML = avecP2.map(b => {
@@ -1430,6 +1444,19 @@ function renderListPassage2() {
       ${statutBadge(p2.statut)}
     </div>`;
   }).join("");
+}
+function updateBtnGenComplet() {
+  const btn = document.getElementById("btnGenComplet");
+  const hint = document.getElementById("btnGenCompletHint");
+  if (!btn) return;
+  // Ne bloque que s'il existe des push 2ème passage envoyés mais pas encore reçus
+  // (statut "en-attente") : sans ça, le reporting complet fusionnait des données
+  // 2ème passage vides. Si personne n'a jamais été repassé, rien à attendre.
+  const avecP2 = _batiments.filter(b => b.passage2);
+  const sansRecu = avecP2.filter(b => b.passage2.statut === "en-attente").length;
+  const pret = sansRecu === 0;
+  btn.disabled = !pret;
+  if (hint) hint.textContent = pret ? "" : `${sansRecu} rapport(s) 2ème passage encore en attente.`;
 }
 
 // ── Carte 1 : push 1er passage ──
@@ -1620,9 +1647,18 @@ window.genererRapportComplet = async function() {
     document.getElementById("dlZipComplet").href = data.zipUrl;
     document.getElementById("dlXlsxComplet").href = data.xlsxUrl;
     box.style.display = "block";
-    await loadBatiments();
+
+    // Garde le dossier généré accessible même après avoir quitté/rouvert la période.
+    try {
+      const reportingComplet = { nbBatiments: data.nbBatiments, zipUrl: data.zipUrl, xlsxUrl: data.xlsxUrl, generatedAt: new Date().toISOString() };
+      await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { reportingComplet, updatedAt: new Date().toISOString() }, { merge: true });
+      const s = _semaines.find(x => x.id === _currentSemaineId);
+      if (s) s.reportingComplet = reportingComplet;
+    } catch(e) { /* non bloquant */ }
+
+    loadBatiments();
   } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
-  finally { btn.disabled = false; btn.textContent = "Créer le dossier PDF + reporting complet"; }
+  finally { btn.disabled = false; btn.textContent = "Créer le dossier PDF + reporting complet"; updateBtnGenComplet(); }
 };
 </script>
 <script type="module" src="suivi-badge.js"></script>
