@@ -1365,12 +1365,27 @@ window.addEnvoiRow = function(nomFeuille, destinataireKizeoUserId) {
   const row = document.createElement("div");
   row.className = "envoi-row";
   row.innerHTML = `
-    <input class="form-input" type="text" data-role="feuille" placeholder="ex: T1" value="${nomFeuille ? String(nomFeuille).replace(/"/g,'&quot;') : ""}">
-    <select class="form-input" data-role="technicien">${techOptionsHtml()}</select>
-    <button type="button" class="btn-row-remove" onclick="this.closest('.envoi-row').remove()">×</button>
+    <input class="form-input" type="text" data-role="feuille" placeholder="ex: T1" value="${nomFeuille ? String(nomFeuille).replace(/"/g,'&quot;') : ""}" oninput="debouncedAutosaveEnvois()">
+    <select class="form-input" data-role="technicien" onchange="debouncedAutosaveEnvois()">${techOptionsHtml()}</select>
+    <button type="button" class="btn-row-remove" onclick="this.closest('.envoi-row').remove();autosaveEnvois();">×</button>
   `;
   document.getElementById("envoisList").appendChild(row);
   if (destinataireKizeoUserId) row.querySelector("select[data-role='technicien']").value = destinataireKizeoUserId;
+};
+let _autosaveEnvoisTimer = null;
+window.debouncedAutosaveEnvois = function() {
+  clearTimeout(_autosaveEnvoisTimer);
+  _autosaveEnvoisTimer = setTimeout(autosaveEnvois, 800);
+};
+window.autosaveEnvois = async function() {
+  if (!_currentSemaineId) return;
+  try {
+    const envois = collectEnvois();
+    const s = _semaines.find(x => x.id === _currentSemaineId);
+    const config = { ...((s && s.config) || {}), envois };
+    await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { config, updatedAt: new Date().toISOString() }, { merge: true });
+    if (s) s.config = config;
+  } catch(e) { console.error("autosaveEnvois:", e.message); }
 };
 
 window.saveConfig = async function() {
