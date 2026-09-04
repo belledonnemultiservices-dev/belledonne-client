@@ -1290,9 +1290,36 @@ function letterToIndex(letter) {
   return n - 1;
 }
 const COL_FIELDS = ["colSecteur", "colNumeroRue", "colNomRue", "colCodePostal", "colVille", "colLocataire", "colReference", "colEtage"];
+const COL_FIELD_MAP = { colSecteur: "secteur", colNumeroRue: "numeroRue", colNomRue: "nomRue", colCodePostal: "codePostal", colVille: "ville", colLocataire: "locataire", colReference: "referenceLogement", colEtage: "etage" };
 COL_FIELDS.forEach(id => {
-  document.getElementById(id).addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ""); });
+  document.getElementById(id).addEventListener("input", (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "");
+    debouncedAutosaveColonnes();
+  });
 });
+let _autosaveColonnesTimer = null;
+function debouncedAutosaveColonnes() {
+  clearTimeout(_autosaveColonnesTimer);
+  _autosaveColonnesTimer = setTimeout(autosaveColonnes, 800);
+}
+// Sauvegarde silencieuse dès que les 8 colonnes sont valides (sans attendre le
+// clic sur "Enregistrer la configuration"), nécessaire pour que la recherche
+// logement au niveau campagne puisse parser le fichier de cette période.
+async function autosaveColonnes() {
+  if (!_currentSemaineId) return;
+  const colonnes = {};
+  for (const [id, key] of Object.entries(COL_FIELD_MAP)) {
+    const idx = letterToIndex(document.getElementById(id).value.trim());
+    if (idx === null) return;
+    colonnes[key] = idx;
+  }
+  try {
+    const s = _semaines.find(x => x.id === _currentSemaineId);
+    const config = { ...((s && s.config) || {}), colonnes };
+    await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { config, updatedAt: new Date().toISOString() }, { merge: true });
+    if (s) s.config = config;
+  } catch(e) { console.error("autosaveColonnes:", e.message); }
+}
 
 function loadConfigFromSemaine(s) {
   const col = (s.config && s.config.colonnes) || {};

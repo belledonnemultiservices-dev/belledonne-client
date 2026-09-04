@@ -3527,24 +3527,30 @@ exports.campagneRechercheLogement = functions
         const dernierFichier = config.dernierFichier;
         const envois = config.envois || [];
         const colonnes = config.colonnes;
-        if (!dernierFichier || !dernierFichier.url || !envois.length || !colonnes) continue;
+        if (!dernierFichier || !dernierFichier.url || !envois.length || !colonnes) {
+          console.log(`campagneRechercheLogement: période ${semDoc.id} ignorée — dernierFichier:${!!dernierFichier} envois:${envois.length} colonnes:${!!colonnes}`);
+          continue;
+        }
 
         const path = storagePathFromDownloadUrl(dernierFichier.url);
-        if (!path) continue;
+        if (!path) { console.log(`campagneRechercheLogement: période ${semDoc.id} — chemin non extrait de l'URL`); continue; }
         let wb;
         try {
           const [buf] = await bucket.file(path).download();
           wb = new ExcelJS.Workbook();
           await wb.xlsx.load(buf);
         } catch(e) { console.error(`campagneRechercheLogement: lecture ${path} échouée:`, e.message); continue; }
+        console.log(`campagneRechercheLogement: période ${semDoc.id} — feuilles dispo: ${wb.worksheets.map(s=>s.name).join(", ")} — envois configurés: ${envois.map(e=>e.nomFeuille).join(", ")}`);
 
         for (const envoi of envois) {
           if (resultats.length >= LIMITE) break;
           const ws = wb.getWorksheet(envoi.nomFeuille);
-          if (!ws) continue;
+          if (!ws) { console.log(`campagneRechercheLogement: feuille "${envoi.nomFeuille}" introuvable dans le fichier`); continue; }
           const techNom = await nomTechnicienParKizeoId(envoi.destinataireKizeoUserId);
+          let nbLignesLues = 0, nbErreurs = 0;
           ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
             if (rowNumber === 1 || resultats.length >= LIMITE) return;
+            nbLignesLues++;
             try {
               const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
               const nomRue = cellStr(row, colonnes.nomRue);
@@ -3566,8 +3572,9 @@ exports.campagneRechercheLogement = functions
                 technicien: techNom || "—",
                 periode: `${semDoc.data().dateDebut || ""} → ${semDoc.data().dateFin || ""}`,
               });
-            } catch(e) { /* ligne ignorée */ }
+            } catch(e) { nbErreurs++; }
           });
+          console.log(`campagneRechercheLogement: feuille "${envoi.nomFeuille}" — ${nbLignesLues} ligne(s) lue(s), ${nbErreurs} erreur(s)`);
         }
       }
 
