@@ -2204,6 +2204,18 @@ async function deleteStoragePrefix(bucket, prefix) {
     return files.length;
   } catch(e) { console.error(`deleteStoragePrefix (${prefix}):`, e.message); return 0; }
 }
+// Extrait le chemin Storage d'une URL de téléchargement Firebase
+// (".../o/<chemin-encodé>?alt=media&token=..."). Retourne null si non reconnue.
+function storagePathFromDownloadUrl(url) {
+  const m = String(url || "").match(/\/o\/([^?]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+async function deleteStorageFileFromUrl(bucket, url) {
+  const path = storagePathFromDownloadUrl(url);
+  if (!path) return 0;
+  try { await bucket.file(path).delete(); return 1; }
+  catch(e) { console.error(`deleteStorageFileFromUrl (${path}):`, e.message); return 0; }
+}
 
 exports.deleteCampagneCascade = functions
   .region("europe-west1")
@@ -2226,6 +2238,9 @@ exports.deleteCampagneCascade = functions
 
       const semainesSnap = await db.collection("campagnes-semaines").where("campagneId", "==", campagneId).get();
       const semaineIds = semainesSnap.docs.map(d => d.id);
+      const dernierFichierUrls = semainesSnap.docs
+        .map(d => d.data().config && d.data().config.dernierFichier && d.data().config.dernierFichier.url)
+        .filter(Boolean);
 
       const nbBatiments = await deleteQueryDocs(db, db.collection("campagnes-batiments").where("campagneId", "==", campagneId));
       let nbReportingsSemaine = 0;
@@ -2244,6 +2259,11 @@ exports.deleteCampagneCascade = functions
       for (const sid of semaineIds) {
         nbFichiers += await deleteStoragePrefix(bucket, `campagnes-reportings/${sid}/`);
         nbFichiers += await deleteStoragePrefix(bucket, `campagnes-reception/${sid}/`);
+      }
+      // Fichiers Excel du push 1er passage (push-campagne/...), retrouvés via les URLs
+      // mémorisées sur chaque période (config.dernierFichier).
+      for (const url of dernierFichierUrls) {
+        nbFichiers += await deleteStorageFileFromUrl(bucket, url);
       }
 
       await db.collection("gestion-campagnes").doc(campagneId).delete();
@@ -2276,7 +2296,8 @@ exports.deleteSemaineCascade = functions
       const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
 
       const semaineSnap = await db.collection("campagnes-semaines").doc(semaineId).get();
-      const campagneId = semaineSnap.exists ? semaineSnap.data().campagneId : null;
+      const semaineData = semaineSnap.exists ? semaineSnap.data() : {};
+      const campagneId = semaineData.campagneId || null;
 
       const nbBatiments = await deleteQueryDocs(db, db.collection("campagnes-batiments").where("semaineId", "==", semaineId));
       const nbRecaps = (await deleteQueryDocs(db, db.collection("campagnes-reportings-semaine").where("semaineId", "==", semaineId)))
@@ -2286,6 +2307,10 @@ exports.deleteSemaineCascade = functions
       nbFichiers += await deleteStoragePrefix(bucket, `campagnes-reportings/${semaineId}/`);
       nbFichiers += await deleteStoragePrefix(bucket, `campagnes-reception/${semaineId}/`);
       if (campagneId) nbFichiers += await deleteStoragePrefix(bucket, `campagnes-documents/${campagneId}/planning-passage2/${semaineId}`);
+      // Fichier Excel du push 1er passage (push-campagne/...), retrouvé via l'URL mémorisée
+      // sur la période (config.dernierFichier) : chemin non déductible autrement.
+      const dernierFichierUrl = semaineData.config && semaineData.config.dernierFichier && semaineData.config.dernierFichier.url;
+      if (dernierFichierUrl) nbFichiers += await deleteStorageFileFromUrl(bucket, dernierFichierUrl);
 
       await db.collection("campagnes-semaines").doc(semaineId).delete();
 
