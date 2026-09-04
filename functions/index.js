@@ -2762,7 +2762,7 @@ exports.pushCampagnePassage2Kizeo = functions
       }
     }
 
-    const { getFirestore } = require("firebase-admin/firestore");
+    const { getFirestore, FieldValue } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
     const semaineSnap = await db.collection("campagnes-semaines").doc(semaineId).get();
     if (!semaineSnap.exists) { res.status(404).json({ error: "Semaine introuvable" }); return; }
@@ -2840,6 +2840,13 @@ exports.pushCampagnePassage2Kizeo = functions
               statut: "en-attente",
               kizeoDataId: dataId2 ? String(dataId2) : null,
               pushedAt: nowIso2,
+              // Efface les éventuelles réponses/PDF d'un envoi précédent (ex: renvoi
+              // à un autre technicien après une 1ère réception) plutôt que de les
+              // laisser traîner en attendant d'être écrasées par la prochaine réception.
+              resultats: FieldValue.delete(),
+              fileUrlPdf: FieldValue.delete(),
+              fileUrlExcel: FieldValue.delete(),
+              receivedAt: FieldValue.delete(),
             },
             updatedAt: nowIso2,
           }, { merge: true });
