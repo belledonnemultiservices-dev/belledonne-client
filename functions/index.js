@@ -2181,6 +2181,122 @@ exports.generateCampagneRapportConsolide = functions
     }
   });
 
+// ── SUPPRESSION EN CASCADE (campagne / période) ─────────────────────
+// Supprime les documents Firestore ET les fichiers Storage associés,
+// contrairement à la suppression simple côté app (qui ne retirait que le
+// document racine, laissant tout le reste orphelin).
+async function deleteQueryDocs(db, query) {
+  const snap = await query.get();
+  let n = 0;
+  let batch = db.batch();
+  for (const d of snap.docs) {
+    batch.delete(d.ref);
+    n++;
+    if (n % 400 === 0) { await batch.commit(); batch = db.batch(); }
+  }
+  if (n % 400 !== 0) await batch.commit();
+  return n;
+}
+async function deleteStoragePrefix(bucket, prefix) {
+  try {
+    const [files] = await bucket.getFiles({ prefix });
+    await Promise.all(files.map(f => f.delete().catch(() => {})));
+    return files.length;
+  } catch(e) { console.error(`deleteStoragePrefix (${prefix}):`, e.message); return 0; }
+}
+
+exports.deleteCampagneCascade = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId } = req.body || {};
+    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+
+    try {
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+
+      const semainesSnap = await db.collection("campagnes-semaines").where("campagneId", "==", campagneId).get();
+      const semaineIds = semainesSnap.docs.map(d => d.id);
+
+      const nbBatiments = await deleteQueryDocs(db, db.collection("campagnes-batiments").where("campagneId", "==", campagneId));
+      let nbReportingsSemaine = 0;
+      for (const sid of semaineIds) {
+        nbReportingsSemaine += await deleteQueryDocs(db, db.collection("campagnes-reportings-semaine").where("semaineId", "==", sid));
+        nbReportingsSemaine += await deleteQueryDocs(db, db.collection("campagnes-reportings-complet").where("semaineId", "==", sid));
+      }
+      const nbConsolide = await deleteQueryDocs(db, db.collection("campagnes-reportings-consolide").where("campagneId", "==", campagneId));
+      const nbDocsGeneres = await deleteQueryDocs(db, db.collection("campagnes-documents-generes").where("campagneId", "==", campagneId));
+      const nbSemaines = await deleteQueryDocs(db, db.collection("campagnes-semaines").where("campagneId", "==", campagneId));
+
+      let nbFichiers = 0;
+      nbFichiers += await deleteStoragePrefix(bucket, `campagnes-documents/${campagneId}/`);
+      nbFichiers += await deleteStoragePrefix(bucket, `campagnes-templates/${campagneId}/`);
+      nbFichiers += await deleteStoragePrefix(bucket, `campagnes-reportings/${campagneId}/`);
+      for (const sid of semaineIds) {
+        nbFichiers += await deleteStoragePrefix(bucket, `campagnes-reportings/${sid}/`);
+        nbFichiers += await deleteStoragePrefix(bucket, `campagnes-reception/${sid}/`);
+      }
+
+      await db.collection("gestion-campagnes").doc(campagneId).delete();
+
+      console.log(`deleteCampagneCascade: campagne ${campagneId} -> ${nbSemaines} période(s), ${nbBatiments} bâtiment(s), ${nbReportingsSemaine + nbConsolide} recap(s), ${nbDocsGeneres} doc(s) générés, ${nbFichiers} fichier(s) Storage`);
+      res.status(200).json({ success: true, nbSemaines, nbBatiments, nbFichiers });
+    } catch(e) {
+      console.error("deleteCampagneCascade:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+exports.deleteSemaineCascade = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { semaineId } = req.body || {};
+    if (!semaineId) { res.status(400).json({ error: "semaineId requis" }); return; }
+
+    try {
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+
+      const semaineSnap = await db.collection("campagnes-semaines").doc(semaineId).get();
+      const campagneId = semaineSnap.exists ? semaineSnap.data().campagneId : null;
+
+      const nbBatiments = await deleteQueryDocs(db, db.collection("campagnes-batiments").where("semaineId", "==", semaineId));
+      const nbRecaps = (await deleteQueryDocs(db, db.collection("campagnes-reportings-semaine").where("semaineId", "==", semaineId)))
+        + (await deleteQueryDocs(db, db.collection("campagnes-reportings-complet").where("semaineId", "==", semaineId)));
+
+      let nbFichiers = 0;
+      nbFichiers += await deleteStoragePrefix(bucket, `campagnes-reportings/${semaineId}/`);
+      nbFichiers += await deleteStoragePrefix(bucket, `campagnes-reception/${semaineId}/`);
+      if (campagneId) nbFichiers += await deleteStoragePrefix(bucket, `campagnes-documents/${campagneId}/planning-passage2/${semaineId}`);
+
+      await db.collection("campagnes-semaines").doc(semaineId).delete();
+
+      console.log(`deleteSemaineCascade: période ${semaineId} -> ${nbBatiments} bâtiment(s), ${nbRecaps} recap(s), ${nbFichiers} fichier(s) Storage`);
+      res.status(200).json({ success: true, nbBatiments, nbFichiers });
+    } catch(e) {
+      console.error("deleteSemaineCascade:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 exports.generateGarantieRapportsParClient = functions
   .region("europe-west1")
   .runWith({ timeoutSeconds: 300 })

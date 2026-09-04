@@ -622,6 +622,8 @@ const FN_RESEND_P1 = "https://europe-west1-belledonne-client.cloudfunctions.net/
 const FN_PUSH2 = "https://europe-west1-belledonne-client.cloudfunctions.net/pushCampagnePassage2Kizeo";
 const FN_PLANNING_PASSAGE2 = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningPassage2";
 const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportsSemaine";
+const FN_DELETE_CAMPAGNE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteCampagneCascade";
+const FN_DELETE_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteSemaineCascade";
 const FN_GEN_COMPLET = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportComplet";
 const FN_GEN_CONSOLIDE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportConsolide";
 const FN_DOC_PLANNING_CLIENT = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningClient";
@@ -725,10 +727,16 @@ window.saveCampagne = async function() {
   openCampagne(ref.id);
 };
 window.deleteCampagne = async function(campagneId) {
-  if (!confirm("Supprimer cette campagne ? Les périodes et bâtiments déjà créés resteront en base mais ne seront plus accessibles depuis cette page.")) return;
-  await deleteDoc(doc(db, "gestion-campagnes", campagneId));
-  await loadCampagnes();
-  showToast("Campagne supprimée");
+  if (!confirm("Supprimer DÉFINITIVEMENT cette campagne ?\n\nCeci supprime aussi toutes ses périodes, bâtiments/rapports, documents générés et fichiers Storage associés (plannings, PDF, reportings, dossier source). Action irréversible.")) return;
+  const c = _campagnes.find(x => x.id === campagneId);
+  showToast("Suppression en cours...");
+  try {
+    const resp = await fetch(FN_DELETE_CAMPAGNE, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ campagneId }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    await loadCampagnes();
+    showToast(`Campagne "${c ? c.nom : ''}" et toutes ses données supprimées`);
+  } catch(e) { showToast("Erreur : " + e.message); }
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -1047,12 +1055,24 @@ function renderSemaines() {
   if (!_semaines.length) { grid.innerHTML = ""; empty.style.display = ""; return; }
   empty.style.display = "none";
   grid.innerHTML = _semaines.map(s => `
-    <div class="s-card" onclick="openSemaine('${s.id}')">
+    <div class="s-card" style="position:relative;" onclick="openSemaine('${s.id}')">
+      <button class="btn-icon danger" style="position:absolute;top:8px;right:8px;" title="Supprimer cette période" onclick="event.stopPropagation();deleteSemaine('${s.id}')"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
       <div class="s-date">${fmtDate(s.dateDebut)} → ${fmtDate(s.dateFin)}</div>
       <div class="s-row"><span>${s.statut === "terminee" ? "Terminée" : "En cours"}</span></div>
     </div>
   `).join("");
 }
+window.deleteSemaine = async function(semaineId) {
+  if (!confirm("Supprimer DÉFINITIVEMENT cette période ?\n\nCeci supprime aussi ses bâtiments/rapports et les fichiers Storage associés (rapports, reportings). Action irréversible.")) return;
+  showToast("Suppression en cours...");
+  try {
+    const resp = await fetch(FN_DELETE_SEMAINE, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ semaineId }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    await loadSemaines();
+    showToast("Période et ses données supprimées");
+  } catch(e) { showToast("Erreur : " + e.message); }
+};
 window.openSemaineModal = function() {
   document.getElementById("mDateDebut").value = "";
   document.getElementById("mDateFin").value = "";
