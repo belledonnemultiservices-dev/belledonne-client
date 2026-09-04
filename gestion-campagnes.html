@@ -1412,7 +1412,7 @@ function renderListPassage2Source() {
   if (!candidats.length) { el.innerHTML = `<div class="empty-state">Aucun bâtiment avec des absents à repasser (génère d'abord le dossier en carte 2, une fois tous les rapports reçus).</div>`; updatePush2SelCount(); return; }
   el.innerHTML = candidats.map(b => {
     const nbAbsents = (b.passage1.resultats || []).filter(l => l.statut === "Absent").length;
-    const dejaEnvoye = b.passage2 ? `<span class="r-badge r-badge-ok" style="margin-left:8px;">Déjà envoyé</span>` : "";
+    const envoyeA = b.passage2 ? `<span class="b-info">2ème passage envoyé à : ${b.passage2.technicienNom || "—"}</span>` : "";
     const technicien1 = b.passage1.technicienNom || "—";
     const defaultKizeoId = b.passage1.technicienKizeoUserId || "";
     const resetBtn = (b.passage2 && b.passage2.statut !== "en-attente")
@@ -1420,11 +1420,11 @@ function renderListPassage2Source() {
     return `<div class="batiment-row">
       <label style="display:flex;align-items:center;gap:10px;flex:1;">
         <input type="checkbox" class="push2-check" value="${b.id}" onchange="updatePush2SelCount()" ${b.passage2 ? "" : "checked"}>
-        <span class="b-adresse">${b.adresseRue || "—"}</span>${dejaEnvoye}
+        <span class="b-adresse">${b.adresseRue || "—"}</span>
       </label>
       <span class="b-info">1er passage : ${technicien1}</span>
       <span class="b-info">${nbAbsents} absent(s)</span>
-      ${b.passage2 ? statutBadge(b.passage2.statut) : ""}
+      ${envoyeA}
       <select class="form-input push2-tech" data-id="${b.id}" style="height:32px;font-size:12px;width:auto;">${techOptionsHtml()}</select>
       <button type="button" class="btn-row-resend" onclick="renvoyerPassage2Ligne('${b.id}')">Renvoyer</button>
       ${resetBtn}
