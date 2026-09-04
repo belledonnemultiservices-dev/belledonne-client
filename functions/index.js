@@ -3335,6 +3335,126 @@ exports.campagneGenererPlanningPassage2 = functions
     }
   });
 
+// ── PLANNING TECHNICIEN GLOBAL (campagne) ───────────────────────────
+// Même croisement que campagneGenererPlanningPassage2, mais agrège TOUTES
+// les périodes de la campagne (au lieu d'une seule) : un fichier par
+// technicien qui cumule ses adresses/jours sur l'ensemble de la campagne.
+exports.campagneGenererPlanningTechnicienGlobal = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId } = req.body || {};
+    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+
+    try {
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const campagneSnap = await db.collection("gestion-campagnes").doc(campagneId).get();
+      if (!campagneSnap.exists) { res.status(404).json({ error: "Campagne introuvable" }); return; }
+      const docSourceStoragePath = campagneSnap.data().docSourceStoragePath;
+      if (!docSourceStoragePath) { res.status(400).json({ error: "Fichier source planning (Gestion documentation) non configuré pour cette campagne" }); return; }
+
+      const bSnap = await db.collection("campagnes-batiments").where("campagneId", "==", campagneId).get();
+      const batiments = bSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const candidats = batiments.filter(b => b.passage1 && b.passage1.statut === "archive" && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
+      if (!candidats.length) { res.status(400).json({ error: "Aucun bâtiment avec des absents pour cette campagne" }); return; }
+      const sansPush2 = candidats.filter(b => !b.passage2);
+      if (sansPush2.length) {
+        res.status(400).json({ error: `${sansPush2.length} bâtiment(s) n'ont pas encore reçu leur push 2ème passage, toutes périodes confondues. Termine d'abord tous les envois.` });
+        return;
+      }
+
+      const ExcelJS = require("exceljs");
+      const JSZip = require("jszip");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const [srcBuffer] = await bucket.file(docSourceStoragePath).download();
+      const srcWb = new ExcelJS.Workbook();
+      await srcWb.xlsx.load(srcBuffer);
+      const srcWs = srcWb.worksheets[0];
+      if (!srcWs) { res.status(400).json({ error: "Feuille source introuvable" }); return; }
+      const lignesSource = lirePlanningSource(srcWs);
+      const dateHeureParAdresse = new Map();
+      lignesSource.forEach(l => {
+        const cle = normaliserAdresseComparaison(l.adresse);
+        if (!dateHeureParAdresse.has(cle)) dateHeureParAdresse.set(cle, { date2: l.date2, heure2: l.heure2 });
+      });
+
+      let nbSansDate = 0;
+      const parTech = new Map();
+      const ordreTech = [];
+      candidats.forEach(b => {
+        const tech = (b.passage2.technicienNom || "").trim() || "Sans technicien";
+        if (!parTech.has(tech)) { parTech.set(tech, []); ordreTech.push(tech); }
+        const cle = normaliserAdresseComparaison(b.adresseRue);
+        const infosDate = dateHeureParAdresse.get(cle);
+        if (!infosDate || !infosDate.date2) nbSansDate++;
+        parTech.get(tech).push({
+          adresse: b.adresseRue,
+          horaire: (infosDate && infosDate.heure2) || "",
+          nbLogements: (b.passage2.logements || []).length,
+          jour: (infosDate && infosDate.date2) || "Date non trouvée",
+          dateTri: infosDate ? parseDateJourFr(infosDate.date2) : null,
+        });
+      });
+
+      const zip = new JSZip();
+      for (const tech of ordreTech) {
+        const lignes = parTech.get(tech);
+        lignes.sort((a, b2) => {
+          if (a.dateTri && b2.dateTri) return a.dateTri - b2.dateTri;
+          if (a.dateTri) return -1;
+          if (b2.dateTri) return 1;
+          return 0;
+        });
+        const parJour = new Map();
+        lignes.forEach(l => { if (!parJour.has(l.jour)) parJour.set(l.jour, []); parJour.get(l.jour).push(l); });
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet("Planning");
+        ws.getColumn(1).width = 42; ws.getColumn(2).width = 18; ws.getColumn(3).width = 14;
+        const titleRow = ws.addRow([`Planning technicien - ${tech} - 2ème passage (campagne complète)`]);
+        titleRow.font = { bold: true, size: 14 };
+        ws.addRow(["Belledonne Multiservices"]);
+        ws.addRow([]);
+        for (const [jour, lignesJour] of parJour) {
+          const bannerRow = ws.addRow([jour]);
+          bannerRow.font = { bold: true, size: 12 };
+          bannerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDDEEDD" } };
+          const headerRow = ws.addRow(["Adresse", "Horaire", "Nb logements"]);
+          headerRow.font = { bold: true };
+          lignesJour.forEach(l => { ws.addRow([l.adresse, l.horaire, l.nbLogements]); });
+          ws.addRow([]);
+        }
+
+        const outBuffer = await wb.xlsx.writeBuffer();
+        zip.folder("Planning technicien").file(`${sanitizeNomFichier(tech)}.xlsx`, outBuffer);
+      }
+
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+      const outPath = `campagnes-documents/${campagneId}/planning-technicien-global/${Date.now()}.zip`;
+      const zipFileName = "Planning technicien (campagne complete).zip";
+      const token = crypto.randomUUID();
+      await bucket.file(outPath).save(zipBuffer, {
+        contentType: "application/zip",
+        metadata: { contentDisposition: contentDispositionHeader(zipFileName), metadata: { firebaseStorageDownloadTokens: token } },
+      });
+      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(outPath)}?alt=media&token=${token}`;
+      const statsText = `${ordreTech.length} technicien(s), ${candidats.length} bâtiment(s)` + (nbSansDate ? `, ${nbSansDate} sans date trouvée` : "");
+
+      res.status(200).json({ success: true, url, fileName: zipFileName, statsText, nbSansDate });
+    } catch(e) {
+      console.error("campagneGenererPlanningTechnicienGlobal:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 // ══════════════════════════════════════════════════════════════════
 // AVIS DE PASSAGE (docx) : le template reste un .docx normal, une seule
 // page, avec des balises {Adresse} / {date-heure} (syntaxe docxtemplater).

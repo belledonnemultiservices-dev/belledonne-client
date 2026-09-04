@@ -396,6 +396,19 @@
         <div class="empty-state" id="semainesEmpty" style="display:none;">Aucune période. Crée-en une pour commencer le 1er passage.</div>
 
         <div class="card">
+          <div class="card-title">Planning technicien (campagne complète)</div>
+          <div class="card-sub">Agrège, pour chaque technicien, toutes ses adresses de 2ème passage sur l'ensemble des périodes de la campagne (un fichier par technicien).</div>
+          <button class="btn-generate" id="btnPlanningTechGlobal" onclick="genererPlanningTechnicienGlobal()" disabled>Générer le planning technicien</button>
+          <div class="card-sub" id="btnPlanningTechGlobalHint" style="margin-top:8px;margin-bottom:0;"></div>
+          <div class="result-box" id="resultBoxPlanningTechGlobal">
+            <div class="r-title">Planning technicien généré</div>
+            <div class="r-stats" id="resultStatsPlanningTechGlobal"></div>
+            <a class="btn-download" id="dlPlanningTechGlobal" href="#" target="_blank" rel="noopener">Télécharger le zip</a>
+          </div>
+          <div class="error-box" id="errorBoxPlanningTechGlobal"></div>
+        </div>
+
+        <div class="card">
           <div class="card-title">Rapport consolidé de la campagne</div>
           <div class="card-sub">Agrège les reportings complets de toutes les périodes de cette campagne, et regroupe tous les PDF d'émargement dans un dossier (sous-dossiers "1er passage" / "2nd passage").</div>
           <button class="btn-generate" id="btnGenConsolide" onclick="genererRapportConsolide()" disabled>Générer le rapport consolidé</button>
@@ -622,6 +635,7 @@ const FN_PUSH1 = "https://europe-west1-belledonne-client.cloudfunctions.net/push
 const FN_RESEND_P1 = "https://europe-west1-belledonne-client.cloudfunctions.net/resendCampagnePassage1Kizeo";
 const FN_PUSH2 = "https://europe-west1-belledonne-client.cloudfunctions.net/pushCampagnePassage2Kizeo";
 const FN_PLANNING_PASSAGE2 = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningPassage2";
+const FN_PLANNING_TECH_GLOBAL = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningTechnicienGlobal";
 const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportsSemaine";
 const FN_DELETE_CAMPAGNE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteCampagneCascade";
 const FN_DELETE_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteSemaineCascade";
@@ -756,7 +770,20 @@ window.openCampagne = async function(campagneId) {
   document.getElementById("errorBoxConsolide").style.display = "none";
   renderPeriode(c);
   selectCampTab(1);
+
+  // Réaffiche le dernier planning technicien global généré, s'il y en a un.
+  const ptg = c.planningTechnicienGlobal;
+  const boxPtg = document.getElementById("resultBoxPlanningTechGlobal");
+  if (ptg && ptg.url) {
+    document.getElementById("resultStatsPlanningTechGlobal").textContent = ptg.statsText || "";
+    document.getElementById("dlPlanningTechGlobal").href = ptg.url;
+    boxPtg.style.display = "block";
+  } else {
+    boxPtg.style.display = "none";
+  }
+
   await loadSemaines();
+  updateBtnPlanningTechGlobal();
 };
 function renderPeriode(c) {
   document.getElementById("campPeriodEdit").style.display = "none";
@@ -1064,6 +1091,42 @@ function renderSemaines() {
     </div>
   `).join("");
 }
+async function updateBtnPlanningTechGlobal() {
+  const btn = document.getElementById("btnPlanningTechGlobal");
+  const hint = document.getElementById("btnPlanningTechGlobalHint");
+  if (!btn || !_currentCampagneId) return;
+  btn.disabled = true;
+  const bSnap = await getDocs(query(collection(db, "campagnes-batiments"), where("campagneId", "==", _currentCampagneId)));
+  const batiments = bSnap.docs.map(d => d.data());
+  const candidats = batiments.filter(b => b.passage1 && b.passage1.statut === "archive" && (b.passage1.resultats || []).some(l => l.statut === "Absent"));
+  const sansPush2 = candidats.filter(b => !b.passage2).length;
+  const pret = candidats.length > 0 && sansPush2 === 0;
+  btn.disabled = !pret;
+  if (hint) hint.textContent = pret ? "" : (candidats.length ? `${sansPush2} bâtiment(s) sans push 2ème passage envoyé, toutes périodes confondues.` : "Aucun bâtiment à repasser pour l'instant.");
+}
+window.genererPlanningTechnicienGlobal = async function() {
+  const btn = document.getElementById("btnPlanningTechGlobal");
+  const box = document.getElementById("resultBoxPlanningTechGlobal");
+  const err = document.getElementById("errorBoxPlanningTechGlobal");
+  box.style.display = "none"; err.style.display = "none";
+  btn.disabled = true; btn.textContent = "Génération en cours...";
+  try {
+    const resp = await fetch(FN_PLANNING_TECH_GLOBAL, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ campagneId: _currentCampagneId }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    document.getElementById("resultStatsPlanningTechGlobal").textContent = data.statsText || "";
+    document.getElementById("dlPlanningTechGlobal").href = data.url;
+    box.style.display = "block";
+
+    try {
+      const planningTechnicienGlobal = { url: data.url, statsText: data.statsText, generatedAt: new Date().toISOString() };
+      await setDoc(doc(db, "gestion-campagnes", _currentCampagneId), { planningTechnicienGlobal, updatedAt: new Date().toISOString() }, { merge: true });
+      const c = _campagnes.find(x => x.id === _currentCampagneId);
+      if (c) c.planningTechnicienGlobal = planningTechnicienGlobal;
+    } catch(e) { /* non bloquant */ }
+  } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
+  finally { btn.textContent = "Générer le planning technicien"; updateBtnPlanningTechGlobal(); }
+};
 function updateBtnGenConsolide() {
   const btn = document.getElementById("btnGenConsolide");
   const hint = document.getElementById("btnGenConsolideHint");
