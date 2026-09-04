@@ -391,10 +391,15 @@
           <button class="btn-save" onclick="saveKizeoConfig()">Enregistrer</button>
         </div>
 
+        <div class="section-sep">Périodes</div>
+        <div class="semaines-grid" id="semainesGrid"></div>
+        <div class="empty-state" id="semainesEmpty" style="display:none;">Aucune période. Crée-en une pour commencer le 1er passage.</div>
+
         <div class="card">
           <div class="card-title">Rapport consolidé de la campagne</div>
           <div class="card-sub">Agrège les reportings complets de toutes les périodes de cette campagne, et regroupe tous les PDF d'émargement dans un dossier (sous-dossiers "1er passage" / "2nd passage").</div>
-          <button class="btn-generate" id="btnGenConsolide" onclick="genererRapportConsolide()">Générer le rapport consolidé</button>
+          <button class="btn-generate" id="btnGenConsolide" onclick="genererRapportConsolide()" disabled>Générer le rapport consolidé</button>
+          <div class="card-sub" id="btnGenConsolideHint" style="margin-top:8px;margin-bottom:0;"></div>
           <div class="result-box" id="resultBoxConsolide">
             <div class="r-title">Rapport consolidé généré</div>
             <div class="r-stats" id="resultStatsConsolide"></div>
@@ -403,10 +408,6 @@
           </div>
           <div class="error-box" id="errorBoxConsolide"></div>
         </div>
-
-        <div class="section-sep">Périodes</div>
-        <div class="semaines-grid" id="semainesGrid"></div>
-        <div class="empty-state" id="semainesEmpty" style="display:none;">Aucune période. Crée-en une pour commencer le 1er passage.</div>
       </div>
     </div>
 
@@ -1052,6 +1053,7 @@ async function loadSemaines() {
 function renderSemaines() {
   const grid = document.getElementById("semainesGrid");
   const empty = document.getElementById("semainesEmpty");
+  updateBtnGenConsolide();
   if (!_semaines.length) { grid.innerHTML = ""; empty.style.display = ""; return; }
   empty.style.display = "none";
   grid.innerHTML = _semaines.map(s => `
@@ -1061,6 +1063,15 @@ function renderSemaines() {
       <div class="s-row"><span>${s.statut === "terminee" ? "Terminée" : "En cours"}</span></div>
     </div>
   `).join("");
+}
+function updateBtnGenConsolide() {
+  const btn = document.getElementById("btnGenConsolide");
+  const hint = document.getElementById("btnGenConsolideHint");
+  if (!btn) return;
+  const sansReporting = _semaines.filter(s => !(s.reportingComplet && s.reportingComplet.zipUrl)).length;
+  const pret = _semaines.length > 0 && sansReporting === 0;
+  btn.disabled = !pret;
+  if (hint) hint.textContent = pret ? "" : (_semaines.length ? `${sansReporting} période(s) sans reporting complet généré (carte 4).` : "Crée d'abord une période.");
 }
 window.deleteSemaine = async function(semaineId) {
   if (!confirm("Supprimer DÉFINITIVEMENT cette période ?\n\nCeci supprime aussi ses bâtiments/rapports et les fichiers Storage associés (rapports, reportings). Action irréversible.")) return;
