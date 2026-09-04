@@ -652,6 +652,17 @@ const FN_PUSH2 = "https://europe-west1-belledonne-client.cloudfunctions.net/push
 const FN_PLANNING_PASSAGE2 = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningPassage2";
 const FN_PLANNING_TECH_GLOBAL = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningTechnicienGlobal";
 const FN_RECHERCHE_LOGEMENT = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneRechercheLogement";
+const FN_REINDEXER_LOGEMENTS = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneReindexerLogements";
+// Reconstruction en tâche de fond de l'index de recherche (jamais attendue,
+// ne bloque rien) : appelée dès qu'un fichier/colonnes/envois change, pour
+// que la recherche soit déjà prête à l'ouverture de la modale.
+function reindexerLogementsEnFond() {
+  const c = _campagnes.find(x => x.id === _currentCampagneId);
+  if (!c) return;
+  authHeaders().then(headers => {
+    fetch(FN_REINDEXER_LOGEMENTS, { method: "POST", headers, body: JSON.stringify({ campagneId: c.id }) }).catch(() => {});
+  });
+}
 const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportsSemaine";
 const FN_DELETE_CAMPAGNE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteCampagneCascade";
 const FN_DELETE_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteSemaineCascade";
@@ -1318,6 +1329,7 @@ async function autosaveColonnes() {
     const config = { ...((s && s.config) || {}), colonnes };
     await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { config, updatedAt: new Date().toISOString() }, { merge: true });
     if (s) s.config = config;
+    reindexerLogementsEnFond();
   } catch(e) { console.error("autosaveColonnes:", e.message); }
 }
 
@@ -1412,6 +1424,7 @@ window.autosaveEnvois = async function() {
     const config = { ...((s && s.config) || {}), envois };
     await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { config, updatedAt: new Date().toISOString() }, { merge: true });
     if (s) s.config = config;
+    reindexerLogementsEnFond();
   } catch(e) { console.error("autosaveEnvois:", e.message); }
 };
 
@@ -1690,6 +1703,7 @@ window.onFileSelected = async function(event) {
     const dfInfo = document.getElementById("dernierFichierInfo");
     const dfLien = document.getElementById("dernierFichierLien");
     if (dfInfo && dfLien) { dfLien.href = fileUrl; dfLien.textContent = dernierFichier.nom; dfInfo.style.display = "block"; }
+    reindexerLogementsEnFond();
   } catch(e) { console.error("Sauvegarde fichier à la sélection échouée:", e.message); }
 };
 
@@ -1748,6 +1762,7 @@ window.pushPremierPassage = async function() {
       const dfInfo = document.getElementById("dernierFichierInfo");
       const dfLien = document.getElementById("dernierFichierLien");
       dfLien.href = fileUrl; dfLien.textContent = dernierFichier.nom; dfInfo.style.display = "block";
+      reindexerLogementsEnFond();
     } catch(e) { /* non bloquant */ }
 
     await loadBatiments();

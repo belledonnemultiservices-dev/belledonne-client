@@ -3560,7 +3560,40 @@ async function construireIndexLogements(campagneId) {
     return lignes;
   }));
 
-  return parPeriode.flat();
+  // Déduplique (un fichier a souvent une feuille "récap" en plus des feuilles
+  // par technicien, qui liste les mêmes logements) : une entrée par
+  // adresse+nom+numéro, en gardant celle qui a un technicien assigné.
+  const parCle = new Map();
+  for (const l of parPeriode.flat()) {
+    const cle = `${normaliserAdresseComparaison(l.adresse)}|${(l.nom||"").toLowerCase()}|${l.numero}|${l.periode}`;
+    const existante = parCle.get(cle);
+    if (!existante || (existante.technicien === "—" && l.technicien !== "—")) parCle.set(cle, l);
+  }
+  return Array.from(parCle.values());
+}
+
+// Récupère l'index depuis le cache mémoire (chaud), sinon depuis Firestore
+// (persisté, survit aux redémarrages de l'instance), sinon le reconstruit
+// depuis les fichiers Excel (lent, seulement au tout premier appel).
+async function obtenirIndexLogements(campagneId, forceRefresh) {
+  const cached = _rechercheLogementCache.get(campagneId);
+  if (!forceRefresh && cached && (Date.now() - cached.builtAt) < RECHERCHE_CACHE_TTL_MS) return cached.index;
+
+  const { getFirestore } = require("firebase-admin/firestore");
+  const db = getFirestore(admin.app(), "belledonne-client");
+  if (!forceRefresh) {
+    const docSnap = await db.collection("campagnes-recherche-index").doc(campagneId).get();
+    if (docSnap.exists) {
+      const index = docSnap.data().rows || [];
+      _rechercheLogementCache.set(campagneId, { builtAt: Date.now(), index });
+      return index;
+    }
+  }
+
+  const index = await construireIndexLogements(campagneId);
+  _rechercheLogementCache.set(campagneId, { builtAt: Date.now(), index });
+  await db.collection("campagnes-recherche-index").doc(campagneId).set({ rows: index, builtAt: new Date().toISOString() });
+  return index;
 }
 
 exports.campagneRechercheLogement = functions
@@ -3580,20 +3613,39 @@ exports.campagneRechercheLogement = functions
     if (terme.length < 2) { res.status(400).json({ error: "Recherche trop courte (2 caractères minimum)" }); return; }
 
     try {
-      const cached = _rechercheLogementCache.get(campagneId);
-      let index;
-      if (!forceRefresh && cached && (Date.now() - cached.builtAt) < RECHERCHE_CACHE_TTL_MS) {
-        index = cached.index;
-      } else {
-        index = await construireIndexLogements(campagneId);
-        _rechercheLogementCache.set(campagneId, { builtAt: Date.now(), index });
-      }
-
+      const index = await obtenirIndexLogements(campagneId, forceRefresh);
       const resultats = index.filter(l => l.haystack.includes(terme)).slice(0, 30)
         .map(({ haystack, ...r }) => r);
       res.status(200).json({ resultats, nbIndexe: index.length });
     } catch(e) {
       console.error("campagneRechercheLogement:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+// Reconstruit et persiste l'index de recherche logement (appelé en tâche de
+// fond côté app dès qu'un fichier/colonnes/envois change, pour que la
+// recherche soit déjà prête quand l'utilisateur ouvre la modale — pas
+// seulement déclenché par la 1ère recherche).
+exports.campagneReindexerLogements = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId } = req.body || {};
+    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+
+    try {
+      const index = await obtenirIndexLogements(campagneId, true);
+      res.status(200).json({ success: true, count: index.length });
+    } catch(e) {
+      console.error("campagneReindexerLogements:", e);
       res.status(500).json({ error: e.message });
     }
   });
