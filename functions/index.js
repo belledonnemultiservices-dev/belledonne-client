@@ -3461,6 +3461,108 @@ exports.campagneGenererPlanningTechnicienGlobal = functions
 // envoyés à Kizeo, cf. config.dernierFichier sauvegardé dès la sélection
 // du fichier), puis complète avec la date/heure 1er passage retrouvée
 // dans le fichier planning source (Gestion documentation), par adresse.
+// Cache en mémoire (persiste entre appels tant que l'instance de la fonction
+// reste "chaude") : la 1ère recherche d'une campagne construit l'index complet
+// (téléchargement + parsing de tous les fichiers Excel, coûteux), les
+// suivantes filtrent juste dessus, quasi instantané. Expire après 15 min.
+const _rechercheLogementCache = new Map();
+const RECHERCHE_CACHE_TTL_MS = 15 * 60 * 1000;
+
+async function construireIndexLogements(campagneId) {
+  const { getFirestore } = require("firebase-admin/firestore");
+  const db = getFirestore(admin.app(), "belledonne-client");
+  const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+  const ExcelJS = require("exceljs");
+
+  const campagneSnap = await db.collection("gestion-campagnes").doc(campagneId).get();
+  const docSourceStoragePath = campagneSnap.exists ? campagneSnap.data().docSourceStoragePath : null;
+  const dateHeureParAdresse = new Map();
+  if (docSourceStoragePath) {
+    try {
+      const [srcBuffer] = await bucket.file(docSourceStoragePath).download();
+      const srcWb = new ExcelJS.Workbook();
+      await srcWb.xlsx.load(srcBuffer);
+      const srcWs = srcWb.worksheets[0];
+      if (srcWs) {
+        lirePlanningSource(srcWs).forEach(l => {
+          const cle = normaliserAdresseComparaison(l.adresse);
+          if (!dateHeureParAdresse.has(cle)) dateHeureParAdresse.set(cle, { date1: l.date1, heure1: l.heure1 });
+        });
+      }
+    } catch(e) { console.error("construireIndexLogements: lecture fichier source échouée:", e.message); }
+  }
+
+  const nomsTechniciens = new Map();
+  async function nomTechnicienParKizeoId(kizeoUserId) {
+    if (!kizeoUserId) return "";
+    if (nomsTechniciens.has(kizeoUserId)) return nomsTechniciens.get(kizeoUserId);
+    let nom = "";
+    try {
+      const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", String(kizeoUserId)).limit(1).get();
+      if (!tSnap.empty) {
+        const t = tSnap.docs[0].data();
+        nom = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+      }
+    } catch(e) { /* ignore */ }
+    nomsTechniciens.set(kizeoUserId, nom);
+    return nom;
+  }
+
+  const semainesSnap = await db.collection("campagnes-semaines").where("campagneId", "==", campagneId).get();
+  // Téléchargement + parsing des fichiers de toutes les périodes en parallèle.
+  const parPeriode = await Promise.all(semainesSnap.docs.map(async (semDoc) => {
+    const config = semDoc.data().config || {};
+    const dernierFichier = config.dernierFichier;
+    const envois = config.envois || [];
+    const colonnes = config.colonnes;
+    if (!dernierFichier || !dernierFichier.url || !colonnes) return [];
+    const path = storagePathFromDownloadUrl(dernierFichier.url);
+    if (!path) return [];
+
+    let wb;
+    try {
+      const [buf] = await bucket.file(path).download();
+      wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf);
+    } catch(e) { console.error(`construireIndexLogements: lecture ${path} échouée:`, e.message); return []; }
+
+    const periodeTxt = `${semDoc.data().dateDebut || ""} → ${semDoc.data().dateFin || ""}`;
+    const lignes = [];
+    // Parcourt TOUTES les feuilles du fichier (pas seulement celles déjà
+    // associées à un technicien dans "Envois"), pour ne rater aucun logement.
+    for (const ws of wb.worksheets) {
+      const envoi = envois.find(e => e.nomFeuille === ws.name);
+      const techNom = envoi ? await nomTechnicienParKizeoId(envoi.destinataireKizeoUserId) : "";
+      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1) return;
+        try {
+          const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
+          const nomRue = cellStr(row, colonnes.nomRue);
+          if (!nomRue) return;
+          const adresseRue = `${numeroRue} ${nomRue}`.trim();
+          const nomLocataire = cellStr(row, colonnes.locataire);
+          const reference = cellStr(row, colonnes.referenceLogement);
+          const numeroCourt = extraire4DerniersChiffres(reference);
+          const cle = normaliserAdresseComparaison(adresseRue);
+          const infosDate = dateHeureParAdresse.get(cle);
+          lignes.push({
+            nom: nomLocataire,
+            numero: numeroCourt,
+            adresse: adresseRue,
+            dateHeure1erPassage: infosDate && infosDate.date1 ? `${infosDate.date1}${infosDate.heure1 ? " - " + infosDate.heure1 : ""}` : "Non trouvée",
+            technicien: techNom || "—",
+            periode: periodeTxt,
+            haystack: `${adresseRue} ${nomLocataire} ${numeroCourt}`.toLowerCase(),
+          });
+        } catch(e) { /* ligne ignorée */ }
+      });
+    }
+    return lignes;
+  }));
+
+  return parPeriode.flat();
+}
+
 exports.campagneRechercheLogement = functions
   .region("europe-west1")
   .runWith({ timeoutSeconds: 120 })
@@ -3472,116 +3574,24 @@ exports.campagneRechercheLogement = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId, q } = req.body || {};
+    const { campagneId, q, forceRefresh } = req.body || {};
     if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
     const terme = String(q || "").trim().toLowerCase();
     if (terme.length < 2) { res.status(400).json({ error: "Recherche trop courte (2 caractères minimum)" }); return; }
 
     try {
-      const { getFirestore } = require("firebase-admin/firestore");
-      const db = getFirestore(admin.app(), "belledonne-client");
-      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-      const ExcelJS = require("exceljs");
-
-      const campagneSnap = await db.collection("gestion-campagnes").doc(campagneId).get();
-      const docSourceStoragePath = campagneSnap.exists ? campagneSnap.data().docSourceStoragePath : null;
-      let dateHeureParAdresse = new Map();
-      if (docSourceStoragePath) {
-        try {
-          const [srcBuffer] = await bucket.file(docSourceStoragePath).download();
-          const srcWb = new ExcelJS.Workbook();
-          await srcWb.xlsx.load(srcBuffer);
-          const srcWs = srcWb.worksheets[0];
-          if (srcWs) {
-            lirePlanningSource(srcWs).forEach(l => {
-              const cle = normaliserAdresseComparaison(l.adresse);
-              if (!dateHeureParAdresse.has(cle)) dateHeureParAdresse.set(cle, { date1: l.date1, heure1: l.heure1 });
-            });
-          }
-        } catch(e) { console.error("campagneRechercheLogement: lecture fichier source échouée:", e.message); }
+      const cached = _rechercheLogementCache.get(campagneId);
+      let index;
+      if (!forceRefresh && cached && (Date.now() - cached.builtAt) < RECHERCHE_CACHE_TTL_MS) {
+        index = cached.index;
+      } else {
+        index = await construireIndexLogements(campagneId);
+        _rechercheLogementCache.set(campagneId, { builtAt: Date.now(), index });
       }
 
-      const nomsTechniciens = new Map();
-      async function nomTechnicienParKizeoId(kizeoUserId) {
-        if (!kizeoUserId) return "";
-        if (nomsTechniciens.has(kizeoUserId)) return nomsTechniciens.get(kizeoUserId);
-        let nom = "";
-        try {
-          const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", String(kizeoUserId)).limit(1).get();
-          if (!tSnap.empty) {
-            const t = tSnap.docs[0].data();
-            nom = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
-          }
-        } catch(e) { /* ignore */ }
-        nomsTechniciens.set(kizeoUserId, nom);
-        return nom;
-      }
-
-      const semainesSnap = await db.collection("campagnes-semaines").where("campagneId", "==", campagneId).get();
-      const resultats = [];
-      const LIMITE = 30;
-
-      for (const semDoc of semainesSnap.docs) {
-        if (resultats.length >= LIMITE) break;
-        const config = semDoc.data().config || {};
-        const dernierFichier = config.dernierFichier;
-        const envois = config.envois || [];
-        const colonnes = config.colonnes;
-        if (!dernierFichier || !dernierFichier.url || !envois.length || !colonnes) {
-          console.log(`campagneRechercheLogement: période ${semDoc.id} ignorée — dernierFichier:${!!dernierFichier} envois:${envois.length} colonnes:${!!colonnes}`);
-          continue;
-        }
-
-        const path = storagePathFromDownloadUrl(dernierFichier.url);
-        if (!path) { console.log(`campagneRechercheLogement: période ${semDoc.id} — chemin non extrait de l'URL`); continue; }
-        let wb;
-        try {
-          const [buf] = await bucket.file(path).download();
-          wb = new ExcelJS.Workbook();
-          await wb.xlsx.load(buf);
-        } catch(e) { console.error(`campagneRechercheLogement: lecture ${path} échouée:`, e.message); continue; }
-        console.log(`campagneRechercheLogement: période ${semDoc.id} — feuilles dispo: ${wb.worksheets.map(s=>s.name).join(", ")} — envois configurés: ${envois.map(e=>e.nomFeuille).join(", ")}`);
-
-        // Parcourt TOUTES les feuilles du fichier (pas seulement celles déjà
-        // associées à un technicien dans "Envois"), pour ne rater aucun logement.
-        // Le technicien affiché reste "—" si la feuille n'a pas (encore) d'envoi.
-        for (const ws of wb.worksheets) {
-          if (resultats.length >= LIMITE) break;
-          const envoi = envois.find(e => e.nomFeuille === ws.name);
-          const techNom = envoi ? await nomTechnicienParKizeoId(envoi.destinataireKizeoUserId) : "";
-          let nbLignesLues = 0, nbErreurs = 0, nbSansAdresse = 0;
-          ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-            if (rowNumber === 1 || resultats.length >= LIMITE) return;
-            nbLignesLues++;
-            try {
-              const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
-              const nomRue = cellStr(row, colonnes.nomRue);
-              if (!nomRue) { nbSansAdresse++; return; }
-              const adresseRue = `${numeroRue} ${nomRue}`.trim();
-              const nomLocataire = cellStr(row, colonnes.locataire);
-              const reference = cellStr(row, colonnes.referenceLogement);
-              const numeroCourt = extraire4DerniersChiffres(reference);
-              const haystack = `${adresseRue} ${nomLocataire} ${numeroCourt}`.toLowerCase();
-              if (rowNumber <= 4) console.log(`campagneRechercheLogement: échantillon ligne ${rowNumber} feuille "${ws.name}" — colonnes.locataire=${colonnes.locataire} colonnes.numeroRue=${colonnes.numeroRue} colonnes.nomRue=${colonnes.nomRue} => adresse="${adresseRue}" nom="${nomLocataire}" numero="${numeroCourt}"`);
-              if (!haystack.includes(terme)) return;
-
-              const cle = normaliserAdresseComparaison(adresseRue);
-              const infosDate = dateHeureParAdresse.get(cle);
-              resultats.push({
-                nom: nomLocataire,
-                numero: numeroCourt,
-                adresse: adresseRue,
-                dateHeure1erPassage: infosDate && infosDate.date1 ? `${infosDate.date1}${infosDate.heure1 ? " - " + infosDate.heure1 : ""}` : "Non trouvée",
-                technicien: techNom || "—",
-                periode: `${semDoc.data().dateDebut || ""} → ${semDoc.data().dateFin || ""}`,
-              });
-            } catch(e) { nbErreurs++; }
-          });
-          console.log(`campagneRechercheLogement: feuille "${ws.name}" — ${nbLignesLues} ligne(s) lue(s), ${nbErreurs} erreur(s), ${nbSansAdresse} sans adresse`);
-        }
-      }
-
-      res.status(200).json({ resultats });
+      const resultats = index.filter(l => l.haystack.includes(terme)).slice(0, 30)
+        .map(({ haystack, ...r }) => r);
+      res.status(200).json({ resultats, nbIndexe: index.length });
     } catch(e) {
       console.error("campagneRechercheLogement:", e);
       res.status(500).json({ error: e.message });
