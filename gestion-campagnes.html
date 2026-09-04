@@ -607,6 +607,21 @@
   </div>
 </div>
 
+<!-- MODAL RECHERCHE LOGEMENT (campagne) -->
+<div id="modalRechercheLogement" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeRechercheLogement()">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title">Rechercher un logement</div>
+      <button class="btn-close" onclick="closeRechercheLogement()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="card-sub" style="margin-bottom:12px;">Recherche par adresse, nom du locataire ou numéro de logement, sur toutes les périodes de la campagne (fichiers de push 1er passage déjà sélectionnés).</div>
+      <input class="form-input" type="text" id="rlQuery" placeholder="ex: Kogan, DUPONT, 0063..." oninput="debouncedRechercheLogement()">
+      <div id="rlResultats" style="margin-top:16px;max-height:400px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
   <span id="toastMsg"></span>
@@ -636,6 +651,7 @@ const FN_RESEND_P1 = "https://europe-west1-belledonne-client.cloudfunctions.net/
 const FN_PUSH2 = "https://europe-west1-belledonne-client.cloudfunctions.net/pushCampagnePassage2Kizeo";
 const FN_PLANNING_PASSAGE2 = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningPassage2";
 const FN_PLANNING_TECH_GLOBAL = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningTechnicienGlobal";
+const FN_RECHERCHE_LOGEMENT = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneRechercheLogement";
 const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportsSemaine";
 const FN_DELETE_CAMPAGNE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteCampagneCascade";
 const FN_DELETE_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteSemaineCascade";
@@ -718,6 +734,7 @@ function renderCampagnes() {
       <button class="btn-icon danger" style="position:absolute;top:8px;right:8px;" title="Supprimer cette campagne" onclick="event.stopPropagation();deleteCampagne('${c.id}')"><svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
       <div class="s-date">${c.nom || "—"}</div>
       <div class="s-sub">${c.client || "—"}</div>
+      <button type="button" class="btn-tpl" style="margin-top:10px;" onclick="event.stopPropagation();openRechercheLogement('${c.id}')">🔍 Rechercher un logement</button>
     </div>
   `).join("");
 }
@@ -753,6 +770,46 @@ window.deleteCampagne = async function(campagneId) {
     showToast(`Campagne "${c ? c.nom : ''}" et toutes ses données supprimées`);
   } catch(e) { showToast("Erreur : " + e.message); }
 };
+
+// ── RECHERCHE LOGEMENT (campagne) ──
+let _rlCampagneId = null;
+window.openRechercheLogement = function(campagneId) {
+  _rlCampagneId = campagneId;
+  document.getElementById("rlQuery").value = "";
+  document.getElementById("rlResultats").innerHTML = "";
+  document.getElementById("modalRechercheLogement").style.display = "flex";
+  document.getElementById("rlQuery").focus();
+};
+window.closeRechercheLogement = function() {
+  document.getElementById("modalRechercheLogement").style.display = "none";
+  _rlCampagneId = null;
+};
+let _rlTimer = null;
+window.debouncedRechercheLogement = function() {
+  clearTimeout(_rlTimer);
+  _rlTimer = setTimeout(rechercheLogement, 400);
+};
+async function rechercheLogement() {
+  const q = document.getElementById("rlQuery").value.trim();
+  const el = document.getElementById("rlResultats");
+  if (q.length < 2) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="empty-state">Recherche...</div>`;
+  try {
+    const resp = await fetch(FN_RECHERCHE_LOGEMENT, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ campagneId: _rlCampagneId, q }) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    const resultats = data.resultats || [];
+    if (!resultats.length) { el.innerHTML = `<div class="empty-state">Aucun résultat.</div>`; return; }
+    el.innerHTML = resultats.map(r => `
+      <div class="batiment-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+        <div style="font-weight:600;">${r.nom || "—"} ${r.numero ? "— logement " + r.numero : ""}</div>
+        <div class="b-info">${r.adresse || "—"}</div>
+        <div class="b-info">1er passage : ${r.dateHeure1erPassage || "—"} — ${r.technicien || "—"}</div>
+        <div class="b-info" style="color:var(--text-muted);font-size:11px;">Période ${r.periode || ""}</div>
+      </div>
+    `).join("");
+  } catch(e) { el.innerHTML = `<div class="error-box" style="display:block;">Erreur : ${e.message}</div>`; }
+}
 
 // ═══════════════════════════════════════════════════════════════
 // VUE 2 : DÉTAIL CAMPAGNE (semaines + rapport consolidé)
@@ -1328,12 +1385,15 @@ window.saveConfig = async function() {
   }
   btn.disabled = true; btn.textContent = "Enregistrement...";
   try {
-    const config = { colonnes };
+    // Enregistre aussi les envois (feuille/technicien) tels quels, même vides
+    // d'un envoi Kizeo : nécessaires pour la recherche logement au niveau campagne.
+    const envois = collectEnvois();
+    const config = { colonnes, envois };
     await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), {
       config, updatedAt: new Date().toISOString(),
     }, { merge: true });
     const s = _semaines.find(x => x.id === _currentSemaineId);
-    if (s) s.config = { ...(s.config||{}), colonnes };
+    if (s) s.config = { ...(s.config||{}), colonnes, envois };
     showToast("Configuration enregistrée");
   } catch(e) { showToast("Erreur : " + e.message); }
   finally { btn.disabled = false; btn.textContent = "Enregistrer la configuration"; }
@@ -1562,7 +1622,7 @@ function updateBtnGenComplet() {
 }
 
 // ── Carte 1 : push 1er passage ──
-window.onFileSelected = function(event) {
+window.onFileSelected = async function(event) {
   const file = event.target.files[0];
   if (!file) return;
   _selectedFile = file;
@@ -1570,6 +1630,25 @@ window.onFileSelected = function(event) {
   document.getElementById("btnGenerate").disabled = false;
   document.getElementById("resultBox").style.display = "none";
   document.getElementById("errorBox").style.display = "none";
+
+  // Sauvegarde le fichier dès sa sélection (pas seulement après un envoi Kizeo
+  // réussi), pour qu'il reste disponible pour la recherche logement au niveau
+  // campagne même si ce push n'est jamais envoyé.
+  if (!_currentSemaineId) return;
+  try {
+    const storagePath = `push-campagne/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+    const storageRef = ref(storage, storagePath);
+    await uploadBytesResumable(storageRef, file);
+    const fileUrl = await getDownloadURL(storageRef);
+    const dernierFichier = { url: fileUrl, nom: file.name, uploadedAt: new Date().toISOString() };
+    const config = { ...((_semaines.find(x=>x.id===_currentSemaineId)||{}).config||{}), dernierFichier };
+    await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { config, updatedAt: new Date().toISOString() }, { merge: true });
+    const s = _semaines.find(x => x.id === _currentSemaineId);
+    if (s) s.config = config;
+    const dfInfo = document.getElementById("dernierFichierInfo");
+    const dfLien = document.getElementById("dernierFichierLien");
+    if (dfInfo && dfLien) { dfLien.href = fileUrl; dfLien.textContent = dernierFichier.nom; dfInfo.style.display = "block"; }
+  } catch(e) { console.error("Sauvegarde fichier à la sélection échouée:", e.message); }
 };
 
 function collectEnvois() {

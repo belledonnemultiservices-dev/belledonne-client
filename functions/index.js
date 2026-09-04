@@ -3455,6 +3455,129 @@ exports.campagneGenererPlanningTechnicienGlobal = functions
     }
   });
 
+// ── RECHERCHE LOGEMENT (campagne) ───────────────────────────────────
+// Cherche par adresse/nom/numéro de logement dans les fichiers Excel de
+// push 1er passage de TOUTES les périodes de la campagne (même non
+// envoyés à Kizeo, cf. config.dernierFichier sauvegardé dès la sélection
+// du fichier), puis complète avec la date/heure 1er passage retrouvée
+// dans le fichier planning source (Gestion documentation), par adresse.
+exports.campagneRechercheLogement = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 120 })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { campagneId, q } = req.body || {};
+    if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
+    const terme = String(q || "").trim().toLowerCase();
+    if (terme.length < 2) { res.status(400).json({ error: "Recherche trop courte (2 caractères minimum)" }); return; }
+
+    try {
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const ExcelJS = require("exceljs");
+
+      const campagneSnap = await db.collection("gestion-campagnes").doc(campagneId).get();
+      const docSourceStoragePath = campagneSnap.exists ? campagneSnap.data().docSourceStoragePath : null;
+      let dateHeureParAdresse = new Map();
+      if (docSourceStoragePath) {
+        try {
+          const [srcBuffer] = await bucket.file(docSourceStoragePath).download();
+          const srcWb = new ExcelJS.Workbook();
+          await srcWb.xlsx.load(srcBuffer);
+          const srcWs = srcWb.worksheets[0];
+          if (srcWs) {
+            lirePlanningSource(srcWs).forEach(l => {
+              const cle = normaliserAdresseComparaison(l.adresse);
+              if (!dateHeureParAdresse.has(cle)) dateHeureParAdresse.set(cle, { date1: l.date1, heure1: l.heure1 });
+            });
+          }
+        } catch(e) { console.error("campagneRechercheLogement: lecture fichier source échouée:", e.message); }
+      }
+
+      const nomsTechniciens = new Map();
+      async function nomTechnicienParKizeoId(kizeoUserId) {
+        if (!kizeoUserId) return "";
+        if (nomsTechniciens.has(kizeoUserId)) return nomsTechniciens.get(kizeoUserId);
+        let nom = "";
+        try {
+          const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", String(kizeoUserId)).limit(1).get();
+          if (!tSnap.empty) {
+            const t = tSnap.docs[0].data();
+            nom = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+          }
+        } catch(e) { /* ignore */ }
+        nomsTechniciens.set(kizeoUserId, nom);
+        return nom;
+      }
+
+      const semainesSnap = await db.collection("campagnes-semaines").where("campagneId", "==", campagneId).get();
+      const resultats = [];
+      const LIMITE = 30;
+
+      for (const semDoc of semainesSnap.docs) {
+        if (resultats.length >= LIMITE) break;
+        const config = semDoc.data().config || {};
+        const dernierFichier = config.dernierFichier;
+        const envois = config.envois || [];
+        const colonnes = config.colonnes;
+        if (!dernierFichier || !dernierFichier.url || !envois.length || !colonnes) continue;
+
+        const path = storagePathFromDownloadUrl(dernierFichier.url);
+        if (!path) continue;
+        let wb;
+        try {
+          const [buf] = await bucket.file(path).download();
+          wb = new ExcelJS.Workbook();
+          await wb.xlsx.load(buf);
+        } catch(e) { console.error(`campagneRechercheLogement: lecture ${path} échouée:`, e.message); continue; }
+
+        for (const envoi of envois) {
+          if (resultats.length >= LIMITE) break;
+          const ws = wb.getWorksheet(envoi.nomFeuille);
+          if (!ws) continue;
+          const techNom = await nomTechnicienParKizeoId(envoi.destinataireKizeoUserId);
+          ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+            if (rowNumber === 1 || resultats.length >= LIMITE) return;
+            try {
+              const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
+              const nomRue = cellStr(row, colonnes.nomRue);
+              if (!nomRue) return;
+              const adresseRue = `${numeroRue} ${nomRue}`.trim();
+              const nomLocataire = cellStr(row, colonnes.locataire);
+              const reference = cellStr(row, colonnes.referenceLogement);
+              const numeroCourt = extraire4DerniersChiffres(reference);
+              const haystack = `${adresseRue} ${nomLocataire} ${numeroCourt}`.toLowerCase();
+              if (!haystack.includes(terme)) return;
+
+              const cle = normaliserAdresseComparaison(adresseRue);
+              const infosDate = dateHeureParAdresse.get(cle);
+              resultats.push({
+                nom: nomLocataire,
+                numero: numeroCourt,
+                adresse: adresseRue,
+                dateHeure1erPassage: infosDate && infosDate.date1 ? `${infosDate.date1}${infosDate.heure1 ? " - " + infosDate.heure1 : ""}` : "Non trouvée",
+                technicien: techNom || "—",
+                periode: `${semDoc.data().dateDebut || ""} → ${semDoc.data().dateFin || ""}`,
+              });
+            } catch(e) { /* ligne ignorée */ }
+          });
+        }
+      }
+
+      res.status(200).json({ resultats });
+    } catch(e) {
+      console.error("campagneRechercheLogement:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 // ══════════════════════════════════════════════════════════════════
 // AVIS DE PASSAGE (docx) : le template reste un .docx normal, une seule
 // page, avec des balises {Adresse} / {date-heure} (syntaxe docxtemplater).
