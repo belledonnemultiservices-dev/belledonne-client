@@ -3540,6 +3540,9 @@ async function construireIndexLogements(campagneId) {
           const nomRue = cellStr(row, colonnes.nomRue);
           if (!nomRue) return;
           const adresseRue = `${numeroRue} ${nomRue}`.trim();
+          const ville = cellStr(row, colonnes.ville);
+          const codePostal = nettoyerNombre(cellStr(row, colonnes.codePostal));
+          const adresseComplete = [adresseRue, codePostal, ville].filter(Boolean).join(" ");
           const nomLocataire = cellStr(row, colonnes.locataire);
           const reference = cellStr(row, colonnes.referenceLogement);
           const numeroCourt = extraire4DerniersChiffres(reference);
@@ -3548,11 +3551,13 @@ async function construireIndexLogements(campagneId) {
           lignes.push({
             nom: nomLocataire,
             numero: numeroCourt,
-            adresse: adresseRue,
+            adresse: adresseComplete,
             dateHeure1erPassage: infosDate && infosDate.date1 ? `${infosDate.date1}${infosDate.heure1 ? " - " + infosDate.heure1 : ""}` : "Non trouvée",
             technicien: techNom || "—",
             periode: periodeTxt,
-            haystack: `${adresseRue} ${nomLocataire} ${numeroCourt}`.toLowerCase(),
+            nomNorm: (nomLocataire || "").toLowerCase(),
+            numeroNorm: String(numeroCourt || "").replace(/^0+/, "") || "0",
+            adresseNorm: adresseComplete.toLowerCase(),
           });
         } catch(e) { /* ligne ignorée */ }
       });
@@ -3582,7 +3587,7 @@ async function obtenirIndexLogements(campagneId, forceRefresh) {
   if (!forceRefresh && cached && (Date.now() - cached.builtAt) < RECHERCHE_CACHE_TTL_MS) return cached.index;
 
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-  const indexPath = `campagnes-recherche-index/${campagneId}.json`;
+  const indexPath = `campagnes-recherche-index/${campagneId}.v2.json`;
   if (!forceRefresh) {
     try {
       const [buf] = await bucket.file(indexPath).download();
@@ -3609,15 +3614,20 @@ exports.campagneRechercheLogement = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { campagneId, q, forceRefresh } = req.body || {};
+    const { campagneId, nom, numero, adresse, forceRefresh } = req.body || {};
     if (!campagneId) { res.status(400).json({ error: "campagneId requis" }); return; }
-    const terme = String(q || "").trim().toLowerCase();
-    if (terme.length < 2) { res.status(400).json({ error: "Recherche trop courte (2 caractères minimum)" }); return; }
+    const nomTerme = String(nom || "").trim().toLowerCase();
+    const numeroTerme = String(numero || "").trim().replace(/^0+/, "") || (numero ? "0" : "");
+    const adresseTerme = String(adresse || "").trim().toLowerCase();
+    if ((nomTerme + numeroTerme + adresseTerme).length < 2) { res.status(400).json({ error: "Recherche trop courte (2 caractères minimum)" }); return; }
 
     try {
       const index = await obtenirIndexLogements(campagneId, forceRefresh);
-      const resultats = index.filter(l => l.haystack.includes(terme)).slice(0, 30)
-        .map(({ haystack, ...r }) => r);
+      const resultats = index.filter(l =>
+        (!nomTerme || (l.nomNorm || "").includes(nomTerme)) &&
+        (!numeroTerme || (l.numeroNorm || "").includes(numeroTerme)) &&
+        (!adresseTerme || (l.adresseNorm || "").includes(adresseTerme))
+      ).slice(0, 30).map(({ nomNorm, numeroNorm, adresseNorm, ...r }) => r);
       res.status(200).json({ resultats, nbIndexe: index.length });
     } catch(e) {
       console.error("campagneRechercheLogement:", e);
