@@ -50,6 +50,8 @@ service firebase.storage {
 
     // campagnes-documents : fichier source + documents générés (Gestion documentation), admin only
     match /campagnes-documents/{file=**}   { allow read, write: if isAdmin(); }
+    // campagnes-recherche-index : index de recherche logement (généré côté serveur), admin only
+    match /campagnes-recherche-index/{file=**} { allow read, write: if isAdmin(); }
     // campagnes-templates : templates uploadés manuellement (Planning client/technicien, Avis, Convocation), admin only
     match /campagnes-templates/{file=**}   { allow read, write: if isAdmin(); }
 

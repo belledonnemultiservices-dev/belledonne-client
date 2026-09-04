@@ -3575,24 +3575,26 @@ async function construireIndexLogements(campagneId) {
 // Récupère l'index depuis le cache mémoire (chaud), sinon depuis Firestore
 // (persisté, survit aux redémarrages de l'instance), sinon le reconstruit
 // depuis les fichiers Excel (lent, seulement au tout premier appel).
+// Stocké dans Cloud Storage plutôt que Firestore : un index peut dépasser
+// la limite de 1 Mo d'un document Firestore sur une grosse campagne.
 async function obtenirIndexLogements(campagneId, forceRefresh) {
   const cached = _rechercheLogementCache.get(campagneId);
   if (!forceRefresh && cached && (Date.now() - cached.builtAt) < RECHERCHE_CACHE_TTL_MS) return cached.index;
 
-  const { getFirestore } = require("firebase-admin/firestore");
-  const db = getFirestore(admin.app(), "belledonne-client");
+  const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+  const indexPath = `campagnes-recherche-index/${campagneId}.json`;
   if (!forceRefresh) {
-    const docSnap = await db.collection("campagnes-recherche-index").doc(campagneId).get();
-    if (docSnap.exists) {
-      const index = docSnap.data().rows || [];
+    try {
+      const [buf] = await bucket.file(indexPath).download();
+      const index = JSON.parse(buf.toString("utf8"));
       _rechercheLogementCache.set(campagneId, { builtAt: Date.now(), index });
       return index;
-    }
+    } catch(e) { /* pas encore d'index, on le construit ci-dessous */ }
   }
 
   const index = await construireIndexLogements(campagneId);
   _rechercheLogementCache.set(campagneId, { builtAt: Date.now(), index });
-  await db.collection("campagnes-recherche-index").doc(campagneId).set({ rows: index, builtAt: new Date().toISOString() });
+  await bucket.file(indexPath).save(Buffer.from(JSON.stringify(index)), { contentType: "application/json" });
   return index;
 }
 
