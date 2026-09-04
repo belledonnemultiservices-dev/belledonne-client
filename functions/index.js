@@ -3486,7 +3486,7 @@ async function construireIndexLogements(campagneId) {
       if (srcWs) {
         lirePlanningSource(srcWs).forEach(l => {
           const cle = normaliserAdresseComparaison(l.adresse);
-          if (!dateHeureParAdresse.has(cle)) dateHeureParAdresse.set(cle, { date1: l.date1, heure1: l.heure1 });
+          if (!dateHeureParAdresse.has(cle)) dateHeureParAdresse.set(cle, { date1: l.date1, heure1: l.heure1, date2: l.date2, heure2: l.heure2 });
         });
       }
     } catch(e) { console.error("construireIndexLogements: lecture fichier source échouée:", e.message); }
@@ -3552,7 +3552,10 @@ async function construireIndexLogements(campagneId) {
             nom: nomLocataire,
             numero: numeroCourt,
             adresse: adresseComplete,
+            adresseRue, // adresse fiable (n° + rue seuls) : sert de clé de déduplication, insensible aux
+                        // colonnes ville/code postal mal alignées sur une feuille "récap" à mise en page différente
             dateHeure1erPassage: infosDate && infosDate.date1 ? `${infosDate.date1}${infosDate.heure1 ? " - " + infosDate.heure1 : ""}` : "Non trouvée",
+            dateHeure2emePassage: infosDate && infosDate.date2 ? `${infosDate.date2}${infosDate.heure2 ? " - " + infosDate.heure2 : ""}` : "Non trouvée",
             technicien: techNom || "—",
             periode: periodeTxt,
             nomNorm: (nomLocataire || "").toLowerCase(),
@@ -3570,7 +3573,7 @@ async function construireIndexLogements(campagneId) {
   // adresse+nom+numéro, en gardant celle qui a un technicien assigné.
   const parCle = new Map();
   for (const l of parPeriode.flat()) {
-    const cle = `${normaliserAdresseComparaison(l.adresse)}|${(l.nom||"").toLowerCase()}|${l.numero}|${l.periode}`;
+    const cle = `${normaliserAdresseComparaison(l.adresseRue || l.adresse)}|${(l.nom||"").toLowerCase()}|${l.numero}|${l.periode}`;
     const existante = parCle.get(cle);
     if (!existante || (existante.technicien === "—" && l.technicien !== "—")) parCle.set(cle, l);
   }
@@ -3587,7 +3590,7 @@ async function obtenirIndexLogements(campagneId, forceRefresh) {
   if (!forceRefresh && cached && (Date.now() - cached.builtAt) < RECHERCHE_CACHE_TTL_MS) return cached.index;
 
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-  const indexPath = `campagnes-recherche-index/${campagneId}.v2.json`;
+  const indexPath = `campagnes-recherche-index/${campagneId}.v3.json`;
   if (!forceRefresh) {
     try {
       const [buf] = await bucket.file(indexPath).download();
@@ -3627,7 +3630,7 @@ exports.campagneRechercheLogement = functions
         (!nomTerme || (l.nomNorm || "").includes(nomTerme)) &&
         (!numeroTerme || (l.numeroNorm || "").includes(numeroTerme)) &&
         (!adresseTerme || (l.adresseNorm || "").includes(adresseTerme))
-      ).slice(0, 30).map(({ nomNorm, numeroNorm, adresseNorm, ...r }) => r);
+      ).slice(0, 30).map(({ nomNorm, numeroNorm, adresseNorm, adresseRue, ...r }) => r);
       res.status(200).json({ resultats, nbIndexe: index.length });
     } catch(e) {
       console.error("campagneRechercheLogement:", e);

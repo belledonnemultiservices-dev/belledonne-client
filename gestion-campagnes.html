@@ -823,6 +823,7 @@ async function rechercheLogement() {
         <div style="font-weight:600;">${r.nom || "—"} ${r.numero ? "— logement " + r.numero : ""}</div>
         <div class="b-info">${r.adresse || "—"}</div>
         <div class="b-info">1er passage : ${r.dateHeure1erPassage || "—"} — ${r.technicien || "—"}</div>
+        <div class="b-info">2ème passage : ${r.dateHeure2emePassage || "—"}</div>
         <div class="b-info" style="color:var(--text-muted);font-size:11px;">Période ${r.periode || ""}</div>
       </div>
     `).join("");
