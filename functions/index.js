@@ -3542,24 +3542,27 @@ exports.campagneRechercheLogement = functions
         } catch(e) { console.error(`campagneRechercheLogement: lecture ${path} échouée:`, e.message); continue; }
         console.log(`campagneRechercheLogement: période ${semDoc.id} — feuilles dispo: ${wb.worksheets.map(s=>s.name).join(", ")} — envois configurés: ${envois.map(e=>e.nomFeuille).join(", ")}`);
 
-        for (const envoi of envois) {
+        // Parcourt TOUTES les feuilles du fichier (pas seulement celles déjà
+        // associées à un technicien dans "Envois"), pour ne rater aucun logement.
+        // Le technicien affiché reste "—" si la feuille n'a pas (encore) d'envoi.
+        for (const ws of wb.worksheets) {
           if (resultats.length >= LIMITE) break;
-          const ws = wb.getWorksheet(envoi.nomFeuille);
-          if (!ws) { console.log(`campagneRechercheLogement: feuille "${envoi.nomFeuille}" introuvable dans le fichier`); continue; }
-          const techNom = await nomTechnicienParKizeoId(envoi.destinataireKizeoUserId);
-          let nbLignesLues = 0, nbErreurs = 0;
+          const envoi = envois.find(e => e.nomFeuille === ws.name);
+          const techNom = envoi ? await nomTechnicienParKizeoId(envoi.destinataireKizeoUserId) : "";
+          let nbLignesLues = 0, nbErreurs = 0, nbSansAdresse = 0;
           ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
             if (rowNumber === 1 || resultats.length >= LIMITE) return;
             nbLignesLues++;
             try {
               const numeroRue = nettoyerNombre(cellStr(row, colonnes.numeroRue));
               const nomRue = cellStr(row, colonnes.nomRue);
-              if (!nomRue) return;
+              if (!nomRue) { nbSansAdresse++; return; }
               const adresseRue = `${numeroRue} ${nomRue}`.trim();
               const nomLocataire = cellStr(row, colonnes.locataire);
               const reference = cellStr(row, colonnes.referenceLogement);
               const numeroCourt = extraire4DerniersChiffres(reference);
               const haystack = `${adresseRue} ${nomLocataire} ${numeroCourt}`.toLowerCase();
+              if (rowNumber <= 4) console.log(`campagneRechercheLogement: échantillon ligne ${rowNumber} feuille "${ws.name}" — colonnes.locataire=${colonnes.locataire} colonnes.numeroRue=${colonnes.numeroRue} colonnes.nomRue=${colonnes.nomRue} => adresse="${adresseRue}" nom="${nomLocataire}" numero="${numeroCourt}"`);
               if (!haystack.includes(terme)) return;
 
               const cle = normaliserAdresseComparaison(adresseRue);
@@ -3574,7 +3577,7 @@ exports.campagneRechercheLogement = functions
               });
             } catch(e) { nbErreurs++; }
           });
-          console.log(`campagneRechercheLogement: feuille "${envoi.nomFeuille}" — ${nbLignesLues} ligne(s) lue(s), ${nbErreurs} erreur(s)`);
+          console.log(`campagneRechercheLogement: feuille "${ws.name}" — ${nbLignesLues} ligne(s) lue(s), ${nbErreurs} erreur(s), ${nbSansAdresse} sans adresse`);
         }
       }
 
