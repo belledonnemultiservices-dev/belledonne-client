@@ -2189,6 +2189,7 @@ async function saveIntervention(silent) {
       const idx = interventions.findIndex(i=>i.id===editId);
       if (idx !== -1) interventions[idx] = {...interventions[idx], ...data};
     window.interventions = interventions;
+    window._syncEcheancesReception(editId, passages);
     } else {
       data.createdAt = new Date().toISOString();
       await window._addSuivi(data);
@@ -4196,6 +4197,7 @@ async function saveInterventionParticulier(silent) {
       await window._updateSuivi(editIdP,data);
       const idx=(window.interventions||[]).findIndex(i=>i.id===editIdP);
       if(idx!==-1) window.interventions[idx]={...window.interventions[idx],...data};
+      window._syncEcheancesReception(editIdP, data.passages);
     } else {
       data.createdAt=new Date().toISOString();
       await window._addSuivi(data);
@@ -4291,6 +4293,7 @@ async function saveInterventionEntreprise(silent) {
       await window._updateSuivi(editIdE,data);
       const idx=(window.interventions||[]).findIndex(i=>i.id===editIdE);
       if(idx!==-1) window.interventions[idx]={...window.interventions[idx],...data};
+      window._syncEcheancesReception(editIdE, data.passages);
     } else {
       data.createdAt=new Date().toISOString();
       await window._addSuivi(data);
@@ -4381,6 +4384,7 @@ window.saveInterventionTache = async function(silent) {
       await window._updateSuivi(editIdT,data);
       const idx=(window.interventions||[]).findIndex(i=>i.id===editIdT);
       if(idx!==-1) window.interventions[idx]={...window.interventions[idx],...data};
+      window._syncEcheancesReception(editIdT, data.passages);
     } else {
       data.createdAt=new Date().toISOString();
       const id=await window._addSuivi(data);
@@ -4462,6 +4466,26 @@ window._addSuivi = async function(data) {
 };
 window._updateSuivi = async function(id, data) {
   await updateDoc(doc(db, 'suivi', id), data);
+};
+// Un rapport Kizeo "en attente" mémorise la date/heure du passage au moment du push
+// (dateFin figée). Si le passage est reprogrammé après coup, ce rapport en attente
+// doit être resynchronisé immédiatement, sinon il reste marqué "Non reçu" à tort
+// tant que personne n'ouvre Gestion rapports (qui ne fait la correction qu'à l'affichage).
+window._syncEcheancesReception = async function(suiviId, passages) {
+  if (!suiviId || !Array.isArray(passages) || !passages.length) return;
+  try {
+    const snap = await getDocs(query(collection(db, 'reception-rapports'), where('suiviId', '==', suiviId), where('statut', '==', 'en-attente')));
+    for (const d of snap.docs) {
+      const r = d.data();
+      const passage = (r.passageId && passages.find(p => p.passageId === r.passageId))
+        || passages.find(p => String(p.num) === String(r.numPassage));
+      if (!passage) continue;
+      const updates = {};
+      if (passage.fin && passage.fin !== r.dateFin) updates.dateFin = passage.fin;
+      if (passage.debut && passage.debut !== r.dateDebut) updates.dateDebut = passage.debut;
+      if (Object.keys(updates).length) await updateDoc(doc(db, 'reception-rapports', d.id), updates);
+    }
+  } catch(e) { console.warn('_syncEcheancesReception échoué:', e.message); }
 };
 window._createFacture = async function(data) {
   await addDoc(collection(db, 'facturation'), data);
