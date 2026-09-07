@@ -1724,7 +1724,12 @@ exports.kizeoPull = functions
           // "non lue" côté Kizeo pour la retester au prochain pull (pas de perte).
           if (processed !== false) readyIds.push(dataId);
         }
-        catch(e) { console.error(`kizeoPull: soumission ${dataId} échouée:`, e.message); readyIds.push(dataId); }
+        catch(e) {
+          // Ne PAS marquer comme lue : une soumission dont le traitement plante ne doit
+          // pas être archivée côté Kizeo, sinon elle disparaît définitivement de la file
+          // "non lue" même si le technicien la re-remplit plus tard (perte silencieuse).
+          console.error(`kizeoPull: soumission ${dataId} échouée, laissée non lue pour retest:`, e.message);
+        }
       }
       if (readyIds.length) {
         try {
