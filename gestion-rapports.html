@@ -379,6 +379,32 @@ function hoursLate(r) {
   return Math.max(0, Math.floor((Date.now() - finMs) / 3600000));
 }
 
+// dateDebut/dateFin sont figés au moment du push (snapshot) : si le passage est
+// reprogrammé plus tard côté Suivi, ce doc "en attente" garde l'ancienne date et
+// se retrouve à tort marqué "Non reçu" en retard. Se resynchronise en tâche de
+// fond sur la date réelle du passage dans Suivi, pour chaque ligne en attente.
+const _resyncEnCours = new Set();
+async function resyncEcheances(list) {
+  for (const r of list) {
+    if (r.statut !== "en-attente" || !r.suiviId || (!r.passageId && !r.numPassage)) continue;
+    if (_resyncEnCours.has(r.id)) continue;
+    _resyncEnCours.add(r.id);
+    try {
+      const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+      if (!sSnap.exists()) continue;
+      const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
+      const passage = (r.passageId && passages.find(p => p.passageId === r.passageId))
+        || passages.find(p => String(p.num) === String(r.numPassage));
+      if (!passage) continue;
+      const updates = {};
+      if (passage.fin && passage.fin !== r.dateFin) updates.dateFin = passage.fin;
+      if (passage.debut && passage.debut !== r.dateDebut) updates.dateDebut = passage.debut;
+      if (Object.keys(updates).length) await updateDoc(doc(db, "reception-rapports", r.id), updates);
+    } catch(e) { console.warn(`resyncEcheances: ${r.id} échoué:`, e.message); }
+    finally { _resyncEnCours.delete(r.id); }
+  }
+}
+
 // ── Colonnes redimensionnables (persistées en localStorage) ──
 const COL_WIDTHS_KEY = "gestionRapports.colWidths";
 const DEFAULT_COL_WIDTHS = [110, 110, 100, 130, 150, 180, 90, 150, 560];
@@ -430,6 +456,7 @@ function render() {
     return ms && mq;
   });
   document.getElementById("resultsCount").textContent = list.length + " rapport" + (list.length !== 1 ? "s" : "");
+  resyncEcheances(list.filter(r => r.statut === "en-attente"));
   const container = document.getElementById("list");
   const empty = document.getElementById("emptyState");
   const head = container.querySelector(".list-head");
