@@ -1661,11 +1661,11 @@ function addPassage(value = '', calEventId = '') {
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div>
-        <input class="form-input" type="datetime-local" id="fDateDebut${n}" value="${debut}" style="width:100%;">
+        <input class="form-input" type="datetime-local" id="fDateDebut${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${debut}" style="width:100%;">
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div>
-        <input class="form-input" type="datetime-local" id="fDateFin${n}" value="${fin}" style="width:100%;">
+        <input class="form-input" type="datetime-local" id="fDateFin${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" style="width:100%;">
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;margin-top:16px;">
         <button type="button" onclick="jumpToPassage(${n})" title="Voir dans l'agenda" style="width:28px;height:28px;border:none;background:#EEF2FF;color:#4338CA;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
@@ -3342,6 +3342,38 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3500);
 }
 
+// ── GARDE-FOU DATES PASSAGES ──
+// Empêche la saisie d'une année aberrante (ex. 0006 au lieu de 2026) dans les
+// champs Début/Fin des passages, sur les 4 modales (Contrat/Particulier/Entreprise/Tâche).
+// Sans ça, un passage avec une date de fin en l'an 0006 déclenche un badge
+// "Non reçu +17706743h" et fausse toutes les échéances.
+const PASSAGE_DATE_SEL = '#passagesContainer input[type=datetime-local], #passagesContainerP input[type=datetime-local], #passagesContainerE input[type=datetime-local], #passagesContainerT input[type=datetime-local]';
+const PASSAGE_DATE_MIN = (new Date().getFullYear() - 1) + '-01-01T00:00';
+const PASSAGE_DATE_MAX = (new Date().getFullYear() + 3) + '-12-31T23:59';
+function passageYearBounds() {
+  const y = new Date().getFullYear();
+  return { min: y - 1, max: y + 3 };
+}
+document.addEventListener('focusin', e => {
+  if (e.target.matches && e.target.matches(PASSAGE_DATE_SEL)) e.target.dataset.prevValid = e.target.value || '';
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (!el.matches || !el.matches(PASSAGE_DATE_SEL)) return;
+  const v = el.value || '';
+  if (!v) { el.dataset.prevValid = ''; return; }
+  const year = parseInt(v.slice(0, 4), 10);
+  const { min, max } = passageYearBounds();
+  if (isNaN(year) || year < min || year > max) {
+    showToast(`Année invalide (${year || '?'}). Attendu entre ${min} et ${max}.`);
+    el.value = el.dataset.prevValid || '';
+    // Re-déclenche l'auto-save avec la valeur corrigée (au cas où un save serait déjà planifié).
+    setTimeout(() => el.dispatchEvent(new Event('change', { bubbles: true })), 0);
+  } else {
+    el.dataset.prevValid = v;
+  }
+}, true);
+
 // ── AUTO-SAVE ──
 // Indicateur discret (texte du bouton) au lieu du toast bloquant, pour ne pas gêner la saisie.
 function showAutosaveIndicator(btnId) {
@@ -3455,8 +3487,8 @@ function addPassageP(value='') {
       <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Passage</div>
       <input type="number" id="fPassageNumP${n}" value="${displayNum}" min="1" style="width:52px;padding:4px 2px;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:700;text-align:center;background:var(--bg);color:var(--text-mid);font-family:inherit;">
     </div>
-    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutP${n}" value="${debut}" style="width:100%;"></div>
-    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinP${n}" value="${fin}" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutP${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${debut}" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinP${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" style="width:100%;"></div>
     <button type="button" onclick="removePassageP(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;margin-top:16px;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
   document.getElementById('passagesContainerP').appendChild(div);
 }
@@ -3489,8 +3521,8 @@ function addPassageE(value='') {
       <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Passage</div>
       <input type="number" id="fPassageNumE${n}" value="${displayNum}" min="1" style="width:52px;padding:4px 2px;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:700;text-align:center;background:var(--bg);color:var(--text-mid);font-family:inherit;">
     </div>
-    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutE${n}" value="${debut}" style="width:100%;"></div>
-    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinE${n}" value="${fin}" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutE${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${debut}" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinE${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" style="width:100%;"></div>
     <button type="button" onclick="removePassageE(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;margin-top:16px;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
   document.getElementById('passagesContainerE').appendChild(div);
 }
@@ -3957,11 +3989,11 @@ function addPassageT(value = '', calEventId = '') {
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div>
-        <input class="form-input" type="datetime-local" id="fDateDebutT${n}" value="${debut}" style="width:100%;">
+        <input class="form-input" type="datetime-local" id="fDateDebutT${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${debut}" style="width:100%;">
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div>
-        <input class="form-input" type="datetime-local" id="fDateFinT${n}" value="${fin}" style="width:100%;">
+        <input class="form-input" type="datetime-local" id="fDateFinT${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" style="width:100%;">
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;margin-top:16px;">
         <button type="button" onclick="removePassageT(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>
