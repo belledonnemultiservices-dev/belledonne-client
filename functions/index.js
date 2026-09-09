@@ -3116,6 +3116,7 @@ exports.campagneGenererPlanningTechnicien = functions
         const pHoraire = placeholders["##horaire"];
         const pNbLog = placeholders["##nblogements"];
         const pDateHeure2 = placeholders["##dateheure2ndpassage"];
+        const pRemarque = placeholders["##remarque"]; // optionnel : ancien template sans colonne Remarque reste valide
         if (!pJour || !pAdresse || !pHoraire || !pNbLog || !pDateHeure2) {
           res.status(400).json({ error: "Template invalide : placeholders ##Jour-date/##Adresse/##Horaire/##NbLogements/##DateHeure2ndPassage introuvables" });
           return;
@@ -3123,7 +3124,7 @@ exports.campagneGenererPlanningTechnicien = functions
 
         if (pNom) ws.getRow(pNom.row).getCell(pNom.col).value = `Planning technicien - ${tech}`;
 
-        const minCol = pAdresse.col, maxCol = pDateHeure2.col;
+        const minCol = pAdresse.col, maxCol = Math.max(pDateHeure2.col, pRemarque ? pRemarque.col : 0);
         const bannerStyle = ws.getRow(pJour.row).getCell(pJour.col).style;
         const bannerHeight = ws.getRow(pJour.row).height;
         const headerRowNumber = pJour.row + 1;
@@ -3136,6 +3137,7 @@ exports.campagneGenererPlanningTechnicien = functions
           horaire: ws.getRow(pHoraire.row).getCell(pHoraire.col).style,
           nbLog: ws.getRow(pNbLog.row).getCell(pNbLog.col).style,
           dateHeure2: ws.getRow(pDateHeure2.row).getCell(pDateHeure2.col).style,
+          remarque: pRemarque ? ws.getRow(pRemarque.row).getCell(pRemarque.col).style : null,
         };
 
         // Vide le bloc modèle d'origine (banner + en-têtes + ligne de données) pour repartir propre.
@@ -3165,6 +3167,7 @@ exports.campagneGenererPlanningTechnicien = functions
             dRow.getCell(pHoraire.col).value = l.heure1; dRow.getCell(pHoraire.col).style = dataStyles.horaire;
             dRow.getCell(pNbLog.col).value = l.nbLogements || ""; dRow.getCell(pNbLog.col).style = dataStyles.nbLog;
             dRow.getCell(pDateHeure2.col).value = formaterDateHeure2ndPassage(l.date2, l.heure2); dRow.getCell(pDateHeure2.col).style = dataStyles.dateHeure2;
+            if (pRemarque) { dRow.getCell(pRemarque.col).value = l.remarque || ""; dRow.getCell(pRemarque.col).style = dataStyles.remarque; }
             cursor++;
           });
           cursor++; // ligne d'espacement entre jours
