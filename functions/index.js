@@ -1327,10 +1327,10 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   const r = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}`);
   if (r.status !== 200) {
     console.error(`Kizeo: lecture soumission ${dataId} échouée (${r.status})`);
-    return;
+    return false;
   }
   let parsed;
-  try { parsed = JSON.parse(r.body); } catch(e) { console.error(`Kizeo: réponse illisible pour ${dataId}`); return; }
+  try { parsed = JSON.parse(r.body); } catch(e) { console.error(`Kizeo: réponse illisible pour ${dataId}`); return false; }
   const submission = parsed.data || parsed;
   const fields = submission.fields || {};
   const getField = (fid) => {
@@ -1381,17 +1381,17 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   // Excel est quand même téléchargé et archivé pour consultation.
   if (refInterne.startsWith("campagne::")) {
     const partsA = refInterne.split("::");
-    if (partsA.length !== 4) { console.warn(`Kizeo campagne: refInterne invalide (${refInterne}), soumission ${dataId} ignorée`); return; }
+    if (partsA.length !== 4) { console.warn(`Kizeo campagne: refInterne invalide (${refInterne}), soumission ${dataId} laissée non lue`); return false; }
     const [, semaineId, passageStr, batimentId] = partsA;
     const passageNum = parseInt(passageStr, 10);
-    if (passageNum !== 1 && passageNum !== 2) { console.warn(`Kizeo campagne: numéro de passage invalide (${refInterne})`); return; }
+    if (passageNum !== 1 && passageNum !== 2) { console.warn(`Kizeo campagne: numéro de passage invalide (${refInterne})`); return false; }
     const passageKey = passageNum === 1 ? "passage1" : "passage2";
 
     const batimentRefA = db.collection("campagnes-batiments").doc(batimentId);
     const batimentSnapA = await batimentRefA.get();
-    if (!batimentSnapA.exists) { console.warn(`Kizeo campagne: bâtiment ${batimentId} introuvable, soumission ${dataId} ignorée`); return; }
+    if (!batimentSnapA.exists) { console.warn(`Kizeo campagne: bâtiment ${batimentId} introuvable, soumission ${dataId} laissée non lue`); return false; }
     const batimentA = batimentSnapA.data();
-    if (batimentA.semaineId !== semaineId) { console.warn(`Kizeo campagne: semaineId incohérent pour ${refInterne}`); return; }
+    if (batimentA.semaineId !== semaineId) { console.warn(`Kizeo campagne: semaineId incohérent pour ${refInterne}`); return false; }
 
     // Extraction des résultats par logement depuis le champ liste "tableau".
     // statut_1er_passage = choix UNIQUE -> on lit .value (texte simple).
@@ -1417,7 +1417,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
 
     // PDF (obligatoire) + Excel Kizeo (archive, non bloquant si absent/échoue).
     const pdfA = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
-    if (pdfA.status !== 200) { console.error(`Kizeo campagne: téléchargement PDF échoué (${pdfA.status}) pour ${dataId}`); return; }
+    if (pdfA.status !== 200) { console.error(`Kizeo campagne: téléchargement PDF échoué (${pdfA.status}) pour ${dataId}`); return false; }
 
     const bucketA = admin.storage().bucket("belledonne-client.firebasestorage.app");
     const nomBaseA = `${batimentA.adresseRue || "adresse"}_passage_${passageNum}`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
@@ -1460,26 +1460,33 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   // "suivi" classique ci-dessous. refInterne = garantie::semaineId::blocId::ligneId.
   if (refInterne.startsWith("garantie::")) {
     const parts = refInterne.split("::");
-    if (parts.length !== 4) { console.warn(`Kizeo: refInterne garantie invalide (${refInterne}), soumission ${dataId} ignorée`); return; }
+    // Ces cas (refInterne mal formé, semaine/bloc/ligne introuvable) sont laissés
+    // "non lus" côté Kizeo (return false) plutôt qu'ignorés silencieusement : un
+    // "ignore" implicite (return undefined) est traité par kizeoPull comme "traité"
+    // et marque la soumission lue chez Kizeo SANS jamais rien écrire en base, donc
+    // le rapport disparaît de la file pour toujours (bug identifié le 14/09 sur
+    // Djididi). Laisser non lu permet de le retester au pull suivant, une fois le
+    // rattachement corrigé, sans perdre le rapport déjà rempli par le technicien.
+    if (parts.length !== 4) { console.warn(`Kizeo: refInterne garantie invalide (${refInterne}), soumission ${dataId} laissée non lue`); return false; }
     const [, semaineId, blocId, ligneId] = parts;
     const semaineSnap = await db.collection("garanties-semaines").doc(semaineId).get();
-    if (!semaineSnap.exists) { console.warn(`Kizeo: semaine garantie ${semaineId} introuvable, soumission ${dataId} ignorée`); return; }
+    if (!semaineSnap.exists) { console.warn(`Kizeo: semaine garantie ${semaineId} introuvable, soumission ${dataId} laissée non lue`); return false; }
     const semaine = semaineSnap.data();
     const blocs = Array.isArray(semaine.blocs) ? semaine.blocs : [];
     const bloc = blocs.find(b => b.id === blocId);
     const ligne = bloc ? (bloc.lignes || []).find(l => l.id === ligneId) : null;
-    if (!bloc || !ligne) { console.warn(`Kizeo: bloc/ligne garantie introuvable (${refInterne}), soumission ${dataId} ignorée`); return; }
+    if (!bloc || !ligne) { console.warn(`Kizeo: bloc/ligne garantie introuvable (${refInterne}), soumission ${dataId} laissée non lue`); return false; }
 
     const typeSortieG = formConf.typeSortie === "excel" ? "excel" : "pdf";
     let fileBufferG, extG, contentTypeG;
     if (typeSortieG === "excel") {
-      if (!formConf.exportId) { console.error(`Kizeo: exportId manquant pour le formulaire ${formId}`); return; }
+      if (!formConf.exportId) { console.error(`Kizeo: exportId manquant pour le formulaire ${formId}`); return false; }
       const ex = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/exports/${encodeURIComponent(formConf.exportId)}`, null, true);
-      if (ex.status !== 200) { console.error(`Kizeo: export échoué (${ex.status}) pour ${dataId}`); return; }
+      if (ex.status !== 200) { console.error(`Kizeo: export échoué (${ex.status}) pour ${dataId}`); return false; }
       fileBufferG = ex.body; extG = "xlsx"; contentTypeG = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     } else {
       const pdf = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
-      if (pdf.status !== 200) { console.error(`Kizeo: téléchargement PDF échoué (${pdf.status}) pour ${dataId}`); return; }
+      if (pdf.status !== 200) { console.error(`Kizeo: téléchargement PDF échoué (${pdf.status}) pour ${dataId}`); return false; }
       fileBufferG = pdf.body; extG = "pdf"; contentTypeG = "application/pdf";
     }
 
@@ -1490,7 +1497,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     const downloadTokenG = crypto.randomUUID();
     try {
       await bucketG.file(storagePathG).save(fileBufferG, { contentType: contentTypeG, metadata: { metadata: { firebaseStorageDownloadTokens: downloadTokenG } } });
-    } catch(e) { console.error(`Kizeo: upload Storage garantie échoué pour ${dataId}:`, e.message); return; }
+    } catch(e) { console.error(`Kizeo: upload Storage garantie échoué pour ${dataId}:`, e.message); return false; }
     const fileUrlG = `https://firebasestorage.googleapis.com/v0/b/${bucketG.name}/o/${encodeURIComponent(storagePathG)}?alt=media&token=${downloadTokenG}`;
 
     const nowG = new Date().toISOString();
@@ -1575,14 +1582,14 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   const typeSortie = formConf.typeSortie === "excel" ? "excel" : "pdf";
   let fileBuffer, ext, contentType;
   if (typeSortie === "excel") {
-    if (!formConf.exportId) { console.error(`Kizeo: exportId manquant pour le formulaire ${formId}`); return; }
+    if (!formConf.exportId) { console.error(`Kizeo: exportId manquant pour le formulaire ${formId}`); return false; }
     const ex = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/exports/${encodeURIComponent(formConf.exportId)}`, null, true);
-    if (ex.status !== 200) { console.error(`Kizeo: export Excel échoué (${ex.status}) pour ${dataId}`); return; }
+    if (ex.status !== 200) { console.error(`Kizeo: export Excel échoué (${ex.status}) pour ${dataId}`); return false; }
     fileBuffer = ex.body; ext = "xlsx";
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   } else {
     const pdf = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
-    if (pdf.status !== 200) { console.error(`Kizeo: téléchargement PDF échoué (${pdf.status}) pour ${dataId}`); return; }
+    if (pdf.status !== 200) { console.error(`Kizeo: téléchargement PDF échoué (${pdf.status}) pour ${dataId}`); return false; }
     fileBuffer = pdf.body; ext = "pdf"; contentType = "application/pdf";
   }
 
@@ -1601,7 +1608,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     });
   } catch(e) {
     console.error(`Kizeo: upload Storage échoué pour ${dataId}:`, e.message);
-    return;
+    return false;
   }
   const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
 
