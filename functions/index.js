@@ -429,6 +429,7 @@ exports.sendNotification = functions
 
     try {
       const mailAttachments = [];
+      const pjEnEchec = [];
       if (attachments && attachments.length > 0) {
         for (const att of attachments) {
           try {
@@ -440,7 +441,16 @@ exports.sendNotification = functions
             });
           } catch(e) {
             console.error("Erreur PJ:", att.url, e.message);
+            pjEnEchec.push(att.filename || att.url);
           }
+        }
+        // Un mail qui annonce un document sans le porter est pire que pas de mail :
+        // le client croit avoir reçu son rapport, et rien ne signale l'absence côté
+        // expéditeur. On échoue donc l'envoi, pour qu'il soit rejoué en connaissance
+        // de cause plutôt que de partir amputé.
+        if (pjEnEchec.length) {
+          res.status(502).json({ error: "Pièce(s) jointe(s) indisponible(s) : " + pjEnEchec.join(", ") + ". Aucun mail n'a été envoyé." });
+          return;
         }
       }
 
@@ -1244,6 +1254,14 @@ exports.pushKizeoForm = functions
     }
     console.log("Kizeo push OK:", suiviId, "passage", numPassage, "-> user", recipient, renvois > 0 ? `(renvoi ${renvois})` : "");
 
+    // Identifiant de la soumission créée par ce push (même extraction que les circuits
+    // campagnes). Le stocker dès l'envoi permet au rattrapage quotidien d'interroger
+    // directement cette soumission pour savoir si le technicien a répondu, sans dépendre
+    // de la file "non lue" de Kizeo. Reste à null si le format de réponse change : le
+    // rattrapage sait alors retrouver la soumission par sa date de création.
+    let pushedDataId = null;
+    try { const id = JSON.parse(r.body).data.data_id; if (id) pushedDataId = String(id); } catch(e) { /* réponse inattendue */ }
+
     // Ligne "en attente" dans Gestion rapports : créée (ou réutilisée si un envoi
     // précédent existait déjà pour ce passage) dès le push, avant même que le
     // technicien ait répondu. Permet de suivre qui doit encore rendre son rapport.
@@ -1256,7 +1274,7 @@ exports.pushKizeoForm = functions
       }
       const now = new Date().toISOString();
       const pendingData = {
-        kizeoDataId: null,
+        kizeoDataId: pushedDataId,
         kizeoFormId: form.formId,
         kizeoFormDocId: String(kizeoFormDocId),
         recipientUserId: recipient,
@@ -1746,6 +1764,121 @@ exports.kizeoPull = functions
         }
       }
     }
+  });
+
+// ── RATTRAPAGE KIZEO (filet indépendant de la file "non lue") ─────
+// Le pull ne voit que les soumissions que Kizeo range dans sa file "non lue".
+// Une soumission sortie de cette file n'y revient jamais, même remplie et signée
+// plus tard : le rapport devient alors invisible pour toujours (cf. le bug corrigé
+// le 07/09, qui marquait lu en cas d'échec de traitement — un rapport poussé le
+// 02/09 et rempli le 20/09 n'est jamais remonté).
+//
+// Ce rattrapage part de l'autre bout : les lignes "en-attente" de Gestion rapports,
+// qui sont la liste de ce que l'app attend réellement, et va interroger Kizeo
+// soumission par soumission. Il ne dépend donc plus du tout de l'état lu/non lu,
+// et ne marque rien comme lu (le pull reste seul à le faire).
+exports.kizeoRattrapage = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 540, memory: "512MB", secrets: [KIZEO_API_TOKEN] })
+  .pubsub.schedule("every day 05:30")
+  .timeZone("Europe/Paris")
+  .onRun(async () => {
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+    const token = KIZEO_API_TOKEN.value();
+
+    // Fenêtre : au-delà de 24 h le pull a déjà eu 96 occasions de faire son travail,
+    // donc une ligne encore en attente est soit un technicien qui n'a pas répondu,
+    // soit une soumission perdue. En deçà de 24 h on laisse le pull travailler.
+    // La borne basse évite de rouvrir indéfiniment des envois abandonnés.
+    const now = Date.now();
+    const PLUS_VIEUX_QUE = now - 24 * 3600 * 1000;
+    const PAS_AVANT = now - 180 * 24 * 3600 * 1000;
+
+    let snap;
+    try {
+      snap = await db.collection("reception-rapports").where("statut", "==", "en-attente").get();
+    } catch(e) {
+      console.error("kizeoRattrapage: lecture reception-rapports échouée:", e.message);
+      return;
+    }
+
+    const candidats = snap.docs
+      .map(d => ({ id: d.id, ref: d.ref, ...d.data() }))
+      .filter(r => r.kizeoFormId && r.refInterne)
+      .filter(r => {
+        const t = Date.parse(r.pushedAt || r.createdAt || r.arriveeAt || "");
+        return t && t < PLUS_VIEUX_QUE && t > PAS_AVANT;
+      });
+
+    if (!candidats.length) { console.log("kizeoRattrapage: aucune ligne en attente à vérifier"); return; }
+    console.log(`kizeoRattrapage: ${candidats.length} ligne(s) en attente à vérifier`);
+
+    // Les lignes poussées avant que pushKizeoForm ne stocke l'identifiant Kizeo n'en
+    // ont pas. On le retrouve par la date de création de la soumission, que Kizeo
+    // renvoie en masse : le push crée la soumission dans la seconde, donc `pushedAt`
+    // et `_create_time` coïncident à la minute près. Le ref_interne de la candidate
+    // est ensuite vérifié avant tout traitement, la date seule ne prouvant rien.
+    const indexParForm = {};
+    const chargerIndex = async (formId) => {
+      if (indexParForm[formId]) return indexParForm[formId];
+      const r = await kizeoRequest(token, "POST", `/forms/${encodeURIComponent(formId)}/data/advanced`, { limit: 2000 });
+      let liste = [];
+      if (r.status === 200) {
+        try { liste = (JSON.parse(r.body).data || []).map(x => ({ id: String(x._id), cree: Date.parse((x._create_time || "").replace(" ", "T") + "Z") })); }
+        catch(e) { console.error(`kizeoRattrapage: index illisible pour ${formId}:`, e.message); }
+      } else {
+        console.error(`kizeoRattrapage: index formulaire ${formId} -> ${r.status}`);
+      }
+      indexParForm[formId] = liste;
+      return liste;
+    };
+
+    let recuperes = 0, sansReponse = 0, introuvables = 0;
+
+    for (const ligne of candidats) {
+      try {
+        let dataId = ligne.kizeoDataId ? String(ligne.kizeoDataId) : null;
+
+        if (!dataId) {
+          const pousseA = Date.parse(ligne.pushedAt || ligne.createdAt || ligne.arriveeAt || "");
+          const index = await chargerIndex(String(ligne.kizeoFormId));
+          const proches = index
+            .filter(x => x.cree && Math.abs(x.cree - pousseA) < 3 * 60 * 1000)
+            .sort((a, b) => Math.abs(a.cree - pousseA) - Math.abs(b.cree - pousseA))
+            .slice(0, 5);
+          for (const c of proches) {
+            const d = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(ligne.kizeoFormId)}/data/${encodeURIComponent(c.id)}`);
+            if (d.status !== 200) continue;
+            let champRef = "";
+            try {
+              const sub = JSON.parse(d.body).data || {};
+              const fs = sub.fields || {};
+              for (const k of Object.keys(fs)) {
+                const v = fs[k] && typeof fs[k] === "object" ? fs[k].value : fs[k];
+                if (typeof v === "string" && v === ligne.refInterne) { champRef = v; break; }
+              }
+            } catch(e) { continue; }
+            if (champRef) { dataId = c.id; break; }
+          }
+          // Identifiant retrouvé : on l'écrit sur la ligne pour ne plus jamais
+          // refaire cette recherche, qu'elle aboutisse à un traitement ou non.
+          if (dataId) { try { await ligne.ref.update({ kizeoDataId: dataId }); } catch(e) {} }
+        }
+
+        if (!dataId) { introuvables++; console.warn(`kizeoRattrapage: soumission introuvable pour ${ligne.refInterne} (reception-rapports/${ligne.id})`); continue; }
+
+        // Même chemin de réception que le webhook et le pull : idempotent, et
+        // retourne false tant que le technicien n'a pas signé.
+        const traite = await receiveKizeoSubmission(db, token, String(ligne.kizeoFormId), dataId, "rattrapage");
+        if (traite === true) { recuperes++; console.log(`kizeoRattrapage: rapport récupéré (${ligne.refInterne}, soumission ${dataId})`); }
+        else sansReponse++;
+      } catch(e) {
+        console.error(`kizeoRattrapage: ligne ${ligne.id} échouée:`, e.message);
+      }
+    }
+
+    console.log(`kizeoRattrapage: ${recuperes} récupéré(s), ${sansReponse} sans réponse du technicien, ${introuvables} introuvable(s)`);
   });
 
 // ── GARANTIES : POUSSER UN RAPPORT KIZEO PAR LIGNE (bloc d'une semaine garantie) ─
