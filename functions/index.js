@@ -1206,8 +1206,10 @@ exports.pushKizeoForm = functions
 
     // Construction des champs à pousser (uniquement les champs mappés)
     const passageLabel = String(numPassage) === "1" ? "1er passage" : numPassage + "ème passage";
-    let baseLibelle = (libelle && String(libelle).trim()) || ((reference ? reference + " - " : "") + passageLabel);
-    if (renvois > 0) baseLibelle += ` (${renvois})`;
+    // Libellé laissé tel quel, vide compris : le nom du rapport est celui saisi
+    // dans le Suivi (recopié du titre agenda), sans repli automatique.
+    let baseLibelle = (libelle && String(libelle).trim()) || "";
+    if (renvois > 0) baseLibelle = (baseLibelle ? baseLibelle + " " : "") + `(${renvois})`;
     const appValues = {
       refInterne,
       libelle: baseLibelle,

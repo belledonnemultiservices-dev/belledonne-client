@@ -1684,7 +1684,7 @@ function addPassage(value = '', calEventId = '') {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Titre agenda</div>
-          <input class="form-input" id="fTitre${n}" value="${savedTitre.replace(/"/g,'&quot;')}" style="width:100%;font-size:12px;" placeholder="Titre de l'événement">
+          <input class="form-input" id="fTitre${n}" value="${savedTitre.replace(/"/g,'&quot;')}" oninput="window._onTitreAgendaInput('${n}')" style="width:100%;font-size:12px;" placeholder="Titre de l'événement">
         </div>
         <div>
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Adresse</div>
@@ -1714,6 +1714,25 @@ function fmtNotifDate(iso) {
   const p = x => String(x).padStart(2, '0');
   return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' à ' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
+// ── Titre agenda ↔ libellé du rapport ──
+// Le libellé part vide et recopie le titre agenda du même passage, tant que
+// Yacine ne l'a pas saisi lui-même. Dès qu'il y touche, la recopie s'arrête
+// pour ce passage (repère posé sur le passage, il survit aux re-rendus).
+window._onTitreAgendaInput = function(n, tache) {
+  const div = document.getElementById((tache ? 'passageT_' : 'passage_') + n);
+  if (div && div.dataset.libelleManuel) return;
+  const label = document.getElementById((tache ? 'kzLabelT' : 'kzLabel') + n);
+  const titre = document.getElementById((tache ? 'fTitreT' : 'fTitre') + n);
+  if (label && titre) label.value = titre.value;
+};
+
+window._onKzLabelInput = function(n, tache) {
+  const div = document.getElementById((tache ? 'passageT_' : 'passage_') + n);
+  const label = document.getElementById((tache ? 'kzLabelT' : 'kzLabel') + n);
+  if (!div || !label) return;
+  div.dataset.libelleManuel = label.value;
+};
+
 // Rejoue le rendu des blocs "Rapport terrain" : utilisé quand la nature de mission
 // ou le client change, pour que le formulaire lié se remette à jour.
 window._refreshRapportZones = function() {
@@ -1813,16 +1832,16 @@ function buildKizeoControl(n) {
   const selId = kizeoPush ? kizeoPush.kizeoFormDocId : (lie ? lie.id : '');
   const formOpts = forms.map(f => `<option value="${f.id}" ${String(selId) === String(f.id) ? 'selected' : ''}>${(f.nom||'Formulaire').replace(/"/g,'&quot;')}${lie && lie.id === f.id ? ' (lié)' : ''}</option>`).join('');
   const techOpts = techMatches.map(t => `<option value="${t.kizeoUserId}" ${kizeoPush && String(kizeoPush.recipientUserId) === String(t.kizeoUserId) ? 'selected' : ''}>${(t.nomComplet||t.nom).replace(/"/g,'&quot;')}</option>`).join('');
-  const bc = (document.getElementById('fBC')?.value || document.getElementById('fPL')?.value || '').trim();
-  const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
-  const defLabel = ((bc ? bc + ' - ' : '') + passageLabel).replace(/"/g,'&quot;');
-  // Le libellé utilisé au dernier envoi est conservé (sinon il repart du défaut BC+passage à chaque re-render).
-  const labelValue = (kizeoPush && kizeoPush.libelle ? kizeoPush.libelle : defLabel).replace(/"/g,'&quot;');
+  // Libellé : vide par défaut, recopié du titre agenda tant qu'il n'a pas été
+  // saisi à la main sur ce passage. Le libellé du dernier envoi prime.
+  const titreAgenda = (document.getElementById('fTitre' + n)?.value || '').trim();
+  const libelleManuel = document.getElementById('passage_' + n)?.dataset.libelleManuel || '';
+  const labelValue = (kizeoPush && kizeoPush.libelle ? kizeoPush.libelle : (libelleManuel || titreAgenda)).replace(/"/g,'&quot;');
   const pushBadge = kizeoPush ? `<span id="kzPushBadge${n}" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);padding:4px 10px;border-radius:20px;white-space:nowrap;" title="${(kizeoPush.formNom||'').replace(/"/g,'&quot;')}">✓ Envoyé le ${fmtNotifDate(kizeoPush.at)} à ${(kizeoPush.technicien||'').replace(/"/g,'&quot;')}</span>` : `<span id="kzPushBadge${n}"></span>`;
   return wrap(`
       <select id="kzForm${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:180px;">${formOpts}</select>
       <select id="kzTech${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:150px;">${techOpts}</select>
-      <input id="kzLabel${n}" class="form-input" value="${labelValue}" placeholder="Nom du rapport" title="Nom affiché sur le mobile" style="font-size:12px;height:32px;padding:0 8px;max-width:200px;">
+      <input id="kzLabel${n}" class="form-input" value="${labelValue}" oninput="window._onKzLabelInput('${n}')" placeholder="Nom du rapport" title="Nom affiché sur le mobile — recopié du titre agenda" style="font-size:12px;height:32px;padding:0 8px;max-width:200px;">
       <button type="button" onclick="genererRapportKizeo(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M4 4h16v2H4zm0 14h16v2H4zm7-7h9v2h-9zm0-4h9v2h-9zm0 8h9v2h-9zM4 8l3 3-3 3z"/></svg>
         ${kizeoPush ? 'Renvoyer le rapport' : 'Générer le rapport'}
@@ -3930,15 +3949,15 @@ function buildKizeoControlT(n) {
   const formOpts = forms.map(f => `<option value="${f.id}" ${kizeoPush && kizeoPush.kizeoFormDocId === f.id ? 'selected' : ''}>${(f.nom||'Formulaire').replace(/"/g,'&quot;')}</option>`).join('');
   const techOpts = techMatches.map(t => `<option value="${t.kizeoUserId}" ${kizeoPush && String(kizeoPush.recipientUserId) === String(t.kizeoUserId) ? 'selected' : ''}>${(t.nomComplet||t.nom).replace(/"/g,'&quot;')}</option>`).join('');
   const num = parseInt(document.getElementById('fPassageNumT' + n)?.value) || n;
-  const typeLabel = document.getElementById('fTypeTache')?.selectedOptions?.[0]?.textContent || 'Tâche';
-  const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
-  const defLabel = (typeLabel + ' - ' + passageLabel).replace(/"/g,'&quot;');
-  const labelValue = (kizeoPush && kizeoPush.libelle ? kizeoPush.libelle : defLabel).replace(/"/g,'&quot;');
+  // Même règle que la modale intervention : vide par défaut, miroir du titre agenda.
+  const titreAgenda = (document.getElementById('fTitreT' + n)?.value || '').trim();
+  const libelleManuel = document.getElementById('passageT_' + n)?.dataset.libelleManuel || '';
+  const labelValue = (kizeoPush && kizeoPush.libelle ? kizeoPush.libelle : (libelleManuel || titreAgenda)).replace(/"/g,'&quot;');
   const pushBadge = kizeoPush ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-pale);padding:4px 10px;border-radius:20px;white-space:nowrap;" title="${(kizeoPush.formNom||'').replace(/"/g,'&quot;')}">✓ Envoyé le ${fmtNotifDate(kizeoPush.at)} à ${(kizeoPush.technicien||'').replace(/"/g,'&quot;')}</span>` : '';
   return wrap(`
       <select id="kzFormT${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:180px;">${formOpts}</select>
       <select id="kzTechT${n}" class="form-input" style="font-size:12px;height:32px;padding:0 8px;max-width:150px;">${techOpts}</select>
-      <input id="kzLabelT${n}" class="form-input" value="${labelValue}" placeholder="Nom du rapport" title="Nom affiché sur le mobile" style="font-size:12px;height:32px;padding:0 8px;max-width:200px;">
+      <input id="kzLabelT${n}" class="form-input" value="${labelValue}" oninput="window._onKzLabelInput('${n}', true)" placeholder="Nom du rapport" title="Nom affiché sur le mobile — recopié du titre agenda" style="font-size:12px;height:32px;padding:0 8px;max-width:200px;">
       <button type="button" onclick="genererRapportKizeoT(${n})" style="display:inline-flex;align-items:center;gap:5px;background:#F3E8FF;color:#7C3AED;border:1px solid #D8B4FE;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;"><path d="M4 4h16v2H4zm0 14h16v2H4zm7-7h9v2h-9zm0-4h9v2h-9zm0 8h9v2h-9zM4 8l3 3-3 3z"/></svg>
         ${kizeoPush ? 'Renvoyer le rapport' : 'Générer le rapport'}
@@ -4039,7 +4058,7 @@ function addPassageT(value = '', calEventId = '') {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <div>
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Titre agenda</div>
-          <input class="form-input" id="fTitreT${n}" value="${savedTitre.replace(/"/g,'&quot;')}" style="width:100%;font-size:12px;" placeholder="Titre de l'événement">
+          <input class="form-input" id="fTitreT${n}" value="${savedTitre.replace(/"/g,'&quot;')}" oninput="window._onTitreAgendaInput('${n}', true)" style="width:100%;font-size:12px;" placeholder="Titre de l'événement">
         </div>
         <div>
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Adresse</div>
