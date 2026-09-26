@@ -97,6 +97,11 @@
   .btn-save{height:40px;padding:0 22px;background:var(--green);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer;}
   .btn-save:hover{background:var(--green-dark);color:#fff;}
   .btn-cancel{height:40px;padding:0 16px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  .chips-box{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);min-height:38px;max-height:132px;overflow-y:auto;}
+  .chips-box .vide{font-size:12px;color:var(--text-muted);font-style:italic;}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border:1px solid var(--border);border-radius:20px;background:var(--surface);cursor:pointer;user-select:none;}
+  .chip input{margin:0;accent-color:var(--green-dark);}
+  .chip.on{border-color:var(--green);background:var(--green-pale);color:var(--green-dark);font-weight:600;}
   .section-sep{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin:20px 0 14px;display:flex;align-items:center;gap:10px;}
   .section-sep::after{content:'';flex:1;height:1px;background:var(--border);}
   .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);transform:translateY(80px);opacity:0;transition:all 0.3s ease;z-index:999;}
@@ -212,6 +217,35 @@
           <div class="form-hint">Détermine où il est classé dans Gestion rapports et l'espace client.</div>
         </div>
       </div>
+      <div class="section-sep">Liaison au suivi (optionnel)</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
+        Renseignez au minimum une <strong>nature de mission</strong> et un <strong>client</strong> pour que ce formulaire
+        soit proposé automatiquement dans le Suivi. Sans ces deux informations, il reste choisissable à la main, comme avant.
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Natures de mission</label>
+          <div class="chips-box" id="fNaturesMission"><span class="vide">Chargement...</span></div>
+          <div class="form-hint">Plusieurs choix possibles.</div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Clients</label>
+          <div class="chips-box" id="fClientsLies"><span class="vide">Chargement...</span></div>
+          <div class="form-hint">Clients disposant d'un compte. Plusieurs choix possibles.</div>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:16px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Numéro de passage</label>
+          <select class="form-select" id="fPassageLie">
+            <option value="">Tous les passages</option>
+            <option value="1">1er passage</option>
+            <option value="suivant">Passage suivant (2, 3, 4...)</option>
+          </select>
+          <div class="form-hint">Affinage facultatif : un formulaire qui précise le passage passe devant un formulaire qui ne le précise pas.</div>
+        </div>
+      </div>
+
       <div class="form-row" style="margin-top:16px">
         <div class="form-group" id="exportIdGroup" style="margin-bottom:0;display:none">
           <label class="form-label">Export Excel</label>
@@ -283,7 +317,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, getDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",
@@ -302,9 +336,69 @@ const FN_LIST_FIELDS = "https://europe-west1-belledonne-client.cloudfunctions.ne
 const MAP_KEYS = ["refInterne", "libelle", "reference", "passage", "client", "adresse", "date", "nom", "etage", "codePostal", "ville", "numeroLogement", "signature"];
 const MAP_EL = { refInterne: "mapRefInterne", libelle: "mapLibelle", reference: "mapReference", passage: "mapPassage", client: "mapClient", adresse: "mapAdresse", date: "mapDate", nom: "mapNom", etage: "mapEtage", codePostal: "mapCodePostal", ville: "mapVille", numeroLogement: "mapNumeroLogement", signature: "mapSignature" };
 let _user = null;
+// Référentiels de la liaison au suivi : mêmes sources que le Suivi interventions
+const NATURES_DEFAUT = ['Punaises de lit','Punaises de lit vacant','Blattes choc','Blattes choc vacant','Dératisation','Guêpes/Frelons'];
+let naturesMission = NATURES_DEFAUT.slice();
+let clientsComptes = [];
 let loadedFields = [];   // [{id, libelle, type}]
 let loadedExports = [];  // [{id, nom, type}]
 let unsub = null;
+
+function escAttr(v) { return String(v).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+
+// Cases à cocher d'un champ multi-valeurs. `selected` = valeurs enregistrées,
+// conservées même si elles ne sont plus dans le référentiel (client supprimé,
+// nature renommée) : on ne perd pas une liaison en silence.
+function renderChips(boxId, valeurs, selected) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  selected = selected || [];
+  const toutes = valeurs.slice();
+  selected.forEach(v => { if (!toutes.includes(v)) toutes.push(v); });
+  if (!toutes.length) { box.innerHTML = '<span class="vide">Aucune valeur disponible</span>'; return; }
+  box.innerHTML = toutes.map(v => {
+    const on = selected.includes(v);
+    return '<label class="chip' + (on ? ' on' : '') + '">' +
+      '<input type="checkbox" value="' + escAttr(v) + '"' + (on ? ' checked' : '') +
+      ' onchange="this.parentNode.classList.toggle(\'on\', this.checked)">' + v + '</label>';
+  }).join("");
+}
+
+function readChips(boxId) {
+  const box = document.getElementById(boxId);
+  if (!box) return [];
+  return Array.from(box.querySelectorAll("input:checked")).map(i => i.value);
+}
+
+// Natures de mission (config/naturesMission) et clients à compte (users role=client)
+let _refsPromise = null;
+function ensureReferentiels() { if (!_refsPromise) _refsPromise = loadReferentiels(); return _refsPromise; }
+
+async function loadReferentiels() {
+  try {
+    const snap = await getDoc(doc(db, "config", "naturesMission"));
+    const liste = snap.exists() ? snap.data().liste : null;
+    if (Array.isArray(liste) && liste.length) naturesMission = liste.slice();
+  } catch(e) { console.warn("naturesMission", e); }
+  try {
+    const snapU = await getDocs(query(collection(db, "users"), where("role", "==", "client")));
+    clientsComptes = [...new Set(snapU.docs.map(d => d.data().client).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  } catch(e) { console.warn("clients", e); }
+}
+
+// Un formulaire n'est liable que s'il porte au moins une nature ET un client
+function liaisonActive(f) {
+  return (f.naturesMission || []).length > 0 && (f.clientsLies || []).length > 0;
+}
+
+function resumeLiaison(f) {
+  if (!liaisonActive(f)) {
+    const partiel = (f.naturesMission || []).length || (f.clientsLies || []).length;
+    return partiel ? '<span class="ko">Incomplète</span>' : "—";
+  }
+  const p = f.passageLie === "1" ? " · 1er passage" : (f.passageLie === "suivant" ? " · passage suivant" : "");
+  return escAttr((f.naturesMission || []).join(", ") + " → " + (f.clientsLies || []).join(", ") + p);
+}
 
 function populateExports(savedValue) {
   const sel = document.getElementById("fExportId");
@@ -321,6 +415,7 @@ onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = "login.html"; return; }
   if (user.email !== "belledonne.multiservices@gmail.com") { window.location.href = "dashboard.html"; return; }
   _user = user;
+  ensureReferentiels();
   loadForms();
 });
 
@@ -378,6 +473,7 @@ function render(forms) {
         <div class="stat-line"><span class="stat-lbl">Réf. interne (lien)</span><span class="stat-val">${m.refInterne || "—"}</span></div>
         <div class="stat-line"><span class="stat-lbl">Référence / Passage</span><span class="stat-val">${m.reference || "—"} / ${m.passage || "—"}</span></div>
         <div class="stat-line"><span class="stat-lbl">Client / Adresse</span><span class="stat-val">${m.client || "—"} / ${m.adresse || "—"}</span></div>
+        <div class="stat-line"><span class="stat-lbl">Liaison au suivi</span><span class="stat-val">${resumeLiaison(f)}</span></div>
       </div>
     </div>`;
   }).join("");
@@ -445,6 +541,7 @@ window.loadFields = async function() {
 
 // ── MODAL ──
 window.openModal = async function(docId) {
+  await ensureReferentiels();
   document.getElementById("editDocId").value = docId || "";
   document.getElementById("modalTitle").textContent = docId ? "Modifier le formulaire" : "Ajouter un formulaire";
   document.getElementById("loadStatus").innerHTML = "";
@@ -459,12 +556,18 @@ window.openModal = async function(docId) {
     savedExport = f.exportId || "";
     selectType(f.typeSortie || "pdf");
     document.getElementById("fNature").value = f.nature || "intervention";
+    document.getElementById("fPassageLie").value = f.passageLie || "";
+    renderChips("fNaturesMission", naturesMission, f.naturesMission || []);
+    renderChips("fClientsLies", clientsComptes, f.clientsLies || []);
     current = f.mapping || {};
   } else {
     document.getElementById("fNom").value = "";
     document.getElementById("fFormId").value = "";
     selectType("pdf");
     document.getElementById("fNature").value = "intervention";
+    document.getElementById("fPassageLie").value = "";
+    renderChips("fNaturesMission", naturesMission, []);
+    renderChips("fClientsLies", clientsComptes, []);
   }
   populateMapSelects(current);
   populateExports(savedExport);
@@ -496,7 +599,13 @@ window.saveForm = async function() {
   if (!mapping.refInterne) { showToast("Le champ Référence interne doit être associé"); return; }
   if (typeSortie === "excel" && !exportId) { showToast("ID d'export Excel requis pour un formulaire Excel"); return; }
 
-  const data = { nom, formId, typeSortie, nature, exportId, mapping, updatedAt: new Date().toISOString() };
+  const naturesLiees = readChips("fNaturesMission");
+  const clientsLies = readChips("fClientsLies");
+  const passageLie = document.getElementById("fPassageLie").value;
+
+  const data = { nom, formId, typeSortie, nature, exportId, mapping,
+    naturesMission: naturesLiees, clientsLies, passageLie,
+    updatedAt: new Date().toISOString() };
   const btn = document.getElementById("saveBtn");
   btn.disabled = true; btn.textContent = "Enregistrement...";
   try {

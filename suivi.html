@@ -499,7 +499,7 @@
               <button type="button" class="btn-client-type" id="btnTypeEntreprise" onclick="setClientType('entreprise')">Entreprise</button>
             </div>
             <div id="clientContrat">
-              <select class="form-select" id="fClient"><option value="">— Sélectionner —</option></select>
+              <select class="form-select" id="fClient" onchange="window._refreshRapportZones && window._refreshRapportZones()"><option value="">— Sélectionner —</option></select>
             </div>
             <div id="clientLibre" style="display:none;">
               <input class="form-input" id="fClientLibre" placeholder="Nom et prénom...">
@@ -1714,6 +1714,15 @@ function fmtNotifDate(iso) {
   const p = x => String(x).padStart(2, '0');
   return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' à ' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
+// Rejoue le rendu des blocs "Rapport terrain" : utilisé quand la nature de mission
+// ou le client change, pour que le formulaire lié se remette à jour.
+window._refreshRapportZones = function() {
+  document.querySelectorAll('#passagesContainer > [id^="passage_"]').forEach(div => {
+    const n = div.id.replace('passage_', '');
+    try { renderRapportZone(n); } catch(e) {}
+  });
+};
+
 window.renderRapportZone = function(n) {
   const zone = document.getElementById('rapportZone' + n);
   if (!zone) return;
@@ -1793,9 +1802,17 @@ function buildKizeoControl(n) {
   try { kizeoPush = JSON.parse(document.getElementById('passage_' + n)?.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }
   // Le formulaire et le technicien utilisés au dernier envoi sont conservés (sinon
   // le select revient sur le premier de la liste à chaque re-render).
-  const formOpts = forms.map(f => `<option value="${f.id}" ${kizeoPush && kizeoPush.kizeoFormDocId === f.id ? 'selected' : ''}>${(f.nom||'Formulaire').replace(/"/g,'&quot;')}</option>`).join('');
-  const techOpts = techMatches.map(t => `<option value="${t.kizeoUserId}" ${kizeoPush && String(kizeoPush.recipientUserId) === String(t.kizeoUserId) ? 'selected' : ''}>${(t.nomComplet||t.nom).replace(/"/g,'&quot;')}</option>`).join('');
   const num = parseInt(document.getElementById('fPassageNum' + n)?.value) || n;
+  // Formulaire lié au dossier (nature de mission + client + passage). Il n'est que
+  // présélectionné : la liste reste complète et modifiable. Un passage déjà envoyé
+  // garde le formulaire réellement utilisé.
+  const lie = window._findKizeoFormLie(
+    document.getElementById('fNature')?.value || '',
+    document.getElementById('fClient')?.value || '',
+    num);
+  const selId = kizeoPush ? kizeoPush.kizeoFormDocId : (lie ? lie.id : '');
+  const formOpts = forms.map(f => `<option value="${f.id}" ${String(selId) === String(f.id) ? 'selected' : ''}>${(f.nom||'Formulaire').replace(/"/g,'&quot;')}${lie && lie.id === f.id ? ' (lié)' : ''}</option>`).join('');
+  const techOpts = techMatches.map(t => `<option value="${t.kizeoUserId}" ${kizeoPush && String(kizeoPush.recipientUserId) === String(t.kizeoUserId) ? 'selected' : ''}>${(t.nomComplet||t.nom).replace(/"/g,'&quot;')}</option>`).join('');
   const bc = (document.getElementById('fBC')?.value || document.getElementById('fPL')?.value || '').trim();
   const passageLabel = num === 1 ? '1er passage' : num + 'ème passage';
   const defLabel = ((bc ? bc + ' - ' : '') + passageLabel).replace(/"/g,'&quot;');
@@ -4539,6 +4556,7 @@ window.renderNatureField = function(id, val) {
   wrap.innerHTML = html;
   const el = document.getElementById(id);
   if (el) el.dataset.prev = val;
+  if (id === 'fNature' && window._refreshRapportZones) window._refreshRapportZones();
 };
 
 // Point d'entrée unique utilisé par les formulaires
@@ -4553,7 +4571,11 @@ window.refreshNatureFields = function() {
 };
 
 window.onNatureChange = function(el) {
-  if (el.value !== '__new__') { el.dataset.prev = el.value; return; }
+  if (el.value !== '__new__') {
+    el.dataset.prev = el.value;
+    if (el.id === 'fNature' && window._refreshRapportZones) window._refreshRapportZones();
+    return;
+  }
   const prev = el.dataset.prev || '';
   const saisie = (prompt('Nouvelle nature de mission :') || '').trim();
   if (!saisie) { el.value = prev; return; }
@@ -4947,6 +4969,28 @@ async function loadTechniciens() {
   populateTechChips();
 }
 window._loadTechniciens = loadTechniciens;
+
+// Formulaire Kizeo lié à un dossier : croise la nature de mission, le client et
+// le numéro de passage renseignés dans la config du formulaire (kizeo-config.html).
+// Un formulaire n'est candidat que s'il porte au moins une nature ET un client.
+// Le plus précis gagne : celui qui cible un passage précis passe devant.
+window._findKizeoFormLie = function(nature, client, num) {
+  nature = (nature || '').trim();
+  client = (client || '').trim();
+  if (!nature || !client) return null;
+  const forms = window._kizeoForms || [];
+  const cands = forms.filter(f => {
+    const nats = f.naturesMission || [], cls = f.clientsLies || [];
+    if (!nats.length || !cls.length) return false;
+    if (!nats.includes(nature) || !cls.includes(client)) return false;
+    const p = f.passageLie || '';
+    if (!p) return true;
+    return p === '1' ? num === 1 : num >= 2;
+  });
+  if (!cands.length) return null;
+  cands.sort((a, b) => ((b.passageLie ? 1 : 0) - (a.passageLie ? 1 : 0)));
+  return cands[0];
+};
 
 async function loadKizeoForms() {
   const snap = await getDocs(collection(db, 'kizeo-forms'));
