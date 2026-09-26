@@ -1601,12 +1601,32 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   // Téléchargement du fichier (PDF ou Excel selon la config du formulaire)
   const typeSortie = formConf.typeSortie === "excel" ? "excel" : "pdf";
   let fileBuffer, ext, contentType;
+  let sourceXlsxBuffer = null;      // Excel d'origine quand le PDF est reconstruit
+  let erreurReconstruction = null;  // raison d'un repli sur l'Excel
   if (typeSortie === "excel") {
     if (!formConf.exportId) { console.error(`Kizeo: exportId manquant pour le formulaire ${formId}`); return false; }
     const ex = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/exports/${encodeURIComponent(formConf.exportId)}`, null, true);
     if (ex.status !== 200) { console.error(`Kizeo: export Excel échoué (${ex.status}) pour ${dataId}`); return false; }
     fileBuffer = ex.body; ext = "xlsx";
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    // Formulaire marqué "Reconstruire le rapport en PDF" (kizeo-config) : l'Excel
+    // revenu de Kizeo sert de source à un PDF structuré par chambre, et c'est lui
+    // qui poursuit le circuit. L'Excel d'origine est quand même archivé plus bas.
+    if (formConf.reconstruirePdf === true) {
+      try {
+        const { reconstruireEnPdf } = require("./rapport-pdf");
+        const r = await reconstruireEnPdf(fileBuffer);
+        sourceXlsxBuffer = fileBuffer;
+        fileBuffer = r.pdf; ext = "pdf"; contentType = "application/pdf";
+        console.log(`Kizeo: rapport ${dataId} reconstruit en PDF (${r.nbChambres} chambre(s), ${r.photosManquantes} photo(s) manquante(s))`);
+      } catch (e) {
+        // Jamais bloquant : l'Excel part tel quel et la ligne porte la raison,
+        // sinon un modèle inattendu bloquerait le rapport indéfiniment.
+        erreurReconstruction = e.message;
+        console.error(`Kizeo: reconstruction PDF échouée pour ${dataId}:`, e.message);
+      }
+    }
   } else {
     const pdf = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
     if (pdf.status !== 200) { console.error(`Kizeo: téléchargement PDF échoué (${pdf.status}) pour ${dataId}`); return false; }
@@ -1632,6 +1652,24 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   }
   const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
 
+  // Excel d'origine conservé quand le PDF a été reconstruit : il n'apparaît pas
+  // dans le circuit, il sert à comprendre si un PDF sort de travers. Son échec
+  // d'archivage ne remet pas en cause le rapport lui-même.
+  let sourceXlsxUrl = null;
+  if (sourceXlsxBuffer) {
+    try {
+      const pathXlsx = `reception/${folder}/source-xlsx/${Date.now()}_${nomBase}.xlsx`;
+      const tokenXlsx = crypto.randomUUID();
+      await bucket.file(pathXlsx).save(sourceXlsxBuffer, {
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        metadata: { metadata: { firebaseStorageDownloadTokens: tokenXlsx } },
+      });
+      sourceXlsxUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(pathXlsx)}?alt=media&token=${tokenXlsx}`;
+    } catch (e) {
+      console.error(`Kizeo: archivage de l'Excel source échoué pour ${dataId}:`, e.message);
+    }
+  }
+
   const now = new Date().toISOString();
   const docData = {
     kizeoDataId: String(dataId),
@@ -1648,9 +1686,11 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     bc,
     numPassage,
     passageLabel,
-    type: typeSortie,
+    type: ext === "pdf" ? "pdf" : typeSortie,
     typeRapport: formConf.nature === "absence-annulation" ? "absence-annulation" : "intervention",
     fileUrl,
+    sourceXlsxUrl,
+    erreurReconstruction,
     gsheetId: null,
     gsheetUrl: null,
     statut: "a-traiter",
@@ -1682,7 +1722,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
 // à faire tourner (KIZEO_WEBHOOK_SECRET) s'il est un jour compromis.
 exports.kizeoWebhook = functions
   .region("europe-west1")
-  .runWith({ secrets: [KIZEO_API_TOKEN, KIZEO_WEBHOOK_SECRET] })
+  .runWith({ timeoutSeconds: 300, memory: "1GB", secrets: [KIZEO_API_TOKEN, KIZEO_WEBHOOK_SECRET] })
   .https.onRequest(async (req, res) => {
     if (req.get("X-Kizeo-Secret") !== KIZEO_WEBHOOK_SECRET.value()) {
       res.status(401).json({ error: "Non autorisé" });
@@ -1712,7 +1752,7 @@ exports.kizeoWebhook = functions
 // le canal "espace-client" et les marque lues une fois traitées.
 exports.kizeoPull = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 300, secrets: [KIZEO_API_TOKEN] })
+  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: [KIZEO_API_TOKEN] })
   .pubsub.schedule("every 15 minutes")
   .timeZone("Europe/Paris")
   .onRun(async () => {
@@ -1781,7 +1821,7 @@ exports.kizeoPull = functions
 // et ne marque rien comme lu (le pull reste seul à le faire).
 exports.kizeoRattrapage = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 540, memory: "512MB", secrets: [KIZEO_API_TOKEN] })
+  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: [KIZEO_API_TOKEN] })
   .pubsub.schedule("every day 05:30")
   .timeZone("Europe/Paris")
   .onRun(async () => {

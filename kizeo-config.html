@@ -217,6 +217,16 @@
           <div class="form-hint">Détermine où il est classé dans Gestion rapports et l'espace client.</div>
         </div>
       </div>
+      <div class="form-row" style="margin-top:16px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="chip" style="cursor:pointer;">
+            <input type="checkbox" id="fReconstruirePdf">
+            Reconstruire le rapport en PDF
+          </label>
+          <div class="form-hint">L'Excel revenu de Kizeo est retransformé en PDF structuré (en-tête, puis une section par chambre avec ses photos). C'est ce PDF qui arrive dans Gestion rapports et part au client. Réservé aux formulaires Excel à tableau.</div>
+        </div>
+      </div>
+
       <div class="section-sep">Liaison au suivi (optionnel)</div>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">
         Renseignez au minimum une <strong>nature de mission</strong> et un <strong>client</strong> pour que ce formulaire
@@ -453,7 +463,7 @@ function render(forms) {
     return `<div class="source-card">
       <div class="source-card-header">
         <div class="source-card-info">
-          <div class="source-card-top"><div class="source-name">${f.nom || "—"}</div>${badge}${natureBadge}</div>
+          <div class="source-card-top"><div class="source-name">${f.nom || "—"}</div>${badge}${natureBadge}${f.reconstruirePdf ? '<span class="badge-type" style="background:#F3E8FF;color:#7C3AED;">PDF reconstruit</span>' : ""}</div>
           <div class="source-freq">formId ${f.formId || "—"}</div>
         </div>
         <div class="source-card-actions">
@@ -557,6 +567,7 @@ window.openModal = async function(docId) {
     selectType(f.typeSortie || "pdf");
     document.getElementById("fNature").value = f.nature || "intervention";
     document.getElementById("fPassageLie").value = f.passageLie || "";
+    document.getElementById("fReconstruirePdf").checked = f.reconstruirePdf === true;
     renderChips("fNaturesMission", naturesMission, f.naturesMission || []);
     renderChips("fClientsLies", clientsComptes, f.clientsLies || []);
     current = f.mapping || {};
@@ -566,6 +577,7 @@ window.openModal = async function(docId) {
     selectType("pdf");
     document.getElementById("fNature").value = "intervention";
     document.getElementById("fPassageLie").value = "";
+    document.getElementById("fReconstruirePdf").checked = false;
     renderChips("fNaturesMission", naturesMission, []);
     renderChips("fClientsLies", clientsComptes, []);
   }
@@ -602,9 +614,10 @@ window.saveForm = async function() {
   const naturesLiees = readChips("fNaturesMission");
   const clientsLies = readChips("fClientsLies");
   const passageLie = document.getElementById("fPassageLie").value;
+  const reconstruirePdf = document.getElementById("fReconstruirePdf").checked;
 
   const data = { nom, formId, typeSortie, nature, exportId, mapping,
-    naturesMission: naturesLiees, clientsLies, passageLie,
+    naturesMission: naturesLiees, clientsLies, passageLie, reconstruirePdf,
     updatedAt: new Date().toISOString() };
   const btn = document.getElementById("saveBtn");
   btn.disabled = true; btn.textContent = "Enregistrement...";
