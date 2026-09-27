@@ -360,6 +360,9 @@ let _entites = [];    // entités de facturation du client sélectionné
 window._devisLignes = [];
 
 const STATUTS = ['Brouillon', 'Envoyé', 'Accepté', 'Refusé'];
+// Existence des interventions liées, vérifiée une fois par suiviId puis gardée :
+// sans ça on renverrait vers un dossier supprimé entre-temps.
+const _suiviVivants = {};
 const CHIP = { 'Brouillon': 'chip-brouillon', 'Envoyé': 'chip-envoye', 'Accepté': 'chip-accepte', 'Refusé': 'chip-refuse' };
 
 document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -477,7 +480,9 @@ function renderTable(list) {
       actions += ' <button class="btn-action btn-accepte" onclick="accepterDevis(\'' + d.id + '\')">Accepté</button>';
       actions += ' <button class="btn-action btn-refuse" onclick="marquerDevis(\'' + d.id + '\',\'Refusé\')">Refusé</button>';
     }
-    if (d.suiviId) actions += ' <a class="btn-action btn-chorus" href="suivi.html" title="Une intervention a été créée dans le Suivi">Intervention ✓</a>';
+    // Le dossier a pu être supprimé du Suivi depuis : on ne renvoie pas vers un
+    // dossier qui n'existe plus.
+    if (d.suiviId && _suiviVivants[d.suiviId] === true) actions += ' <a class="btn-action btn-chorus" href="suivi.html" title="Une intervention a été créée dans le Suivi">Intervention ✓</a>';
     actions += ' <button class="btn-action btn-del" onclick="supprimerDevis(\'' + d.id + '\')">Sup.</button>';
     return '<tr>'
       + '<td class="client-cell">' + esc(d.client || '—') + '</td>'
@@ -527,10 +532,21 @@ window.accepterDevis = async function(id) {
 
 window.supprimerDevis = async function(id) {
   const d = devisList.find(x => x.id === id) || {};
-  const avert = d.numDevis ? '\n\nLe devis ' + d.numDevis + ' restera dans Axonaut, seule la ligne de cette page est supprimée.' : '';
-  if (!confirm('Supprimer cette ligne de devis ?' + avert)) return;
-  try { await window._deleteDevis(id); showToast('Ligne supprimée.'); }
-  catch(e) { showToast('Erreur : ' + e.message, true); }
+  const avert = d.numDevis ? '\n\nLe devis ' + fmtNumDevis(d.numDevis) + ' restera dans Axonaut, il n\'y est ni supprimé ni annulé.' : '';
+  // Une intervention a pu être créée à l'acceptation : on ne la supprime jamais
+  // en silence, et on ne la mentionne que si elle existe encore.
+  const interventionVivante = d.suiviId && _suiviVivants[d.suiviId] === true;
+  const mentionSuivi = interventionVivante ? '\n\nUne intervention a été créée dans le Suivi à partir de ce devis.' : '';
+  if (!confirm('Supprimer cette ligne de devis ?' + avert + mentionSuivi)) return;
+  let supprimerSuivi = false;
+  if (interventionVivante) {
+    supprimerSuivi = confirm('Supprimer aussi l\'intervention correspondante dans le Suivi ?\n\nOK : les deux sont supprimés.\nAnnuler : l\'intervention est conservée, seule la ligne de devis part.');
+  }
+  try {
+    if (supprimerSuivi) await window._deleteSuiviDevis(d.suiviId);
+    await window._deleteDevis(id);
+    showToast(supprimerSuivi ? 'Devis et intervention supprimés.' : 'Ligne de devis supprimée.');
+  } catch(e) { showToast('Erreur : ' + e.message, true); }
 };
 </script>
 <script>
@@ -820,6 +836,15 @@ window._createSuiviDepuisDevis = async function(info) {
   return ref.id;
 };
 
+// Vérifie qu'une intervention liée existe toujours, et la supprime si Yacine
+// choisit de la retirer en même temps que sa ligne de devis. La suppression
+// reste volontaire, jamais en cascade automatique.
+window._suiviExiste = async function(id) {
+  try { const snap = await getDoc(doc(db, 'suivi', id)); return snap.exists(); }
+  catch(e) { console.warn('suiviExiste:', e); return false; }
+};
+window._deleteSuiviDevis = async function(id) { await deleteDoc(doc(db, 'suivi', id)); };
+
 window._callFn = async function(name, body) {
   const idt = await auth.currentUser.getIdToken();
   const r = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/' + name, {
@@ -863,10 +888,16 @@ onAuthStateChanged(auth, async (user) => {
     if (Array.isArray(liste) && liste.length) natures = liste.slice();
   } catch(e) { console.warn('natures:', e); }
 
-  onSnapshot(query(collection(db, 'devis'), orderBy('createdAt', 'desc')), (snap) => {
+  onSnapshot(query(collection(db, 'devis'), orderBy('createdAt', 'desc')), async (snap) => {
     devisList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     window.devisList = devisList;
     populateClientFilter();
+    applyFilters();
+    // Interventions liées : une lecture par suiviId encore inconnu, puis on
+    // redessine pour que le repère "Intervention ✓" colle à la réalité.
+    const aVerifier = [...new Set(devisList.map(d => d.suiviId).filter(id => id && _suiviVivants[id] === undefined))];
+    if (!aVerifier.length) return;
+    await Promise.all(aVerifier.map(async id => { _suiviVivants[id] = await window._suiviExiste(id); }));
     applyFilters();
   });
 });
