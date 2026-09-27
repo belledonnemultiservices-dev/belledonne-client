@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devis — Belledonne</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#0D1B2A;--navy-mid:#1A2E42;--navy-light:#243B52;
+    --green:#2ECC8F;--green-dark:#1DA870;--green-pale:#E8F9F2;
+    --amber:#F5A623;
+    --text:#0D1B2A;--text-mid:#4A6078;--text-muted:#8FA4B8;
+    --border:rgba(13,27,42,0.09);--surface:#FFFFFF;--bg:#F2F5F8;
+    --sidebar-w:240px;--radius:14px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;}
+  .sidebar{width:var(--sidebar-w);background:var(--navy);height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:100;}
+  .logo-wrap{padding:20px 16px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo-icon{width:36px;height:36px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+  .logo-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#fff;}
+  .logo-tagline{font-size:10px;color:rgba(255,255,255,0.4);}
+  .sidebar-client{margin:16px 16px 0;background:rgba(255,255,255,0.05);border-radius:var(--radius-sm);padding:12px 14px;}
+  .client-name{font-size:13px;font-weight:600;color:#fff;}
+  .client-contract{font-size:11px;color:var(--green);margin-top:2px;}
+  .sidebar-nav{flex:1;padding:16px 12px;overflow-y:auto;}
+  .nav-group-label{font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.25);padding:8px 4px 6px;margin-top:8px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;margin-bottom:2px;text-decoration:none;}
+  .nav-item:hover{background:rgba(255,255,255,0.07);color:#fff;}
+  .nav-item.active{background:var(--green);color:var(--navy);font-weight:500;}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0;}
+  .sidebar-footer{padding:12px;border-top:1px solid rgba(255,255,255,0.07);}
+  .footer-user{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);}
+  .f-avatar{width:32px;height:32px;border-radius:50%;background:var(--navy-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--green);flex-shrink:0;}
+  .footer-name{font-size:13px;font-weight:500;color:#fff;}
+  .footer-role{font-size:11px;color:rgba(255,255,255,0.4);}
+  .admin-badge{margin:12px 16px 0;background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius-sm);padding:8px 12px;display:flex;align-items:center;gap:8px;}
+  .admin-badge svg{width:14px;height:14px;color:var(--amber);flex-shrink:0;}
+  .admin-badge span{font-size:11px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:0.06em;}
+  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+  .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);}
+  .breadcrumb span:last-child{color:var(--text);font-weight:500;}
+  .date-chip{font-size:12px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:6px 12px;border-radius:20px;}
+  .content{padding:28px 32px;flex:1;}
+  .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;}
+  .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px;}
+  .page-sub{font-size:14px;color:var(--text-muted);}
+  .filters-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+  .search-wrap{position:relative;flex:1;min-width:220px;}
+  .search-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted);pointer-events:none;}
+  .search-input{width:100%;height:42px;padding:0 14px 0 40px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .search-input:focus{border-color:var(--green);}
+  .filter-select{height:42px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);outline:none;cursor:pointer;}
+  .results-count{font-size:13px;color:var(--text-muted);white-space:nowrap;margin-left:auto;}
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;}
+  .fact-table{width:100%;border-collapse:collapse;min-width:900px;}
+  .fact-table thead th{padding:11px 14px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:500;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);}
+  .fact-table tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+  .fact-table tbody tr:last-child{border-bottom:none;}
+  .fact-table tbody tr:hover{background:var(--bg);}
+  .fact-table td{padding:12px 14px;font-size:13px;color:var(--text-mid);vertical-align:middle;}
+  .fact-table td.client-cell{font-weight:600;color:var(--text);}
+  .chip{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap;}
+  .chip-a-facturer{background:#FEF3CD;color:#996600;}
+  .chip-facture{background:#DBEAFE;color:#1D4ED8;}
+  .chip-envoye{background:#FEF3CD;color:#B45309;}
+  .chip-chorus{background:#EEF2FF;color:#4338CA;}
+  .chip-paye{background:#E8F9F2;color:#1DA870;}
+  .chip-brouillon{background:#EEF2F7;color:#4A6078;}
+  .chip-accepte{background:#E8F9F2;color:#1DA870;}
+  .chip-refuse{background:#FDECEA;color:#E74C3C;}
+  .btn-accepte{color:#1DA870;background:#E8F9F2;}
+  .btn-refuse{color:#E74C3C;background:#FDECEA;}
+  .btn-new{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 18px;background:var(--navy);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#fff;cursor:pointer;white-space:nowrap;}
+  .btn-new:hover{background:var(--navy-mid);}
+  .btn-ghost{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;white-space:nowrap;text-decoration:none;}
+  .montant-cell{font-family:monospace;font-size:13px;font-weight:600;color:var(--text);}
+  .pdf-link{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--green-dark);text-decoration:none;background:var(--green-pale);padding:4px 10px;border-radius:6px;white-space:nowrap;}
+  .pdf-link:hover{background:#D0F3E7;}
+  .pdf-link svg{width:11px;height:11px;flex-shrink:0;}
+  .btn-action{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+  .btn-completer{color:#fff;background:var(--navy);}
+  .btn-chorus{color:#4338CA;background:#EEF2FF;}
+  .btn-envoye{color:#B45309;background:#FEF3CD;}
+  .btn-paye{color:#1DA870;background:#E8F9F2;}
+  .btn-del{color:#E74C3C;background:#FDECEA;}
+  .period-bar{display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+  .period-btn{font-size:12px;font-weight:500;padding:6px 14px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+  .period-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .period-label{font-size:11px;color:var(--text-muted);font-weight:500;}
+  .period-date-input{height:32px;border:1px solid var(--border);border-radius:8px;padding:0 10px;font-size:12px;color:var(--text);background:var(--bg-card);font-family:'DM Sans',sans-serif;cursor:pointer;outline:none;transition:border-color 0.15s;}
+  .period-date-input:focus{border-color:var(--green);}
+  .period-sep{width:1px;height:20px;background:var(--border);margin:0 2px;}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border-radius:var(--radius);width:640px;max-width:100%;box-shadow:0 24px 60px rgba(13,27,42,0.2);margin:auto;}
+  .modal-header{padding:22px 28px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;border-radius:var(--radius) var(--radius) 0 0;}
+  .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
+  .modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:18px;color:var(--text-mid);display:flex;align-items:center;justify-content:center;}
+  .modal-body{padding:24px 28px;}
+  .modal-footer{padding:16px 28px 24px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);}
+  .form-section{margin-bottom:20px;}
+  .form-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-full{grid-column:1/-1;}
+  .form-group{display:flex;flex-direction:column;gap:5px;}
+  .form-label{font-size:12px;font-weight:500;color:var(--text-mid);}
+  .form-label .opt{font-weight:400;color:var(--text-muted);font-size:11px;}
+  .form-input,.form-select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color 0.15s;}
+  .form-input:focus,.form-select:focus{border-color:var(--green);background:#fff;}
+  .form-input[readonly]{background:var(--bg);color:var(--text-mid);cursor:default;}
+  .info-row{display:flex;gap:16px;padding:12px 14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:18px;}
+  .info-item{display:flex;flex-direction:column;gap:2px;}
+  .info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:500;}
+  .info-value{font-size:13px;font-weight:600;color:var(--text);}
+  .drop-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center;background:var(--bg);cursor:pointer;transition:all 0.15s;}
+  .drop-zone.drag-over{border-color:var(--green);background:var(--green-pale);}
+  .drop-zone-text{font-size:12px;color:var(--text-muted);}
+  .drop-zone-btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:var(--navy);background:#EBF0F5;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:8px;}
+  .drop-zone-chosen{font-size:12px;font-weight:600;color:var(--green-dark);margin-top:6px;display:none;}
+  .btn-save{display:inline-flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border:none;padding:11px 24px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;}
+  .btn-save:hover{background:var(--navy-mid);}
+  .btn-cancel{height:42px;padding:0 18px;border:1px solid var(--border);background:transparent;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-mid);cursor:pointer;}
+  #toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;z-index:999;opacity:0;transform:translateY(10px);transition:all 0.3s;pointer-events:none;}
+  #toast.show{opacity:1;transform:translateY(0);}
+  .stats-bar{display:flex;gap:16px;margin-bottom:24px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 20px;display:flex;flex-direction:column;gap:4px;min-width:160px;}
+  .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-weight:500;}
+  .stat-value{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:var(--text);}
+  .stat-sub{font-size:11px;color:var(--text-muted);}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo-wrap">
+    <div class="logo-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+    <div><div class="logo-name">BELLEDONNE</div><div class="logo-tagline">Multiservices</div></div>
+  </div>
+  <div class="sidebar-client">
+    <div class="client-name" id="sideClientName">—</div>
+    <div class="client-contract" id="sideClientId"></div>
+  </div>
+  <div class="admin-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Espace Admin</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Principal</div>
+    <a class="nav-item" href="dashboard.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg><span>Tableau de bord</span></a>
+    <a class="nav-item" href="suivi.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span>Suivi interventions</span></a>
+    <a class="nav-item" href="rapports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg><span>Rapports d'intervention</span></a>
+    <a class="nav-item" href="garanties-client.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span>Garanties</span></a>
+    <a class="nav-item" href="reportings.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg><span>Reportings campagnes</span></a>
+    <a class="nav-item active" href="devis.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg><span>Devis</span></a>
+    <a class="nav-item" href="facturation.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg><span>Facturation</span></a>
+    <a class="nav-item" href="absents.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z"/></svg><span>Absents / Annulations</span></a>
+    <div class="nav-group-label">Documentation</div>
+    <a class="nav-item" href="produits.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg><span>Fiches produits & FDS</span></a>
+    <a class="nav-item" href="protocoles.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg><span>Protocoles d'intervention</span></a>
+    <div class="nav-group-label" style="color:rgba(245,166,35,0.6);">Administration</div>
+    <a class="nav-item" href="admin.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span>Comptes clients</span></a>
+    <a class="nav-item" href="contacts.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>Contacts & notifs</span></a>
+    <a class="nav-item" href="techniciens.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span>Techniciens</span></a>
+    <a class="nav-item" href="imports.html"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span>Import email</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="footer-user">
+      <div class="f-avatar" id="sideAvatar">—</div>
+      <div><div class="footer-name" id="sideFooterName">—</div><div class="footer-role">Administrateur</div></div>
+    </div>
+    <button onclick="handleLogout()" style="width:100%;margin-top:8px;padding:8px 12px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='rgba(231,76,60,0.15)';this.style.color='#E74C3C'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.5)'">
+      <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Se déconnecter
+    </button>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Administration</span><span>›</span><span>Facturation</span></div>
+    <div class="date-chip" id="dateChip"></div>
+
+<div class="main">
+  <header class="topbar">
+    <div class="breadcrumb"><span>Administration</span><span>›</span><span>Devis</span></div>
+    <div class="date-chip" id="dateChip"></div>
+  </header>
+
+  <div class="content">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Devis</div>
+        <div class="page-sub">Devis générés dans Axonaut — du chiffrage à l'acceptation</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <a class="btn-ghost" href="facturation.html#config" title="Les tarifs et les entités sont communs aux devis et aux factures">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M19.14 12.94a7.07 7.07 0 000-1.88l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6-.22l-2.39.96a7.03 7.03 0 00-1.62-.94l-.36-2.54a.5.5 0 00-.5-.42h-3.84a.5.5 0 00-.5.42l-.36 2.54c-.58.24-1.12.56-1.62.94l-2.39-.96a.5.5 0 00-.6.22L2.67 8.84a.5.5 0 00.12.64l2.03 1.58a7.07 7.07 0 000 1.88l-2.03 1.58a.5.5 0 00-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.58-.24 1.12-.56 1.62-.94l2.39.96c.22.08.47 0 .6-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg>
+          Tarifs & entités
+        </a>
+        <button class="btn-new" onclick="openModalDevis()">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:15px;height:15px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Nouveau devis
+        </button>
+      </div>
+    </div>
+
+    <div class="stats-bar" id="statsBar"></div>
+
+    <div class="period-bar">
+      <span class="period-label">Période</span>
+      <button class="period-btn" onclick="setPeriodDates('mois', this)">Ce mois</button>
+      <button class="period-btn" onclick="setPeriodDates('trimestre', this)">Ce trimestre</button>
+      <button class="period-btn" onclick="setPeriodDates('annee', this)">Cette année</button>
+      <div class="period-sep"></div>
+      <span class="period-label">Du</span>
+      <input type="date" class="period-date-input" id="dateFrom" onchange="clearPeriodBtns();applyFilters()">
+      <span class="period-label">au</span>
+      <input type="date" class="period-date-input" id="dateTo" onchange="clearPeriodBtns();applyFilters()">
+      <button class="period-btn" onclick="clearDateRange()">Tout</button>
+    </div>
+
+    <div class="filters-bar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 001.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 00-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 005.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49L15.5 14z"/></svg>
+        <input class="search-input" id="search" placeholder="Rechercher un client, un objet, un n° de devis..." oninput="applyFilters()">
+      </div>
+      <select class="filter-select" id="filterClient" onchange="applyFilters()"><option value="">Tous les clients</option></select>
+      <select class="filter-select" id="filterStatut" onchange="applyFilters()">
+        <option value="">Tous les statuts</option>
+        <option>Brouillon</option>
+        <option>Envoyé</option>
+        <option>Accepté</option>
+        <option>Refusé</option>
+      </select>
+      <span class="results-count" id="resultsCount">—</span>
+    </div>
+
+    <div class="table-wrap">
+      <table class="fact-table">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Objet</th>
+            <th>Adresse</th>
+            <th>Date</th>
+            <th>Montant HT</th>
+            <th>N° Devis</th>
+            <th>PDF</th>
+            <th>Statut</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE DEVIS -->
+<div class="modal-overlay" id="modalDevis">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalDevisTitle">Nouveau devis</div>
+      <button class="modal-close" onclick="closeModalDevis()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-section">
+        <div class="form-section-title">Client</div>
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">Client</label>
+            <input class="form-input" id="dClient" list="clientsDatalist" placeholder="Nom du client..." oninput="onClientDevisChange()">
+            <datalist id="clientsDatalist"></datalist>
+          </div>
+          <div class="form-group form-full" id="dEntiteGroup" style="display:none;">
+            <label class="form-label">Entité à facturer <span class="opt">— préremplit les coordonnées</span></label>
+            <select class="form-select" id="dEntite" onchange="onEntiteDevisChange()"></select>
+          </div>
+        </div>
+        <div class="form-grid" id="devisClientManuel" style="margin-top:14px;">
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select class="form-select" id="dcType">
+              <option value="bailleur">Bailleur social / public</option>
+              <option value="entreprise">Entreprise</option>
+              <option value="particulier">Particulier</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Raison sociale / Nom</label>
+            <input class="form-input" id="dcNom">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Adresse de facturation</label>
+            <input class="form-input" id="dcAdresse">
+          </div>
+          <div class="form-group"><label class="form-label">Code postal</label><input class="form-input" id="dcCP"></div>
+          <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="dcVille"></div>
+          <div class="form-group"><label class="form-label">SIRET <span class="opt">— optionnel</span></label><input class="form-input" id="dcSiret"></div>
+          <div class="form-group"><label class="form-label">N° TVA <span class="opt">— optionnel</span></label><input class="form-input" id="dcTva"></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Devis</div>
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">Objet</label>
+            <input class="form-input" id="dObjet" placeholder="ex: Traitement punaises de lit - 3 logements">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">Adresse d'intervention <span class="opt">— reprise dans l'intervention si le devis est accepté</span></label>
+            <input class="form-input" id="dAdresse">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nature de la mission</label>
+            <div id="dNatureWrap"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date</label>
+            <input class="form-input" type="date" id="dDate">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Lignes</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">
+          Tape librement une désignation et son prix, ou choisis une prestation du BPU du client pour remplir le prix automatiquement.
+        </div>
+        <datalist id="bpuDatalist"></datalist>
+        <div id="devisLignes"></div>
+        <button type="button" class="drop-zone-btn" onclick="addDevisLigne()" style="margin-top:0;">+ Ajouter une ligne</button>
+        <div style="display:flex;gap:18px;justify-content:flex-end;margin-top:14px;font-size:13px;">
+          <div>Total HT <b id="dTotalHT" style="font-family:monospace;">0.00 €</b></div>
+          <div>TVA <b id="dTotalTVA" style="font-family:monospace;">0.00 €</b></div>
+          <div>TTC <b id="dTotalTTC" style="font-family:monospace;">0.00 €</b></div>
+        </div>
+      </div>
+
+      <div class="form-section" style="margin-bottom:0;">
+        <div class="form-section-title">Axonaut</div>
+        <div id="devisExistant" style="display:none;font-size:12px;color:var(--text-mid);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;"></div>
+        <button type="button" class="btn-save" id="btnGenAxonaut" onclick="genererDevisAxonaut()">Générer le devis dans Axonaut</button>
+        <div id="axonautMsg" style="font-size:12px;margin-top:8px;"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModalDevis()">Fermer</button>
+      <button class="btn-save" onclick="saveDevis()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── ÉTAT ──
+let devisList = [];
+let editDevisId = null;
+let _bpu = [];        // prestations du client sélectionné
+let _entites = [];    // entités de facturation du client sélectionné
+window._devisLignes = [];
+
+const STATUTS = ['Brouillon', 'Envoyé', 'Accepté', 'Refusé'];
+const CHIP = { 'Brouillon': 'chip-brouillon', 'Envoyé': 'chip-envoye', 'Accepté': 'chip-accepte', 'Refusé': 'chip-refuse' };
+
+document.getElementById('dateChip').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+function showToast(msg, isErr) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isErr ? '#E74C3C' : 'var(--navy)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return isNaN(dt) ? '—' : dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+function fmtMontant(v) {
+  const n = Number(v);
+  return isNaN(n) || !n ? '—' : n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+}
+
+// ── FILTRES ──
+function setPeriodDates(period, btn) {
+  const now = new Date();
+  let from, to;
+  if (period === 'mois') { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth() + 1, 0); }
+  else if (period === 'trimestre') { const q = Math.floor(now.getMonth() / 3); from = new Date(now.getFullYear(), q * 3, 1); to = new Date(now.getFullYear(), q * 3 + 3, 0); }
+  else { from = new Date(now.getFullYear(), 0, 1); to = new Date(now.getFullYear(), 11, 31); }
+  document.getElementById('dateFrom').value = from.toISOString().slice(0, 10);
+  document.getElementById('dateTo').value = to.toISOString().slice(0, 10);
+  clearPeriodBtns();
+  if (btn) btn.classList.add('active');
+  applyFilters();
+}
+function clearPeriodBtns() { document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active')); }
+function clearDateRange() {
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  clearPeriodBtns();
+  applyFilters();
+}
+function getFiltered() {
+  const q = (document.getElementById('search').value || '').toLowerCase().trim();
+  const cl = document.getElementById('filterClient').value;
+  const st = document.getElementById('filterStatut').value;
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  return devisList.filter(d => {
+    if (cl && d.client !== cl) return false;
+    if (st && (d.statut || 'Brouillon') !== st) return false;
+    const ref = (d.dateDevis || (d.createdAt || '').slice(0, 10) || '');
+    if (from && ref < from) return false;
+    if (to && ref > to) return false;
+    if (q) {
+      const hay = [d.client, d.objet, d.numDevis, d.adresse, d.nature].map(v => (v || '').toLowerCase()).join(' ');
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+function applyFilters() {
+  const list = getFiltered();
+  document.getElementById('resultsCount').textContent = list.length + (list.length > 1 ? ' devis' : ' devis');
+  updateStats(list);
+  renderTable(list);
+}
+function populateClientFilter() {
+  const sel = document.getElementById('filterClient');
+  const cur = sel.value;
+  const noms = [...new Set(devisList.map(d => d.client).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  sel.innerHTML = '<option value="">Tous les clients</option>' + noms.map(n => '<option>' + esc(n) + '</option>').join('');
+  sel.value = cur;
+}
+function updateStats(list) {
+  const total = list.reduce((s, d) => s + (Number(d.montantHT) || 0), 0);
+  const acceptes = list.filter(d => d.statut === 'Accepté');
+  const attente = list.filter(d => (d.statut || 'Brouillon') === 'Brouillon' || d.statut === 'Envoyé');
+  const totalAcc = acceptes.reduce((s, d) => s + (Number(d.montantHT) || 0), 0);
+  const carte = (label, val, sub) => '<div class="stat-card"><div class="stat-label">' + label + '</div><div class="stat-value">' + val + '</div><div class="stat-sub">' + sub + '</div></div>';
+  document.getElementById('statsBar').innerHTML =
+    carte('Devis', list.length, fmtMontant(total) + ' HT au total') +
+    carte('En attente', attente.length, 'brouillons et envoyés') +
+    carte('Acceptés', acceptes.length, fmtMontant(totalAcc) + ' HT gagnés') +
+    carte('Refusés', list.filter(d => d.statut === 'Refusé').length, 'sur la période');
+}
+
+// ── TABLEAU ──
+function renderTable(list) {
+  const tb = document.getElementById('tbody');
+  if (!list.length) {
+    tb.innerHTML = '<tr><td colspan="9"><div class="empty-state">Aucun devis. Clique sur <strong>Nouveau devis</strong> pour en créer un.</div></td></tr>';
+    return;
+  }
+  tb.innerHTML = list.map(d => {
+    const statut = d.statut || 'Brouillon';
+    const pdf = d.devisUrl
+      ? '<a class="pdf-link" href="' + esc(d.devisUrl) + '" target="_blank"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>PDF</a>'
+      : '<span style="color:var(--text-muted);">—</span>';
+    // L'acceptation crée l'intervention : on ne la propose qu'une fois, et on
+    // signale ensuite que le dossier existe déjà dans le Suivi.
+    let actions = '<button class="btn-action btn-completer" onclick="openModalDevis(\'' + d.id + '\')">Modifier</button>';
+    if (statut !== 'Accepté' && statut !== 'Refusé') {
+      if (statut === 'Brouillon' && d.numDevis) actions += ' <button class="btn-action btn-envoye" onclick="marquerDevis(\'' + d.id + '\',\'Envoyé\')">Envoyé</button>';
+      actions += ' <button class="btn-action btn-accepte" onclick="accepterDevis(\'' + d.id + '\')">Accepté</button>';
+      actions += ' <button class="btn-action btn-refuse" onclick="marquerDevis(\'' + d.id + '\',\'Refusé\')">Refusé</button>';
+    }
+    if (d.suiviId) actions += ' <a class="btn-action btn-chorus" href="suivi.html" title="Une intervention a été créée dans le Suivi">Intervention ✓</a>';
+    actions += ' <button class="btn-action btn-del" onclick="supprimerDevis(\'' + d.id + '\')">Sup.</button>';
+    return '<tr>'
+      + '<td class="client-cell">' + esc(d.client || '—') + '</td>'
+      + '<td>' + esc(d.objet || '—') + '</td>'
+      + '<td style="max-width:200px;">' + esc(d.adresse || '—') + '</td>'
+      + '<td>' + fmtDate(d.dateDevis || d.createdAt) + '</td>'
+      + '<td class="montant-cell">' + fmtMontant(d.montantHT) + '</td>'
+      + '<td>' + esc(d.numDevis || '—') + '</td>'
+      + '<td>' + pdf + '</td>'
+      + '<td><span class="chip ' + (CHIP[statut] || 'chip-brouillon') + '">' + statut + '</span></td>'
+      + '<td style="text-align:right;white-space:nowrap;">' + actions + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+// ── STATUTS ──
+window.marquerDevis = async function(id, statut) {
+  try {
+    await window._updateDevis(id, { statut, updatedAt: new Date().toISOString() });
+    showToast('Devis marqué « ' + statut + ' ».');
+  } catch(e) { showToast('Erreur : ' + e.message, true); }
+};
+
+// L'acceptation crée le dossier dans Suivi interventions, avec le n° de devis
+// et son PDF, prêt à être planifié.
+window.accepterDevis = async function(id) {
+  const d = devisList.find(x => x.id === id);
+  if (!d) return;
+  if (!confirm('Marquer ce devis accepté et créer l\'intervention correspondante dans le Suivi ?')) return;
+  try {
+    const suiviId = await window._createSuiviDepuisDevis({
+      client: d.client || '',
+      clientType: d.clientType || 'entreprise',
+      nature: d.nature || '',
+      adresse: d.adresse || '',
+      nomClient: (d.devisClient && d.devisClient.nom) || '',
+      siret: (d.devisClient && d.devisClient.siret) || '',
+      devis: d.numDevis || '',
+      devisUrl: d.devisUrl || '',
+      observations: d.objet ? ('Devis accepté : ' + d.objet) : '',
+      dateEmission: d.dateDevis || new Date().toISOString().slice(0, 10),
+    });
+    await window._updateDevis(id, { statut: 'Accepté', suiviId, dateAcceptation: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    showToast('Devis accepté — intervention créée dans le Suivi.');
+  } catch(e) { showToast('Erreur : ' + e.message, true); }
+};
+
+window.supprimerDevis = async function(id) {
+  const d = devisList.find(x => x.id === id) || {};
+  const avert = d.numDevis ? '\n\nLe devis ' + d.numDevis + ' restera dans Axonaut, seule la ligne de cette page est supprimée.' : '';
+  if (!confirm('Supprimer cette ligne de devis ?' + avert)) return;
+  try { await window._deleteDevis(id); showToast('Ligne supprimée.'); }
+  catch(e) { showToast('Erreur : ' + e.message, true); }
+};
+</script>
+<script>
+// ── NATURE DE LA MISSION ──
+// Même référentiel que le Suivi (config/naturesMission), avec repli sur la
+// liste par défaut tant que le document n'existe pas.
+const NATURES_DEFAUT = ['Punaises de lit','Punaises de lit vacant','Blattes choc','Blattes choc vacant','Dératisation','Guêpes/Frelons'];
+let natures = NATURES_DEFAUT.slice();
+
+function renderNature(val) {
+  const wrap = document.getElementById('dNatureWrap');
+  if (!wrap) return;
+  val = val || '';
+  const liste = natures.slice();
+  if (val && !liste.includes(val)) liste.push(val);
+  wrap.innerHTML = '<select class="form-select" id="dNature">'
+    + '<option value="">— Sélectionner —</option>'
+    + liste.map(n => '<option value="' + esc(n) + '"' + (n === val ? ' selected' : '') + '>' + n + '</option>').join('')
+    + '</select>';
+}
+
+// ── MODALE ──
+window.openModalDevis = async function(id) {
+  editDevisId = id || null;
+  const d = id ? (devisList.find(x => x.id === id) || {}) : {};
+  document.getElementById('modalDevisTitle').textContent = id ? 'Modifier le devis' : 'Nouveau devis';
+  document.getElementById('axonautMsg').textContent = '';
+  document.getElementById('dClient').value = d.client || '';
+  document.getElementById('dObjet').value = d.objet || '';
+  document.getElementById('dAdresse').value = d.adresse || '';
+  document.getElementById('dDate').value = d.dateDevis || new Date().toISOString().slice(0, 10);
+  renderNature(d.nature || '');
+
+  const dc = d.devisClient || {};
+  document.getElementById('dcType').value = dc.type || 'bailleur';
+  document.getElementById('dcNom').value = dc.nom || d.client || '';
+  document.getElementById('dcAdresse').value = dc.adresse || '';
+  document.getElementById('dcCP').value = dc.cp || '';
+  document.getElementById('dcVille').value = dc.ville || '';
+  document.getElementById('dcSiret').value = dc.siret || '';
+  document.getElementById('dcTva').value = dc.tva || '';
+
+  window._devisLignes = (Array.isArray(d.lignes) && d.lignes.length)
+    ? d.lignes.map(l => ({ designation: l.designation || '', qte: Number(l.qte) || 1, pu: Number(l.pu) || 0, tva: (l.tva !== undefined ? Number(l.tva) : 10) }))
+    : [{ designation: '', qte: 1, pu: 0, tva: 10 }];
+  renderDevisLignes();
+
+  // Un devis déjà généré n'est pas modifiable côté Axonaut : régénérer en crée
+  // un nouveau, l'ancien restant dans Axonaut. On le dit avant plutôt qu'après.
+  const ex = document.getElementById('devisExistant');
+  if (d.numDevis) {
+    ex.style.display = '';
+    ex.innerHTML = 'Devis <b>' + esc(d.numDevis) + '</b> déjà généré' + (d.dateDevis ? ' le ' + fmtDate(d.dateDevis) : '')
+      + '. Régénérer en crée un nouveau dans Axonaut, l\'ancien n\'est ni supprimé ni annulé.';
+    document.getElementById('btnGenAxonaut').textContent = 'Régénérer le devis dans Axonaut';
+  } else {
+    ex.style.display = 'none';
+    document.getElementById('btnGenAxonaut').textContent = 'Générer le devis dans Axonaut';
+  }
+
+  document.getElementById('modalDevis').classList.add('open');
+  await onClientDevisChange(d.entiteIdx);
+};
+
+window.closeModalDevis = function() { document.getElementById('modalDevis').classList.remove('open'); editDevisId = null; };
+
+// Changement de client : recharge son BPU et ses entités de facturation.
+window.onClientDevisChange = async function(entiteIdxVoulu) {
+  const client = (document.getElementById('dClient').value || '').trim();
+  _bpu = client ? ((await window._loadBpu(client)) || []) : [];
+  document.getElementById('bpuDatalist').innerHTML = _bpu.map(p => '<option value="' + esc(p.designation || '') + '"></option>').join('');
+  _entites = client ? ((await window._loadFactClient(client)) || []) : [];
+  const sel = document.getElementById('dEntite');
+  sel.innerHTML = _entites.map((e, i) => '<option value="' + i + '">' + esc(e.libelle || e.raisonSociale || ('Entité ' + (i + 1))) + (e.siret ? ' - SIRET ' + esc(e.siret) : '') + '</option>').join('')
+    + '<option value="manuel">— Saisie manuelle —</option>';
+  document.getElementById('dEntiteGroup').style.display = _entites.length ? '' : 'none';
+  const voulu = (entiteIdxVoulu !== undefined && entiteIdxVoulu !== null && entiteIdxVoulu !== '') ? String(entiteIdxVoulu) : (_entites.length ? '0' : 'manuel');
+  sel.value = voulu;
+  if (voulu !== 'manuel') onEntiteDevisChange();
+};
+
+window.onEntiteDevisChange = function() {
+  const v = document.getElementById('dEntite').value;
+  if (v === 'manuel') return;
+  const e = _entites[Number(v)];
+  if (!e) return;
+  document.getElementById('dcType').value = e.type || 'bailleur';
+  document.getElementById('dcNom').value = e.nom || e.raisonSociale || '';
+  document.getElementById('dcAdresse').value = e.adresse || '';
+  document.getElementById('dcCP').value = e.cp || '';
+  document.getElementById('dcVille').value = e.ville || '';
+  document.getElementById('dcSiret').value = e.siret || '';
+  document.getElementById('dcTva').value = e.tva || '';
+};
+
+// ── LIGNES ──
+function renderDevisLignes() {
+  document.getElementById('devisLignes').innerHTML = window._devisLignes.map((l, i) => {
+    const total = ((Number(l.qte) || 0) * (Number(l.pu) || 0)).toFixed(2);
+    return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px;background:#fff;">'
+      + '<input class="form-input" list="bpuDatalist" style="width:100%;margin-bottom:6px;" value="' + esc(l.designation) + '" oninput="devisLigneChg(' + i + ",'designation',this.value)\" placeholder=\"Désignation (libre ou BPU)\">"
+      + '<div style="display:flex;gap:8px;align-items:center;">'
+      + '<span style="font-size:11px;color:var(--text-muted);">Qté</span>'
+      + '<input class="form-input" type="number" min="0" step="1" style="width:56px;text-align:center;" value="' + l.qte + '" oninput="devisLigneChg(' + i + ",'qte',this.value)\">"
+      + '<span style="font-size:11px;color:var(--text-muted);">PU HT</span>'
+      + '<input class="form-input" type="number" min="0" step="0.01" style="width:82px;text-align:center;" value="' + l.pu + '" oninput="devisLigneChg(' + i + ",'pu',this.value)\">"
+      + '<span style="font-size:11px;color:var(--text-muted);">TVA %</span>'
+      + '<input class="form-input" type="number" min="0" step="1" style="width:56px;text-align:center;" value="' + l.tva + '" oninput="devisLigneChg(' + i + ",'tva',this.value)\">"
+      + '<b class="ligne-total" style="margin-left:auto;font-family:monospace;font-size:13px;">' + total + ' €</b>'
+      + '<button type="button" onclick="removeDevisLigne(' + i + ')" title="Supprimer la ligne" style="width:26px;height:32px;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;color:var(--red);font-size:16px;line-height:1;">×</button>'
+      + '</div></div>';
+  }).join('');
+  recomputeDevisTotals();
+}
+window.devisLigneChg = function(i, field, value) {
+  const l = window._devisLignes[i]; if (!l) return;
+  if (field === 'designation') {
+    l.designation = value;
+    // Désignation reprise au mot près d'une prestation du BPU : prix et TVA suivent.
+    const match = _bpu.find(p => (p.designation || '') === value);
+    if (match) { l.pu = Number(match.prix) || 0; l.tva = (match.tva !== undefined ? Number(match.tva) : 10); renderDevisLignes(); return; }
+    recomputeDevisTotals(); return;
+  }
+  l[field] = value;
+  const rows = document.getElementById('devisLignes').children;
+  if (rows[i]) { const t = rows[i].querySelector('.ligne-total'); if (t) t.textContent = ((Number(l.qte) || 0) * (Number(l.pu) || 0)).toFixed(2) + ' €'; }
+  recomputeDevisTotals();
+};
+window.addDevisLigne = function() { window._devisLignes.push({ designation: '', qte: 1, pu: 0, tva: 10 }); renderDevisLignes(); };
+window.removeDevisLigne = function(i) {
+  window._devisLignes.splice(i, 1);
+  if (!window._devisLignes.length) window._devisLignes.push({ designation: '', qte: 1, pu: 0, tva: 10 });
+  renderDevisLignes();
+};
+function recomputeDevisTotals() {
+  let ht = 0, tva = 0;
+  window._devisLignes.forEach(l => { const lh = (Number(l.qte) || 0) * (Number(l.pu) || 0); ht += lh; tva += lh * ((Number(l.tva) || 0) / 100); });
+  document.getElementById('dTotalHT').textContent = ht.toFixed(2) + ' €';
+  document.getElementById('dTotalTVA').textContent = tva.toFixed(2) + ' €';
+  document.getElementById('dTotalTTC').textContent = (ht + tva).toFixed(2) + ' €';
+  return ht;
+}
+
+// ── ENREGISTREMENT ──
+function lireFormulaireDevis() {
+  const lignes = (window._devisLignes || []).map(l => ({
+    designation: (l.designation || '').trim(), qte: Number(l.qte) || 1, pu: Number(l.pu) || 0, tva: Number(l.tva) || 0,
+  })).filter(l => l.designation || l.pu);
+  const montantHT = lignes.reduce((s, l) => s + l.qte * l.pu, 0);
+  return {
+    client: (document.getElementById('dClient').value || '').trim(),
+    objet: (document.getElementById('dObjet').value || '').trim(),
+    adresse: (document.getElementById('dAdresse').value || '').trim(),
+    nature: (document.getElementById('dNature') || {}).value || '',
+    dateDevis: document.getElementById('dDate').value || '',
+    entiteIdx: document.getElementById('dEntite').value,
+    devisClient: {
+      type: document.getElementById('dcType').value,
+      nom: (document.getElementById('dcNom').value || '').trim(),
+      adresse: (document.getElementById('dcAdresse').value || '').trim(),
+      cp: (document.getElementById('dcCP').value || '').trim(),
+      ville: (document.getElementById('dcVille').value || '').trim(),
+      siret: (document.getElementById('dcSiret').value || '').trim(),
+      tva: (document.getElementById('dcTva').value || '').trim(),
+    },
+    clientType: document.getElementById('dcType').value === 'particulier' ? 'particulier' : (document.getElementById('dcType').value === 'entreprise' ? 'entreprise' : 'contrat'),
+    lignes, montantHT,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+window.saveDevis = async function() {
+  const data = lireFormulaireDevis();
+  if (!data.client && !data.devisClient.nom) { showToast('Renseigne le client.', true); return; }
+  try {
+    if (editDevisId) {
+      await window._updateDevis(editDevisId, data);
+    } else {
+      data.statut = 'Brouillon';
+      data.createdAt = new Date().toISOString();
+      editDevisId = await window._addDevis(data);
+    }
+    showToast('Devis enregistré.');
+    closeModalDevis();
+  } catch(e) { showToast('Erreur : ' + e.message, true); }
+};
+
+// ── AXONAUT ──
+// La Cloud Function createAxonautInvoice crée un devis quand mode vaut "devis"
+// (endpoint /api/v2/quotations), et retrouve ou crée la fiche client au passage.
+window.genererDevisAxonaut = async function() {
+  const msg = document.getElementById('axonautMsg');
+  const data = lireFormulaireDevis();
+  const clientNom = data.devisClient.nom || data.client;
+  if (!clientNom) { msg.style.color = 'var(--red)'; msg.textContent = 'Renseigne le client.'; return; }
+  const lignes = data.lignes.filter(l => l.designation && l.pu > 0);
+  if (!lignes.length) { msg.style.color = 'var(--red)'; msg.textContent = 'Ajoute au moins une ligne (désignation + prix).'; return; }
+  const dejaGenere = !!(editDevisId && (devisList.find(x => x.id === editDevisId) || {}).numDevis);
+  if (dejaGenere && !confirm('Un devis existe déjà pour cette ligne.\nEn créer un nouveau dans Axonaut ?')) return;
+
+  const btn = document.getElementById('btnGenAxonaut');
+  btn.disabled = true;
+  msg.style.color = 'var(--text-muted)'; msg.textContent = 'Génération du devis dans Axonaut...';
+  try {
+    // La ligne est enregistrée d'abord : un devis créé dans Axonaut sans ligne
+    // en face serait invisible dans l'app.
+    if (!editDevisId) {
+      const creation = { ...data, statut: 'Brouillon', createdAt: new Date().toISOString() };
+      editDevisId = await window._addDevis(creation);
+    } else {
+      await window._updateDevis(editDevisId, data);
+    }
+    const r = await window._callFn('createAxonautInvoice', {
+      client: { ...data.devisClient, nom: clientNom },
+      lignes: lignes.map(l => ({ designation: l.designation, qte: l.qte, pu: l.pu, tva: l.tva })),
+      objet: data.objet,
+      date: data.dateDevis || undefined,
+      mode: 'devis',
+    });
+    const totalHT = lignes.reduce((s, l) => s + l.qte * l.pu, 0);
+    await window._updateDevis(editDevisId, {
+      numDevis: r.number || '', devisUrl: r.pdfUrl || '', portalUrl: r.portalUrl || '',
+      axonautId: r.id || '', axonautCompanyId: r.companyId || null,
+      montantHT: totalHT, statut: 'Envoyé', updatedAt: new Date().toISOString(),
+    });
+    msg.style.color = 'var(--green-dark)';
+    msg.innerHTML = 'Devis créé ✓ ' + esc(r.number || '') + (r.pdfUrl ? ' — <a href="' + esc(r.pdfUrl) + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
+    document.getElementById('btnGenAxonaut').textContent = 'Régénérer le devis dans Axonaut';
+  } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }
+  finally { btn.disabled = false; }
+};
+
+document.getElementById('modalDevis').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalDevis')) closeModalDevis();
+});
+</script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
+const auth = getAuth(app);
+const db = getFirestore(app, "belledonne-client");
+
+window.handleLogout = async function() { await signOut(auth); window.location.href='login.html'; };
+
+window._addDevis = async function(data) {
+  const ref = await addDoc(collection(db, 'devis'), data);
+  return ref.id;
+};
+window._updateDevis = async function(id, data) { await updateDoc(doc(db, 'devis', id), data); };
+window._deleteDevis = async function(id) { await deleteDoc(doc(db, 'devis', id)); };
+
+// BPU et entités : mêmes collections que la facturation, un seul référentiel
+// de tarifs pour les devis et les factures.
+window._loadBpu = async function(client) {
+  try { const s = await getDoc(doc(db, 'bpu', client)); return s.exists() ? (s.data().prestations || []) : []; }
+  catch(e) { console.warn('loadBpu:', e); return []; }
+};
+window._loadFactClient = async function(client) {
+  try { const s = await getDoc(doc(db, 'facturation-clients', client)); return s.exists() ? (s.data().entites || []) : []; }
+  catch(e) { console.warn('loadFactClient:', e); return []; }
+};
+
+// Devis accepté : le dossier part dans Suivi interventions, sans passage, prêt
+// à être planifié. Les champs suivent la forme d'une intervention saisie à la main.
+window._createSuiviDepuisDevis = async function(info) {
+  const now = new Date().toISOString();
+  const ref = await addDoc(collection(db, 'suivi'), {
+    client: info.client, clientType: info.clientType || 'entreprise',
+    siret: info.siret || '', chorus: '',
+    dateEmission: info.dateEmission || now.slice(0, 10),
+    expediteur: '', assignes: [], assigne: '',
+    statut: 'À traiter',
+    pl: '', plUrl: '', bc: '', bcUrl: '',
+    devis: info.devis || '', devisUrl: info.devisUrl || '',
+    nature: info.nature || '',
+    nomClient: info.nomClient || '', coordonnees: [], emailClient: '',
+    adresse: info.adresse || '',
+    observations: info.observations || '',
+    passages: [], calEventIds: [], notes: '',
+    origineDevis: true,
+    createdAt: now, updatedAt: now,
+  });
+  return ref.id;
+};
+
+window._callFn = async function(name, body) {
+  const idt = await auth.currentUser.getIdToken();
+  const r = await fetch('https://europe-west1-belledonne-client.cloudfunctions.net/' + name, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idt }, body: JSON.stringify(body || {})
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({ error: 'HTTP ' + r.status })); throw new Error(e.error || ('HTTP ' + r.status)); }
+  return r.json();
+};
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href='login.html'; return; }
+  const snapU = await getDocs(query(collection(db,'users')));
+  const profile = snapU.docs.map(d=>d.data()).find(p=>p.uid===user.uid) || {};
+  if (profile.role !== 'admin' && profile.role !== 'administrateur') { window.location.href='dashboard.html'; return; }
+
+  document.getElementById('sideClientName').textContent = profile.client || 'Belledonne Multiservices';
+  document.getElementById('sideClientId').textContent = 'belledonne-admin';
+  document.getElementById('sideAvatar').textContent = 'BM';
+  document.getElementById('sideFooterName').textContent = profile.client || user.email;
+
+  // Clients proposés à la saisie : comptes clients + clients déjà configurés
+  // côté BPU ou entités, pour ne pas retaper un nom qui existe déjà.
+  try {
+    const [uSnap, bpuSnap, entSnap] = await Promise.all([
+      getDocs(query(collection(db, 'users'), where('role', '==', 'client'))),
+      getDocs(collection(db, 'bpu')),
+      getDocs(collection(db, 'facturation-clients')),
+    ]);
+    const noms = [...new Set([
+      ...uSnap.docs.map(d => d.data().client).filter(Boolean),
+      ...bpuSnap.docs.map(d => d.id),
+      ...entSnap.docs.map(d => d.id),
+    ])].sort((a, b) => a.localeCompare(b, 'fr'));
+    document.getElementById('clientsDatalist').innerHTML = noms.map(n => '<option value="' + n.replace(/"/g, '&quot;') + '"></option>').join('');
+  } catch(e) { console.warn('clients:', e); }
+
+  // Natures de mission : même document que le Suivi, repli sur la liste par défaut.
+  try {
+    const s = await getDoc(doc(db, 'config', 'naturesMission'));
+    const liste = s.exists() ? s.data().liste : null;
+    if (Array.isArray(liste) && liste.length) natures = liste.slice();
+  } catch(e) { console.warn('natures:', e); }
+
+  onSnapshot(query(collection(db, 'devis'), orderBy('createdAt', 'desc')), (snap) => {
+    devisList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    window.devisList = devisList;
+    populateClientFilter();
+    applyFilters();
+  });
+});
+</script>
+<script type="module" src="suivi-badge.js"></script>
+</body>
+</html>

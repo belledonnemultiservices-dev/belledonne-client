@@ -67,6 +67,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Devis : lignes de devis Axonaut, admin uniquement ──
+    match /devis/{doc}               { allow read, write: if isAdmin(); }
+
     // ── Facturation : BPU et entités clients, réservés aux admins ──
     match /bpu/{doc}                 { allow read, write: if isAdmin(); }
     match /facturation-clients/{doc} { allow read, write: if isAdmin(); }
