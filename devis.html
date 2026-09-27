@@ -377,6 +377,16 @@ function fmtDate(d) {
   const dt = new Date(d);
   return isNaN(dt) ? '—' : dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
+// Axonaut renvoie un numéro brut du genre "#133". On l'affiche et on le
+// transmet au Suivi sous la forme "Devis-133". Un numéro déjà littéral
+// (référence personnalisée côté Axonaut) est laissé tel quel plutôt que
+// d'être déformé.
+function fmtNumDevis(num) {
+  const brut = String(num || '').trim().replace(/^#+/, '');
+  if (!brut) return '';
+  return /^\d+$/.test(brut) ? ('Devis-' + brut) : brut;
+}
+
 function fmtMontant(v) {
   const n = Number(v);
   return isNaN(n) || !n ? '—' : n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -475,7 +485,7 @@ function renderTable(list) {
       + '<td style="max-width:200px;">' + esc(d.adresse || '—') + '</td>'
       + '<td>' + fmtDate(d.dateDevis || d.createdAt) + '</td>'
       + '<td class="montant-cell">' + fmtMontant(d.montantHT) + '</td>'
-      + '<td>' + esc(d.numDevis || '—') + '</td>'
+      + '<td>' + esc(fmtNumDevis(d.numDevis) || '—') + '</td>'
       + '<td>' + pdf + '</td>'
       + '<td><span class="chip ' + (CHIP[statut] || 'chip-brouillon') + '">' + statut + '</span></td>'
       + '<td style="text-align:right;white-space:nowrap;">' + actions + '</td>'
@@ -741,13 +751,14 @@ window.genererDevisAxonaut = async function() {
       mode: 'devis',
     });
     const totalHT = lignes.reduce((s, l) => s + l.qte * l.pu, 0);
+    const numDevis = fmtNumDevis(r.number);
     await window._updateDevis(editDevisId, {
-      numDevis: r.number || '', devisUrl: r.pdfUrl || '', portalUrl: r.portalUrl || '',
+      numDevis, devisUrl: r.pdfUrl || '', portalUrl: r.portalUrl || '',
       axonautId: r.id || '', axonautCompanyId: r.companyId || null,
       montantHT: totalHT, statut: 'Envoyé', updatedAt: new Date().toISOString(),
     });
     msg.style.color = 'var(--green-dark)';
-    msg.innerHTML = 'Devis créé ✓ ' + esc(r.number || '') + (r.pdfUrl ? ' — <a href="' + esc(r.pdfUrl) + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
+    msg.innerHTML = 'Devis créé ✓ ' + esc(numDevis) + (r.pdfUrl ? ' — <a href="' + esc(r.pdfUrl) + '" target="_blank" style="color:var(--green-dark);text-decoration:underline;">Voir le PDF</a>' : '');
     document.getElementById('btnGenAxonaut').textContent = 'Régénérer le devis dans Axonaut';
   } catch(e) { msg.style.color = 'var(--red)'; msg.textContent = 'Erreur : ' + e.message; }
   finally { btn.disabled = false; }
