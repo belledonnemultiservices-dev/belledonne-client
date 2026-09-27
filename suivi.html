@@ -1663,11 +1663,11 @@ function addPassage(value = '', calEventId = '') {
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div>
-        <input class="form-input" type="datetime-local" id="fDateDebut${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${debut}" style="width:100%;">
+        <input class="form-input" type="datetime-local" id="fDateDebut${n}" min="${PASSAGE_DATE_MIN}" max="${fin || PASSAGE_DATE_MAX}" value="${debut}" oninput="window._bornerPassage('fDateDebut${n}','fDateFin${n}','debut')" style="width:100%;">
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div>
-        <input class="form-input" type="datetime-local" id="fDateFin${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" style="width:100%;">
+        <input class="form-input" type="datetime-local" id="fDateFin${n}" min="${debut || PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" oninput="window._bornerPassage('fDateDebut${n}','fDateFin${n}','fin')" style="width:100%;">
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;margin-top:16px;">
         <button type="button" onclick="jumpToPassage(${n})" title="Voir dans l'agenda" style="width:28px;height:28px;border:none;background:#EEF2FF;color:#4338CA;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
@@ -2209,6 +2209,10 @@ async function saveIntervention(silent) {
     }
 
     const passages = getPassageDates();
+    // Un passage à l'envers ne doit pas partir en base : le `min` du champ borne
+    // le sélecteur, pas l'enregistrement.
+    const nIncoherent = window._passageIncoherent(passages);
+    if (nIncoherent) { showToast(`Passage ${nIncoherent} : la date de fin est antérieure à la date de début.`, true); return; }
     const data = {
       client, clientType: currentClientType,
       siret: document.getElementById('fSiret').value.trim(),
@@ -3402,6 +3406,36 @@ function showToast(msg) {
 const PASSAGE_DATE_SEL = '#passagesContainer input[type=datetime-local], #passagesContainerP input[type=datetime-local], #passagesContainerE input[type=datetime-local], #passagesContainerT input[type=datetime-local]';
 const PASSAGE_DATE_MIN = (new Date().getFullYear() - 1) + '-01-01T00:00';
 const PASSAGE_DATE_MAX = (new Date().getFullYear() + 3) + '-12-31T23:59';
+// Un passage ne peut pas finir avant d'avoir commencé : la Fin est bornée par
+// le Début et réciproquement, à chaque frappe. Quand un nouveau Début passe
+// devant la Fin déjà saisie, la Fin est recalée dessus plutôt que de laisser un
+// champ en erreur à corriger. Les bornes d'année posées plus haut restent
+// actives, celle-ci vient par-dessus.
+window._bornerPassage = function(idDebut, idFin, modifie) {
+  const d = document.getElementById(idDebut), f = document.getElementById(idFin);
+  if (!d || !f) return;
+  const ts = v => { const t = Date.parse(v); return isNaN(t) ? null : t; };
+  const td = ts(d.value), tf = ts(f.value);
+  if (modifie === 'debut' && td !== null && tf !== null && tf < td) f.value = d.value;
+  // Saisie clavier d'une fin antérieure : le navigateur laisse passer, on recale.
+  if (modifie === 'fin' && td !== null && tf !== null && tf < td) f.value = d.value;
+  f.min = d.value || PASSAGE_DATE_MIN;
+  d.max = f.value || PASSAGE_DATE_MAX;
+};
+
+// Contrôle à l'enregistrement : le `min` d'un champ HTML bloque le sélecteur
+// mais n'empêche pas d'enregistrer. Retourne le n° du premier passage à
+// l'envers, ou null si tout va bien.
+window._passageIncoherent = function(passages) {
+  for (let i = 0; i < (passages || []).length; i++) {
+    const p = passages[i] || {};
+    if (!p.debut || !p.fin) continue;
+    const td = Date.parse(p.debut), tf = Date.parse(p.fin);
+    if (!isNaN(td) && !isNaN(tf) && tf < td) return p.num || (i + 1);
+  }
+  return null;
+};
+
 function passageYearBounds() {
   const y = new Date().getFullYear();
   return { min: y - 1, max: y + 3 };
@@ -3539,8 +3573,8 @@ function addPassageP(value='') {
       <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Passage</div>
       <input type="number" id="fPassageNumP${n}" value="${displayNum}" min="1" style="width:52px;padding:4px 2px;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:700;text-align:center;background:var(--bg);color:var(--text-mid);font-family:inherit;">
     </div>
-    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutP${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${debut}" style="width:100%;"></div>
-    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinP${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutP${n}" min="${PASSAGE_DATE_MIN}" max="${fin || PASSAGE_DATE_MAX}" value="${debut}" oninput="window._bornerPassage('fDateDebutP${n}','fDateFinP${n}','debut')" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinP${n}" min="${debut || PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" oninput="window._bornerPassage('fDateDebutP${n}','fDateFinP${n}','fin')" style="width:100%;"></div>
     <button type="button" onclick="removePassageP(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;margin-top:16px;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
   document.getElementById('passagesContainerP').appendChild(div);
 }
@@ -3573,8 +3607,8 @@ function addPassageE(value='') {
       <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Passage</div>
       <input type="number" id="fPassageNumE${n}" value="${displayNum}" min="1" style="width:52px;padding:4px 2px;border:1px solid var(--border);border-radius:6px;font-size:15px;font-weight:700;text-align:center;background:var(--bg);color:var(--text-mid);font-family:inherit;">
     </div>
-    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutE${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${debut}" style="width:100%;"></div>
-    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinE${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div><input class="form-input" type="datetime-local" id="fDateDebutE${n}" min="${PASSAGE_DATE_MIN}" max="${fin || PASSAGE_DATE_MAX}" value="${debut}" oninput="window._bornerPassage('fDateDebutE${n}','fDateFinE${n}','debut')" style="width:100%;"></div>
+    <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div><input class="form-input" type="datetime-local" id="fDateFinE${n}" min="${debut || PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" oninput="window._bornerPassage('fDateDebutE${n}','fDateFinE${n}','fin')" style="width:100%;"></div>
     <button type="button" onclick="removePassageE(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;margin-top:16px;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>`;
   document.getElementById('passagesContainerE').appendChild(div);
 }
@@ -4040,11 +4074,11 @@ function addPassageT(value = '', calEventId = '') {
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Début</div>
-        <input class="form-input" type="datetime-local" id="fDateDebutT${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${debut}" style="width:100%;">
+        <input class="form-input" type="datetime-local" id="fDateDebutT${n}" min="${PASSAGE_DATE_MIN}" max="${fin || PASSAGE_DATE_MAX}" value="${debut}" oninput="window._bornerPassage('fDateDebutT${n}','fDateFinT${n}','debut')" style="width:100%;">
       </div>
       <div>
         <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em;">Fin</div>
-        <input class="form-input" type="datetime-local" id="fDateFinT${n}" min="${PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" style="width:100%;">
+        <input class="form-input" type="datetime-local" id="fDateFinT${n}" min="${debut || PASSAGE_DATE_MIN}" max="${PASSAGE_DATE_MAX}" value="${fin}" oninput="window._bornerPassage('fDateDebutT${n}','fDateFinT${n}','fin')" style="width:100%;">
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;margin-top:16px;">
         <button type="button" onclick="removePassageT(${n})" style="width:28px;height:28px;border:none;background:#FDECEA;color:#E74C3C;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;">×</button>
@@ -4258,6 +4292,8 @@ function resetFormParticulier() {
 async function saveInterventionParticulier(silent) {
   const client=(document.getElementById('fNomP')?.value||'').trim();
   if(!client){if(!silent)alert('Le nom est obligatoire.');return;}
+  const nIncohP = window._passageIncoherent(getPassagesFromContainerP());
+  if (nIncohP) { if(!silent) alert(`Passage ${nIncohP} : la date de fin est antérieure à la date de début.`); return; }
   if (silent && !editIdP) return;
   const btn=document.getElementById('btnSaveP');
   if(!silent){btn.disabled=true; btn.textContent='Enregistrement...';}
@@ -4344,6 +4380,8 @@ function resetFormEntreprise() {
 async function saveInterventionEntreprise(silent) {
   const client=(document.getElementById('fNomE')?.value||'').trim();
   if(!client){if(!silent)alert("Le nom de l'entreprise est obligatoire.");return;}
+  const nIncohE = window._passageIncoherent(getPassagesFromContainerE());
+  if (nIncohE) { if(!silent) alert(`Passage ${nIncohE} : la date de fin est antérieure à la date de début.`); return; }
   if (silent && !editIdE) return;
   const btn=document.getElementById('btnSaveE');
   if(!silent){btn.disabled=true; btn.textContent='Enregistrement...';}
@@ -4444,6 +4482,8 @@ function resetFormTache() {
 }
 window.saveInterventionTache = async function(silent) {
   const typeIntervention = document.getElementById('fTypeTache')?.value||'devis';
+  const nIncohT = window._passageIncoherent(getPassagesFromDOMT());
+  if (nIncohT) { if(!silent) showToast(`Passage ${nIncohT} : la date de fin est antérieure à la date de début.`, true); return; }
   if (silent && !editIdT) return;
   const btn=document.getElementById('btnSaveT');
   if(!silent){btn.disabled=true; btn.textContent='Enregistrement...';}
