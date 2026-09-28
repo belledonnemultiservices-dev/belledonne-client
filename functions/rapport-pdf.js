@@ -55,8 +55,21 @@ const LIBELLES_ENTETE = {
   produits_: "Produits utilisés",
   passage_numero_: "N° de passage",
   nom_locataire_representant_: "Nom locataire / représentant",
+  type_de_logement_: "Type de logement",
   type_de_logement_partie_commu: "Type de logement / partie commune",
+  type_de_lieux_: "Type de lieux",
+  statut: "Statut",
+  motif: "Motif",
 };
+
+// Un identifiant absent de la table ne doit pas s'afficher brut dans le rapport
+// (on lisait "type_de_logement_" en clair) : à défaut de libellé connu, on
+// rhabille l'identifiant Kizeo, ce qui couvre aussi les champs à venir.
+function libelleEntete(cle) {
+  if (LIBELLES_ENTETE[cle]) return LIBELLES_ENTETE[cle];
+  const mots = cle.replace(/_+$/, "").replace(/_/g, " ").trim();
+  return mots ? mots.charAt(0).toUpperCase() + mots.slice(1) : cle;
+}
 
 function valeurCellule(cell) {
   const v = cell ? cell.value : null;
@@ -100,7 +113,7 @@ async function lireRapport(buffer) {
     const valeur = valeurCellule(cellB);
     const lien = lienCellule(cellB);
     if (/signature/i.test(a)) { signature = { libelle: a, valeur, lien }; continue; }
-    entete.push({ cle: a, libelle: LIBELLES_ENTETE[a] || a, valeur });
+    entete.push({ cle: a, libelle: libelleEntete(a), valeur });
   }
   if (!ligneTableau) throw new Error("ligne \"Tableau\" introuvable, le fichier ne suit pas le modèle attendu");
 
