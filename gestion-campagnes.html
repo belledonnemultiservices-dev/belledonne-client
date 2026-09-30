@@ -1342,6 +1342,22 @@ async function autosaveColonnes() {
   } catch(e) { console.error("autosaveColonnes:", e.message); }
 }
 
+// Résultat du dernier push, affiché après l'envoi comme à la réouverture de la
+// période. Sans ça, la confirmation disparaissait au moindre rechargement et on
+// ne savait plus ce qui était parti, ni à qui.
+function renderResultatPush(dp) {
+  const box = document.getElementById("resultBox");
+  if (!dp || !dp.results) { box.style.display = "none"; return; }
+  const quand = dp.at ? new Date(dp.at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  document.getElementById("resultStats").textContent =
+    `${dp.nbEnvoyes} envoyé(s) · ${dp.nbErreurs} erreur(s) sur ${dp.nbBatiments} bâtiment(s), ${dp.nbFeuilles} feuille(s)`
+    + (quand ? ` — le ${quand}` : "");
+  document.getElementById("resultDetail").innerHTML = (dp.results || []).map(r =>
+    `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "❌"} [${r.nomFeuille || "?"}] ${r.adresse || ""} — ${r.technicien || "?"} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
+  ).join("");
+  box.style.display = "block";
+}
+
 function loadConfigFromSemaine(s) {
   const col = (s.config && s.config.colonnes) || {};
   document.getElementById("colSecteur").value = indexToLetter(col.secteur);
@@ -1372,6 +1388,9 @@ function loadConfigFromSemaine(s) {
   } else {
     dfInfo.style.display = "none";
   }
+
+  // Réaffiche la confirmation du dernier push (carte 1), s'il y en a un.
+  renderResultatPush(s.config && s.config.dernierPush);
 
   // Réaffiche le dernier dossier PDF + reporting Excel généré (carte 2), s'il y en a un.
   const rs = s.reportingSemaine;
@@ -1753,18 +1772,26 @@ window.pushPremierPassage = async function() {
     const resp = await fetch(FN_PUSH1, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ storagePath, envois, semaineId: _currentSemaineId }) });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
-    document.getElementById("resultStats").textContent = `${data.nbEnvoyes} envoyé(s) · ${data.nbErreurs} erreur(s) sur ${data.nbBatiments} bâtiment(s), ${envois.length} feuille(s)`;
-    document.getElementById("resultDetail").innerHTML = (data.results || []).map(r =>
-      `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "❌"} [${r.nomFeuille || "?"}] ${r.adresse} — ${r.technicien || "?"} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
-    ).join("");
-    resultBox.style.display = "block";
+    // Trace du push, conservée dans la période : elle est réaffichée telle quelle
+    // à la réouverture, sinon la confirmation est perdue au rechargement.
+    const dernierPush = {
+      at: new Date().toISOString(),
+      nbEnvoyes: data.nbEnvoyes || 0, nbErreurs: data.nbErreurs || 0,
+      nbBatiments: data.nbBatiments || 0, nbFeuilles: envois.length,
+      fichier: _selectedFile.name,
+      results: (data.results || []).map(r => ({
+        success: !!r.success, nomFeuille: r.nomFeuille || "", adresse: r.adresse || "",
+        technicien: r.technicien || "", error: r.error || "",
+      })),
+    };
+    renderResultatPush(dernierPush);
 
     // Mémorise les feuilles/techniciens utilisés (préremplissage la prochaine fois)
     // et garde le fichier Excel envoyé accessible/téléchargeable depuis cette carte.
     try {
       const fileUrl = await getDownloadURL(storageRef);
       const dernierFichier = { url: fileUrl, nom: _selectedFile.name, uploadedAt: new Date().toISOString() };
-      const config = { ...((_semaines.find(x=>x.id===_currentSemaineId)||{}).config||{}), envois, dernierFichier };
+      const config = { ...((_semaines.find(x=>x.id===_currentSemaineId)||{}).config||{}), envois, dernierFichier, dernierPush };
       await setDoc(doc(db, "campagnes-semaines", _currentSemaineId), { config, updatedAt: new Date().toISOString() }, { merge: true });
       const s = _semaines.find(x => x.id === _currentSemaineId);
       if (s) s.config = config;
