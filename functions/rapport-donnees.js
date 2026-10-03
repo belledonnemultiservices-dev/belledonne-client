@@ -64,11 +64,14 @@ function valeurBrute(champ) {
 function normaliserDefinition(formDef) {
   const f = (formDef && formDef.form) || formDef || {};
   const champs = f.fields || {};
-  let colonnes = {};
-  for (const def of Object.values(champs)) {
-    if (def && def.type === TYPE_SUBFORM && def.columns) { colonnes = def.columns; break; }
+  // Le tableau répétable est reconnu à son TYPE, pas à son nom : un nouveau
+  // formulaire peut nommer le sien autrement que "tableau" sans que rien
+  // n'ait à être touché ici.
+  let colonnes = {}, cleSubform = null;
+  for (const [cle, def] of Object.entries(champs)) {
+    if (def && def.type === TYPE_SUBFORM && def.columns) { colonnes = def.columns; cleSubform = cle; break; }
   }
-  return { nom: f.name || "", champs, colonnes };
+  return { nom: f.name || "", champs, colonnes, cleSubform };
 }
 
 function decrireChamp(cle, def, valeur) {
@@ -128,7 +131,7 @@ function lireSoumission(submission, formDef) {
 
   // Subform : une ligne par chambre, avec ses propres champs et photos.
   const lignes = [];
-  const brutLignes = valeurBrute(valeurs.tableau);
+  const brutLignes = def.cleSubform ? valeurBrute(valeurs[def.cleSubform]) : null;
   if (Array.isArray(brutLignes) && Object.keys(def.colonnes).length) {
     brutLignes.forEach((ligne, i) => {
       const t = trierChamps(ligne || {}, def.colonnes);

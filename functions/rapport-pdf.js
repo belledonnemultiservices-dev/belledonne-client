@@ -346,4 +346,12 @@ async function reconstruireEnPdf(excelBuffer) {
   return { pdf, nbChambres: data.chambres.length, photosManquantes };
 }
 
-module.exports = { reconstruireEnPdf };
+// Blocs de mise en page exposés pour le générateur alimenté par le JSON
+// (rapport-pdf-json.js) : même rendu pour tous les clients, une seule
+// maquette à faire évoluer.
+module.exports = {
+  reconstruireEnPdf,
+  blocEntete, blocChamps, blocPhotos, blocChambre, construireDocument,
+  telechargerImage, enPuces,
+  POLICES, LOGO, VERT, ENCRE, GRIS, TRAIT, VIDE,
+};
