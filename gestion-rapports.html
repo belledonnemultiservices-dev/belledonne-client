@@ -88,6 +88,38 @@
   .empty-state{text-align:center;padding:60px 32px;color:var(--text-muted);font-size:13px;}
   .empty-state svg{width:40px;height:40px;color:var(--border);margin-bottom:12px;}
 
+
+  /* ── RELECTURE D'UN RAPPORT ─────────────────────────────────────
+     Édition des données lues dans le JSON Kizeo, avant fabrication du
+     PDF. On ne touche jamais au fichier d'origine : on corrige les
+     valeurs, c'est le PDF qui sera construit à partir d'elles. */
+  .btn-relire{background:var(--green-pale);color:var(--green-dark);}
+  .btn-relire:hover{background:var(--green);color:var(--navy);}
+  .modal.modal-lg{width:980px;}
+  .rl-bloc{border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px;overflow:hidden;}
+  .rl-bloc-tete{background:var(--bg);padding:10px 14px;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .rl-bloc-corps{padding:14px;}
+  .rl-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;}
+  .rl-champ{display:flex;flex-direction:column;gap:5px;}
+  .rl-champ.rl-large{grid-column:1/-1;}
+  .rl-lbl{font-size:11px;font-weight:600;color:var(--text-mid);}
+  .rl-in{width:100%;min-height:36px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--bg);outline:none;resize:vertical;}
+  .rl-in:focus{border-color:var(--green);background:#fff;}
+  .rl-coches{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);}
+  .rl-coche{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px;background:#fff;border:1px solid var(--border);border-radius:20px;cursor:pointer;}
+  .rl-coche input{accent-color:var(--green);margin:0;}
+  .rl-coche.on{border-color:var(--green);background:var(--green-pale);}
+  .rl-photos{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
+  .rl-photo{width:120px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg);}
+  .rl-photo img{width:100%;height:92px;object-fit:cover;display:block;cursor:zoom-in;}
+  .rl-photo-barre{display:flex;align-items:center;justify-content:space-between;padding:3px 4px;gap:2px;}
+  .rl-mini{border:none;background:transparent;cursor:pointer;font-size:13px;line-height:1;padding:3px 5px;border-radius:4px;color:var(--text-mid);}
+  .rl-mini:hover{background:#fff;color:var(--text);}
+  .rl-mini.rl-sup:hover{color:var(--red);}
+  .rl-mini:disabled{opacity:0.25;cursor:default;}
+  .rl-vide{font-size:12px;color:var(--text-muted);font-style:italic;}
+  .rl-note{font-size:12px;color:var(--text-mid);background:var(--green-pale);border-radius:var(--radius-sm);padding:9px 12px;margin-bottom:14px;}
+  .rl-alerte{font-size:12px;color:#8a4b00;background:#FFF4E0;border-radius:var(--radius-sm);padding:9px 12px;margin-bottom:14px;}
   .modal-overlay{position:fixed;inset:0;background:rgba(13,27,42,0.5);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;}
   .modal-overlay.open{display:flex;}
   .modal{background:#fff;border-radius:var(--radius);width:520px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(13,27,42,0.2);}
@@ -202,6 +234,23 @@
 </div>
 
 <!-- MODAL RATTACHER -->
+
+<!-- MODAL RELECTURE -->
+<div class="modal-overlay" id="modalRelecture">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="rlTitre">Relire le rapport</div>
+      <button class="btn-close" onclick="closeRelecture()">&times;</button>
+    </div>
+    <div class="modal-body" id="rlBody"></div>
+    <div class="modal-footer">
+      <span id="rlEtat" style="margin-right:auto;font-size:12px;color:var(--text-muted);"></span>
+      <button class="btn-cancel" onclick="closeRelecture()">Annuler</button>
+      <button class="btn-save" id="rlBtnSave" onclick="enregistrerRelecture()">Enregistrer les corrections</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalRattacher">
   <div class="modal">
     <div class="modal-header">
@@ -480,6 +529,7 @@ function render() {
       ? `${resendBtn}<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Supprimer</button><button class="btn-a btn-annuler" onclick="ouvrirAnnulerPassage('${r.id}')">Annuler le passage</button>`
       : `
         <a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>
+        ${r.donnees ? `<button class="btn-a btn-relire" onclick="openRelecture('${r.id}')" title="Relire et corriger ce qu'a saisi le technicien">Relire${r.relueAt ? " \u2713" : ""}</button>` : ""}
         <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
         ${resendBtn}
         ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
@@ -614,6 +664,194 @@ window.supprimerReception = async function(id) {
 
 // ── RATTACHER ──
 let _rattacherId = null;
+// ═══════════════════════════════════════════════════════════════
+// RELECTURE D'UN RAPPORT
+// Édite les données lues dans le JSON Kizeo (champ `donnees` de la ligne),
+// pas le fichier reçu. Le PDF remis au client sera construit à partir de
+// ces valeurs corrigées : on ne retouche donc jamais un document, on
+// corrige la donnée avant qu'elle ne devienne un document.
+// ═══════════════════════════════════════════════════════════════
+let _rlId = null, _rlDonnees = null, _rlChoix = null;
+
+const rlEsc = (v) => String(v == null ? "" : v)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+// Les valeurs à choix multiple arrivent collées par ", ", et certains
+// libellés contiennent eux-mêmes une virgule ("Non, pas à ce stade") : on ne
+// découpe donc pas la chaîne, on teste la présence de chaque choix connu.
+// Du plus long au plus court, pour qu'un libellé inclus dans un autre ne
+// vole pas la correspondance.
+function rlSelection(valeur, choix) {
+  const v = String(valeur || "");
+  return choix
+    .map(c => c.libelle)
+    .sort((a, b) => b.length - a.length)
+    .filter(lib => lib && v.includes(lib));
+}
+
+function rlWidget(champ, chemin) {
+  const choix = (_rlChoix && _rlChoix[champ.cle]) || champ.choix || [];
+  const id = "rlf-" + chemin;
+  if (choix.length && champ.multiple) {
+    const coches = rlSelection(champ.valeur, choix);
+    return `<div class="rl-coches" id="${id}" data-chemin="${rlEsc(chemin)}" data-multi="1">` +
+      choix.map(c => {
+        const on = coches.includes(c.libelle);
+        return `<label class="rl-coche${on ? " on" : ""}"><input type="checkbox" value="${rlEsc(c.libelle)}" ${on ? "checked" : ""} onchange="this.closest('.rl-coche').classList.toggle('on',this.checked)">${rlEsc(c.libelle)}</label>`;
+      }).join("") + `</div>`;
+  }
+  if (choix.length) {
+    const connu = choix.some(c => c.libelle === champ.valeur);
+    return `<select class="rl-in" id="${id}" data-chemin="${rlEsc(chemin)}">` +
+      `<option value=""${!champ.valeur ? " selected" : ""}>—</option>` +
+      choix.map(c => `<option value="${rlEsc(c.libelle)}"${c.libelle === champ.valeur ? " selected" : ""}>${rlEsc(c.libelle)}</option>`).join("") +
+      // Une valeur hors liste (ancien choix retiré du formulaire) reste
+      // proposée : la relecture ne doit jamais effacer en silence.
+      (!connu && champ.valeur ? `<option value="${rlEsc(champ.valeur)}" selected>${rlEsc(champ.valeur)} (hors liste)</option>` : "") +
+      `</select>`;
+  }
+  const longue = champ.type === "textarea" || String(champ.valeur || "").length > 60;
+  if (longue) return `<textarea class="rl-in" rows="3" id="${id}" data-chemin="${rlEsc(chemin)}">${rlEsc(champ.valeur)}</textarea>`;
+  return `<input class="rl-in" type="text" id="${id}" data-chemin="${rlEsc(chemin)}" value="${rlEsc(champ.valeur)}">`;
+}
+
+function rlChamps(champs, prefixe) {
+  if (!champs.length) return `<div class="rl-vide">Aucun champ.</div>`;
+  return `<div class="rl-grille">` + champs.map((c, i) => {
+    const choix = (_rlChoix && _rlChoix[c.cle]) || c.choix || [];
+    const large = (choix.length && c.multiple) || c.type === "textarea" || String(c.valeur || "").length > 60;
+    return `<div class="rl-champ${large ? " rl-large" : ""}">
+      <label class="rl-lbl">${rlEsc(c.libelle)}</label>
+      ${rlWidget(c, prefixe + "." + i)}
+    </div>`;
+  }).join("") + `</div>`;
+}
+
+function rlPhotos(photos, prefixe) {
+  if (!photos.length) return "";
+  return `<div class="rl-photos" id="rlph-${prefixe}">` + photos.map((p, i) => `
+    <div class="rl-photo" data-index="${i}">
+      ${p.url ? `<img src="${rlEsc(p.url)}" alt="${rlEsc(p.libelle)}" loading="lazy" onclick="window.open('${rlEsc(p.url)}','_blank')">`
+               : `<div style="height:92px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);">indisponible</div>`}
+      <div class="rl-photo-barre">
+        <button class="rl-mini" title="Déplacer vers la gauche" onclick="rlDeplacer('${prefixe}',${i},-1)" ${i === 0 ? "disabled" : ""}>&#8592;</button>
+        <button class="rl-mini" title="Déplacer vers la droite" onclick="rlDeplacer('${prefixe}',${i},1)" ${i === photos.length - 1 ? "disabled" : ""}>&#8594;</button>
+        <button class="rl-mini rl-sup" title="Retirer cette photo du rapport" onclick="rlRetirerPhoto('${prefixe}',${i})">&#215;</button>
+      </div>
+    </div>`).join("") + `</div>`;
+}
+
+// Les corrections en cours sont relues dans le DOM avant tout réaffichage :
+// déplacer une photo ne doit pas faire perdre une valeur déjà saisie.
+function rlCollecter() {
+  document.querySelectorAll("#rlBody [data-chemin]").forEach(el => {
+    const [zone, idx, sousIdx] = el.dataset.chemin.split(".");
+    const cible = zone === "e" ? _rlDonnees.entete[+idx] : _rlDonnees.lignes[+idx].champs[+sousIdx];
+    if (!cible) return;
+    if (el.dataset.multi) {
+      cible.valeur = [...el.querySelectorAll("input:checked")].map(i => i.value).join(", ");
+    } else {
+      cible.valeur = el.value;
+    }
+  });
+}
+
+function rlRendu() {
+  const d = _rlDonnees;
+  const manquantes = (d.photos || []).filter(p => !p.url).length
+    + (d.lignes || []).reduce((s, l) => s + l.photos.filter(p => !p.url).length, 0);
+
+  let html = `<div class="rl-note">Corrigez ce que le technicien a saisi. Le PDF remis au client sera fabriqué à partir de ces valeurs, le rapport d'origine n'est jamais modifié.</div>`;
+  if (manquantes) html += `<div class="rl-alerte">${manquantes} photo(s) n'ont pas pu être récupérées depuis Kizeo et n'apparaîtront pas dans le PDF.</div>`;
+
+  html += `<div class="rl-bloc">
+    <div class="rl-bloc-tete"><span>En-tête</span><span style="font-weight:400;color:var(--text-muted);">${d.entete.length} champ(s)</span></div>
+    <div class="rl-bloc-corps">${rlChamps(d.entete, "e")}
+      ${d.photos.length ? `<div class="rl-lbl" style="margin-top:14px;">Photos</div>${rlPhotos(d.photos, "r")}` : ""}
+    </div></div>`;
+
+  d.lignes.forEach((l, i) => {
+    html += `<div class="rl-bloc">
+      <div class="rl-bloc-tete"><span>Chambre ${rlEsc(l.titre) || (i + 1)}</span><span style="font-weight:400;color:var(--text-muted);">${l.champs.length} champ(s) · ${l.photos.length} photo(s)</span></div>
+      <div class="rl-bloc-corps">${rlChamps(l.champs, "l." + i)}
+        ${l.photos.length ? `<div class="rl-lbl" style="margin-top:14px;">Photos</div>${rlPhotos(l.photos, "l" + i)}` : ""}
+      </div></div>`;
+  });
+
+  if (d.signature && d.signature.url) {
+    html += `<div class="rl-bloc"><div class="rl-bloc-tete"><span>Signature du technicien</span></div>
+      <div class="rl-bloc-corps"><img src="${rlEsc(d.signature.url)}" style="max-height:90px;background:#fff;border:1px solid var(--border);border-radius:6px;padding:4px;"></div></div>`;
+  }
+  document.getElementById("rlBody").innerHTML = html;
+}
+
+function rlPhotosDe(prefixe) {
+  return prefixe === "r" ? _rlDonnees.photos : _rlDonnees.lignes[+prefixe.slice(1)].photos;
+}
+
+window.rlDeplacer = function(prefixe, i, sens) {
+  rlCollecter();
+  const arr = rlPhotosDe(prefixe);
+  const j = i + sens;
+  if (j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  rlRendu();
+};
+
+window.rlRetirerPhoto = function(prefixe, i) {
+  rlCollecter();
+  const arr = rlPhotosDe(prefixe);
+  if (!confirm("Retirer cette photo du rapport ? Elle n'apparaîtra pas dans le PDF.")) return;
+  arr.splice(i, 1);
+  rlRendu();
+};
+
+window.openRelecture = async function(id) {
+  const r = allDocs.find(x => x.id === id);
+  if (!r) return;
+  if (!r.donnees) {
+    alert("Ce rapport est arrivé avant la mise en place de la relecture : ses données ne sont pas disponibles.");
+    return;
+  }
+  _rlId = id;
+  // Copie de travail : annuler doit vraiment tout abandonner.
+  _rlDonnees = JSON.parse(JSON.stringify(r.donnees));
+  _rlChoix = r.donneesChoix || {};
+  _rlDonnees.entete = _rlDonnees.entete || [];
+  _rlDonnees.lignes = _rlDonnees.lignes || [];
+  _rlDonnees.photos = _rlDonnees.photos || [];
+  (_rlDonnees.lignes).forEach(l => { l.champs = l.champs || []; l.photos = l.photos || []; });
+
+  document.getElementById("rlTitre").textContent = _rlDonnees.formNom || "Relire le rapport";
+  document.getElementById("rlEtat").textContent = (r.client || "") + (r.bc ? " · " + r.bc : "");
+  rlRendu();
+  document.getElementById("modalRelecture").classList.add("open");
+};
+
+window.closeRelecture = function() {
+  document.getElementById("modalRelecture").classList.remove("open");
+  _rlId = null; _rlDonnees = null; _rlChoix = null;
+};
+
+window.enregistrerRelecture = async function() {
+  if (!_rlId) return;
+  rlCollecter();
+  const btn = document.getElementById("rlBtnSave");
+  btn.disabled = true; btn.textContent = "Enregistrement...";
+  try {
+    await updateDoc(doc(db, "reception-rapports", _rlId), {
+      donnees: _rlDonnees,
+      relueAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    closeRelecture();
+  } catch (e) {
+    alert("Enregistrement impossible : " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Enregistrer les corrections";
+  }
+};
+
 window.openRattacher = function(id) {
   _rattacherId = id;
   document.getElementById("rattBc").value = "";
