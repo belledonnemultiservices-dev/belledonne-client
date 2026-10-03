@@ -26,11 +26,12 @@ const PdfPrinter = require("pdfmake");
 // soumission non signée n'entre pas dans le circuit).
 const SIGNATURE_DANS_PDF = false;
 
-// Un champ sans valeur n'est pas affiché dans le corps : sur un formulaire
-// de 24 champs dont la moitié est facultative, les laisser remplirait le
-// rapport de tirets. Les champs d'identification, eux, restent toujours
-// visibles (une adresse manquante doit se voir).
-const vide = (v) => !String(v == null ? "" : v).trim() || String(v).trim() === M.VIDE;
+// Tous les champs du formulaire sont reproduits, y compris ceux laissés
+// vides ou à « / » : l'absence de réponse est une information en soi pour
+// le client, et un rapport qui n'affiche que ce qui est rempli ne permet
+// plus de voir ce qui n'a pas été renseigné. Seuls les champs techniques
+// sont écartés, et ils le sont en amont, à la lecture du JSON
+// (ref_interne, libellé interne, séparateurs), ainsi que la signature.
 
 // Les sections du formulaire Kizeo donnent le découpage naturel du rapport.
 // `apres` est le nombre de champs déjà rencontrés quand la section s'ouvre,
@@ -56,7 +57,7 @@ function grouperParSection(champs, sections) {
 function decouper(rapport) {
   const groupes = grouperParSection(rapport.entete, rapport.sections);
   const identification = groupes.length ? groupes[0].champs : rapport.entete;
-  const corps = groupes.slice(1).filter(g => g.champs.some(c => !vide(c.valeur)));
+  const corps = groupes.slice(1);
   return { identification, corps };
 }
 
@@ -68,7 +69,6 @@ const sansDeuxPoints = (t) => String(t || "").replace(/\s*:\s*$/, "").trim().toL
 // « Recommandations ») afficherait deux fois la même chose : on efface alors
 // son libellé et on ne garde que la valeur.
 const versChamps = (champs, titreSection) => champs
-  .filter(c => !vide(c.valeur))
   .map(c => ({
     titre: sansDeuxPoints(c.libelle) === sansDeuxPoints(titreSection) ? "" : c.libelle,
     valeur: c.valeur,
