@@ -4495,6 +4495,14 @@ exports.validerRapport = functions
       });
       const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(chemin)}?alt=media&token=${token}`;
 
+      // Garde-fou : une donnée devenue trop grosse doit se dire clairement
+      // plutôt que de faire échouer l'écriture sur un message Firestore.
+      const poids = Buffer.byteLength(JSON.stringify(donneesFinales));
+      if (poids > 900000) {
+        res.status(400).json({ error: `Données trop volumineuses (${Math.round(poids / 1024)} ko). Le PDF a été fabriqué mais n'a pas pu être rattaché.` });
+        return;
+      }
+
       const now = new Date().toISOString();
       const maj = {
         donnees: donneesFinales,

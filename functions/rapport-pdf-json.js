@@ -127,8 +127,12 @@ function construire(rapport, logoDataUri) {
  * @param {(url:string)=>Promise<Buffer>} chargerImage  récupère une image par son URL
  * @returns {Promise<{pdf: Buffer, nbLignes: number, photosManquantes: number}>}
  */
-async function genererPdf(rapport, chargerImage) {
+async function genererPdf(rapportEntree, chargerImage) {
   const fs = require("fs");
+  // Copie de travail : les images sont encodées en base64 pour pdfmake, ce
+  // qui pèse plusieurs Mo. Les poser sur l'objet reçu le rendrait trop gros
+  // pour être réenregistré (limite de 1 Mo par document Firestore).
+  const rapport = JSON.parse(JSON.stringify(rapportEntree));
   let logoDataUri = null;
   try { logoDataUri = "data:image/png;base64," + fs.readFileSync(M.LOGO).toString("base64"); }
   catch (e) { console.warn("rapport-pdf-json: logo introuvable, en-tête en texte"); }
