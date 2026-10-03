@@ -4439,3 +4439,83 @@ exports.purgerPhotosRapports = functions
     console.log(`purgerPhotosRapports: ${nbFichiers} photo(s) supprimée(s) sur ${nbRapports} rapport(s) envoyé(s) il y a plus de ${PURGE_APRES_JOURS} jours, ${nbEchecs} échec(s)`);
     return null;
   });
+
+// ══════════════════════════════════════════════════════════════════
+// VALIDATION D'UN RAPPORT RELU
+//
+// Fabrique le PDF à partir des données corrigées dans l'écran de relecture
+// et le substitue au fichier porté par la ligne. C'est le PDF ainsi produit
+// qui poursuit le circuit et part au client.
+//
+// Le fichier précédent n'est pas supprimé : en cas de doute sur une
+// validation, l'ancien reste accessible dans Storage. La purge des photos
+// s'occupe du ménage une fois le rapport envoyé.
+// ══════════════════════════════════════════════════════════════════
+exports.validerRapport = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 300, memory: "1GB" })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { rapportId, donnees } = req.body || {};
+    if (!rapportId) { res.status(400).json({ error: "rapportId requis" }); return; }
+
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+
+    try {
+      const ref = db.collection("reception-rapports").doc(rapportId);
+      const snap = await ref.get();
+      if (!snap.exists) { res.status(404).json({ error: "Rapport introuvable" }); return; }
+      const r = snap.data();
+
+      // Les corrections sont envoyées par l'écran de relecture, qui est la
+      // source la plus à jour. À défaut (revalidation), on reprend ce qui est
+      // déjà enregistré.
+      const donneesFinales = donnees || r.donnees;
+      if (!donneesFinales) { res.status(400).json({ error: "Ce rapport n'a pas de données exploitables" }); return; }
+
+      const { genererPdf } = require("./rapport-pdf-json");
+      const out = await genererPdf(donneesFinales, fetchBuffer);
+
+      const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+      const dossier = r.client || "_inconnu";
+      const base = `${(donneesFinales.formNom || "Rapport").trim()}_${r.bc || r.reference || rapportId}_passage_${r.numPassage || 1}`
+        .replace(/\s+/g, "_").replace(/[^\w.-]/g, "_");
+      const chemin = `reception/${dossier}/${Date.now()}_${base}.pdf`;
+      const token = crypto.randomUUID();
+      await bucket.file(chemin).save(out.pdf, {
+        contentType: "application/pdf",
+        metadata: { metadata: { firebaseStorageDownloadTokens: token } },
+      });
+      const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(chemin)}?alt=media&token=${token}`;
+
+      const now = new Date().toISOString();
+      const maj = {
+        donnees: donneesFinales,
+        fileUrl,
+        type: "pdf",
+        valideeAt: now,
+        relueAt: r.relueAt || now,
+        erreurReconstruction: null,
+        updatedAt: now,
+      };
+      // Tant que la relecture n'est pas obligatoire, les rapports arrivent
+      // en "a-traiter" : on ne touche pas au statut pour ne pas court-circuiter
+      // le circuit existant. Une fois la bascule faite, un rapport "a-relire"
+      // rejoint "a-traiter" en étant validé.
+      if (r.statut === "a-relire") maj.statut = "a-traiter";
+      await ref.update(maj);
+
+      console.log(`validerRapport: ${rapportId} -> PDF ${Math.round(out.pdf.length / 1024)} ko, ${out.nbLignes} ligne(s), ${out.photosManquantes} photo(s) manquante(s)`);
+      res.status(200).json({ fileUrl, nbLignes: out.nbLignes, photosManquantes: out.photosManquantes, taille: out.pdf.length });
+    } catch (e) {
+      console.error("validerRapport:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
