@@ -1067,6 +1067,25 @@ function kizeoRequest(token, method, path, jsonBody, binary) {
   });
 }
 
+// Définition d'un formulaire Kizeo (libellés lisibles, types, listes de
+// choix). Elle ne bouge quasiment jamais et sert à chaque rapport reçu : on
+// la garde en mémoire le temps de vie de l'instance plutôt que de la
+// redemander à Kizeo à chaque soumission. Un pull en traite plusieurs d'un
+// coup, souvent sur le même formulaire.
+const _defsFormulaires = new Map();
+const DEF_FORM_TTL_MS = 60 * 60 * 1000;
+
+async function definitionFormulaire(token, formId) {
+  const cle = String(formId);
+  const c = _defsFormulaires.get(cle);
+  if (c && (Date.now() - c.at) < DEF_FORM_TTL_MS) return c.def;
+  const r = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(cle)}`);
+  if (r.status !== 200) throw new Error(`définition du formulaire ${cle} indisponible (${r.status})`);
+  const def = JSON.parse(r.body);
+  _defsFormulaires.set(cle, { at: Date.now(), def });
+  return def;
+}
+
 // ── LISTER LES CHAMPS D'UN FORMULAIRE (pour le configurateur) ─────
 // Entrée : { formId }. Retourne la liste { id (field_id), libelle, type }
 // pour permettre le mapping en menus déroulants côté configurateur.
@@ -1670,12 +1689,52 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     }
   }
 
+  // ── Lecture du rapport depuis le JSON de la soumission ────────────
+  // Posée EN PARALLÈLE du circuit existant : rien de ce qui part au client
+  // n'en dépend encore. Elle alimente `donnees` et `photos`, qui serviront à
+  // l'écran de relecture puis au futur générateur PDF. Un échec ici ne doit
+  // donc jamais empêcher le rapport d'arriver comme avant.
+  let donnees = null, donneesChoix = null, donneesErreur = null, photosPaths = [];
+  try {
+    const { lireSoumission, telechargerMedias, compacter } = require("./rapport-donnees");
+    const formDef = await definitionFormulaire(token, formId);
+    const lu = lireSoumission(parsed, formDef);
+
+    // Les photos deviennent des fichiers à nous : l'écran de relecture peut
+    // s'ouvrir des jours après la réception sans dépendre de la durée de vie
+    // des médias côté Kizeo.
+    const dossierPhotos = `reception-photos/${String(dataId)}`;
+    const res = await telechargerMedias(lu, {
+      kizeoGet: (p) => kizeoRequest(token, "GET", p, null, true),
+      deposer: async (m, buffer, type) => {
+        const ext2 = type === "image/png" ? "png" : type === "image/gif" ? "gif" : "jpg";
+        const nom = `${dossierPhotos}/${m.ligne === null ? "r" : "l" + m.ligne}_${m.cle}.${ext2}`;
+        const tk = crypto.randomUUID();
+        await bucket.file(nom).save(buffer, { contentType: type, metadata: { metadata: { firebaseStorageDownloadTokens: tk } } });
+        photosPaths.push(nom);
+        return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(nom)}?alt=media&token=${tk}`;
+      },
+    });
+    const c = compacter(lu);
+    donnees = c.rapport;
+    donneesChoix = c.catalogue;
+    console.log(`Kizeo: rapport ${dataId} lu depuis le JSON (${lu.entete.length} champ(s), ${lu.lignes.length} ligne(s), ${res.nb} média(s), ${res.erreurs.length} échec(s))`);
+    if (res.erreurs.length) donneesErreur = `${res.erreurs.length} média(s) non récupéré(s)`;
+  } catch (e) {
+    donneesErreur = e.message;
+    console.error(`Kizeo: lecture JSON échouée pour ${dataId}:`, e.message);
+  }
+
   const now = new Date().toISOString();
   const docData = {
     kizeoDataId: String(dataId),
     kizeoFormId: String(formId),
     kizeoFormDocId: formsSnap.docs[0].id,
     recipientUserId: submissionUserId ? parseInt(submissionUserId, 10) : null,
+    donnees,
+    donneesChoix,
+    donneesErreur,
+    photosPaths,
     refInterne: refInterne || null,
     reference: reference || "",
     arriveeAt: now,
@@ -4311,4 +4370,72 @@ exports.campagneGenererConvocations = functions
       console.error("campagneGenererConvocations:", e);
       res.status(500).json({ error: e.message });
     }
+  });
+
+// ══════════════════════════════════════════════════════════════════
+// PURGE DES PHOTOS BRUTES DES RAPPORTS
+//
+// Les photos téléchargées depuis Kizeo à la réception servent à l'écran de
+// relecture et à la fabrication du PDF. Une fois le rapport envoyé au
+// client, elles sont dans le PDF : les garder en double n'apporte rien et
+// fait grossir le Storage (~2 Mo par rapport).
+//
+// Délai de grâce volontaire : on ne purge qu'au-delà de PURGE_APRES_JOURS
+// après l'envoi, pour pouvoir régénérer un PDF le lendemain si un détail a
+// été raté. Le PDF lui-même n'est jamais touché, seulement les photos
+// sources sous reception-photos/.
+// ══════════════════════════════════════════════════════════════════
+const PURGE_APRES_JOURS = 30;
+
+exports.purgerPhotosRapports = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 540 })
+  .pubsub.schedule("every day 04:15")
+  .timeZone("Europe/Paris")
+  .onRun(async () => {
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(admin.app(), "belledonne-client");
+    const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+    const limite = new Date(Date.now() - PURGE_APRES_JOURS * 86400000).toISOString();
+
+    let snap;
+    try {
+      snap = await db.collection("reception-rapports").where("statut", "==", "envoye").get();
+    } catch (e) {
+      console.error("purgerPhotosRapports: lecture Firestore échouée:", e.message);
+      return null;
+    }
+
+    let nbRapports = 0, nbFichiers = 0, nbEchecs = 0;
+    for (const doc of snap.docs) {
+      const r = doc.data();
+      const paths = Array.isArray(r.photosPaths) ? r.photosPaths : [];
+      if (!paths.length) continue;
+      // Date d'envoi : `updatedAt` au passage en "envoye", `notifiedAt` quand
+      // un mail est parti. On prend la plus tardive des deux pour ne jamais
+      // purger plus tôt que prévu.
+      const envoyeLe = [r.notifiedAt, r.updatedAt].filter(Boolean).sort().pop() || "";
+      if (!envoyeLe || envoyeLe > limite) continue;
+
+      let supprimes = 0;
+      for (const p of paths) {
+        try { await bucket.file(p).delete(); supprimes++; }
+        catch (e) {
+          // 404 = déjà supprimé, c'est l'état voulu : on ne le compte pas en échec.
+          if (e.code === 404) supprimes++;
+          else { nbEchecs++; console.error(`purgerPhotosRapports: suppression ${p} échouée:`, e.message); }
+        }
+      }
+      // On ne vide `photosPaths` que si tout est parti, sinon la prochaine
+      // exécution reprendra les fichiers restants.
+      if (supprimes === paths.length) {
+        try {
+          await doc.ref.update({ photosPaths: [], photosPurgeesAt: new Date().toISOString() });
+          nbRapports++; nbFichiers += supprimes;
+        } catch (e) { console.error(`purgerPhotosRapports: mise à jour ${doc.id} échouée:`, e.message); }
+      }
+    }
+
+    console.log(`purgerPhotosRapports: ${nbFichiers} photo(s) supprimée(s) sur ${nbRapports} rapport(s) envoyé(s) il y a plus de ${PURGE_APRES_JOURS} jours, ${nbEchecs} échec(s)`);
+    return null;
   });
