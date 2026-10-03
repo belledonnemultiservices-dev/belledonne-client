@@ -3682,22 +3682,6 @@ async function construireIndexLogements(campagneId) {
     } catch(e) { console.error("construireIndexLogements: lecture fichier source échouée:", e.message); }
   }
 
-  const nomsTechniciens = new Map();
-  async function nomTechnicienParKizeoId(kizeoUserId) {
-    if (!kizeoUserId) return "";
-    if (nomsTechniciens.has(kizeoUserId)) return nomsTechniciens.get(kizeoUserId);
-    let nom = "";
-    try {
-      const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", String(kizeoUserId)).limit(1).get();
-      if (!tSnap.empty) {
-        const t = tSnap.docs[0].data();
-        nom = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
-      }
-    } catch(e) { /* ignore */ }
-    nomsTechniciens.set(kizeoUserId, nom);
-    return nom;
-  }
-
   const semainesSnap = await db.collection("campagnes-semaines").where("campagneId", "==", campagneId).get();
   // Téléchargement + parsing des fichiers de toutes les périodes en parallèle.
   const parPeriode = await Promise.all(semainesSnap.docs.map(async (semDoc) => {
@@ -3722,7 +3706,10 @@ async function construireIndexLogements(campagneId) {
     // associées à un technicien dans "Envois"), pour ne rater aucun logement.
     for (const ws of wb.worksheets) {
       const envoi = envois.find(e => e.nomFeuille === ws.name);
-      const techNom = envoi ? await nomTechnicienParKizeoId(envoi.destinataireKizeoUserId) : "";
+      // On indexe l'identifiant Kizeo, jamais le nom : renommer un technicien
+      // dans sa fiche doit se voir tout de suite dans la recherche, sans
+      // reconstruire l'index. Le nom est résolu au moment de la recherche.
+      const techKizeoId = envoi ? String(envoi.destinataireKizeoUserId || "") : "";
       ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
         if (rowNumber === 1) return;
         try {
@@ -3746,7 +3733,7 @@ async function construireIndexLogements(campagneId) {
                         // colonnes ville/code postal mal alignées sur une feuille "récap" à mise en page différente
             dateHeure1erPassage: infosDate && infosDate.date1 ? `${infosDate.date1}${infosDate.heure1 ? " - " + infosDate.heure1 : ""}` : "Non trouvée",
             dateHeure2emePassage: infosDate && infosDate.date2 ? `${infosDate.date2}${infosDate.heure2 ? " - " + infosDate.heure2 : ""}` : "Non trouvée",
-            technicien: techNom || "—",
+            technicienKizeoUserId: techKizeoId,
             periode: periodeTxt,
             nomNorm: (nomLocataire || "").toLowerCase(),
             numeroNorm: String(numeroCourt || "").replace(/^0+/, "") || "0",
@@ -3765,7 +3752,7 @@ async function construireIndexLogements(campagneId) {
   for (const l of parPeriode.flat()) {
     const cle = `${normaliserAdresseComparaison(l.adresseRue || l.adresse)}|${(l.nom||"").toLowerCase()}|${l.numero}|${l.periode}`;
     const existante = parCle.get(cle);
-    if (!existante || (existante.technicien === "—" && l.technicien !== "—")) parCle.set(cle, l);
+    if (!existante || (!existante.technicienKizeoUserId && l.technicienKizeoUserId)) parCle.set(cle, l);
   }
   return Array.from(parCle.values());
 }
@@ -3780,7 +3767,10 @@ async function obtenirIndexLogements(campagneId, forceRefresh) {
   if (!forceRefresh && cached && (Date.now() - cached.builtAt) < RECHERCHE_CACHE_TTL_MS) return cached.index;
 
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-  const indexPath = `campagnes-recherche-index/${campagneId}.v3.json`;
+  // v4 : l'index stocke technicienKizeoUserId au lieu du nom du technicien.
+  // Le changement de version force la reconstruction des index v3 existants,
+  // qui portaient un nom figé au moment de leur construction.
+  const indexPath = `campagnes-recherche-index/${campagneId}.v4.json`;
   if (!forceRefresh) {
     try {
       const [buf] = await bucket.file(indexPath).download();
@@ -3816,11 +3806,34 @@ exports.campagneRechercheLogement = functions
 
     try {
       const index = await obtenirIndexLogements(campagneId, forceRefresh);
-      const resultats = index.filter(l =>
+      const trouves = index.filter(l =>
         (!nomTerme || (l.nomNorm || "").includes(nomTerme)) &&
         (!numeroTerme || (l.numeroNorm || "").includes(numeroTerme)) &&
         (!adresseTerme || (l.adresseNorm || "").includes(adresseTerme))
-      ).slice(0, 30).map(({ nomNorm, numeroNorm, adresseNorm, adresseRue, ...r }) => r);
+      ).slice(0, 30);
+
+      // Nom du technicien lu en direct sur sa fiche, pas dans l'index : un
+      // renommage est visible immédiatement. Une seule lecture par
+      // identifiant Kizeo, au plus une poignée pour 30 résultats.
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const ids = [...new Set(trouves.map(l => l.technicienKizeoUserId).filter(Boolean))];
+      const noms = new Map();
+      await Promise.all(ids.map(async (id) => {
+        try {
+          const tSnap = await db.collection("techniciens").where("kizeoUserId", "==", id).limit(1).get();
+          if (!tSnap.empty) {
+            const t = tSnap.docs[0].data();
+            const n = t.nomComplet || `${t.prenom || ""} ${t.nom || ""}`.trim();
+            if (n) noms.set(id, n);
+          }
+        } catch(e) { console.error("campagneRechercheLogement: lookup technicien échoué:", e.message); }
+      }));
+
+      const resultats = trouves.map(({ nomNorm, numeroNorm, adresseNorm, adresseRue, technicienKizeoUserId, ...r }) => ({
+        ...r,
+        technicien: noms.get(technicienKizeoUserId) || "—",
+      }));
       res.status(200).json({ resultats, nbIndexe: index.length });
     } catch(e) {
       console.error("campagneRechercheLogement:", e);
