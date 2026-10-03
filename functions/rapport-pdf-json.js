@@ -20,6 +20,12 @@
 const M = require("./rapport-pdf");
 const PdfPrinter = require("pdfmake");
 
+// La signature du technicien n'est pas imprimée dans le rapport remis au
+// client. Elle reste récupérée et conservée : c'est elle qui atteste, à la
+// réception, que le technicien a bien terminé son intervention (une
+// soumission non signée n'entre pas dans le circuit).
+const SIGNATURE_DANS_PDF = false;
+
 // Un champ sans valeur n'est pas affiché dans le corps : sur un formulaire
 // de 24 champs dont la moitié est facultative, les laisser remplirait le
 // rapport de tirets. Les champs d'identification, eux, restent toujours
@@ -77,6 +83,7 @@ const versImages = (photos) => photos.map(p => ({
 function construire(rapport, logoDataUri) {
   const entete = (rapport.entete || []);
   const lignes = (rapport.lignes || []);
+  const signature = SIGNATURE_DANS_PDF ? (rapport.signature || null) : null;
 
   if (lignes.length) {
     // Rapport à chambres : la maquette CCAS convient telle quelle.
@@ -87,7 +94,7 @@ function construire(rapport, logoDataUri) {
         champs: versChamps(l.champs),
         images: versImages(l.photos || []),
       })),
-      signature: rapport.signature || null,
+      signature,
     };
     return M.construireDocument(data, logoDataUri);
   }
@@ -97,7 +104,7 @@ function construire(rapport, logoDataUri) {
   // avec zéro chambre, puis on insère les sections avant la signature.
   const { identification, corps } = decouper(rapport);
   const doc = M.construireDocument(
-    { entete: identification.map(c => ({ libelle: c.libelle, valeur: c.valeur })), chambres: [], signature: rapport.signature || null },
+    { entete: identification.map(c => ({ libelle: c.libelle, valeur: c.valeur })), chambres: [], signature },
     logoDataUri
   );
 
@@ -116,7 +123,7 @@ function construire(rapport, logoDataUri) {
 
   // La signature est le dernier bloc posé par construireDocument : on insère
   // le corps juste avant, pour qu'elle reste en fin de document.
-  const nbSignature = rapport.signature ? 2 : 0;
+  const nbSignature = signature ? 2 : 0;
   doc.content.splice(doc.content.length - nbSignature, 0, ...sections);
   return doc;
 }
@@ -151,7 +158,7 @@ async function genererPdf(rapportEntree, chargerImage) {
 
   for (const p of rapport.photos || []) await charger(p);
   for (const l of rapport.lignes || []) for (const p of l.photos || []) await charger(p);
-  if (rapport.signature) await charger(rapport.signature);
+  if (SIGNATURE_DANS_PDF && rapport.signature) await charger(rapport.signature);
 
   const printer = new PdfPrinter(M.POLICES);
   const kit = printer.createPdfKitDocument(construire(rapport, logoDataUri));
