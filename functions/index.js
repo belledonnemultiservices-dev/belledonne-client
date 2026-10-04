@@ -1698,7 +1698,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   try {
     const { lireSoumission, telechargerMedias, compacter } = require("./rapport-donnees");
     const formDef = await definitionFormulaire(token, formId);
-    const lu = lireSoumission(parsed, formDef);
+    const lu = lireSoumission(parsed, formDef, mapping);
 
     // Les photos deviennent des fichiers à nous : l'écran de relecture peut
     // s'ouvrir des jours après la réception sans dépendre de la durée de vie

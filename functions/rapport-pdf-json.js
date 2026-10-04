@@ -113,10 +113,32 @@ function construire(rapport, logoDataUri) {
     const champs = versChamps(g.champs, g.titre);
     if (!champs.length) return;
     if (g.titre) {
-      sections.push({ text: g.titre.replace(/\s*:\s*$/, ""), style: "titreChambre", fontSize: 12, margin: [0, 16, 0, 2] });
-      sections.push({ canvas: [{ type: "line", x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: M.VERT }], margin: [0, 0, 0, 10] });
+      // Le titre reste solidaire de sa première rangée de champs, sinon il
+      // se retrouve seul en bas de page quand le contenu bascule sur la
+      // suivante. On passe par une rangée de tableau plutôt que par
+      // `unbreakable` : plusieurs blocs insécables qui s'enchaînent font
+      // produire à pdfmake une page blanche en fin de document.
+      sections.push({
+        table: {
+          widths: ["*"],
+          body: [[{
+            border: [false, false, false, false],
+            stack: [
+              { text: g.titre.replace(/\s*:\s*$/, ""), style: "titreChambre", fontSize: 12, margin: [0, 16, 0, 2] },
+              { canvas: [{ type: "line", x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: M.VERT }], margin: [0, 0, 0, 10] },
+              M.blocChamps(champs.slice(0, 2)),
+            ],
+          }]],
+        },
+        layout: {
+          hLineWidth: () => 0, vLineWidth: () => 0,
+          paddingTop: () => 0, paddingBottom: () => 0, paddingLeft: () => 0, paddingRight: () => 0,
+        },
+      });
+      if (champs.length > 2) sections.push(M.blocChamps(champs.slice(2)));
+    } else {
+      sections.push(M.blocChamps(champs));
     }
-    sections.push(M.blocChamps(champs));
   });
   const photos = versImages(rapport.photos || []);
   if (photos.length) sections.push(...M.blocPhotos(photos));

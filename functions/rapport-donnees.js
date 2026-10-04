@@ -29,8 +29,19 @@ const TYPE_SECTION = "section";
 const TYPE_SUBFORM = "subform";
 
 // Champs techniques posés par l'app au moment du push : ils n'ont rien à
-// faire ni dans l'écran de relecture ni dans le PDF remis au client.
-const CLES_TECHNIQUES = new Set(["ref_interne", "libelle", "separateur1"]);
+// faire ni dans l'écran de relecture ni dans le PDF remis au client. Les
+// clés varient d'un formulaire à l'autre (un « Rapport dératisation » porte
+// `re_interne`, une coquille côté Kizeo), d'où la reconnaissance par motif
+// plutôt que par liste fermée. L'appelant complète avec le mapping du
+// formulaire, qui est la source de vérité.
+const CLES_TECHNIQUES = new Set(["libelle", "separateur1"]);
+const MOTIF_TECHNIQUE = /^re?f?_?interne$/i;
+
+function estTechnique(cle, clesSupplementaires) {
+  if (CLES_TECHNIQUES.has(cle)) return true;
+  if (MOTIF_TECHNIQUE.test(String(cle).replace(/_/g, "_"))) return true;
+  return clesSupplementaires ? clesSupplementaires.has(cle) : false;
+}
 
 // "T1:T1;T2:T2" ou "Blattes:Blattes" -> [{valeur, libelle}]. Le séparateur de
 // paire est le PREMIER deux-points : un libellé peut lui-même en contenir
@@ -88,12 +99,12 @@ function decrireChamp(cle, def, valeur) {
 
 // Parcourt un jeu de champs (racine ou ligne de subform) et les range par
 // nature : titres de section, valeurs éditables, photos, signature.
-function trierChamps(valeurs, definitions) {
+function trierChamps(valeurs, definitions, clesTechniques) {
   const resultat = { sections: [], champs: [], photos: [], signature: null };
   for (const [cle, def] of Object.entries(definitions)) {
     const type = (def && def.type) || "text";
     if (type === TYPE_SUBFORM) continue;           // traité à part
-    if (CLES_TECHNIQUES.has(cle)) continue;
+    if (estTechnique(cle, clesTechniques)) continue;
 
     const brute = valeurBrute(valeurs[cle]);
 
@@ -122,19 +133,26 @@ function trierChamps(valeurs, definitions) {
 //   submission : l'objet renvoyé par GET /forms/{formId}/data/{dataId}
 //                (soit { data: {...} }, soit l'objet lui-même)
 //   formDef    : GET /forms/{formId}
-function lireSoumission(submission, formDef) {
+function lireSoumission(submission, formDef, mapping) {
   const s = (submission && submission.data) || submission || {};
   const valeurs = s.fields || {};
   const def = normaliserDefinition(formDef);
 
-  const racine = trierChamps(valeurs, def.champs);
+  // Le mapping du formulaire dit quel champ porte la référence interne :
+  // plus fiable qu'un nom deviné, et valable quelle que soit son orthographe.
+  const sup = new Set();
+  if (mapping) {
+    [mapping.refInterne, mapping.libelle].forEach(c => { if (c) sup.add(String(c)); });
+  }
+
+  const racine = trierChamps(valeurs, def.champs, sup);
 
   // Subform : une ligne par chambre, avec ses propres champs et photos.
   const lignes = [];
   const brutLignes = def.cleSubform ? valeurBrute(valeurs[def.cleSubform]) : null;
   if (Array.isArray(brutLignes) && Object.keys(def.colonnes).length) {
     brutLignes.forEach((ligne, i) => {
-      const t = trierChamps(ligne || {}, def.colonnes);
+      const t = trierChamps(ligne || {}, def.colonnes, sup);
       // Première colonne = identifiant de la chambre (num_chambre). On la sort
       // du lot pour en faire le titre de la ligne dans l'éditeur et le PDF.
       const titre = t.champs.length ? t.champs[0] : null;
@@ -156,7 +174,7 @@ function lireSoumission(submission, formDef) {
     technicienKizeoUserId: String(s.user_id || ""),
     recipientNom: s.recipient_name || "",
     dateSoumission: s.update_time || s.create_time || "",
-    refInterne: String(valeurBrute(valeurs.ref_interne) || ""),
+    refInterne: String(valeurBrute(valeurs[(mapping && mapping.refInterne) || "ref_interne"]) || ""),
     libelle: String(valeurBrute(valeurs.libelle) || ""),
     entete: racine.champs,
     sections: racine.sections,
