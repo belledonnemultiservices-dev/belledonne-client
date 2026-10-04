@@ -157,17 +157,26 @@ function setup() {
       return b;
     });
 
-    onSnapshot(
-      query(collection(db, 'reception-rapports'), where('statut', '==', 'a-traiter')),
-      snap => {
-        const n = snap.size;
-        reportBadgesJaune.forEach(b => {
-          b.textContent = n;
-          b.style.display = n ? '' : 'none';
-        });
-      },
-      err => console.error('suivi-badge (a-traiter):', err)
-    );
+    // Jaune : ce qui demande une action de notre part, c'est-à-dire les
+    // rapports à relire (depuis la relecture obligatoire) et ceux restés à
+    // traiter sur l'ancien circuit. Deux écoutes séparées plutôt qu'un
+    // filtre "in" : Firestore ne notifie que la requête concernée, et le
+    // total reste juste même si une seule des deux change.
+    const compteJaune = { "a-relire": 0, "a-traiter": 0 };
+    const rafraichirJaune = () => {
+      const n = compteJaune["a-relire"] + compteJaune["a-traiter"];
+      reportBadgesJaune.forEach(b => {
+        b.textContent = n;
+        b.style.display = n ? '' : 'none';
+      });
+    };
+    ["a-relire", "a-traiter"].forEach(statut => {
+      onSnapshot(
+        query(collection(db, 'reception-rapports'), where('statut', '==', statut)),
+        snap => { compteJaune[statut] = snap.size; rafraichirJaune(); },
+        err => console.error(`suivi-badge (${statut}):`, err)
+      );
+    });
 
     onSnapshot(
       query(collection(db, 'reception-rapports'), where('statut', '==', 'en-attente')),
