@@ -64,6 +64,7 @@
   .badge-statut{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;}
   .st-en-attente{background:#EEF2FF;color:#4338CA;}
   .st-a-traiter{background:rgba(245,166,35,0.15);color:#C27D0A;}
+  .st-a-relire{background:rgba(124,58,237,0.14);color:#6D28D9;}
   .st-envoye{background:var(--green-pale);color:var(--green-dark);}
   .st-archive{background:#EBF0F5;color:var(--text-mid);}
   .badge-retard{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#fff;background:var(--red);padding:2px 8px;border-radius:10px;white-space:nowrap;}
@@ -99,6 +100,8 @@
   .rl-bloc{border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px;overflow:hidden;}
   .rl-bloc-tete{background:var(--bg);padding:10px 14px;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px;}
   .rl-bloc-corps{padding:14px;}
+  .rl-num{width:92px;padding:3px 7px;border:1px solid var(--border);border-radius:5px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--text);background:#fff;outline:none;}
+  .rl-num:focus{border-color:var(--green);}
   .rl-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;}
   .rl-champ{display:flex;flex-direction:column;gap:5px;}
   .rl-champ.rl-large{grid-column:1/-1;}
@@ -211,6 +214,7 @@
     <div class="filters-bar">
       <input class="search-input" id="searchInput" placeholder="Rechercher par client, BC, technicien...">
       <select class="filter-select" id="filterStatut">
+        <option value="a-relire">À relire</option>
         <option value="a-traiter" selected>À traiter</option>
         <option value="en-retard">⚠ Non reçu</option>
         <option value="en-attente">En attente technicien</option>
@@ -516,8 +520,8 @@ function render() {
   if (!list.length) { empty.style.display = "block"; return; }
   empty.style.display = "none";
 
-  const STATUT_LABEL = { "en-attente": "En attente", "a-traiter": "À traiter", "envoye": "Envoyé", "archive": "Archivé" };
-  const STATUT_CLASS = { "en-attente": "st-en-attente", "a-traiter": "st-a-traiter", "envoye": "st-envoye", "archive": "st-archive" };
+  const STATUT_LABEL = { "en-attente": "En attente", "a-relire": "À relire", "a-traiter": "À traiter", "envoye": "Envoyé", "archive": "Archivé" };
+  const STATUT_CLASS = { "en-attente": "st-en-attente", "a-relire": "st-a-relire", "a-traiter": "st-a-traiter", "envoye": "st-envoye", "archive": "st-archive" };
 
   const rows = list.map(r => {
     const pending = r.statut === "en-attente";
@@ -529,9 +533,9 @@ function render() {
     const actions = pending
       ? `${resendBtn}<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Supprimer</button><button class="btn-a btn-annuler" onclick="ouvrirAnnulerPassage('${r.id}')">Annuler le passage</button>`
       : `
-        <a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>
-        ${r.donnees ? `<button class="btn-a btn-relire" onclick="openRelecture('${r.id}')" title="Relire et corriger ce qu'a saisi le technicien">Relire${r.relueAt ? " \u2713" : ""}</button>` : ""}
-        <button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>
+        ${r.fileUrl ? `<a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : ""}
+        ${r.donnees ? `<button class="btn-a btn-relire" onclick="openRelecture('${r.id}')" title="${r.statut === "a-relire" ? "Relire et valider pour fabriquer le PDF" : "Relire et corriger ce qu'a saisi le technicien"}">${r.statut === "a-relire" ? "Relire et valider" : "Relire"}${r.relueAt && r.statut !== "a-relire" ? " \u2713" : ""}</button>` : ""}
+        ${r.fileUrl ? `<button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>` : ""}
         ${resendBtn}
         ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
         ${r.statut === "archive" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
@@ -747,6 +751,13 @@ function rlPhotos(photos, prefixe) {
 function rlCollecter() {
   document.querySelectorAll("#rlBody [data-chemin]").forEach(el => {
     const [zone, idx, sousIdx] = el.dataset.chemin.split(".");
+    // "t.<i>" : le numéro de chambre, qui n'est pas un champ comme les
+    // autres mais le titre de la ligne, affiché en tête du bloc et du PDF.
+    if (zone === "t") {
+      const ligne = _rlDonnees.lignes[+idx];
+      if (ligne) ligne.titre = el.value.trim();
+      return;
+    }
     const cible = zone === "e" ? _rlDonnees.entete[+idx] : _rlDonnees.lignes[+idx].champs[+sousIdx];
     if (!cible) return;
     if (el.dataset.multi) {
@@ -773,7 +784,12 @@ function rlRendu() {
 
   d.lignes.forEach((l, i) => {
     html += `<div class="rl-bloc">
-      <div class="rl-bloc-tete"><span>Chambre ${rlEsc(l.titre) || (i + 1)}</span><span style="font-weight:400;color:var(--text-muted);">${l.champs.length} champ(s) · ${l.photos.length} photo(s)</span></div>
+      <div class="rl-bloc-tete">
+        <span style="display:inline-flex;align-items:center;gap:7px;">Chambre
+          <input class="rl-num" type="text" data-chemin="t.${i}" value="${rlEsc(l.titre)}" placeholder="n°" title="Numéro de chambre, repris tel quel dans le PDF">
+        </span>
+        <span style="font-weight:400;color:var(--text-muted);">${l.champs.length} champ(s) · ${l.photos.length} photo(s)</span>
+      </div>
       <div class="rl-bloc-corps">${rlChamps(l.champs, "l." + i)}
         ${l.photos.length ? `<div class="rl-lbl" style="margin-top:14px;">Photos</div>${rlPhotos(l.photos, "l" + i)}` : ""}
       </div></div>`;

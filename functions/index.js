@@ -1617,83 +1617,12 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     return;
   }
 
-  // Téléchargement du fichier (PDF ou Excel selon la config du formulaire)
-  const typeSortie = formConf.typeSortie === "excel" ? "excel" : "pdf";
-  let fileBuffer, ext, contentType;
-  let sourceXlsxBuffer = null;      // Excel d'origine quand le PDF est reconstruit
-  let erreurReconstruction = null;  // raison d'un repli sur l'Excel
-  if (typeSortie === "excel") {
-    if (!formConf.exportId) { console.error(`Kizeo: exportId manquant pour le formulaire ${formId}`); return false; }
-    const ex = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/exports/${encodeURIComponent(formConf.exportId)}`, null, true);
-    if (ex.status !== 200) { console.error(`Kizeo: export Excel échoué (${ex.status}) pour ${dataId}`); return false; }
-    fileBuffer = ex.body; ext = "xlsx";
-    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-
-    // Formulaire marqué "Reconstruire le rapport en PDF" (kizeo-config) : l'Excel
-    // revenu de Kizeo sert de source à un PDF structuré par chambre, et c'est lui
-    // qui poursuit le circuit. L'Excel d'origine est quand même archivé plus bas.
-    if (formConf.reconstruirePdf === true) {
-      try {
-        const { reconstruireEnPdf } = require("./rapport-pdf");
-        const r = await reconstruireEnPdf(fileBuffer);
-        sourceXlsxBuffer = fileBuffer;
-        fileBuffer = r.pdf; ext = "pdf"; contentType = "application/pdf";
-        console.log(`Kizeo: rapport ${dataId} reconstruit en PDF (${r.nbChambres} chambre(s), ${r.photosManquantes} photo(s) manquante(s))`);
-      } catch (e) {
-        // Jamais bloquant : l'Excel part tel quel et la ligne porte la raison,
-        // sinon un modèle inattendu bloquerait le rapport indéfiniment.
-        erreurReconstruction = e.message;
-        console.error(`Kizeo: reconstruction PDF échouée pour ${dataId}:`, e.message);
-      }
-    }
-  } else {
-    const pdf = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
-    if (pdf.status !== 200) { console.error(`Kizeo: téléchargement PDF échoué (${pdf.status}) pour ${dataId}`); return false; }
-    fileBuffer = pdf.body; ext = "pdf"; contentType = "application/pdf";
-  }
-
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-  const folder = client || "_inconnu";
-  // Nom du fichier = Nom du rapport Kizeo _ N° BC/PL/Devis _ passage_N
-  const rapportNom = (formConf.nom || "Rapport").trim();
-  const bcRef = bc || reference || dataId || "sans-bc";
-  const nomBase = `${rapportNom}_${bcRef}_passage_${numPassage}`.replace(/\s+/g, "_");
-  const storagePath = `reception/${folder}/${Date.now()}_${nomBase}.${ext}`;
-  const downloadToken = crypto.randomUUID();
-  try {
-    await bucket.file(storagePath).save(fileBuffer, {
-      contentType,
-      metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
-    });
-  } catch(e) {
-    console.error(`Kizeo: upload Storage échoué pour ${dataId}:`, e.message);
-    return false;
-  }
-  const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
-
-  // Excel d'origine conservé quand le PDF a été reconstruit : il n'apparaît pas
-  // dans le circuit, il sert à comprendre si un PDF sort de travers. Son échec
-  // d'archivage ne remet pas en cause le rapport lui-même.
-  let sourceXlsxUrl = null;
-  if (sourceXlsxBuffer) {
-    try {
-      const pathXlsx = `reception/${folder}/source-xlsx/${Date.now()}_${nomBase}.xlsx`;
-      const tokenXlsx = crypto.randomUUID();
-      await bucket.file(pathXlsx).save(sourceXlsxBuffer, {
-        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        metadata: { metadata: { firebaseStorageDownloadTokens: tokenXlsx } },
-      });
-      sourceXlsxUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(pathXlsx)}?alt=media&token=${tokenXlsx}`;
-    } catch (e) {
-      console.error(`Kizeo: archivage de l'Excel source échoué pour ${dataId}:`, e.message);
-    }
-  }
 
   // ── Lecture du rapport depuis le JSON de la soumission ────────────
-  // Posée EN PARALLÈLE du circuit existant : rien de ce qui part au client
-  // n'en dépend encore. Elle alimente `donnees` et `photos`, qui serviront à
-  // l'écran de relecture puis au futur générateur PDF. Un échec ici ne doit
-  // donc jamais empêcher le rapport d'arriver comme avant.
+  // C'est elle qui alimente l'écran de relecture puis le générateur PDF.
+  // Un échec ici n'empêche jamais le rapport d'arriver : on retombe alors
+  // sur l'ancien circuit, fichier Kizeo compris.
   let donnees = null, donneesChoix = null, donneesErreur = null, photosPaths = [];
   try {
     const { lireSoumission, telechargerMedias, compacter } = require("./rapport-donnees");
@@ -1725,6 +1654,93 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     console.error(`Kizeo: lecture JSON échouée pour ${dataId}:`, e.message);
   }
 
+
+  // Formulaire passé à la relecture obligatoire : le rapport attend d'être
+  // relu avant qu'un PDF ne soit fabriqué, donc aucun fichier n'est
+  // téléchargé chez Kizeo. On n'y renonce que si la lecture du JSON a
+  // réussi : sinon il n'y aurait plus rien du tout à présenter, et on
+  // reprend l'ancien circuit pour ne jamais perdre un rapport.
+  const relecture = formConf.relectureObligatoire === true && !!donnees;
+  if (formConf.relectureObligatoire === true && !donnees) {
+    console.error(`Kizeo: ${dataId} en relecture obligatoire mais JSON illisible, repli sur le fichier Kizeo`);
+  }
+
+  // Téléchargement du fichier (PDF ou Excel selon la config du formulaire)
+  const typeSortie = formConf.typeSortie === "excel" ? "excel" : "pdf";
+  let fileBuffer, ext, contentType;
+  let sourceXlsxBuffer = null;      // Excel d'origine quand le PDF est reconstruit
+  let erreurReconstruction = null;  // raison d'un repli sur l'Excel
+  if (relecture) {
+    // rien à télécharger : le PDF naîtra de la validation
+  } else if (typeSortie === "excel") {
+    if (!formConf.exportId) { console.error(`Kizeo: exportId manquant pour le formulaire ${formId}`); return false; }
+    const ex = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/exports/${encodeURIComponent(formConf.exportId)}`, null, true);
+    if (ex.status !== 200) { console.error(`Kizeo: export Excel échoué (${ex.status}) pour ${dataId}`); return false; }
+    fileBuffer = ex.body; ext = "xlsx";
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    // Formulaire marqué "Reconstruire le rapport en PDF" (kizeo-config) : l'Excel
+    // revenu de Kizeo sert de source à un PDF structuré par chambre, et c'est lui
+    // qui poursuit le circuit. L'Excel d'origine est quand même archivé plus bas.
+    if (formConf.reconstruirePdf === true) {
+      try {
+        const { reconstruireEnPdf } = require("./rapport-pdf");
+        const r = await reconstruireEnPdf(fileBuffer);
+        sourceXlsxBuffer = fileBuffer;
+        fileBuffer = r.pdf; ext = "pdf"; contentType = "application/pdf";
+        console.log(`Kizeo: rapport ${dataId} reconstruit en PDF (${r.nbChambres} chambre(s), ${r.photosManquantes} photo(s) manquante(s))`);
+      } catch (e) {
+        // Jamais bloquant : l'Excel part tel quel et la ligne porte la raison,
+        // sinon un modèle inattendu bloquerait le rapport indéfiniment.
+        erreurReconstruction = e.message;
+        console.error(`Kizeo: reconstruction PDF échouée pour ${dataId}:`, e.message);
+      }
+    }
+  } else {
+    const pdf = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/pdf`, null, true);
+    if (pdf.status !== 200) { console.error(`Kizeo: téléchargement PDF échoué (${pdf.status}) pour ${dataId}`); return false; }
+    fileBuffer = pdf.body; ext = "pdf"; contentType = "application/pdf";
+  }
+
+  const folder = client || "_inconnu";
+  // Nom du fichier = Nom du rapport Kizeo _ N° BC/PL/Devis _ passage_N
+  const rapportNom = (formConf.nom || "Rapport").trim();
+  const bcRef = bc || reference || dataId || "sans-bc";
+  const nomBase = `${rapportNom}_${bcRef}_passage_${numPassage}`.replace(/\s+/g, "_");
+  let fileUrl = null;
+  if (!relecture) {
+    const storagePath = `reception/${folder}/${Date.now()}_${nomBase}.${ext}`;
+    const downloadToken = crypto.randomUUID();
+    try {
+      await bucket.file(storagePath).save(fileBuffer, {
+        contentType,
+        metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } },
+      });
+    } catch(e) {
+      console.error(`Kizeo: upload Storage échoué pour ${dataId}:`, e.message);
+      return false;
+    }
+    fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+  }
+
+  // Excel d'origine conservé quand le PDF a été reconstruit : il n'apparaît pas
+  // dans le circuit, il sert à comprendre si un PDF sort de travers. Son échec
+  // d'archivage ne remet pas en cause le rapport lui-même.
+  let sourceXlsxUrl = null;
+  if (sourceXlsxBuffer) {
+    try {
+      const pathXlsx = `reception/${folder}/source-xlsx/${Date.now()}_${nomBase}.xlsx`;
+      const tokenXlsx = crypto.randomUUID();
+      await bucket.file(pathXlsx).save(sourceXlsxBuffer, {
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        metadata: { metadata: { firebaseStorageDownloadTokens: tokenXlsx } },
+      });
+      sourceXlsxUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(pathXlsx)}?alt=media&token=${tokenXlsx}`;
+    } catch (e) {
+      console.error(`Kizeo: archivage de l'Excel source échoué pour ${dataId}:`, e.message);
+    }
+  }
+
   const now = new Date().toISOString();
   const docData = {
     kizeoDataId: String(dataId),
@@ -1745,14 +1761,16 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     bc,
     numPassage,
     passageLabel,
-    type: ext === "pdf" ? "pdf" : typeSortie,
+    type: relecture ? "pdf" : (ext === "pdf" ? "pdf" : typeSortie),
     typeRapport: formConf.nature === "absence-annulation" ? "absence-annulation" : "intervention",
     fileUrl,
     sourceXlsxUrl,
     erreurReconstruction,
     gsheetId: null,
     gsheetUrl: null,
-    statut: "a-traiter",
+    // Relecture obligatoire : le rapport attend le feu vert avant d'exister
+    // sous forme de document. Il rejoindra "a-traiter" une fois validé.
+    statut: relecture ? "a-relire" : "a-traiter",
     updatedAt: now,
   };
 

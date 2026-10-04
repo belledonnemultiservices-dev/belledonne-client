@@ -221,10 +221,19 @@
       <div class="form-row" style="margin-top:16px">
         <div class="form-group" style="margin-bottom:0">
           <label class="chip" style="cursor:pointer;">
-            <input type="checkbox" id="fReconstruirePdf">
-            Reconstruire le rapport en PDF
+            <input type="checkbox" id="fRelecture">
+            Relecture obligatoire avant envoi
           </label>
-          <div class="form-hint">L'Excel revenu de Kizeo est retransformé en PDF structuré (en-tête, puis une section par chambre avec ses photos). C'est ce PDF qui arrive dans Gestion rapports et part au client. Réservé aux formulaires Excel à tableau.</div>
+          <div class="form-hint">Le rapport arrive au statut « À relire » : rien ne part au client tant que vous n'avez pas relu ce qu'a saisi le technicien et validé. Le PDF est alors fabriqué à partir des valeurs corrigées. Le fichier Kizeo n'est plus téléchargé.</div>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:16px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="chip" style="cursor:pointer;">
+            <input type="checkbox" id="fReconstruirePdf">
+            Reconstruire le rapport en PDF (ancien circuit)
+          </label>
+          <div class="form-hint">Sans objet si la relecture est active. L'Excel revenu de Kizeo est retransformé en PDF structuré, sans passer par la relecture. Réservé aux formulaires Excel à tableau restés sur l'ancien circuit.</div>
         </div>
       </div>
 
@@ -464,7 +473,7 @@ function render(forms) {
     return `<div class="source-card">
       <div class="source-card-header">
         <div class="source-card-info">
-          <div class="source-card-top"><div class="source-name">${f.nom || "—"}</div>${badge}${natureBadge}${f.reconstruirePdf ? '<span class="badge-type" style="background:#F3E8FF;color:#7C3AED;">PDF reconstruit</span>' : ""}</div>
+          <div class="source-card-top"><div class="source-name">${f.nom || "—"}</div>${badge}${natureBadge}${f.relectureObligatoire ? '<span class="badge-type" style="background:#EDE9FE;color:#6D28D9;">Relecture obligatoire</span>' : (f.reconstruirePdf ? '<span class="badge-type" style="background:#F3E8FF;color:#7C3AED;">PDF reconstruit</span>' : "")}</div>
           <div class="source-freq">formId ${f.formId || "—"}</div>
         </div>
         <div class="source-card-actions">
@@ -569,6 +578,7 @@ window.openModal = async function(docId) {
     document.getElementById("fNature").value = f.nature || "intervention";
     document.getElementById("fPassageLie").value = f.passageLie || "";
     document.getElementById("fReconstruirePdf").checked = f.reconstruirePdf === true;
+    document.getElementById("fRelecture").checked = f.relectureObligatoire === true;
     renderChips("fNaturesMission", naturesMission, f.naturesMission || []);
     renderChips("fClientsLies", clientsComptes, f.clientsLies || []);
     current = f.mapping || {};
@@ -579,6 +589,7 @@ window.openModal = async function(docId) {
     document.getElementById("fNature").value = "intervention";
     document.getElementById("fPassageLie").value = "";
     document.getElementById("fReconstruirePdf").checked = false;
+    document.getElementById("fRelecture").checked = false;
     renderChips("fNaturesMission", naturesMission, []);
     renderChips("fClientsLies", clientsComptes, []);
   }
@@ -610,15 +621,18 @@ window.saveForm = async function() {
   if (!nom) { showToast("Nom requis"); return; }
   if (!formId) { showToast("ID de formulaire requis"); return; }
   if (!mapping.refInterne) { showToast("Le champ Référence interne doit être associé"); return; }
-  if (typeSortie === "excel" && !exportId) { showToast("ID d'export Excel requis pour un formulaire Excel"); return; }
+  // En relecture obligatoire le fichier Kizeo n'est plus téléchargé : son
+  // identifiant d'export n'a plus de raison d'être exigé.
+  if (typeSortie === "excel" && !exportId && !relectureObligatoire) { showToast("ID d'export Excel requis pour un formulaire Excel"); return; }
 
   const naturesLiees = readChips("fNaturesMission");
   const clientsLies = readChips("fClientsLies");
   const passageLie = document.getElementById("fPassageLie").value;
   const reconstruirePdf = document.getElementById("fReconstruirePdf").checked;
+  const relectureObligatoire = document.getElementById("fRelecture").checked;
 
   const data = { nom, formId, typeSortie, nature, exportId, mapping,
-    naturesMission: naturesLiees, clientsLies, passageLie, reconstruirePdf,
+    naturesMission: naturesLiees, clientsLies, passageLie, reconstruirePdf, relectureObligatoire,
     updatedAt: new Date().toISOString() };
   const btn = document.getElementById("saveBtn");
   btn.disabled = true; btn.textContent = "Enregistrement...";

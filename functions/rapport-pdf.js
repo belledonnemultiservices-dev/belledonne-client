@@ -23,11 +23,44 @@ const VERT = "#1DA870";
 const ENCRE = "#0D1B2A";
 const GRIS = "#6B7C8F";
 const TRAIT = "#D9E1E8";
+const FOND = "#F4F7F9";   // fond discret du bloc d'identification
 const VIDE = "/";                 // valeur absente : le champ reste visible
 const PHOTOS_PAR_LIGNE = 2;
 const TAILLE_PHOTO = [245, 210];
 const LONGUEUR_CHOIX_MAX = 45;
-const LOGO = path.join(__dirname, "logo.png");
+const LOGO = path.join(__dirname, "logo-rapport.png");
+
+// Mentions légales du pied de page. Elles figurent sur un document remis à
+// des bailleurs et des institutions : elles sont donc regroupées ici, en
+// clair, pour être corrigées sans toucher à la mise en page.
+const SOCIETE = {
+  raison: "BELLEDONNE MULTISERVICES",
+  activite: "Désinsectisation · Dératisation · Désinfection",
+  adresse: "",                       // à compléter
+  siret: "",                         // à compléter
+  siren: "891 508 376",
+  rcs: "",                           // à compléter
+  tva: "",                           // à compléter
+  ape: "",                           // à compléter
+  certibiocide: "",                  // à compléter
+};
+
+// Une seule ligne par information présente : un champ laissé vide ne laisse
+// pas de séparateur orphelin dans le pied de page.
+function lignesMentions() {
+  const l1 = [SOCIETE.raison, SOCIETE.activite].filter(Boolean).join("  ·  ");
+  const l2 = [
+    SOCIETE.adresse,
+    SOCIETE.siret ? "SIRET " + SOCIETE.siret : (SOCIETE.siren ? "SIREN " + SOCIETE.siren : ""),
+    SOCIETE.rcs ? "RCS " + SOCIETE.rcs : "",
+    SOCIETE.ape ? "APE " + SOCIETE.ape : "",
+  ].filter(Boolean).join("  ·  ");
+  const l3 = [
+    SOCIETE.tva ? "TVA " + SOCIETE.tva : "",
+    SOCIETE.certibiocide ? "Certibiocide " + SOCIETE.certibiocide : "",
+  ].filter(Boolean).join("  ·  ");
+  return [l1, l2, l3].filter(Boolean);
+}
 
 // pdfmake ne livre pas les .ttf sur disque : les Roboto sont dans son vfs, en
 // base64, et PdfPrinter accepte des Buffers.
@@ -176,24 +209,52 @@ async function telechargerImage(url, timeoutMs) {
 }
 
 function blocEntete(entete, logoDataUri) {
-  const lignes = entete.map(e => [
-    { text: e.libelle, style: "cleEntete" },
+  // En-tête à deux colonnes : identité à gauche, nature du document à
+  // droite. Plus proche d'une fiche d'intervention que d'une page de
+  // garde, ce que des bailleurs et des services techniques attendent.
+  const bandeau = {
+    columns: [
+      logoDataUri
+        ? { image: logoDataUri, width: 165, margin: [0, 2, 0, 0] }
+        : { text: "BELLEDONNE MULTISERVICES", style: "titre", margin: [0, 6, 0, 0] },
+      {
+        width: "*",
+        stack: [
+          { text: "RAPPORT D'INTERVENTION", style: "titre", alignment: "right" },
+          { text: SOCIETE.activite.toUpperCase(), style: "surTitre", alignment: "right", margin: [0, 2, 0, 0] },
+        ],
+      },
+    ],
+    columnGap: 16,
+  };
+
+  // Les informations d'identification en deux colonnes de paires : plus
+  // compact qu'une liste, et le lecteur retrouve chaque donnée au même
+  // endroit d'un rapport à l'autre.
+  const paires = entete.map(e => [
+    { text: String(e.libelle || "").replace(/\s*:\s*$/, ""), style: "cleEntete" },
     { text: e.valeur || VIDE, style: "valEntete" },
   ]);
+  const body = [];
+  for (let i = 0; i < paires.length; i += 2) {
+    const g = paires[i], d = paires[i + 1];
+    body.push([g[0], g[1], d ? d[0] : {}, d ? d[1] : {}]);
+  }
+
   return [
-    logoDataUri
-      ? { image: logoDataUri, width: 190, alignment: "center", margin: [0, 0, 0, 14] }
-      : { text: "BELLEDONNE MULTISERVICES", style: "titre", alignment: "center", margin: [0, 0, 0, 14] },
-    { text: "Rapport d'intervention", style: "titre", alignment: "center" },
-    { canvas: [{ type: "line", x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2, lineColor: VERT }], margin: [0, 8, 0, 14] },
+    bandeau,
+    { canvas: [{ type: "line", x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 2.2, lineColor: VERT }], margin: [0, 10, 0, 0] },
     {
-      table: { widths: [150, "*"], body: lignes },
+      table: { widths: [92, "*", 92, "*"], body },
       layout: {
-        hLineWidth: (i, node) => (i === 0 || i === node.table.body.length ? 0 : 0.6),
+        hLineWidth: (i, node) => (i === 0 || i === node.table.body.length ? 0 : 0.5),
         vLineWidth: () => 0,
         hLineColor: () => TRAIT,
-        paddingTop: () => 6, paddingBottom: () => 6, paddingLeft: () => 0, paddingRight: () => 0,
+        fillColor: () => FOND,
+        paddingTop: () => 5, paddingBottom: () => 5,
+        paddingLeft: (i) => (i === 0 ? 8 : 0), paddingRight: (i) => (i === 3 ? 8 : 10),
       },
+      margin: [0, 0, 0, 4],
     },
   ];
 }
@@ -283,24 +344,33 @@ function construireDocument(data, logoDataUri) {
   }
   return {
     pageSize: "A4",
-    pageMargins: [40, 40, 40, 50],
+    pageMargins: [40, 38, 40, 62],
     defaultStyle: { font: "Roboto", fontSize: 9.5, color: ENCRE },
     styles: {
-      titre: { fontSize: 17, bold: true, color: ENCRE },
-      titreChambre: { fontSize: 14, bold: true, color: VERT },
+      titre: { fontSize: 14, bold: true, color: ENCRE, characterSpacing: 0.6 },
+      surTitre: { fontSize: 7.5, color: GRIS, characterSpacing: 1.1 },
+      titreChambre: { fontSize: 11.5, bold: true, color: ENCRE, characterSpacing: 0.5 },
       sousTitre: { fontSize: 11, bold: true, color: ENCRE },
-      cleEntete: { fontSize: 9, color: GRIS },
-      valEntete: { fontSize: 10, bold: true },
+      cleEntete: { fontSize: 7.8, color: GRIS, characterSpacing: 0.2 },
+      valEntete: { fontSize: 9, bold: true },
       cleChamp: { fontSize: 8, color: GRIS, characterSpacing: 0.3 },
       valChamp: { fontSize: 9.5 },
       legende: { fontSize: 7.5, color: GRIS, margin: [0, 3, 0, 0] },
+      pied: { fontSize: 6.4, color: GRIS, lineHeight: 1.25 },
+      piedFort: { fontSize: 6.4, color: ENCRE, bold: true, lineHeight: 1.25 },
     },
     footer: (page, total) => ({
-      columns: [
-        { text: "Belledonne Multiservices", fontSize: 7.5, color: GRIS, margin: [40, 0, 0, 0] },
-        { text: page + " / " + total, fontSize: 7.5, color: GRIS, alignment: "right", margin: [0, 0, 40, 0] },
+      stack: [
+        { canvas: [{ type: "line", x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.6, lineColor: TRAIT }], margin: [40, 0, 40, 4] },
+        {
+          columns: [
+            { width: "*", stack: lignesMentions().map((t, i) => ({ text: t, style: i === 0 ? "piedFort" : "pied" })) },
+            { width: 42, text: page + "/" + total, style: "pied", alignment: "right", noWrap: true, margin: [10, 0, 0, 0] },
+          ],
+          margin: [40, 0, 40, 0],
+        },
       ],
-      margin: [0, 12, 0, 0],
+      margin: [0, 10, 0, 0],
     }),
     content: contenu,
   };
