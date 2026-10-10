@@ -289,10 +289,15 @@
       <div class="mn-recap" id="envoiRecap">—</div>
       <div class="form-group" id="envoiStatutWrap" style="display:none;">
         <label class="form-label">Statut</label>
-        <select class="form-input" id="envoiStatut">
+        <select class="form-input" id="envoiStatut" onchange="window.rafraichirTexteEnvoi()">
           <option value="absent">Absent</option>
           <option value="annulation">Annulation</option>
         </select>
+      </div>
+      <div class="form-group" id="envoiMotifWrap" style="display:none;">
+        <label class="form-label">Motif</label>
+        <input class="form-input" type="text" id="envoiMotif" onchange="window.rafraichirTexteEnvoi()" placeholder="Motif communiqué au client">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Repris du constat du technicien. C'est ce texte que verra le client.</div>
       </div>
       <div class="form-group">
         <label class="form-label">Destinataires</label>
@@ -968,24 +973,59 @@ function appliquerVars(text, vars) {
 
 // ── ENVOYER AU CLIENT ──
 let _envoiId = null;
+let _envoiTpl = null, _envoiIsAbsAnnul = false, _envoiRef = null, _envoiTexteGenere = { subject: "", body: "" };
+
+// Objet et message sont produits par le modèle. Ils sont recomposés quand le
+// statut ou le motif changent, mais jamais par-dessus une retouche manuelle :
+// on ne réécrit que ce qui est encore exactement le texte qu'on avait produit.
+function composerTexteEnvoi() {
+  const r = _envoiRef;
+  if (!r || !_envoiTpl) return;
+  const vars = {
+    bc: r.bc || r.reference || "", client: r.client || "", passage: r.passageLabel || "",
+    statut: _envoiIsAbsAnnul ? (document.getElementById("envoiStatut").value === "absent" ? "Absent" : "Annulation") : "",
+    motif: _envoiIsAbsAnnul ? document.getElementById("envoiMotif").value.trim() : "",
+    lien: LIEN_ESPACE,
+  };
+  const subject = appliquerVars(_envoiTpl.subject || (_envoiIsAbsAnnul ? "Intervention non réalisée - BC {{bc}}" : "Rapport disponible - BC {{bc}}"), vars);
+  const body = appliquerVars(_envoiTpl.body || (_envoiIsAbsAnnul
+    ? "Bonjour,\nL'intervention (BC {{bc}}, {{passage}}) n'a pas pu être réalisée.\nConsultez votre espace client : {{lien}}\nCordialement,\nBelledonne Multiservices"
+    : "Bonjour,\nVotre rapport (BC {{bc}}, {{passage}}) est disponible.\nConsultez-le ici : {{lien}}\nCordialement,\nBelledonne Multiservices"), vars);
+
+  const champSubject = document.getElementById("envoiSubject");
+  const champBody = document.getElementById("envoiMsg");
+  if (!champSubject.value || champSubject.value === _envoiTexteGenere.subject) champSubject.value = subject;
+  if (!champBody.value || champBody.value === _envoiTexteGenere.body) champBody.value = body;
+  _envoiTexteGenere = { subject, body };
+}
+
+window.rafraichirTexteEnvoi = function() { composerTexteEnvoi(); };
+
 window.openEnvoi = async function(id) {
   const r = allDocs.find(x => x.id === id);
   if (!r || !r.client) return;
   _envoiId = id;
   const isAbsAnnul = r.typeRapport === "absence-annulation";
   document.getElementById("envoiStatutWrap").style.display = isAbsAnnul ? "" : "none";
-  if (isAbsAnnul) document.getElementById("envoiStatut").value = "annulation";
+  document.getElementById("envoiMotifWrap").style.display = isAbsAnnul ? "" : "none";
+  // Statut et motif viennent du constat relevé sur place quand il existe. Une
+  // absence atteste que le technicien s'est déplacé, une annulation non : forcer
+  // "annulation" par défaut, comme avant, revenait à effacer ce qu'il a constaté.
+  if (isAbsAnnul) {
+    const c = r.absence || {};
+    document.getElementById("envoiStatut").value = c.statut === "absent" ? "absent" : "annulation";
+    document.getElementById("envoiMotif").value = c.motif || "";
+  }
   document.getElementById("envoiRecap").textContent = (r.bc ? "BC " + r.bc + " — " : "") + r.client + (r.passageLabel ? " — " + r.passageLabel : "");
-  const vars = {
-    bc: r.bc || r.reference || "", client: r.client || "", passage: r.passageLabel || "",
-    statut: isAbsAnnul ? (document.getElementById("envoiStatut").value === "absent" ? "Absent" : "Annulation") : "",
-    motif: r.motif || "", lien: LIEN_ESPACE,
-  };
-  const tpl = await chargerTemplate(isAbsAnnul ? "rapportAnnulation" : "rapportClassique");
-  document.getElementById("envoiSubject").value = appliquerVars(tpl.subject || (isAbsAnnul ? "Intervention non réalisée - BC {{bc}}" : "Rapport disponible - BC {{bc}}"), vars);
-  document.getElementById("envoiMsg").value = appliquerVars(tpl.body || (isAbsAnnul
-    ? "Bonjour,\nL'intervention (BC {{bc}}, {{passage}}) n'a pas pu être réalisée.\nConsultez votre espace client : {{lien}}\nCordialement,\nBelledonne Multiservices"
-    : "Bonjour,\nVotre rapport (BC {{bc}}, {{passage}}) est disponible.\nConsultez-le ici : {{lien}}\nCordialement,\nBelledonne Multiservices"), vars);
+  _envoiTpl = await chargerTemplate(isAbsAnnul ? "rapportAnnulation" : "rapportClassique");
+  _envoiIsAbsAnnul = isAbsAnnul;
+  _envoiRef = r;
+  // Remise à zéro avant composition : sans elle, une retouche manuelle faite
+  // sur un rapport précédent serait reconduite telle quelle sur celui-ci.
+  _envoiTexteGenere = { subject: "", body: "" };
+  document.getElementById("envoiSubject").value = "";
+  document.getElementById("envoiMsg").value = "";
+  composerTexteEnvoi();
   document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
   ["envoiBtnEspace", "envoiBtnEmail", "envoiBtnBoth"].forEach(id => { document.getElementById(id).disabled = false; });
   document.getElementById("envoiEmailManuel").value = "";
@@ -1078,12 +1118,18 @@ window.doEnvoyer = async function(mode) {
               if (sSnap.exists()) { adresse = sSnap.data().adresse || ""; nom = sSnap.data().nomClient || ""; }
             } catch(e) { /* tant pis, adresse laissée vide */ }
           }
+          // Le motif écrit ici est celui que lit le client dans son espace.
+          // Il portait jusqu'alors le libellé du passage ("1er passage"), ce
+          // qui n'a jamais été un motif. On prend celui du constat, corrigé
+          // le cas échéant dans ce modal, et on retombe sur le libellé du
+          // passage seulement s'il n'y a rien d'autre à dire.
+          const motifClient = document.getElementById("envoiMotif").value.trim();
           await addDoc(collection(db, "absents"), {
             adresse, nom,
             date: now.split("T")[0],
             bc: r.bc || r.reference || "",
             statut: document.getElementById("envoiStatut").value,
-            motif: r.passageLabel || "",
+            motif: motifClient || r.passageLabel || "",
             client: r.client,
             rapportUrl: r.fileUrl,
             notifs: wantsEmail ? 1 : 0,
