@@ -329,6 +329,14 @@
     </div>
     <div class="modal-body">
       <div class="mn-recap" id="anpRecap">—</div>
+      <!-- Constat relevé par le technicien sur place : rappelé tel quel avant
+           que le rapport ne parte au client. Masqué pour une annulation saisie
+           au bureau, qui n'a ni photo ni auteur terrain. -->
+      <div id="anpConstat" style="display:none;background:#FDECEA;border:1px solid #F5C6C2;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:#C0392B;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Constat du technicien</div>
+        <div id="anpConstatTexte" style="font-size:13px;color:var(--text);line-height:1.5;"></div>
+        <div id="anpConstatPhoto" style="margin-top:10px;"></div>
+      </div>
       <div class="form-group">
         <label class="form-label">Statut</label>
         <select class="form-input" id="anpStatut">
@@ -535,6 +543,7 @@ function render() {
       : `
         ${r.fileUrl ? `<a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : ""}
         ${r.donnees ? `<button class="btn-a btn-relire" onclick="openRelecture('${r.id}')" title="${r.statut === "a-relire" ? "Relire et valider pour fabriquer le PDF" : "Relire et corriger ce qu'a saisi le technicien"}">${r.statut === "a-relire" ? "Relire et valider" : "Relire"}${r.relueAt && r.statut !== "a-relire" ? " \u2713" : ""}</button>` : ""}
+        ${r.absence && r.absence.source === "kizeo" && r.statut !== "envoye" ? `<button class="btn-a btn-relire" onclick="ouvrirAnnulerPassage('${r.id}')" title="Relire le constat du technicien, puis transmettre le rapport au client">Relire et transmettre</button>` : ""}
         ${r.fileUrl ? `<button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>` : ""}
         ${resendBtn}
         ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
@@ -553,7 +562,8 @@ function render() {
       <div class="cell-muted cell-ellipsis" style="font-size:12px;" title="${(r.libelle || "").replace(/"/g, "&quot;")}">${r.libelle || "—"}</div>
       <div style="display:flex;flex-direction:column;gap:3px;">
         <span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>
-        ${r.typeRapport === "absence-annulation" ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">Absence/Annulation</span>` : ""}
+        ${r.typeRapport === "absence-annulation" ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">${r.absence && r.absence.source === "kizeo" ? "Constat terrain" : "Absence/Annulation"}</span>` : ""}
+        ${r.absence && r.absence.source === "kizeo" && !r.absence.photoUrl ? `<span class="badge-type" style="background:#FEF3C7;color:#B45309;" title="${String(r.absence.photoErreur || "Photo absente").replace(/"/g, "&quot;")}">⚠ Sans photo</span>` : ""}
         ${r.erreurReconstruction ? `<span class="badge-type" style="background:#FEF3C7;color:#B45309;" title="Reconstruction PDF échouée : ${String(r.erreurReconstruction).replace(/"/g, "&quot;")} — l'Excel de Kizeo a été déposé à la place.">⚠ PDF non reconstruit</span>` : ""}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
@@ -1188,7 +1198,7 @@ function raNettoyer(texte) {
     .replace(/[^\x20-\x7E\xA0-\xFF\u20AC\u0152\u0153]/g, "");
 }
 
-async function genererPdfAnnulation({ client, adresse, nom, bc, passageLabel, statut, motif, dateDebut }) {
+async function genererPdfAnnulation({ client, adresse, nom, bc, passageLabel, statut, motif, dateDebut, technicien, constateLe, photoOctets }) {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([595, 842]);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -1261,6 +1271,10 @@ async function genererPdfAnnulation({ client, adresse, nom, bc, passageLabel, st
     ['Référence', bc || '-'],
     ['Passage concerné', passageLabel || '-'],
     ...(datePrevue ? [["Date d'intervention prévue", datePrevue]] : []),
+    // Constat relevé sur place : le technicien et l'horodatage de sa saisie
+    // donnent sa valeur de preuve au document, face à un client qui conteste.
+    ...(technicien ? [['Constaté par', technicien]] : []),
+    ...(constateLe ? [['Constaté le', raDateIntervention(constateLe) || raDateEnLettres(String(constateLe).split('T')[0])]] : []),
   ];
   const H_LIGNE = 25;
   const H_TABLE = H_LIGNE * (lignes.length + 1);
@@ -1292,24 +1306,109 @@ async function genererPdfAnnulation({ client, adresse, nom, bc, passageLabel, st
   const attestation = absent
     ? "Ce document atteste que nos techniciens se sont présentés à l'adresse indiquée à la date prévue, et que l'intervention n'a pas pu être réalisée en raison de l'absence constatée ci-dessus."
     : "Ce document atteste que l'intervention prévue à l'adresse indiquée n'a pas pu être réalisée, pour le motif indiqué ci-dessus.";
-  decouper(attestation, LARGEUR, 10).forEach((l, i) => texte(l, MARGE, y - i * 14, { size: 10 }));
+  const lignesAttest = decouper(attestation, LARGEUR, 10);
+  lignesAttest.forEach((l, i) => texte(l, MARGE, y - i * 14, { size: 10 }));
+  y -= lignesAttest.length * 14 + 26;
 
-  page.drawLine({ start: { x: MARGE, y: 72 }, end: { x: MARGE + LARGEUR, y: 72 }, thickness: 0.5, color: TRAIT });
-  centre('BELLEDONNE MULTISERVICES - RCS GRENOBLE B 891 508 376', 58, { size: 7.5, color: GRIS });
-  centre(`Document établi le ${raDateEnLettres(new Date().toISOString().split('T')[0])}`, 46, { size: 7.5, color: GRIS });
+  // Photo de preuve du déplacement, prise par le technicien sur place. Jamais
+  // bloquante : un constat sans photo vaut mieux qu'un constat qui n'existe pas.
+  if (photoOctets && photoOctets.length) {
+    try {
+      const octets = photoOctets;
+      const estPng = octets[0] === 0x89 && octets[1] === 0x50;
+      const img = estPng ? await pdfDoc.embedPng(octets) : await pdfDoc.embedJpg(octets);
+
+      // Place restante au-dessus du pied de page. En dessous de 150 points le
+      // cliché serait illisible : on lui donne alors une page à lui.
+      let pageImg = page, dispo = y - 100;
+      if (dispo < 150) { pageImg = pdfDoc.addPage([595, 842]); y = 780; dispo = y - 100; }
+
+      const LARGEUR_MAX = 300;
+      const ratio = Math.min(LARGEUR_MAX / img.width, dispo / img.height);
+      const w = img.width * ratio, h = img.height * ratio;
+
+      pageImg.drawText(raNettoyer('PREUVE DU PASSAGE'), { x: MARGE, y, size: 9, font: bold, color: GRIS });
+      pageImg.drawImage(img, { x: MARGE, y: y - 14 - h, width: w, height: h });
+      pageImg.drawRectangle({ x: MARGE, y: y - 14 - h, width: w, height: h, borderColor: TRAIT, borderWidth: 0.8 });
+    } catch (e) {
+      texte("Photo de preuve non disponible", MARGE, y, { size: 9, color: GRIS });
+      console.warn('Photo de preuve non embarquée dans le constat :', e.message);
+    }
+  }
+
+  // Pied de page sur chaque page, y compris celle ajoutée pour la photo.
+  pdfDoc.getPages().forEach((pg) => {
+    pg.drawLine({ start: { x: MARGE, y: 72 }, end: { x: MARGE + LARGEUR, y: 72 }, thickness: 0.5, color: TRAIT });
+    const l1 = 'BELLEDONNE MULTISERVICES - RCS GRENOBLE B 891 508 376';
+    const l2 = `Document etabli le ${raDateEnLettres(new Date().toISOString().split('T')[0])}`;
+    pg.drawText(raNettoyer(l1), { x: MARGE + (LARGEUR - font.widthOfTextAtSize(raNettoyer(l1), 7.5)) / 2, y: 58, size: 7.5, font, color: GRIS });
+    pg.drawText(raNettoyer(l2), { x: MARGE + (LARGEUR - font.widthOfTextAtSize(raNettoyer(l2), 7.5)) / 2, y: 46, size: 7.5, font, color: GRIS });
+  });
 
   return await pdfDoc.save();
 }
 let _anpId = null;
+// Octets de la photo de preuve, récupérés à l'ouverture du modal pour que le
+// générateur PDF n'ait plus aucun accès réseau à faire au moment de l'envoi.
+let _anpPhotoOctets = null;
 window.ouvrirAnnulerPassage = async function(id) {
   const r = allDocs.find(x => x.id === id);
   if (!r) return;
-  if (!confirm("Êtes-vous sûr de vouloir annuler ce passage ?\n\nPensez à supprimer le rapport en attente dans l'interface Kizeo (https://forms.kizeo.com/data/history/).")) return;
+  // Constat venu du terrain : le formulaire Kizeo est déjà soumis, il n'y a
+  // rien à supprimer là-bas, et il ne s'agit pas de décider d'une annulation
+  // mais de relire puis transmettre ce que le technicien a constaté.
+  const constat = (r.absence && r.absence.source === "kizeo") ? r.absence : null;
+  if (!constat && !confirm("Êtes-vous sûr de vouloir annuler ce passage ?\n\nPensez à supprimer le rapport en attente dans l'interface Kizeo (https://forms.kizeo.com/data/history/).")) return;
   _anpId = id;
   document.getElementById("anpRecap").textContent = (r.bc ? "BC " + r.bc + " — " : "") + r.client + (r.passageLabel ? " — " + r.passageLabel : "");
-  document.getElementById("anpStatut").value = "annulation";
-  document.getElementById("anpMotif").value = "";
-  const anpVars = { bc: r.bc || r.reference || "", client: r.client || "", passage: r.passageLabel || "", statut: "Annulation", motif: "", lien: LIEN_ESPACE };
+
+  const boxConstat = document.getElementById("anpConstat");
+  if (constat) {
+    boxConstat.style.display = "block";
+    const quand = constat.constateLe ? fmtDate(constat.constateLe) : "";
+    document.getElementById("anpConstatTexte").innerHTML =
+      `<strong>${constat.statut === "absent" ? "Absent" : "Annulation"}</strong>`
+      + (constat.motif ? ` — ${rlEsc(constat.motif)}` : "")
+      + `<br><span style="color:var(--text-muted);font-size:12px;">Relevé par ${rlEsc(constat.technicien || r.technicien || "technicien inconnu")}${quand ? " le " + quand : ""}</span>`;
+    document.getElementById("anpConstatPhoto").innerHTML = constat.photoUrl
+      ? `<a href="${constat.photoUrl}" target="_blank" rel="noopener"><img src="${constat.photoUrl}" alt="Preuve du passage" style="max-width:220px;max-height:180px;border-radius:6px;border:1px solid #F5C6C2;display:block;"></a>
+         <div id="anpPhotoEtat" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Vérification du cliché...</div>`
+      : `<div style="font-size:12px;color:#C0392B;">⚠ Aucune photo de preuve${constat.photoErreur ? " (" + rlEsc(constat.photoErreur) + ")" : ""}. Le rapport partira sans cliché.</div>`;
+    // Le PDF est fabriqué dans le navigateur : la photo doit être lisible par
+    // `fetch`, pas seulement affichable par une balise <img>. On s'en assure
+    // maintenant, pour que tu voies le problème avant d'envoyer au client et
+    // non après, sur un PDF amputé.
+    _anpPhotoOctets = null;
+    if (constat.photoUrl) {
+      (async () => {
+        const etat = () => document.getElementById("anpPhotoEtat");
+        try {
+          const rep = await fetch(constat.photoUrl);
+          if (!rep.ok) throw new Error("HTTP " + rep.status);
+          _anpPhotoOctets = new Uint8Array(await rep.arrayBuffer());
+          if (etat()) etat().textContent = "Photo jointe au rapport envoyé au client";
+        } catch (e) {
+          if (etat()) {
+            etat().style.color = "#C0392B";
+            etat().textContent = "⚠ Le cliché est visible ici mais ne peut pas être intégré au PDF (" + e.message + "). Le rapport partira sans photo.";
+          }
+          console.warn("Photo de preuve illisible pour le PDF :", e.message);
+        }
+      })();
+    }
+  } else {
+    boxConstat.style.display = "none";
+    document.getElementById("anpConstatTexte").innerHTML = "";
+    document.getElementById("anpConstatPhoto").innerHTML = "";
+  }
+
+  // Valeurs du terrain quand elles existent, sinon les valeurs par défaut du
+  // bureau. Le motif reste modifiable dans les deux cas.
+  const statutInit = constat ? constat.statut : "annulation";
+  const motifInit = constat ? (constat.motif || "") : "";
+  document.getElementById("anpStatut").value = statutInit;
+  document.getElementById("anpMotif").value = motifInit;
+  const anpVars = { bc: r.bc || r.reference || "", client: r.client || "", passage: r.passageLabel || "", statut: statutInit === "absent" ? "Absent" : "Annulation", motif: motifInit, lien: LIEN_ESPACE };
   const anpTpl = await chargerTemplate("rapportAnnulation");
   document.getElementById("anpSubject").value = appliquerVars(anpTpl.subject || "Intervention non réalisée - BC {{bc}}", anpVars);
   document.getElementById("anpMsg").value = appliquerVars(anpTpl.body || "Bonjour,\nL'intervention (BC {{bc}}, {{passage}}) n'a pas pu être réalisée.\nConsultez votre espace client : {{lien}}\nCordialement,\nBelledonne Multiservices", anpVars);
@@ -1332,6 +1431,7 @@ window.ouvrirAnnulerPassage = async function(id) {
 window.closeAnnulerPassage = function() {
   document.getElementById("modalAnnulerPassage").classList.remove("open");
   _anpId = null;
+  _anpPhotoOctets = null;
 };
 window.ajouterEmailManuelAnp = function() {
   const input = document.getElementById("anpEmailManuel");
@@ -1379,7 +1479,16 @@ window.confirmerAnnulerPassage = async function(mode) {
       } catch(e) { /* tant pis, valeurs par défaut conservées */ }
     }
     const date = new Date().toISOString().split("T")[0];
-    const pdfBytes = await genererPdfAnnulation({ client: r.client, adresse, nom, bc: reference, passageLabel: r.passageLabel, statut, motif, dateDebut: r.dateDebut || "" });
+    const constat = (r.absence && r.absence.source === "kizeo") ? r.absence : null;
+    const pdfBytes = await genererPdfAnnulation({
+      client: r.client, adresse, nom, bc: reference, passageLabel: r.passageLabel,
+      statut, motif, dateDebut: r.dateDebut || "",
+      // Renseignés seulement pour un constat relevé sur place : une annulation
+      // décidée au bureau n'a ni auteur terrain, ni horodatage, ni cliché.
+      technicien: constat ? (constat.technicien || r.technicien || "") : "",
+      constateLe: constat ? (constat.constateLe || r.arriveeAt || "") : "",
+      photoOctets: constat ? _anpPhotoOctets : null,
+    });
     const filename = Date.now() + "_" + (statut === "absent" ? "absence" : "annulation") + "_" + (reference || r.id) + ".pdf";
     const storageRef = ref(storage, `reception/${r.client || "_inconnu"}/${filename}`);
     await uploadBytesResumable(storageRef, pdfBytes, { contentType: "application/pdf" });
@@ -1419,6 +1528,9 @@ window.confirmerAnnulerPassage = async function(mode) {
 
     await updateDoc(doc(db, "reception-rapports", r.id), {
       statut: "envoye", typeRapport: "absence-annulation", fileUrl, type: "pdf", bc: reference,
+      // Statut et motif finalement retenus, qui peuvent différer de ce qu'a
+      // saisi le technicien si tu les as corrigés avant d'envoyer.
+      absenceRetenue: { statut, motif, origine: constat ? "kizeo" : "bureau", valideLe: now },
       ajouteEspaceClient: wantsEspace, updatedAt: now,
       ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}),
     });

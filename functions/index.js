@@ -1618,6 +1618,115 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   }
 
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+  const photosPathsAbsence = [];
+
+  // ── Passage non réalisé : locataire absent ou annulation sur place ─
+  // Le technicien a basculé "Passage réalisé" sur non. Côté Kizeo, tout le
+  // corps du rapport est alors masqué par condition de visibilité, donc il n'y
+  // a rien à lire ni à reconstruire : seuls le statut, le motif et la photo de
+  // preuve du déplacement comptent. La ligne rejoint le circuit d'annulation
+  // déjà en place (modal "Annuler le passage" de Gestion rapports), à ceci
+  // près qu'elle arrive pré-remplie par le terrain au lieu d'être saisie ici.
+  //
+  // Les quatre associations vont ensemble : un mapping partiel laisserait
+  // passer une absence dans le circuit normal, qui produirait un rapport
+  // d'intervention vide. Dans ce cas on retombe volontairement sur le circuit
+  // classique et la ligne reste relisible à la main.
+  const mappingAbsenceComplet = !!(mapping.passageRealise && mapping.statutAbsence && mapping.motifAbsence && mapping.photoAbsence);
+  const passageNonRealise = mappingAbsenceComplet
+    && String(getField(mapping.passageRealise) || "").trim().toLowerCase() === "non";
+
+  if (passageNonRealise) {
+    const statutBrut = String(getField(mapping.statutAbsence) || "").trim();
+    // L'app ne connaît que "absent" et "annulation" (mêmes valeurs que le modal
+    // saisi à la main) : tout le reste bascule sur "annulation", qui est le cas
+    // le moins engageant vis-à-vis du client.
+    const statutAbsence = /absent/i.test(statutBrut) ? "absent" : "annulation";
+    const motifAbsence = String(getField(mapping.motifAbsence) || "").trim();
+
+    // Photo de preuve. Un champ photo Kizeo rend soit un nom de média, soit une
+    // liste séparée par des virgules : on ne garde que le premier.
+    let photoAbsenceUrl = null, photoAbsenceErreur = null;
+    const photoBrut = getField(mapping.photoAbsence);
+    const nomMedia = String(Array.isArray(photoBrut) ? (photoBrut[0] || "") : photoBrut || "").split(",")[0].trim();
+    if (nomMedia) {
+      try {
+        const med = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/medias/${encodeURIComponent(nomMedia)}`, null, true);
+        if (med.status !== 200 || !med.body || !med.body.length) throw new Error(`Kizeo a répondu ${med.status}`);
+        const typeImg = med.body[0] === 0x89 ? "image/png" : "image/jpeg";
+        const cheminPhoto = `reception-photos/${String(dataId)}/preuve_passage.${typeImg === "image/png" ? "png" : "jpg"}`;
+        const tkPhoto = crypto.randomUUID();
+        await bucket.file(cheminPhoto).save(med.body, { contentType: typeImg, metadata: { metadata: { firebaseStorageDownloadTokens: tkPhoto } } });
+        photosPathsAbsence.push(cheminPhoto);
+        photoAbsenceUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(cheminPhoto)}?alt=media&token=${tkPhoto}`;
+      } catch (e) {
+        // Jamais bloquant : le constat vaut mieux sans photo que pas de constat.
+        photoAbsenceErreur = e.message;
+        console.error(`Kizeo absence: photo de preuve non récupérée pour ${dataId}:`, e.message);
+      }
+    } else {
+      photoAbsenceErreur = "Aucune photo transmise par le technicien";
+    }
+
+    const nowAbs = new Date().toISOString();
+    const docAbs = {
+      kizeoDataId: String(dataId),
+      kizeoFormId: String(formId),
+      kizeoFormDocId: formsSnap.docs[0].id,
+      recipientUserId: submissionUserId ? parseInt(submissionUserId, 10) : null,
+      // Aucune donnée de rapport : le corps du formulaire était masqué.
+      donnees: null,
+      donneesChoix: null,
+      donneesErreur: null,
+      photosPaths: photosPathsAbsence,
+      refInterne: refInterne || null,
+      reference: reference || "",
+      arriveeAt: nowAbs,
+      technicien,
+      origine,
+      suiviId,
+      client,
+      bc,
+      numPassage,
+      passageLabel,
+      type: "pdf",
+      typeRapport: "absence-annulation",
+      // Constat venu du terrain, à distinguer d'une annulation saisie au bureau.
+      absence: {
+        source: "kizeo",
+        statut: statutAbsence,
+        statutBrut,
+        motif: motifAbsence,
+        photoUrl: photoAbsenceUrl,
+        photoErreur: photoAbsenceErreur,
+        constateLe: nowAbs,
+        technicien,
+      },
+      fileUrl: null,
+      sourceXlsxUrl: null,
+      erreurReconstruction: null,
+      gsheetId: null,
+      gsheetUrl: null,
+      // Toujours relu avant envoi, comme un rapport d'intervention : le PDF
+      // naît de la validation dans le modal, pas de la réception.
+      statut: "a-relire",
+      updatedAt: nowAbs,
+    };
+
+    let existAbs = await db.collection("reception-rapports").where("kizeoDataId", "==", String(dataId)).limit(1).get();
+    if (existAbs.empty && refInterne) {
+      existAbs = await db.collection("reception-rapports").where("refInterne", "==", refInterne).where("statut", "==", "en-attente").limit(1).get();
+    }
+    if (!existAbs.empty) {
+      await existAbs.docs[0].ref.update(docAbs);
+      console.log(`Kizeo absence: soumission ${dataId} (${statutAbsence}) mise à jour -> reception-rapports/${existAbs.docs[0].id}`);
+    } else {
+      docAbs.createdAt = nowAbs;
+      const refAbs = await db.collection("reception-rapports").add(docAbs);
+      console.log(`Kizeo absence: soumission ${dataId} (${statutAbsence}) reçue -> reception-rapports/${refAbs.id}`);
+    }
+    return true;
+  }
 
   // ── Lecture du rapport depuis le JSON de la soumission ────────────
   // C'est elle qui alimente l'écran de relecture puis le générateur PDF.
