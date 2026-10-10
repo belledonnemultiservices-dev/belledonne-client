@@ -339,14 +339,14 @@
       </div>
       <div class="form-group">
         <label class="form-label">Statut</label>
-        <select class="form-input" id="anpStatut">
+        <select class="form-input" id="anpStatut" onchange="window.majApercuPdf()">
           <option value="absent">Absent</option>
           <option value="annulation" selected>Annulation</option>
         </select>
       </div>
       <div class="form-group">
         <label class="form-label">Motif *</label>
-        <input class="form-input" type="text" id="anpMotif" placeholder="ex: locataire absent, prévenu par téléphone le 10/08">
+        <input class="form-input" type="text" id="anpMotif" onchange="window.majApercuPdf()" placeholder="ex: locataire absent, prévenu par téléphone le 10/08">
       </div>
       <div class="form-group">
         <label class="form-label">Destinataires</label>
@@ -363,6 +363,11 @@
       <div class="form-group" style="margin-bottom:14px;">
         <label class="form-label">Message</label>
         <textarea class="mn-msg" id="anpMsg"></textarea>
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">Aperçu du rapport envoyé</label>
+        <div id="anpApercu"></div>
+        <div id="anpApercuEtat" style="font-size:12px;color:var(--text-muted);margin-top:6px;">—</div>
       </div>
     </div>
     <div class="modal-footer">
@@ -562,7 +567,7 @@ function render() {
       <div class="cell-muted cell-ellipsis" style="font-size:12px;" title="${(r.libelle || "").replace(/"/g, "&quot;")}">${r.libelle || "—"}</div>
       <div style="display:flex;flex-direction:column;gap:3px;">
         <span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>
-        ${r.typeRapport === "absence-annulation" ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">${r.absence && r.absence.source === "kizeo" ? "Constat terrain" : "Absence/Annulation"}</span>` : ""}
+        ${r.typeRapport === "absence-annulation" ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">Absence/Annulation</span>` : ""}
         ${r.absence && r.absence.source === "kizeo" && !r.absence.photoUrl ? `<span class="badge-type" style="background:#FEF3C7;color:#B45309;" title="${String(r.absence.photoErreur || "Photo absente").replace(/"/g, "&quot;")}">⚠ Sans photo</span>` : ""}
         ${r.erreurReconstruction ? `<span class="badge-type" style="background:#FEF3C7;color:#B45309;" title="Reconstruction PDF échouée : ${String(r.erreurReconstruction).replace(/"/g, "&quot;")} — l'Excel de Kizeo a été déposé à la place.">⚠ PDF non reconstruit</span>` : ""}
       </div>
@@ -1351,6 +1356,73 @@ let _anpId = null;
 // Octets de la photo de preuve, récupérés à l'ouverture du modal pour que le
 // générateur PDF n'ait plus aucun accès réseau à faire au moment de l'envoi.
 let _anpPhotoOctets = null;
+let _anpApercuUrl = null;
+
+// Les URL de téléchargement Storage s'affichent dans une <img> mais ne
+// répondent pas à un `fetch` cross-origin, le bucket n'ayant aucune
+// configuration CORS. Le PDF étant fabriqué ici, dans le navigateur, il faut
+// les octets : on passe par `mediaRapport`, qui les sert avec les en-têtes qui
+// manquent. Le chemin Storage est porté par le constat ; pour les lignes
+// reçues avant ce champ, on le relit dans l'URL elle-même.
+function cheminPhotoConstat(constat) {
+  if (constat.photoChemin) return constat.photoChemin;
+  const m = String(constat.photoUrl || "").match(/\/o\/([^?]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+async function chargerPhotoConstat(constat) {
+  const chemin = cheminPhotoConstat(constat);
+  if (!chemin) throw new Error("Chemin de la photo introuvable");
+  const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  const rep = await fetch(
+    "https://europe-west1-belledonne-client.cloudfunctions.net/mediaRapport?path=" + encodeURIComponent(chemin),
+    { headers: idt ? { Authorization: "Bearer " + idt } : {} }
+  );
+  if (!rep.ok) throw new Error("HTTP " + rep.status);
+  return new Uint8Array(await rep.arrayBuffer());
+}
+
+// Aperçu du document exact qui partira au client, refabriqué à chaque
+// changement de statut ou de motif : ce qui est visible à l'écran est ce qui
+// est envoyé, sans version intermédiaire possible.
+window.majApercuPdf = async function() {
+  const cadre = document.getElementById("anpApercu");
+  const etat = document.getElementById("anpApercuEtat");
+  if (!cadre || !_anpId) return;
+  const r = allDocs.find(x => x.id === _anpId);
+  if (!r) return;
+  etat.textContent = "Génération de l'aperçu...";
+  try {
+    let adresse = "", nom = "", reference = r.bc || r.reference || "";
+    if (r.suiviId) {
+      try {
+        const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+        if (sSnap.exists()) {
+          const sv = sSnap.data();
+          adresse = sv.adresse || ""; nom = sv.nomClient || "";
+          reference = sv.bc || sv.pl || sv.devis || reference;
+        }
+      } catch(e) { /* aperçu dégradé plutôt qu'absent */ }
+    }
+    const constat = (r.absence && r.absence.source === "kizeo") ? r.absence : null;
+    const octets = await genererPdfAnnulation({
+      client: r.client, adresse, nom, bc: reference, passageLabel: r.passageLabel,
+      statut: document.getElementById("anpStatut").value,
+      motif: document.getElementById("anpMotif").value.trim(),
+      dateDebut: r.dateDebut || "",
+      technicien: constat ? (constat.technicien || r.technicien || "") : "",
+      constateLe: constat ? (constat.constateLe || r.arriveeAt || "") : "",
+      photoOctets: constat ? _anpPhotoOctets : null,
+    });
+    if (_anpApercuUrl) URL.revokeObjectURL(_anpApercuUrl);
+    _anpApercuUrl = URL.createObjectURL(new Blob([octets], { type: "application/pdf" }));
+    cadre.innerHTML = `<iframe src="${_anpApercuUrl}" style="width:100%;height:420px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe>`;
+    etat.innerHTML = `<a href="${_anpApercuUrl}" target="_blank" rel="noopener" style="color:var(--green-dark);">Ouvrir dans un onglet</a>`;
+  } catch (e) {
+    cadre.innerHTML = "";
+    etat.textContent = "Aperçu indisponible : " + e.message;
+  }
+};
 window.ouvrirAnnulerPassage = async function(id) {
   const r = allDocs.find(x => x.id === id);
   if (!r) return;
@@ -1383,9 +1455,7 @@ window.ouvrirAnnulerPassage = async function(id) {
       (async () => {
         const etat = () => document.getElementById("anpPhotoEtat");
         try {
-          const rep = await fetch(constat.photoUrl);
-          if (!rep.ok) throw new Error("HTTP " + rep.status);
-          _anpPhotoOctets = new Uint8Array(await rep.arrayBuffer());
+          _anpPhotoOctets = await chargerPhotoConstat(constat);
           if (etat()) etat().textContent = "Photo jointe au rapport envoyé au client";
         } catch (e) {
           if (etat()) {
@@ -1394,6 +1464,7 @@ window.ouvrirAnnulerPassage = async function(id) {
           }
           console.warn("Photo de preuve illisible pour le PDF :", e.message);
         }
+        majApercuPdf();
       })();
     }
   } else {
@@ -1416,6 +1487,7 @@ window.ouvrirAnnulerPassage = async function(id) {
   ["anpBtnEspace", "anpBtnEmail", "anpBtnBoth"].forEach(bid => { document.getElementById(bid).disabled = false; });
   document.getElementById("anpContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Chargement...</div>';
   document.getElementById("modalAnnulerPassage").classList.add("open");
+  majApercuPdf();
   try {
     const snapC = await getDocs(query(collection(db, "contacts"), where("client", "==", r.client)));
     const contacts = snapC.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1432,6 +1504,9 @@ window.closeAnnulerPassage = function() {
   document.getElementById("modalAnnulerPassage").classList.remove("open");
   _anpId = null;
   _anpPhotoOctets = null;
+  if (_anpApercuUrl) { URL.revokeObjectURL(_anpApercuUrl); _anpApercuUrl = null; }
+  const cadre = document.getElementById("anpApercu");
+  if (cadre) cadre.innerHTML = "";
 };
 window.ajouterEmailManuelAnp = function() {
   const input = document.getElementById("anpEmailManuel");

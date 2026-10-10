@@ -1646,7 +1646,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
 
     // Photo de preuve. Un champ photo Kizeo rend soit un nom de média, soit une
     // liste séparée par des virgules : on ne garde que le premier.
-    let photoAbsenceUrl = null, photoAbsenceErreur = null;
+    let photoAbsenceUrl = null, photoAbsenceErreur = null, photoAbsenceChemin = null;
     const photoBrut = getField(mapping.photoAbsence);
     const nomMedia = String(Array.isArray(photoBrut) ? (photoBrut[0] || "") : photoBrut || "").split(",")[0].trim();
     if (nomMedia) {
@@ -1658,6 +1658,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
         const tkPhoto = crypto.randomUUID();
         await bucket.file(cheminPhoto).save(med.body, { contentType: typeImg, metadata: { metadata: { firebaseStorageDownloadTokens: tkPhoto } } });
         photosPathsAbsence.push(cheminPhoto);
+        photoAbsenceChemin = cheminPhoto;
         photoAbsenceUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(cheminPhoto)}?alt=media&token=${tkPhoto}`;
       } catch (e) {
         // Jamais bloquant : le constat vaut mieux sans photo que pas de constat.
@@ -1698,6 +1699,8 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
         statutBrut,
         motif: motifAbsence,
         photoUrl: photoAbsenceUrl,
+        // Chemin Storage, lu par `mediaRapport` pour fabriquer le PDF côté navigateur.
+        photoChemin: photoAbsenceChemin,
         photoErreur: photoAbsenceErreur,
         constateLe: nowAbs,
         technicien,
@@ -1901,6 +1904,46 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   }
   return true;
 }
+
+// ── SERVIR UNE PHOTO DE RÉCEPTION AU NAVIGATEUR ──────────────────
+// Les URL de téléchargement Firebase Storage s'affichent dans une balise <img>
+// mais ne répondent pas à un `fetch` cross-origin : la configuration CORS du
+// bucket est vide, et il n'y a pas d'interface pour la renseigner. Or Gestion
+// rapports fabrique le PDF d'absence dans le navigateur et doit donc lire les
+// octets de la photo de preuve, pas seulement l'afficher.
+//
+// Cette fonction sert ces octets avec les en-têtes CORS qui manquent. Elle est
+// réservée aux administrateurs et strictement limitée au dossier des photos de
+// réception : ce n'est pas un proxy ouvert sur le bucket.
+exports.mediaRapport = functions
+  .region("europe-west1")
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const chemin = String((req.query && req.query.path) || "");
+    if (chemin.includes("..") || !/^reception-photos\/[A-Za-z0-9_\-./]+$/.test(chemin)) {
+      res.status(400).json({ error: "Chemin non autorisé" });
+      return;
+    }
+
+    try {
+      const fichier = admin.storage().bucket("belledonne-client.firebasestorage.app").file(chemin);
+      const [existe] = await fichier.exists();
+      if (!existe) { res.status(404).json({ error: "Fichier introuvable" }); return; }
+      const [meta] = await fichier.getMetadata();
+      const [octets] = await fichier.download();
+      res.set("Content-Type", meta.contentType || "application/octet-stream");
+      res.set("Cache-Control", "private, max-age=300");
+      res.status(200).send(octets);
+    } catch (e) {
+      console.error("mediaRapport:", chemin, e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
 
 // ── WEBHOOK KIZEO (public, sécurisé par secret partagé en header) ─
 // Déclencheur "Recording" configuré côté Kizeo. Kizeo n'offre pas de
