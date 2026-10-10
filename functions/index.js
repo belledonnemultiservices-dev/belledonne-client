@@ -1618,118 +1618,28 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   }
 
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-  const photosPathsAbsence = [];
 
   // ── Passage non réalisé : locataire absent ou annulation sur place ─
-  // Le technicien a basculé "Passage réalisé" sur non. Côté Kizeo, tout le
-  // corps du rapport est alors masqué par condition de visibilité, donc il n'y
-  // a rien à lire ni à reconstruire : seuls le statut, le motif et la photo de
-  // preuve du déplacement comptent. La ligne rejoint le circuit d'annulation
-  // déjà en place (modal "Annuler le passage" de Gestion rapports), à ceci
-  // près qu'elle arrive pré-remplie par le terrain au lieu d'être saisie ici.
-  //
-  // Les quatre associations vont ensemble : un mapping partiel laisserait
-  // passer une absence dans le circuit normal, qui produirait un rapport
-  // d'intervention vide. Dans ce cas on retombe volontairement sur le circuit
-  // classique et la ligne reste relisible à la main.
-  const mappingAbsenceComplet = !!(mapping.passageRealise && mapping.statutAbsence && mapping.motifAbsence && mapping.photoAbsence);
-  const passageNonRealise = mappingAbsenceComplet
+  // Le technicien a basculé "Passage réalisé" sur non. Rien de particulier à
+  // faire du rapport lui-même : les champs du corps sont masqués par condition
+  // de visibilité côté Kizeo, et `lireSoumission` écarte désormais les champs
+  // masqués, donc le constat traverse le circuit ordinaire (relecture,
+  // validation, PDF, envoi) avec les seuls statut, motif et photo de preuve.
+  // On ne retient ici que de quoi le qualifier dans Gestion rapports.
+  const passageNonRealise = !!mapping.passageRealise
     && String(getField(mapping.passageRealise) || "").trim().toLowerCase() === "non";
-
-  if (passageNonRealise) {
-    const statutBrut = String(getField(mapping.statutAbsence) || "").trim();
-    // L'app ne connaît que "absent" et "annulation" (mêmes valeurs que le modal
-    // saisi à la main) : tout le reste bascule sur "annulation", qui est le cas
-    // le moins engageant vis-à-vis du client.
-    const statutAbsence = /absent/i.test(statutBrut) ? "absent" : "annulation";
-    const motifAbsence = String(getField(mapping.motifAbsence) || "").trim();
-
-    // Photo de preuve. Un champ photo Kizeo rend soit un nom de média, soit une
-    // liste séparée par des virgules : on ne garde que le premier.
-    let photoAbsenceUrl = null, photoAbsenceErreur = null, photoAbsenceChemin = null;
-    const photoBrut = getField(mapping.photoAbsence);
-    const nomMedia = String(Array.isArray(photoBrut) ? (photoBrut[0] || "") : photoBrut || "").split(",")[0].trim();
-    if (nomMedia) {
-      try {
-        const med = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(dataId)}/medias/${encodeURIComponent(nomMedia)}`, null, true);
-        if (med.status !== 200 || !med.body || !med.body.length) throw new Error(`Kizeo a répondu ${med.status}`);
-        const typeImg = med.body[0] === 0x89 ? "image/png" : "image/jpeg";
-        const cheminPhoto = `reception-photos/${String(dataId)}/preuve_passage.${typeImg === "image/png" ? "png" : "jpg"}`;
-        const tkPhoto = crypto.randomUUID();
-        await bucket.file(cheminPhoto).save(med.body, { contentType: typeImg, metadata: { metadata: { firebaseStorageDownloadTokens: tkPhoto } } });
-        photosPathsAbsence.push(cheminPhoto);
-        photoAbsenceChemin = cheminPhoto;
-        photoAbsenceUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(cheminPhoto)}?alt=media&token=${tkPhoto}`;
-      } catch (e) {
-        // Jamais bloquant : le constat vaut mieux sans photo que pas de constat.
-        photoAbsenceErreur = e.message;
-        console.error(`Kizeo absence: photo de preuve non récupérée pour ${dataId}:`, e.message);
-      }
-    } else {
-      photoAbsenceErreur = "Aucune photo transmise par le technicien";
-    }
-
-    const nowAbs = new Date().toISOString();
-    const docAbs = {
-      kizeoDataId: String(dataId),
-      kizeoFormId: String(formId),
-      kizeoFormDocId: formsSnap.docs[0].id,
-      recipientUserId: submissionUserId ? parseInt(submissionUserId, 10) : null,
-      // Aucune donnée de rapport : le corps du formulaire était masqué.
-      donnees: null,
-      donneesChoix: null,
-      donneesErreur: null,
-      photosPaths: photosPathsAbsence,
-      refInterne: refInterne || null,
-      reference: reference || "",
-      arriveeAt: nowAbs,
-      technicien,
-      origine,
-      suiviId,
-      client,
-      bc,
-      numPassage,
-      passageLabel,
-      type: "pdf",
-      typeRapport: "absence-annulation",
-      // Constat venu du terrain, à distinguer d'une annulation saisie au bureau.
-      absence: {
+  const statutAbsenceBrut = (passageNonRealise && mapping.statutAbsence) ? String(getField(mapping.statutAbsence) || "").trim() : "";
+  const absence = passageNonRealise
+    ? {
         source: "kizeo",
-        statut: statutAbsence,
-        statutBrut,
-        motif: motifAbsence,
-        photoUrl: photoAbsenceUrl,
-        // Chemin Storage, lu par `mediaRapport` pour fabriquer le PDF côté navigateur.
-        photoChemin: photoAbsenceChemin,
-        photoErreur: photoAbsenceErreur,
-        constateLe: nowAbs,
-        technicien,
-      },
-      fileUrl: null,
-      sourceXlsxUrl: null,
-      erreurReconstruction: null,
-      gsheetId: null,
-      gsheetUrl: null,
-      // Toujours relu avant envoi, comme un rapport d'intervention : le PDF
-      // naît de la validation dans le modal, pas de la réception.
-      statut: "a-relire",
-      updatedAt: nowAbs,
-    };
-
-    let existAbs = await db.collection("reception-rapports").where("kizeoDataId", "==", String(dataId)).limit(1).get();
-    if (existAbs.empty && refInterne) {
-      existAbs = await db.collection("reception-rapports").where("refInterne", "==", refInterne).where("statut", "==", "en-attente").limit(1).get();
-    }
-    if (!existAbs.empty) {
-      await existAbs.docs[0].ref.update(docAbs);
-      console.log(`Kizeo absence: soumission ${dataId} (${statutAbsence}) mise à jour -> reception-rapports/${existAbs.docs[0].id}`);
-    } else {
-      docAbs.createdAt = nowAbs;
-      const refAbs = await db.collection("reception-rapports").add(docAbs);
-      console.log(`Kizeo absence: soumission ${dataId} (${statutAbsence}) reçue -> reception-rapports/${refAbs.id}`);
-    }
-    return true;
-  }
+        // L'app ne connaît que "absent" et "annulation" : tout le reste bascule
+        // sur "annulation", le cas le moins engageant vis-à-vis du client.
+        statut: /absent/i.test(statutAbsenceBrut) ? "absent" : "annulation",
+        statutBrut: statutAbsenceBrut,
+        motif: mapping.motifAbsence ? String(getField(mapping.motifAbsence) || "").trim() : "",
+        constateLe: new Date().toISOString(),
+      }
+    : null;
 
   // ── Lecture du rapport depuis le JSON de la soumission ────────────
   // C'est elle qui alimente l'écran de relecture puis le générateur PDF.
@@ -1772,8 +1682,8 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   // téléchargé chez Kizeo. On n'y renonce que si la lecture du JSON a
   // réussi : sinon il n'y aurait plus rien du tout à présenter, et on
   // reprend l'ancien circuit pour ne jamais perdre un rapport.
-  const relecture = formConf.relectureObligatoire === true && !!donnees;
-  if (formConf.relectureObligatoire === true && !donnees) {
+  const relecture = (formConf.relectureObligatoire === true || passageNonRealise) && !!donnees;
+  if ((formConf.relectureObligatoire === true || passageNonRealise) && !donnees) {
     console.error(`Kizeo: ${dataId} en relecture obligatoire mais JSON illisible, repli sur le fichier Kizeo`);
   }
 
@@ -1874,7 +1784,11 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     numPassage,
     passageLabel,
     type: relecture ? "pdf" : (ext === "pdf" ? "pdf" : typeSortie),
-    typeRapport: formConf.nature === "absence-annulation" ? "absence-annulation" : "intervention",
+    typeRapport: (passageNonRealise || formConf.nature === "absence-annulation") ? "absence-annulation" : "intervention",
+    // Constat relevé sur place. Qualifie la ligne dans Gestion rapports et
+    // porte ce qu'a déclaré le technicien ; le rapport lui-même suit le
+    // circuit ordinaire.
+    absence,
     fileUrl,
     sourceXlsxUrl,
     erreurReconstruction,
@@ -1904,46 +1818,6 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   }
   return true;
 }
-
-// ── SERVIR UNE PHOTO DE RÉCEPTION AU NAVIGATEUR ──────────────────
-// Les URL de téléchargement Firebase Storage s'affichent dans une balise <img>
-// mais ne répondent pas à un `fetch` cross-origin : la configuration CORS du
-// bucket est vide, et il n'y a pas d'interface pour la renseigner. Or Gestion
-// rapports fabrique le PDF d'absence dans le navigateur et doit donc lire les
-// octets de la photo de preuve, pas seulement l'afficher.
-//
-// Cette fonction sert ces octets avec les en-têtes CORS qui manquent. Elle est
-// réservée aux administrateurs et strictement limitée au dossier des photos de
-// réception : ce n'est pas un proxy ouvert sur le bucket.
-exports.mediaRapport = functions
-  .region("europe-west1")
-  .https.onRequest(async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
-    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
-
-    const chemin = String((req.query && req.query.path) || "");
-    if (chemin.includes("..") || !/^reception-photos\/[A-Za-z0-9_\-./]+$/.test(chemin)) {
-      res.status(400).json({ error: "Chemin non autorisé" });
-      return;
-    }
-
-    try {
-      const fichier = admin.storage().bucket("belledonne-client.firebasestorage.app").file(chemin);
-      const [existe] = await fichier.exists();
-      if (!existe) { res.status(404).json({ error: "Fichier introuvable" }); return; }
-      const [meta] = await fichier.getMetadata();
-      const [octets] = await fichier.download();
-      res.set("Content-Type", meta.contentType || "application/octet-stream");
-      res.set("Cache-Control", "private, max-age=300");
-      res.status(200).send(octets);
-    } catch (e) {
-      console.error("mediaRapport:", chemin, e.message);
-      res.status(500).json({ error: e.message });
-    }
-  });
 
 // ── WEBHOOK KIZEO (public, sécurisé par secret partagé en header) ─
 // Déclencheur "Recording" configuré côté Kizeo. Kizeo n'offre pas de

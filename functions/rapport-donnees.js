@@ -97,14 +97,43 @@ function decrireChamp(cle, def, valeur) {
   };
 }
 
+// Un champ masqué par une condition de visibilité Kizeo n'a jamais été présenté
+// au technicien : il n'a donc rien à faire dans l'écran de relecture ni dans le
+// PDF remis au client. Sans ce filtre, un constat de passage non réalisé
+// traînerait derrière lui les vingt-cinq lignes vides du rapport d'intervention.
+//
+// Kizeo exprime la condition sous la forme `champ|opérateur|valeur`. Toute
+// formule d'une autre forme est considérée comme vraie : en cas de doute on
+// montre le champ, un champ en trop se voit et se corrige, un champ avalé en
+// silence ne se voit pas.
+const OPERATEURS_VISIBILITE = {
+  "==": (a, b) => a === b,
+  "!=": (a, b) => a !== b,
+};
+
+function estVisible(def, valeurs, valeursRacine) {
+  const formule = String((def && def.visible_formula) || "").trim();
+  if (!formule) return true;
+  const parts = formule.split("|");
+  if (parts.length !== 3) return true;
+  const [cle, op, attendu] = parts;
+  const test = OPERATEURS_VISIBILITE[op];
+  if (!test) return true;
+  // Une colonne de tableau peut se conditionner sur un champ de la racine.
+  const source = (valeurs && valeurs[cle] !== undefined) ? valeurs : valeursRacine;
+  const courant = String(valeurBrute(source ? source[cle] : "") || "").trim().toLowerCase();
+  return test(courant, String(attendu).trim().toLowerCase());
+}
+
 // Parcourt un jeu de champs (racine ou ligne de subform) et les range par
 // nature : titres de section, valeurs éditables, photos, signature.
-function trierChamps(valeurs, definitions, clesTechniques) {
+function trierChamps(valeurs, definitions, clesTechniques, valeursRacine) {
   const resultat = { sections: [], champs: [], photos: [], signature: null };
   for (const [cle, def] of Object.entries(definitions)) {
     const type = (def && def.type) || "text";
     if (type === TYPE_SUBFORM) continue;           // traité à part
     if (estTechnique(cle, clesTechniques)) continue;
+    if (!estVisible(def, valeurs, valeursRacine)) continue;
 
     const brute = valeurBrute(valeurs[cle]);
 
@@ -152,7 +181,7 @@ function lireSoumission(submission, formDef, mapping) {
   const brutLignes = def.cleSubform ? valeurBrute(valeurs[def.cleSubform]) : null;
   if (Array.isArray(brutLignes) && Object.keys(def.colonnes).length) {
     brutLignes.forEach((ligne, i) => {
-      const t = trierChamps(ligne || {}, def.colonnes, sup);
+      const t = trierChamps(ligne || {}, def.colonnes, sup, valeurs);
       // Première colonne = identifiant de la chambre (num_chambre). On la sort
       // du lot pour en faire le titre de la ligne dans l'éditeur et le PDF.
       const titre = t.champs.length ? t.champs[0] : null;
@@ -236,7 +265,7 @@ async function telechargerMedias(rapport, { kizeoGet, deposer }) {
   return { nb, erreurs };
 }
 
-module.exports = { lireSoumission, listerMedias, telechargerMedias, listeChoix, typeImage };
+module.exports = { lireSoumission, listerMedias, telechargerMedias, listeChoix, typeImage, estVisible };
 
 // Les listes de choix sont identiques d'une ligne de tableau à l'autre : les
 // répéter dans chaque champ gonfle inutilement le document. Sur un CCAS de

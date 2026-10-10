@@ -328,7 +328,8 @@
         <strong>Passage réalisé</strong> (liste <code>oui</code> / <code>non</code>) doit être placé en haut du formulaire&nbsp;:
         les champs du rapport portent la condition de visibilité <code>= oui</code>, ceux de ce bloc <code>= non</code>.
         Laissez la signature obligatoire et sans condition, c'est elle qui prouve que le technicien s'est déplacé.
-        Les quatre associations ci-dessous vont ensemble&nbsp;: tant qu'elles ne sont pas toutes renseignées, le circuit d'absence reste inactif.
+        Le constat suit ensuite le circuit ordinaire d'un rapport&nbsp;: relecture, validation, PDF, envoi. Les champs masqués
+        par condition sont écartés du rapport, seuls le statut, le motif et la photo y figurent.
       </div>
       <div class="form-row">
         <div class="form-group" style="margin-bottom:16px">
@@ -345,10 +346,7 @@
           <label class="form-label">Motif</label>
           <select class="form-select map-select" id="mapMotifAbsence"></select>
         </div>
-        <div class="form-group" style="margin-bottom:16px">
-          <label class="form-label">Photo de preuve du passage</label>
-          <select class="form-select map-select" id="mapPhotoAbsence"></select>
-        </div>
+        <div class="form-group" style="margin-bottom:16px"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -382,8 +380,8 @@ const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
 const FN_LIST_FIELDS = "https://europe-west1-belledonne-client.cloudfunctions.net/kizeoListFields";
 
-const MAP_KEYS = ["refInterne", "libelle", "reference", "passage", "client", "adresse", "date", "nom", "etage", "codePostal", "ville", "numeroLogement", "signature", "passageRealise", "statutAbsence", "motifAbsence", "photoAbsence"];
-const MAP_EL = { refInterne: "mapRefInterne", libelle: "mapLibelle", reference: "mapReference", passage: "mapPassage", client: "mapClient", adresse: "mapAdresse", date: "mapDate", nom: "mapNom", etage: "mapEtage", codePostal: "mapCodePostal", ville: "mapVille", numeroLogement: "mapNumeroLogement", signature: "mapSignature", passageRealise: "mapPassageRealise", statutAbsence: "mapStatutAbsence", motifAbsence: "mapMotifAbsence", photoAbsence: "mapPhotoAbsence" };
+const MAP_KEYS = ["refInterne", "libelle", "reference", "passage", "client", "adresse", "date", "nom", "etage", "codePostal", "ville", "numeroLogement", "signature", "passageRealise", "statutAbsence", "motifAbsence"];
+const MAP_EL = { refInterne: "mapRefInterne", libelle: "mapLibelle", reference: "mapReference", passage: "mapPassage", client: "mapClient", adresse: "mapAdresse", date: "mapDate", nom: "mapNom", etage: "mapEtage", codePostal: "mapCodePostal", ville: "mapVille", numeroLogement: "mapNumeroLogement", signature: "mapSignature", passageRealise: "mapPassageRealise", statutAbsence: "mapStatutAbsence", motifAbsence: "mapMotifAbsence" };
 let _user = null;
 // Référentiels de la liaison au suivi : mêmes sources que le Suivi interventions
 const NATURES_DEFAUT = ['Punaises de lit','Punaises de lit vacant','Blattes choc','Blattes choc vacant','Dératisation','Guêpes/Frelons'];
@@ -498,12 +496,12 @@ function render(forms) {
       : "";
     // Les quatre associations du bloc "passage non réalisé" vont ensemble :
     // partiellement renseignées, le circuit d'absence ne se déclenche pas.
-    const absKeys = ["passageRealise", "statutAbsence", "motifAbsence", "photoAbsence"];
+    const absKeys = ["passageRealise", "statutAbsence", "motifAbsence"];
     const absRenseignes = absKeys.filter(k => m[k]).length;
-    const absBadge = absRenseignes === 4
+    const absBadge = absRenseignes === 3
       ? `<span class="badge-type" style="background:#EEF2FF;color:#4338CA;">Absence gérée</span>`
       : absRenseignes > 0
-        ? `<span class="badge-type" style="background:#FEF3C7;color:#92400E;">Absence incomplète (${absRenseignes}/4)</span>`
+        ? `<span class="badge-type" style="background:#FEF3C7;color:#92400E;">Absence incomplète (${absRenseignes}/3)</span>`
         : "";
     const mapOk = mappingComplete(m)
       ? `<span class="ok">Configuré</span>`
