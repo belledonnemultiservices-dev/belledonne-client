@@ -498,7 +498,10 @@ onAuthStateChanged(auth, async function(user) {
   } else {
     try {
       const snap = await getDocs(query(collection(db, "users"), where("uid", "==", user.uid)));
-      if (!snap.empty) {
+      // Un compte sans fiche "users" laissait la page figée sur ses placeholders
+      // ("—", "Chargement...") sans rien dire. On le dit, et on propose la sortie.
+      if (snap.empty) { signalerProfilIntrouvable("Compte sans fiche client."); return; }
+      {
         const p = snap.docs[0].data();
         const name=document.getElementById("sideClientName"); if(name) name.textContent=p.client||"Client";
         const id=document.getElementById("sideClientId"); if(id) id.textContent=p.identifiant||"";
@@ -510,9 +513,26 @@ onAuthStateChanged(auth, async function(user) {
         const hsub=document.getElementById("heroSub"); if(hsub) hsub.textContent=(p.identifiant||"")+" · Espace client Belledonne";
         await loadClientDashboard(p.client);
       }
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+      signalerProfilIntrouvable("Impossible de charger votre espace.");
+    }
   }
 });
+
+// Affiche l'échec au lieu de laisser le tableau de bord sur "Chargement..."
+// indéfiniment : l'utilisateur voit ce qui se passe et peut se reconnecter.
+function signalerProfilIntrouvable(message) {
+  ["kpiRapports", "kpiAbsents", "kpiCampagnes"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = "—";
+  });
+  ["recentRapports", "recentAbsents", "contactsBelledonne"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div style="text-align:center;padding:30px 20px;color:var(--text-muted);font-size:13px;">Indisponible.</div>';
+  });
+  const hname = document.getElementById("heroClientName"); if (hname) hname.textContent = "Espace indisponible";
+  const hsub = document.getElementById("heroSub"); if (hsub) hsub.textContent = message + " Déconnectez-vous puis reconnectez-vous ; si cela persiste, contactez Belledonne Multiservices.";
+}
 </script>
 <script type="module" src="suivi-badge.js"></script>
 </body>

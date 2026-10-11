@@ -1110,14 +1110,22 @@ window.doEnvoyer = async function(mode) {
     const now = new Date().toISOString();
     try {
       if (wantsEspace) {
+        // Adresse / nom / nature viennent du dossier Suivi : le rapport remonté
+        // de Kizeo ne les porte pas. Lecture commune aux deux branches, sinon
+        // le rapport arrive dans l'espace client sans adresse ni type.
+        let adresse = "", nom = "", nature = "";
+        if (r.suiviId) {
+          try {
+            const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+            if (sSnap.exists()) {
+              const sd = sSnap.data();
+              adresse = sd.adresse || "";
+              nom = sd.nomClient || "";
+              nature = sd.nature || "";
+            }
+          } catch(e) { /* tant pis, champs laissés vides */ }
+        }
         if (isAbsAnnul) {
-          let adresse = "", nom = "";
-          if (r.suiviId) {
-            try {
-              const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
-              if (sSnap.exists()) { adresse = sSnap.data().adresse || ""; nom = sSnap.data().nomClient || ""; }
-            } catch(e) { /* tant pis, adresse laissée vide */ }
-          }
           // Le motif écrit ici est celui que lit le client dans son espace.
           // Il portait jusqu'alors le libellé du passage ("1er passage"), ce
           // qui n'a jamais été un motif. On prend celui du constat, corrigé
@@ -1140,8 +1148,8 @@ window.doEnvoyer = async function(mode) {
             bc: r.bc || r.reference || "",
             client: r.client,
             passage: r.passageLabel || "",
-            site: "",
-            nuisible: "",
+            site: adresse,
+            nuisible: nature,
             date: now.split("T")[0],
             pdfUrl: r.fileUrl,
             createdAt: now,

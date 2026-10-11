@@ -37,8 +37,15 @@ function setup() {
 
   // Liens strictement internes : masqués par défaut, réaffichés seulement pour l'admin.
   // Ils ne doivent JAMAIS apparaître (même vides) côté client.
-  const internalLinks = document.querySelectorAll('a[href="suivi.html"], a[href="facturation.html"]');
+  // Toute nouvelle page interne ajoutée à la sidebar doit venir ici, sinon elle
+  // reste visible au client (cas de "Devis", ajouté le 30/09 et oublié ici).
+  const internalLinks = document.querySelectorAll('a[href="suivi.html"], a[href="facturation.html"], a[href="devis.html"]');
   internalLinks.forEach(el => { el.style.display = 'none'; });
+
+  // Mêmes règles pour le bloc "Administration" et le badge "Espace Admin" :
+  // ils sont dans le HTML de chaque page, et seul l'admin doit les voir.
+  const adminBlocks = document.querySelectorAll('#adminNav, .admin-badge');
+  adminBlocks.forEach(el => { el.style.display = 'none'; });
 
   onAuthStateChanged(auth, async user => {
     if (!user) return;
@@ -60,6 +67,7 @@ function setup() {
       if (isAdmin) {
         // Admin : on réaffiche les liens internes masqués par défaut.
         internalLinks.forEach(el => { el.style.display = ''; });
+        adminBlocks.forEach(el => { el.style.display = ''; });
         document.querySelectorAll('a.nav-item[href="rapports.html"]').forEach(el => el.style.display = 'none');
         // "Garanties" (espace client) n'a de sens que pour un vrai compte client :
         // l'admin gère ça depuis "Gestion garanties", pas besoin du doublon ici.

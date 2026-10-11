@@ -187,7 +187,7 @@ async function loadUsage(){
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, getDocs, query } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({apiKey:"AIzaSyC4tyhE8qxOE2_6P8FPgS56XYJoTbR5qPY",authDomain:"belledonne-client.firebaseapp.com",projectId:"belledonne-client",storageBucket:"belledonne-client.firebasestorage.app",messagingSenderId:"737384028313",appId:"1:737384028313:web:700aee1467ac27d0c58008"});
 const auth = getAuth(app);
@@ -197,8 +197,15 @@ window.handleLogout = async function(){ await signOut(auth); window.location.hre
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
-  const snapU = await getDocs(query(collection(db,'users')));
-  const profile = snapU.docs.map(d=>d.data()).find(p=>p.uid===user.uid) || {};
+  // Lecture limitée à son propre compte : une query sur toute la collection
+  // "users" est refusée par les règles Firestore dès qu'on n'est pas admin, et
+  // l'exception non attrapée interrompait le callback AVANT la redirection.
+  // La page restait alors ouverte et figée sur ses placeholders ("—").
+  let profile = {};
+  try {
+    const snapU = await getDocs(query(collection(db,'users'), where('uid','==',user.uid)));
+    if (!snapU.empty) profile = snapU.docs[0].data();
+  } catch(e) { window.location.href = 'dashboard.html'; return; }
   if (profile.role !== 'admin' && profile.role !== 'administrateur') { window.location.href = 'dashboard.html'; return; }
   document.getElementById('sideFooterName').textContent = profile.client || user.email;
   if (window.__startUsage) window.__startUsage(user);
