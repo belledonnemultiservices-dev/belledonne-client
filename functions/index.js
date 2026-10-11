@@ -2172,16 +2172,48 @@ function fetchBuffer(url) {
   });
 }
 
+// Date et heure du 2ème passage par adresse, lues dans le fichier planning
+// source de la campagne (Gestion documentation, colonnes H/I) : c'est la même
+// source que les plannings technicien et les avis de passage, donc la date
+// annoncée au locataire est exactement celle qui sort dans le reporting.
+// Retourne une Map vide si la campagne n'a pas de fichier source : la colonne
+// reste alors vide plutôt que de faire échouer la génération du reporting.
+async function chargerDateHeure2ndPassageParAdresse(db, campagneId) {
+  const parAdresse = new Map();
+  if (!campagneId) return parAdresse;
+  try {
+    const ExcelJS = require("exceljs");
+    const campagneSnap = await db.collection("gestion-campagnes").doc(campagneId).get();
+    const docSourceStoragePath = campagneSnap.exists ? campagneSnap.data().docSourceStoragePath : null;
+    if (!docSourceStoragePath) return parAdresse;
+    const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+    const [srcBuffer] = await bucket.file(docSourceStoragePath).download();
+    const srcWb = new ExcelJS.Workbook();
+    await srcWb.xlsx.load(srcBuffer);
+    const srcWs = srcWb.worksheets[0];
+    if (!srcWs) return parAdresse;
+    lirePlanningSource(srcWs).forEach(l => {
+      const cle = normaliserAdresseComparaison(l.adresse);
+      // Une adresse scindée entre plusieurs techniciens apparaît plusieurs fois :
+      // on garde la première ligne qui porte une date.
+      if (l.date2 && !parAdresse.has(cle)) parAdresse.set(cle, formaterDateHeure2ndPassage(l.date2, l.heure2));
+    });
+  } catch(e) {
+    console.error("chargerDateHeure2ndPassageParAdresse:", e.message);
+  }
+  return parAdresse;
+}
+
 // ── CAMPAGNES : construction du reporting Excel 3 onglets ─────────
 // Reprend le format historique (Absentsrefus / Logements Surinfestés /
 // Logements punaises de lit). `rows` = une ligne par logement, avec
 // {adresse, codePostal, ville, secteur, technicien, nom, numero, etage,
-//  statut, niveauInfestation(array)}. Un logement peut apparaître dans
-// plusieurs onglets infestation.
+//  statut, niveauInfestation(array), dateHeure2}. Un logement peut
+// apparaître dans plusieurs onglets infestation.
 function buildReportWorkbook(ExcelJS, rows) {
   const wb = new ExcelJS.Workbook();
-  const header = ["Adresse", "Code postal", "Ville", "Secteur", "Technicien", "Nom", "Numéro logement", "Etage", "Statut", "Niveau infestation"];
-  const rowValues = (r) => [r.adresse, r.codePostal, r.ville, r.secteur, r.technicien, r.nom, r.numero, r.etage, r.statut, (r.niveauInfestation || []).join(", ")];
+  const header = ["Adresse", "Code postal", "Ville", "Secteur", "Technicien", "Nom", "Numéro logement", "Etage", "Statut", "Niveau infestation", "Date et heure 2ème passage"];
+  const rowValues = (r) => [r.adresse, r.codePostal, r.ville, r.secteur, r.technicien, r.nom, r.numero, r.etage, r.statut, (r.niveauInfestation || []).join(", "), r.dateHeure2 || ""];
 
   const wsAbsents = wb.addWorksheet("Absentsrefus");
   wsAbsents.addRow(header);
@@ -2232,9 +2264,11 @@ exports.generateCampagneRapportsSemaine = functions
       const ExcelJS = require("exceljs");
       const zip = new JSZip();
       const rows = [];
+      const dateHeure2ParAdresse = await chargerDateHeure2ndPassageParAdresse(db, (batiments.find(b => b.campagneId) || {}).campagneId);
 
       for (const b of batiments) {
         const p1 = b.passage1 || {};
+        const dateHeure2 = dateHeure2ParAdresse.get(normaliserAdresseComparaison(b.adresseRue)) || "";
         if (p1.fileUrlPdf) {
           try {
             const buf = await fetchBuffer(p1.fileUrlPdf);
@@ -2245,7 +2279,7 @@ exports.generateCampagneRapportsSemaine = functions
         (p1.resultats || []).forEach(l => rows.push({
           adresse: b.adresseRue, codePostal: b.codePostal, ville: b.ville, secteur: b.secteur,
           technicien: p1.technicienNom, nom: l.nom, numero: l.numero, etage: l.etage,
-          statut: l.statut, niveauInfestation: l.niveauInfestation,
+          statut: l.statut, niveauInfestation: l.niveauInfestation, dateHeure2,
         }));
       }
 
@@ -2326,6 +2360,7 @@ exports.generateCampagneRapportComplet = functions
       const zip = new JSZip();
       const rows = [];
       const batimentsAvecPassage2 = [];
+      const dateHeure2ParAdresse = await chargerDateHeure2ndPassageParAdresse(db, (batiments.find(b => b.campagneId) || {}).campagneId);
 
       for (const b of batiments) {
         const p1 = b.passage1 || {};
@@ -2340,10 +2375,11 @@ exports.generateCampagneRapportComplet = functions
         if (p2.statut === "a-traiter") batimentsAvecPassage2.push(b.id);
 
         const fusion = fusionnerLogements(p1.resultats, p2.resultats);
+        const dateHeure2 = dateHeure2ParAdresse.get(normaliserAdresseComparaison(b.adresseRue)) || "";
         fusion.forEach(l => rows.push({
           adresse: b.adresseRue, codePostal: b.codePostal, ville: b.ville, secteur: b.secteur,
           technicien: (p2.technicienNom || p1.technicienNom), nom: l.nom, numero: l.numero, etage: l.etage,
-          statut: l.statut, niveauInfestation: l.niveauInfestation,
+          statut: l.statut, niveauInfestation: l.niveauInfestation, dateHeure2,
         }));
       }
 
@@ -2415,6 +2451,7 @@ exports.generateCampagneRapportConsolide = functions
       const folder1 = zip.folder("1er passage");
       const folder2 = zip.folder("2nd passage");
       const rows = [];
+      const dateHeure2ParAdresse = await chargerDateHeure2ndPassageParAdresse(db, campagneId);
 
       for (const b of batiments) {
         const p1 = b.passage1 || {};
@@ -2435,10 +2472,11 @@ exports.generateCampagneRapportConsolide = functions
         }
 
         const fusion = fusionnerLogements(p1.resultats, p2.resultats);
+        const dateHeure2 = dateHeure2ParAdresse.get(normaliserAdresseComparaison(b.adresseRue)) || "";
         fusion.forEach(l => rows.push({
           adresse: b.adresseRue, codePostal: b.codePostal, ville: b.ville, secteur: b.secteur,
           technicien: (p2.technicienNom || p1.technicienNom), nom: l.nom, numero: l.numero, etage: l.etage,
-          statut: l.statut, niveauInfestation: l.niveauInfestation,
+          statut: l.statut, niveauInfestation: l.niveauInfestation, dateHeure2,
         }));
       }
 
