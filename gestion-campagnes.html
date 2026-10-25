@@ -564,6 +564,23 @@
           <div style="margin-top:10px;"><a href="#" onclick="reinitialiserReportingComplet();return false;" style="font-size:12px;color:var(--text-muted);">Réinitialiser (efface ce dossier, pour retester)</a></div>
         </div>
         <div class="error-box" id="errorBoxComplet"></div>
+
+        <!-- Rattrapage : relit les fiches Kizeo par leur identifiant, sans passer
+             par la file "non lue". Sert quand un retour technicien n'est jamais
+             remonté (fiche aspirée vide juste après le push, puis marquée lue). -->
+        <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--border);">
+          <div class="card-title" style="font-size:14px;">Vérifier les réceptions Kizeo</div>
+          <div class="card-sub">Compare, bâtiment par bâtiment, ce que Kizeo contient à ce qui est enregistré ici. Ne modifie rien tant que tu n'as pas confirmé la réparation.</div>
+          <button type="button" class="btn-tpl" id="btnVerifReceptions" onclick="verifierReceptions()">Vérifier le 2ème passage</button>
+          <button type="button" class="btn-tpl" id="btnVerifReceptions1" onclick="verifierReceptions(1)" style="margin-left:8px;">Vérifier le 1er passage</button>
+          <div class="result-box" id="resultBoxVerif">
+            <div class="r-title">Résultat de la vérification</div>
+            <div class="r-stats" id="resultStatsVerif"></div>
+            <div id="detailVerif" style="margin-top:10px;font-size:12px;color:var(--text-mid);max-height:260px;overflow-y:auto;"></div>
+            <button class="btn-generate" id="btnReparerReceptions" onclick="reparerReceptions()" style="margin-top:12px;display:none;">Réparer</button>
+          </div>
+          <div class="error-box" id="errorBoxVerif"></div>
+        </div>
       </div>
     </div>
 
@@ -675,6 +692,7 @@ const FN_GEN_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.ne
 const FN_DELETE_CAMPAGNE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteCampagneCascade";
 const FN_DELETE_SEMAINE = "https://europe-west1-belledonne-client.cloudfunctions.net/deleteSemaineCascade";
 const FN_GEN_COMPLET = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportComplet";
+const FN_RATTRAPAGE_RECEPTIONS = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneRattrapageReceptions";
 const FN_GEN_CONSOLIDE = "https://europe-west1-belledonne-client.cloudfunctions.net/generateCampagneRapportConsolide";
 const FN_DOC_PLANNING_CLIENT = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningClient";
 const FN_DOC_PLANNING_TECHNICIEN = "https://europe-west1-belledonne-client.cloudfunctions.net/campagneGenererPlanningTechnicien";
@@ -1976,6 +1994,83 @@ window.genererRapportComplet = async function() {
     loadBatiments();
   } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
   finally { btn.disabled = false; btn.textContent = "Créer le dossier PDF + reporting complet"; updateBtnGenComplet(); }
+};
+
+// ── Carte 4 : vérification et rattrapage des réceptions Kizeo ──
+// Le push crée la fiche côté Kizeo avant que le technicien l'ouvre. Si elle est
+// lue trop tôt puis marquée lue, le vrai retour ne revient jamais dans la file
+// "non lue" : ces deux boutons relisent les fiches par leur identifiant, ce qui
+// contourne la file. Vérification d'abord, réparation seulement sur confirmation.
+let _verifDernier = null; // { passage, nbRepares } du dernier dry-run affiché
+
+window.verifierReceptions = async function(passage) {
+  const passageNum = passage === 1 ? 1 : 2;
+  const btn = document.getElementById(passageNum === 1 ? "btnVerifReceptions1" : "btnVerifReceptions");
+  const box = document.getElementById("resultBoxVerif");
+  const err = document.getElementById("errorBoxVerif");
+  const btnRep = document.getElementById("btnReparerReceptions");
+  box.style.display = "none"; err.style.display = "none"; btnRep.style.display = "none";
+  _verifDernier = null;
+  const libelle = btn.textContent;
+  btn.disabled = true; btn.textContent = "Vérification...";
+  try {
+    const resp = await fetch(FN_RATTRAPAGE_RECEPTIONS, {
+      method: "POST", headers: await authHeaders(),
+      body: JSON.stringify({ semaineId: _currentSemaineId, passage: passageNum, dryRun: true }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    afficherVerif(data, passageNum);
+  } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
+  finally { btn.disabled = false; btn.textContent = libelle; }
+};
+
+function afficherVerif(data, passageNum) {
+  const box = document.getElementById("resultBoxVerif");
+  const btnRep = document.getElementById("btnReparerReceptions");
+  document.getElementById("resultStatsVerif").textContent = `Passage ${passageNum} — ${data.resume}`;
+
+  // Seules les lignes qui demandent une action sont listées : un "déjà à jour"
+  // n'apprend rien et noierait les quelques lignes qui comptent.
+  const aMontrer = (data.rapport || []).filter(r => r.etat !== "déjà à jour");
+  document.getElementById("detailVerif").innerHTML = aMontrer.length
+    ? aMontrer.map(r => {
+        const couleur = r.etat === "à réparer" ? "var(--text-mid)" : "var(--text-muted)";
+        const suffixe = r.motif ? ` — ${r.motif}` : (r.logements ? ` — ${r.statutsKizeo}/${r.logements} logement(s) renseigné(s) chez Kizeo, ${r.statutsEnBase} ici` : "");
+        return `<div style="padding:3px 0;color:${couleur};"><strong>${r.etat}</strong> · ${r.adresse || r.batimentId}${suffixe}</div>`;
+      }).join("")
+    : `<div style="color:var(--text-muted);">Tout est déjà à jour, rien à réparer.</div>`;
+
+  if (data.nbRepares > 0) {
+    _verifDernier = { passage: passageNum, nbRepares: data.nbRepares };
+    btnRep.textContent = `Réparer les ${data.nbRepares} bâtiment(s)`;
+    btnRep.style.display = "block";
+  }
+  box.style.display = "block";
+}
+
+window.reparerReceptions = async function() {
+  if (!_verifDernier) return;
+  const { passage, nbRepares } = _verifDernier;
+  if (!confirm(`Réparer ${nbRepares} bâtiment(s) du passage ${passage} ?\n\nLes résultats et les PDF seront relus depuis Kizeo et réécrits, et les passages repasseront en "à traiter" pour que tu puisses régénérer le reporting. Le ${passage === 1 ? "2ème" : "1er"} passage n'est pas touché.`)) return;
+  const btn = document.getElementById("btnReparerReceptions");
+  const err = document.getElementById("errorBoxVerif");
+  err.style.display = "none";
+  btn.disabled = true; btn.textContent = "Réparation en cours, cela peut prendre une à deux minutes...";
+  try {
+    const resp = await fetch(FN_RATTRAPAGE_RECEPTIONS, {
+      method: "POST", headers: await authHeaders(),
+      body: JSON.stringify({ semaineId: _currentSemaineId, passage, dryRun: false }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    afficherVerif(data, passage);
+    document.getElementById("btnReparerReceptions").style.display = "none";
+    _verifDernier = null;
+    showToast(`${data.nbRepares} bâtiment(s) réparé(s)`);
+    loadBatiments();
+  } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
+  finally { btn.disabled = false; }
 };
 </script>
 <script type="module" src="suivi-badge.js"></script>

@@ -1426,6 +1426,23 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     if (passageNum !== 1 && passageNum !== 2) { console.warn(`Kizeo campagne: numéro de passage invalide (${refInterne})`); return false; }
     const passageKey = passageNum === 1 ? "passage1" : "passage2";
 
+    // Sentinelle de réception, volontairement INDÉPENDANTE de kizeo-forms.mapping :
+    // le push crée déjà la fiche côté Kizeo, elle est donc "non lue" avant même que
+    // le technicien l'ouvre. Sans ce contrôle, le pull aspire la coquille vide, la
+    // marque lue côté Kizeo, et la vraie soumission ne revient jamais dans la file
+    // (perte silencieuse constatée sur 187 fiches du 2ème passage poussées le 18/10/2026,
+    // le mapping.signature n'étant pas renseigné sur le formulaire 2nd passage).
+    // Le champ s'appelle signature_technicien dans les deux formulaires de campagne ;
+    // mapping.signature sert de repli si un formulaire le nomme autrement.
+    const sigCampagne = (fields.signature_technicien && fields.signature_technicien.value !== undefined)
+      ? fields.signature_technicien.value
+      : (mapping.signature ? getField(mapping.signature) : "");
+    const signeeCampagne = sigCampagne && (typeof sigCampagne !== "object" || Object.keys(sigCampagne).length > 0) && sigCampagne !== "";
+    if (!signeeCampagne) {
+      console.log(`Kizeo campagne: soumission ${dataId} (${refInterne}) pas encore signée par le technicien, laissée non lue`);
+      return false;
+    }
+
     const batimentRefA = db.collection("campagnes-batiments").doc(batimentId);
     const batimentSnapA = await batimentRefA.get();
     if (!batimentSnapA.exists) { console.warn(`Kizeo campagne: bâtiment ${batimentId} introuvable, soumission ${dataId} laissée non lue`); return false; }
@@ -2230,6 +2247,30 @@ function buildReportWorkbook(ExcelJS, rows) {
   return wb;
 }
 
+// ── NOM DE FICHIER D'UN BÂTIMENT DANS UN ZIP ────────────────────────
+// Deux bâtiments distincts peuvent partager la même rue en ne différant que
+// par le secteur (la clé d'unicité d'un bâtiment est secteur|n°|rue|CP|ville).
+// Nommer le fichier sur la seule adresse les faisait s'écraser en silence dans
+// le zip : 22 fiches ressortaient en 20 PDF (constaté le 25/10/2026 sur la
+// période du 05/10, 19 RUE HENRI DUHAMEL et 8 RUE CLAUDE KOGAN).
+// `dejaPris` est un Set par dossier de zip, pas par zip : le consolidé range
+// les deux passages dans deux sous-dossiers, où le même nom est légitime.
+function nomFichierBatimentZip(b, passageNum, dejaPris) {
+  const nettoyer = (s) => String(s || "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+  const base = `${nettoyer(b.adresseRue || "adresse")}_passage_${passageNum}`;
+  const candidat = `${base}.pdf`;
+  if (!dejaPris.has(candidat)) { dejaPris.add(candidat); return candidat; }
+  // Premier recours : le secteur, qui est ce qui distingue réellement les deux.
+  const avecSecteur = `${base}_${nettoyer(b.secteur)}.pdf`;
+  if (b.secteur && !dejaPris.has(avecSecteur)) { dejaPris.add(avecSecteur); return avecSecteur; }
+  // Dernier recours : un indice, pour ne jamais perdre un fichier faute de nom.
+  let i = 2;
+  while (dejaPris.has(`${base}_${i}.pdf`)) i++;
+  const final = `${base}_${i}.pdf`;
+  dejaPris.add(final);
+  return final;
+}
+
 // ── CAMPAGNES : rapports de la semaine (retour 1er passage) ───────
 // Pour chaque bâtiment "à traiter" de la semaine : zippe les PDF reçus
 // (renommés adresse_passage_1) et construit le reporting Excel de la
@@ -2263,6 +2304,7 @@ exports.generateCampagneRapportsSemaine = functions
       const JSZip = require("jszip");
       const ExcelJS = require("exceljs");
       const zip = new JSZip();
+      const nomsPris = new Set();
       const rows = [];
       const dateHeure2ParAdresse = await chargerDateHeure2ndPassageParAdresse(db, (batiments.find(b => b.campagneId) || {}).campagneId);
 
@@ -2272,7 +2314,7 @@ exports.generateCampagneRapportsSemaine = functions
         if (p1.fileUrlPdf) {
           try {
             const buf = await fetchBuffer(p1.fileUrlPdf);
-            const nomFichier = `${(b.adresseRue || "adresse")}_passage_1.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+            const nomFichier = nomFichierBatimentZip(b, 1, nomsPris);
             zip.file(nomFichier, buf);
           } catch(e) { console.error(`generateCampagneRapportsSemaine: PDF illisible pour ${b.id}:`, e.message); }
         }
@@ -2358,6 +2400,7 @@ exports.generateCampagneRapportComplet = functions
       const JSZip = require("jszip");
       const ExcelJS = require("exceljs");
       const zip = new JSZip();
+      const nomsPris = new Set();
       const rows = [];
       const batimentsAvecPassage2 = [];
       const dateHeure2ParAdresse = await chargerDateHeure2ndPassageParAdresse(db, (batiments.find(b => b.campagneId) || {}).campagneId);
@@ -2368,7 +2411,7 @@ exports.generateCampagneRapportComplet = functions
         if (p2.fileUrlPdf) {
           try {
             const buf = await fetchBuffer(p2.fileUrlPdf);
-            const nomFichier = `${(b.adresseRue || "adresse")}_passage_2.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+            const nomFichier = nomFichierBatimentZip(b, 2, nomsPris);
             zip.file(nomFichier, buf);
           } catch(e) { console.error(`generateCampagneRapportComplet: PDF passage 2 illisible pour ${b.id}:`, e.message); }
         }
@@ -2448,6 +2491,8 @@ exports.generateCampagneRapportConsolide = functions
       const JSZip = require("jszip");
       const ExcelJS = require("exceljs");
       const zip = new JSZip();
+      const nomsPris1 = new Set();
+      const nomsPris2 = new Set();
       const folder1 = zip.folder("1er passage");
       const folder2 = zip.folder("2nd passage");
       const rows = [];
@@ -2459,14 +2504,14 @@ exports.generateCampagneRapportConsolide = functions
         if (p1.fileUrlPdf) {
           try {
             const buf = await fetchBuffer(p1.fileUrlPdf);
-            const nomFichier = `${(b.adresseRue || "adresse")}_passage_1.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+            const nomFichier = nomFichierBatimentZip(b, 1, nomsPris1);
             folder1.file(nomFichier, buf);
           } catch(e) { console.error(`generateCampagneRapportConsolide: PDF passage 1 illisible pour ${b.id}:`, e.message); }
         }
         if (p2.fileUrlPdf) {
           try {
             const buf = await fetchBuffer(p2.fileUrlPdf);
-            const nomFichier = `${(b.adresseRue || "adresse")}_passage_2.pdf`.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "_");
+            const nomFichier = nomFichierBatimentZip(b, 2, nomsPris2);
             folder2.file(nomFichier, buf);
           } catch(e) { console.error(`generateCampagneRapportConsolide: PDF passage 2 illisible pour ${b.id}:`, e.message); }
         }
@@ -3062,6 +3107,105 @@ exports.resendCampagnePassage1Kizeo = functions
       res.status(200).json({ ok: true, dataId });
     } catch (e) {
       console.error("resendCampagnePassage1Kizeo:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+// ── RATTRAPAGE CAMPAGNE (one-shot, à supprimer une fois le travail fait) ──
+// Répare les passages aspirés vides par le pull avant que le technicien ait
+// rempli sa fiche (voir la sentinelle de signature dans receiveKizeoSubmission).
+// Ces fiches ont été marquées lues côté Kizeo, elles ne reviendront donc jamais
+// dans la file "non lue" : on les relit ici DIRECTEMENT par le kizeoDataId déjà
+// stocké en base, sans dépendre de cette file.
+// Paramètres : { semaineId? , campagneId? , passage? (1|2, défaut 2), dryRun (défaut TRUE) }
+// En dry-run, aucune écriture : on rapporte seulement ce qui changerait.
+exports.campagneRattrapageReceptions = functions
+  .region("europe-west1")
+  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: [KIZEO_API_TOKEN] })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+
+    const { semaineId, campagneId, passage, dryRun } = req.body || {};
+    if (!semaineId && !campagneId) { res.status(400).json({ error: "semaineId ou campagneId requis" }); return; }
+    const passageNum = parseInt(passage, 10) === 1 ? 1 : 2;
+    const passageKey = passageNum === 1 ? "passage1" : "passage2";
+    const ecrire = dryRun === false; // tout sauf false explicite = dry-run
+
+    try {
+      const { getFirestore } = require("firebase-admin/firestore");
+      const db = getFirestore(admin.app(), "belledonne-client");
+      const token = KIZEO_API_TOKEN.value();
+
+      const q = semaineId
+        ? db.collection("campagnes-batiments").where("semaineId", "==", semaineId)
+        : db.collection("campagnes-batiments").where("campagneId", "==", campagneId);
+      const snap = await q.get();
+      if (snap.empty) { res.status(400).json({ error: "Aucun bâtiment trouvé" }); return; }
+      const batiments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // L'id du formulaire vient de la campagne, pas du bâtiment.
+      const formIdParCampagne = new Map();
+      const formIdDe = async (cid) => {
+        if (!cid) return null;
+        if (formIdParCampagne.has(cid)) return formIdParCampagne.get(cid);
+        const cs = await db.collection("gestion-campagnes").doc(cid).get();
+        const fid = cs.exists ? (passageNum === 1 ? cs.data().kizeoFormId : cs.data().kizeoFormId2) : null;
+        formIdParCampagne.set(cid, fid || null);
+        return fid || null;
+      };
+
+      const rapport = [];
+      let nbRepares = 0, nbDejaBons = 0, nbNonSignes = 0, nbIgnores = 0;
+
+      for (const b of batiments) {
+        const p = b[passageKey] || {};
+        const base = { batimentId: b.id, adresse: b.adresseRue || "", semaineId: b.semaineId };
+        if (!p.kizeoDataId) { nbIgnores++; rapport.push({ ...base, etat: "ignoré", motif: "aucun kizeoDataId (jamais poussé)" }); continue; }
+
+        const formId = await formIdDe(b.campagneId);
+        if (!formId) { nbIgnores++; rapport.push({ ...base, etat: "ignoré", motif: "formulaire Kizeo non configuré sur la campagne" }); continue; }
+
+        // Lecture seule d'abord : on veut savoir si la fiche vaut la peine d'être réécrite.
+        const r = await kizeoRequest(token, "GET", `/forms/${encodeURIComponent(formId)}/data/${encodeURIComponent(p.kizeoDataId)}`);
+        if (r.status !== 200) { nbIgnores++; rapport.push({ ...base, etat: "ignoré", motif: `lecture Kizeo ${r.status}` }); continue; }
+        let fields = {};
+        try { fields = (JSON.parse(r.body).data || {}).fields || {}; } catch(e) {
+          nbIgnores++; rapport.push({ ...base, etat: "ignoré", motif: "réponse Kizeo illisible" }); continue;
+        }
+
+        const sig = (fields.signature_technicien && fields.signature_technicien.value) || "";
+        if (!sig) { nbNonSignes++; rapport.push({ ...base, etat: "non signé", motif: "le technicien n'a pas (encore) rempli cette fiche" }); continue; }
+
+        const lignes = (fields.tableau && fields.tableau.value) || [];
+        const remplisKizeo = lignes.filter(l => ((l.statut_1er_passage || {}).value || "")).length;
+        const remplisBase = ((p.resultats || []).filter(l => l.statut)).length;
+        const detail = { ...base, dataId: String(p.kizeoDataId), logements: lignes.length, statutsKizeo: remplisKizeo, statutsEnBase: remplisBase, statutPassage: p.statut || "" };
+
+        if (remplisKizeo === 0) { nbIgnores++; rapport.push({ ...detail, etat: "ignoré", motif: "fiche signée mais aucun statut saisi" }); continue; }
+        if (remplisBase >= remplisKizeo) { nbDejaBons++; rapport.push({ ...detail, etat: "déjà à jour" }); continue; }
+
+        if (!ecrire) { rapport.push({ ...detail, etat: "à réparer" }); nbRepares++; continue; }
+
+        // Réécriture par le chemin de réception ordinaire : mêmes extractions, même
+        // PDF, même passage en "a-traiter". Rien de dupliqué, donc rien à diverger.
+        const ok = await receiveKizeoSubmission(db, token, String(formId), String(p.kizeoDataId), "rattrapage-campagne");
+        // `true` seul vaut succès : un `undefined` signifie que la réception a
+        // abandonné sans rien écrire (formulaire absent de kizeo-forms, par ex.).
+        if (ok !== true) { nbIgnores++; rapport.push({ ...detail, etat: "ignoré", motif: "la réception a refusé la fiche (voir les logs)" }); continue; }
+        nbRepares++;
+        rapport.push({ ...detail, etat: "réparé" });
+      }
+
+      const resume = `${batiments.length} bâtiment(s) examiné(s) | ${ecrire ? "réparés" : "à réparer"} ${nbRepares} | déjà à jour ${nbDejaBons} | non signés ${nbNonSignes} | ignorés ${nbIgnores}`;
+      console.log(`campagneRattrapageReceptions (${ecrire ? "ECRITURE" : "DRY-RUN"}): ${resume}`);
+      res.status(200).json({ dryRun: !ecrire, passage: passageNum, resume, nbRepares, nbDejaBons, nbNonSignes, nbIgnores, rapport });
+    } catch(e) {
+      console.error("campagneRattrapageReceptions:", e);
       res.status(500).json({ error: e.message });
     }
   });
