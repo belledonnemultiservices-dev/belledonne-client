@@ -3130,11 +3130,17 @@ exports.campagneRattrapageReceptions = functions
     if (req.method !== "POST") { res.status(405).json({ error: "Methode non autorisee" }); return; }
     try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
 
-    const { semaineId, campagneId, passage, dryRun } = req.body || {};
+    const { semaineId, campagneId, passage, dryRun, limite } = req.body || {};
     if (!semaineId && !campagneId) { res.status(400).json({ error: "semaineId ou campagneId requis" }); return; }
     const passageNum = parseInt(passage, 10) === 1 ? 1 : 2;
     const passageKey = passageNum === 1 ? "passage1" : "passage2";
     const ecrire = dryRun === false; // tout sauf false explicite = dry-run
+    // Une réparation coûte ~5 s (lecture Kizeo + téléchargement du PDF + écritures),
+    // soit ~90 réparations avant les 540 s de délai d'exécution. On s'arrête bien
+    // avant et on annonce ce qui reste : l'appelant rappelle jusqu'à épuisement,
+    // et les bâtiments déjà réparés ressortent "déjà à jour" sans être retouchés.
+    const LIMITE_MAX = 60;
+    const limiteEcritures = ecrire ? Math.min(parseInt(limite, 10) || 40, LIMITE_MAX) : Infinity;
 
     try {
       const { getFirestore } = require("firebase-admin/firestore");
@@ -3160,7 +3166,7 @@ exports.campagneRattrapageReceptions = functions
       };
 
       const rapport = [];
-      let nbRepares = 0, nbDejaBons = 0, nbNonSignes = 0, nbIgnores = 0;
+      let nbRepares = 0, nbDejaBons = 0, nbNonSignes = 0, nbIgnores = 0, nbReportes = 0;
 
       for (const b of batiments) {
         const p = b[passageKey] || {};
@@ -3191,6 +3197,8 @@ exports.campagneRattrapageReceptions = functions
 
         if (!ecrire) { rapport.push({ ...detail, etat: "à réparer" }); nbRepares++; continue; }
 
+        if (nbRepares >= limiteEcritures) { nbReportes++; rapport.push({ ...detail, etat: "reporté", motif: "lot suivant" }); continue; }
+
         // Réécriture par le chemin de réception ordinaire : mêmes extractions, même
         // PDF, même passage en "a-traiter". Rien de dupliqué, donc rien à diverger.
         const ok = await receiveKizeoSubmission(db, token, String(formId), String(p.kizeoDataId), "rattrapage-campagne");
@@ -3201,9 +3209,10 @@ exports.campagneRattrapageReceptions = functions
         rapport.push({ ...detail, etat: "réparé" });
       }
 
-      const resume = `${batiments.length} bâtiment(s) examiné(s) | ${ecrire ? "réparés" : "à réparer"} ${nbRepares} | déjà à jour ${nbDejaBons} | non signés ${nbNonSignes} | ignorés ${nbIgnores}`;
+      const resume = `${batiments.length} bâtiment(s) examiné(s) | ${ecrire ? "réparés" : "à réparer"} ${nbRepares} | déjà à jour ${nbDejaBons} | non signés ${nbNonSignes} | ignorés ${nbIgnores}`
+        + (nbReportes ? ` | reportés au lot suivant ${nbReportes}` : "");
       console.log(`campagneRattrapageReceptions (${ecrire ? "ECRITURE" : "DRY-RUN"}): ${resume}`);
-      res.status(200).json({ dryRun: !ecrire, passage: passageNum, resume, nbRepares, nbDejaBons, nbNonSignes, nbIgnores, rapport });
+      res.status(200).json({ dryRun: !ecrire, passage: passageNum, resume, nbRepares, nbDejaBons, nbNonSignes, nbIgnores, restant: nbReportes, rapport });
     } catch(e) {
       console.error("campagneRattrapageReceptions:", e);
       res.status(500).json({ error: e.message });

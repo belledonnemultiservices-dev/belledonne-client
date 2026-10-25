@@ -573,6 +573,7 @@
           <div class="card-sub">Compare, bâtiment par bâtiment, ce que Kizeo contient à ce qui est enregistré ici. Ne modifie rien tant que tu n'as pas confirmé la réparation.</div>
           <button type="button" class="btn-tpl" id="btnVerifReceptions" onclick="verifierReceptions()">Vérifier le 2ème passage</button>
           <button type="button" class="btn-tpl" id="btnVerifReceptions1" onclick="verifierReceptions(1)" style="margin-left:8px;">Vérifier le 1er passage</button>
+          <button type="button" class="btn-tpl" id="btnVerifReceptionsCamp" onclick="verifierReceptions(2, true)" style="margin-left:8px;" title="Toutes les périodes de la campagne, pas seulement celle-ci">Vérifier toute la campagne</button>
           <div class="result-box" id="resultBoxVerif">
             <div class="r-title">Résultat de la vérification</div>
             <div class="r-stats" id="resultStatsVerif"></div>
@@ -2001,11 +2002,11 @@ window.genererRapportComplet = async function() {
 // lue trop tôt puis marquée lue, le vrai retour ne revient jamais dans la file
 // "non lue" : ces deux boutons relisent les fiches par leur identifiant, ce qui
 // contourne la file. Vérification d'abord, réparation seulement sur confirmation.
-let _verifDernier = null; // { passage, nbRepares } du dernier dry-run affiché
+let _verifDernier = null; // { passage, nbRepares, surCampagne } du dernier dry-run affiché
 
-window.verifierReceptions = async function(passage) {
+window.verifierReceptions = async function(passage, surCampagne) {
   const passageNum = passage === 1 ? 1 : 2;
-  const btn = document.getElementById(passageNum === 1 ? "btnVerifReceptions1" : "btnVerifReceptions");
+  const btn = document.getElementById(surCampagne ? "btnVerifReceptionsCamp" : (passageNum === 1 ? "btnVerifReceptions1" : "btnVerifReceptions"));
   const box = document.getElementById("resultBoxVerif");
   const err = document.getElementById("errorBoxVerif");
   const btnRep = document.getElementById("btnReparerReceptions");
@@ -2016,19 +2017,21 @@ window.verifierReceptions = async function(passage) {
   try {
     const resp = await fetch(FN_RATTRAPAGE_RECEPTIONS, {
       method: "POST", headers: await authHeaders(),
-      body: JSON.stringify({ semaineId: _currentSemaineId, passage: passageNum, dryRun: true }),
+      body: JSON.stringify(surCampagne
+        ? { campagneId: _currentCampagneId, passage: passageNum, dryRun: true }
+        : { semaineId: _currentSemaineId, passage: passageNum, dryRun: true }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
-    afficherVerif(data, passageNum);
+    afficherVerif(data, passageNum, surCampagne);
   } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
   finally { btn.disabled = false; btn.textContent = libelle; }
 };
 
-function afficherVerif(data, passageNum) {
+function afficherVerif(data, passageNum, surCampagne) {
   const box = document.getElementById("resultBoxVerif");
   const btnRep = document.getElementById("btnReparerReceptions");
-  document.getElementById("resultStatsVerif").textContent = `Passage ${passageNum} — ${data.resume}`;
+  document.getElementById("resultStatsVerif").textContent = `Passage ${passageNum} · ${surCampagne ? "toute la campagne" : "cette période"} — ${data.resume}`;
 
   // Seules les lignes qui demandent une action sont listées : un "déjà à jour"
   // n'apprend rien et noierait les quelques lignes qui comptent.
@@ -2042,7 +2045,7 @@ function afficherVerif(data, passageNum) {
     : `<div style="color:var(--text-muted);">Tout est déjà à jour, rien à réparer.</div>`;
 
   if (data.nbRepares > 0) {
-    _verifDernier = { passage: passageNum, nbRepares: data.nbRepares };
+    _verifDernier = { passage: passageNum, nbRepares: data.nbRepares, surCampagne: !!surCampagne };
     btnRep.textContent = `Réparer les ${data.nbRepares} bâtiment(s)`;
     btnRep.style.display = "block";
   }
@@ -2051,26 +2054,48 @@ function afficherVerif(data, passageNum) {
 
 window.reparerReceptions = async function() {
   if (!_verifDernier) return;
-  const { passage, nbRepares } = _verifDernier;
-  if (!confirm(`Réparer ${nbRepares} bâtiment(s) du passage ${passage} ?\n\nLes résultats et les PDF seront relus depuis Kizeo et réécrits, et les passages repasseront en "à traiter" pour que tu puisses régénérer le reporting. Le ${passage === 1 ? "2ème" : "1er"} passage n'est pas touché.`)) return;
+  const { passage, nbRepares, surCampagne } = _verifDernier;
+  const portee = surCampagne ? "toute la campagne" : "cette période";
+  if (!confirm(`Réparer ${nbRepares} bâtiment(s) du passage ${passage} sur ${portee} ?\n\nLes résultats et les PDF seront relus depuis Kizeo et réécrits, et les passages repasseront en "à traiter" pour que tu puisses régénérer les reportings. Le ${passage === 1 ? "2ème" : "1er"} passage n'est pas touché.`)) return;
   const btn = document.getElementById("btnReparerReceptions");
   const err = document.getElementById("errorBoxVerif");
   err.style.display = "none";
-  btn.disabled = true; btn.textContent = "Réparation en cours, cela peut prendre une à deux minutes...";
+  btn.disabled = true;
+
+  // Une réparation prend ~5 s et une Cloud Function s'arrête à 540 s : le serveur
+  // s'arrête donc avant la limite et annonce ce qui reste, on le rappelle jusqu'à
+  // épuisement. Les bâtiments déjà réparés ressortent "déjà à jour", donc reprendre
+  // là où on s'est arrêté ne coûte qu'une relecture.
+  let total = 0, lot = 0, derniere = null;
   try {
-    const resp = await fetch(FN_RATTRAPAGE_RECEPTIONS, {
-      method: "POST", headers: await authHeaders(),
-      body: JSON.stringify({ semaineId: _currentSemaineId, passage, dryRun: false }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
-    afficherVerif(data, passage);
+    while (true) {
+      lot++;
+      btn.textContent = `Réparation du lot ${lot} en cours (${total}/${nbRepares} fait)...`;
+      const resp = await fetch(FN_RATTRAPAGE_RECEPTIONS, {
+        method: "POST", headers: await authHeaders(),
+        body: JSON.stringify(surCampagne
+          ? { campagneId: _currentCampagneId, passage, dryRun: false }
+          : { semaineId: _currentSemaineId, passage, dryRun: false }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+      total += data.nbRepares;
+      derniere = data;
+      if (!data.restant) break;
+      // Un lot qui ne répare rien alors qu'il reste du travail signale un blocage :
+      // mieux vaut rendre la main que boucler indéfiniment.
+      if (data.nbRepares === 0) throw new Error(`Lot sans effet, ${data.restant} bâtiment(s) encore à réparer. Relance la vérification.`);
+    }
+    afficherVerif(derniere, passage, surCampagne);
     document.getElementById("btnReparerReceptions").style.display = "none";
     _verifDernier = null;
-    showToast(`${data.nbRepares} bâtiment(s) réparé(s)`);
+    showToast(`${total} bâtiment(s) réparé(s)`);
     loadBatiments();
-  } catch(e) { err.textContent = "Erreur : " + e.message; err.style.display = "block"; }
-  finally { btn.disabled = false; }
+  } catch(e) {
+    err.textContent = `Erreur : ${e.message}` + (total ? ` (${total} bâtiment(s) déjà réparés, relance pour reprendre)` : "");
+    err.style.display = "block";
+  }
+  finally { btn.disabled = false; btn.textContent = `Réparer les ${nbRepares} bâtiment(s)`; }
 };
 </script>
 <script type="module" src="suivi-badge.js"></script>
