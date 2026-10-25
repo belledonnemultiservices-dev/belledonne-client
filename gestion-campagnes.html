@@ -1230,10 +1230,17 @@ function updateBtnGenConsolide() {
   const btn = document.getElementById("btnGenConsolide");
   const hint = document.getElementById("btnGenConsolideHint");
   if (!btn) return;
-  const sansReporting = _semaines.filter(s => !(s.reportingComplet && s.reportingComplet.zipUrl)).length;
-  const pret = _semaines.length > 0 && sansReporting === 0;
+  // Les périodes concernées sont nommées : un simple décompte oblige à rouvrir
+  // chaque période une par une pour trouver laquelle manque.
+  const manquantes = _semaines.filter(s => !(s.reportingComplet && s.reportingComplet.zipUrl));
+  const pret = _semaines.length > 0 && manquantes.length === 0;
   btn.disabled = !pret;
-  if (hint) hint.textContent = pret ? "" : (_semaines.length ? `${sansReporting} période(s) sans reporting complet généré (carte 4).` : "Crée d'abord une période.");
+  if (hint) {
+    hint.textContent = pret ? ""
+      : (_semaines.length
+          ? `Reporting complet (carte 4) manquant sur ${manquantes.length} période(s) : ${manquantes.map(s => fmtDate(s.dateDebut)).join(", ")}.`
+          : "Crée d'abord une période.");
+  }
 }
 window.deleteSemaine = async function(semaineId) {
   if (!confirm("Supprimer DÉFINITIVEMENT cette période ?\n\nCeci supprime aussi ses bâtiments/rapports et les fichiers Storage associés (rapports, reportings). Action irréversible.")) return;
