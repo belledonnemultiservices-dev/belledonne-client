@@ -2278,7 +2278,7 @@ function nomFichierBatimentZip(b, passageNum, dejaPris) {
 // à la réception, pas de reparsing du fichier Excel Kizeo).
 exports.generateCampagneRapportsSemaine = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 300 })
+  .runWith({ timeoutSeconds: 540, memory: "512MB" })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -2377,7 +2377,7 @@ function fusionnerLogements(resultats1, resultats2) {
 
 exports.generateCampagneRapportComplet = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 300 })
+  .runWith({ timeoutSeconds: 540, memory: "512MB" })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -2468,7 +2468,12 @@ exports.generateCampagneRapportComplet = functions
 // de déduplication : les deux passages y figurent quand ils existent).
 exports.generateCampagneRapportConsolide = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 300 })
+  // Agrège les PDF des DEUX passages de toute la campagne (plus de 400 fichiers)
+  // et construit le zip en mémoire par-dessus. Les 256 Mo par défaut suffisaient
+  // tant que les feuilles du 2nd passage étaient vides (21 Ko) ; une fois le
+  // rattrapage fait, elles pèsent ~190 Ko et la fonction mourait en crash
+  // (25/10/2026, "Memory limit of 256 MiB exceeded").
+  .runWith({ timeoutSeconds: 540, memory: "2GB" })
   .https.onRequest(async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
