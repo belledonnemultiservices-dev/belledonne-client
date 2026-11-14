@@ -497,18 +497,20 @@ let ongletActif = (() => { try { return localStorage.getItem(TAB_KEY) || "bureau
 let etapeActive = ""; // filtre d'étape dans l'onglet "bureau"
 let grouperParTech = (() => { try { return localStorage.getItem(GROUPE_KEY) === "1"; } catch(e) { return false; } })();
 
+// Deux étapes seulement côté bureau. "a-traiter" (reçu, ou validé en relecture)
+// et "archive" (ancienne étape intermédiaire supprimée le 14/11) sont tous deux
+// "prêts à envoyer" : l'étape Archiver ne produisait rien et faisait cliquer deux fois.
 const ETAPES = [
-  { statut: "a-relire",  label: "À relire" },
-  { statut: "a-traiter", label: "À archiver" },
-  { statut: "archive",   label: "Prêts à envoyer" },
+  { statuts: ["a-relire"], cle: "a-relire", label: "À relire" },
+  { statuts: ["a-traiter", "archive"], cle: "pret", label: "Prêts à envoyer" },
 ];
 const COLONNES = {
   bureau:  { titres: ["Reçu le", "Client", "BC", "Passage", "Technicien", "Libellé", "Type", "Étape", ""], largeurs: [110, 120, 100, 110, 140, 180, 120, 120, 260] },
   attente: { titres: ["Passage prévu", "Technicien", "Client", "BC", "Passage", "Libellé", "Retard", ""], largeurs: [150, 140, 120, 100, 110, 200, 110, 200] },
   envoyes: { titres: ["Envoyé le", "Client", "BC", "Passage", "Technicien", "Type", "Destination", ""], largeurs: [110, 120, 100, 110, 140, 120, 160, 170] },
 };
-const STATUT_LABEL = { "en-attente": "En attente", "a-relire": "À relire", "a-traiter": "À archiver", "envoye": "Envoyé", "archive": "Prêt à envoyer" };
-const STATUT_CLASS = { "en-attente": "st-en-attente", "a-relire": "st-a-relire", "a-traiter": "st-a-traiter", "envoye": "st-envoye", "archive": "st-archive" };
+const STATUT_LABEL = { "en-attente": "En attente", "a-relire": "À relire", "a-traiter": "Prêt à envoyer", "envoye": "Envoyé", "archive": "Prêt à envoyer" };
+const STATUT_CLASS = { "en-attente": "st-en-attente", "a-relire": "st-a-relire", "a-traiter": "st-a-traiter", "envoye": "st-envoye", "archive": "st-a-traiter" };
 const STATUTS_BUREAU = ["a-relire", "a-traiter", "archive"];
 
 // ── Colonnes redimensionnables, largeurs mémorisées par onglet ──
@@ -606,8 +608,7 @@ function actionPrincipale(r) {
       ? `<button class="btn-a btn-primaire" onclick="openRelecture('${r.id}')">Relire et valider</button>`
       : (r.fileUrl ? `<a class="btn-a btn-primaire" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : "");
   }
-  if (r.statut === "a-traiter") return `<button class="btn-a btn-primaire" onclick="archiver('${r.id}')">Archiver</button>`;
-  if (r.statut === "archive") return `<button class="btn-a btn-primaire" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>`;
+  if (r.statut === "a-traiter" || r.statut === "archive") return `<button class="btn-a btn-primaire" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>`;
   if (r.statut === "envoye") return r.fileUrl ? `<a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : "";
   return "";
 }
@@ -702,7 +703,7 @@ function render() {
   if (ongletActif === "bureau") {
     barre.style.display = "";
     barre.innerHTML = `<button class="etape ${!etapeActive ? "active" : ""}" data-etape="">Toutes <b>${bureau.length}</b></button>`
-      + ETAPES.map((e, i) => `${i ? '<span class="etape-fleche">→</span>' : ""}<button class="etape ${etapeActive === e.statut ? "active" : ""}" data-etape="${e.statut}">${e.label} <b>${bureau.filter(r => r.statut === e.statut).length}</b></button>`).join("");
+      + ETAPES.map((e, i) => `${i ? '<span class="etape-fleche">→</span>' : ""}<button class="etape ${etapeActive === e.cle ? "active" : ""}" data-etape="${e.cle}">${e.label} <b>${bureau.filter(r => e.statuts.includes(r.statut)).length}</b></button>`).join("");
     barre.querySelectorAll(".etape").forEach(b => b.addEventListener("click", () => { etapeActive = b.dataset.etape; render(); }));
   } else if (ongletActif === "attente") {
     barre.style.display = "";
@@ -720,8 +721,9 @@ function render() {
   // Lignes de l'onglet actif
   let html = "", nb = 0;
   if (ongletActif === "bureau") {
-    const ordre = { "a-relire": 0, "a-traiter": 1, "archive": 2 };
-    const liste = bureau.filter(r => !etapeActive || r.statut === etapeActive)
+    const ordre = { "a-relire": 0, "a-traiter": 1, "archive": 1 };
+    const etape = ETAPES.find(e => e.cle === etapeActive);
+    const liste = bureau.filter(r => !etape || etape.statuts.includes(r.statut))
       .sort((a, b) => (ordre[a.statut] - ordre[b.statut]) || (a.arriveeAt || "").localeCompare(b.arriveeAt || ""));
     nb = liste.length;
     html = liste.map(ligneBureau).join("");
@@ -822,19 +824,6 @@ window.renvoyer = async function(id) {
 };
 
 // ── ARCHIVER (stockage interne, visible dans le Suivi, pas encore envoyé au client) ──
-window.archiver = async function(id) {
-  const r = allDocs.find(x => x.id === id);
-  if (!confirm("Archiver ce rapport en interne ? Il restera consultable dans le Suivi de l'intervention, et l'intervention passera au statut \"Terminé\".")) return;
-  try {
-    await updateDoc(doc(db, "reception-rapports", id), { statut: "archive", updatedAt: new Date().toISOString() });
-    if (r && r.suiviId) {
-      try { await updateDoc(doc(db, "suivi", r.suiviId), { statut: "Terminé" }); }
-      catch(e) { console.warn("Mise à jour statut Suivi échouée:", e.message); }
-    }
-    showToast("Rapport archivé");
-  } catch(e) { alert("Erreur : " + e.message); }
-};
-
 // ── SUPPRIMER / ANNULER (erreur d'envoi, doublon, demande annulée...) ──
 window.supprimerReception = async function(id) {
   const r = allDocs.find(x => x.id === id);
@@ -1350,6 +1339,14 @@ window.doEnvoyer = async function(mode) {
       await updateDoc(doc(db, "reception-rapports", r.id), {
         statut: "envoye", updatedAt: now, ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}), ajouteEspaceClient: wantsEspace,
       });
+      // Rapport normal du passage n°1 envoyé : l'intervention passe en "Terminé"
+      // (anciennement fait par le bouton Archiver, supprimé). Les rapports des
+      // passages suivants se rangent sur leur passage sans changer le statut.
+      // Un renvoi depuis "Envoyés" ne retouche pas un statut modifié depuis.
+      if (!isAbsAnnul && r.statut !== "envoye" && r.suiviId && String(r.numPassage) === "1") {
+        try { await updateDoc(doc(db, "suivi", r.suiviId), { statut: "Terminé" }); }
+        catch(e) { console.warn("Mise à jour statut Suivi échouée:", e.message); }
+      }
       // Un rapport d'absence/annulation constaté par le technicien signifie que le
       // passage n'a pas eu lieu normalement : on le marque annulé dans le Suivi.
       if (isAbsAnnul && r.suiviId && r.numPassage) {
