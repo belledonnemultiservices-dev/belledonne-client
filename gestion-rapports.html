@@ -505,7 +505,7 @@ const ETAPES = [
   { statuts: ["a-traiter", "archive"], cle: "pret", label: "Prêts à envoyer" },
 ];
 const COLONNES = {
-  bureau:  { titres: ["Reçu le", "Client", "BC", "Passage", "Technicien", "Libellé", "Type", "Étape", ""], largeurs: [110, 120, 100, 110, 140, 180, 120, 120, 260] },
+  bureau:  { titres: ["Reçu le", "Client", "BC", "Passage", "Technicien", "Libellé", "Type", "Étape", "Voir", ""], largeurs: [110, 120, 100, 110, 140, 180, 120, 120, 90, 230] },
   attente: { titres: ["Passage prévu", "Technicien", "Client", "BC", "Passage", "Libellé", "Retard", ""], largeurs: [150, 140, 120, 100, 110, 200, 110, 200] },
   envoyes: { titres: ["Envoyé le", "Client", "BC", "Passage", "Technicien", "Type", "Destination", ""], largeurs: [110, 120, 100, 110, 140, 120, 160, 170] },
 };
@@ -658,6 +658,7 @@ function ligneBureau(r) {
     <div class="cell-muted" style="font-size:12px;line-height:1.3;">${r.technicien || "—"}</div>
     <div>${cellLibelle(r)}</div><div>${cellType(r)}</div>
     <div><span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span></div>
+    <div>${cellVoir(r)}</div>
     <div>${actionsCell(r)}</div></div>`;
 }
 function ligneAttente(r) {
@@ -675,6 +676,12 @@ function ligneEnvoye(r) {
     <div class="cell-muted" style="font-size:12px;line-height:1.3;">${r.technicien || "—"}</div>
     <div>${cellType(r)}</div><div class="cell-muted" style="font-size:12px;">${dest}</div>
     <div>${actionsCell(r)}</div></div>`;
+}
+// Colonne "Voir" : le fichier final, dès que le rapport est prêt à envoyer.
+function cellVoir(r) {
+  const pret = r.statut === "a-traiter" || r.statut === "archive";
+  if (!pret || !r.fileUrl) return `<span class="cell-muted">—</span>`;
+  return `<a class="btn-a btn-open" href="${r.fileUrl}" target="_blank" title="Ouvrir le rapport tel qu'il partira au client">${r.type === "excel" ? "Voir (Excel)" : "Voir"}</a>`;
 }
 const section = (titre, classe) => `<div class="section-row ${classe || ""}">${titre}</div>`;
 
