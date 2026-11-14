@@ -266,6 +266,22 @@
   .btn-next.neutre{color:var(--navy);background:#EBF0F5;}
   .btn-next.neutre:hover{background:#DCE5EE;}
   .btn-ellipsis{font-size:14px;line-height:1;color:var(--text-mid);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;}
+  .files-bar{align-items:center;}
+  .file-semaine{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 16px;border:2px solid #C7D2FE;border-radius:var(--radius-sm);background:#EEF2FF;font:700 13px 'DM Sans',sans-serif;color:#4338CA;cursor:pointer;}
+  .file-semaine svg{width:16px;height:16px;}
+  .file-semaine:hover{border-color:#4338CA;}
+  .file-semaine.active{background:#4338CA;border-color:#4338CA;color:#fff;}
+  .file-semaine .cpt{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#fff;color:#4338CA;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+  .files-sep{width:1px;align-self:stretch;background:var(--border);margin:0 6px;}
+  .files-titre{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-right:2px;}
+  .bandeau-semaine{display:none;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:14px;padding:12px 16px;border-radius:var(--radius-sm);background:#EEF2FF;border:1px solid #C7D2FE;}
+  .bandeau-semaine .bs-titre{font:700 14px 'DM Sans',sans-serif;color:#312E81;margin-right:6px;}
+  .bandeau-semaine .bs-kpi{display:flex;flex-direction:column;line-height:1.15;}
+  .bandeau-semaine .bs-kpi b{font-size:18px;color:#312E81;}
+  .bandeau-semaine .bs-kpi span{font-size:11px;color:#4A6078;}
+  .bandeau-semaine .bs-kpi.alerte b{color:#E74C3C;}
+  .bandeau-semaine .bs-kpi.ok b{color:#1DA870;}
+  .v2.mode-semaine thead th{background:#EEF2FF;color:#312E81;}
   .kz{display:flex;flex-direction:column;gap:3px;}
   .kz span{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap;}
   .kz-ok{background:#E8F9F2;color:#1DA870;}
@@ -365,6 +381,7 @@
 
     <!-- FILES DE TRAVAIL (nouvelle vue, onglet En contrat) -->
     <div class="files-bar" id="filesBar" style="display:none;"></div>
+    <div class="bandeau-semaine" id="bandeauSemaine"></div>
     <!-- FILTERS -->
     <div class="filters-bar" style="flex-wrap:wrap;gap:8px;">
       <div class="search-wrap" style="min-width:200px;flex:1;">
@@ -3546,10 +3563,50 @@ var FILES_SUIVI = [
 function renderFilesBar(base) {
   var bar = document.getElementById('filesBar');
   if (!bar) return;
-  bar.innerHTML = FILES_SUIVI.map(function(f) {
+  var libelle = function(f){ return typeof f.label === 'function' ? f.label() : f.label; };
+  var sem = FILES_SUIVI.find(function(f){ return f.cle === 'semaine'; });
+  // La Semaine est un outil de pilotage à part : bouton distinct, à gauche, séparé des files de travail.
+  var html = '<button class="file-semaine' + (fileSuivi === 'semaine' ? ' active' : '') + '" onclick="choisirFileSuivi(\'semaine\')">'
+    + '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>'
+    + libelle(sem) + ' <span class="cpt">' + base.filter(sem.test).length + '</span></button>';
+  html += '<span class="files-sep"></span><span class="files-titre">À traiter</span>';
+  html += FILES_SUIVI.filter(function(f){ return f.cle !== 'semaine'; }).map(function(f) {
     var n = base.filter(f.test).length;
-    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (f.alerte && n ? ' alerte' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + (typeof f.label === 'function' ? f.label() : f.label) + ' <span class="cpt">' + n + '</span></button>';
+    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (f.alerte && n ? ' alerte' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + libelle(f) + ' <span class="cpt">' + n + '</span></button>';
   }).join('');
+  bar.innerHTML = html;
+  renderBandeauSemaine(base.filter(sem.test));
+}
+
+// Bandeau de pilotage de la semaine : passages, Kizeo, notifications, rapports.
+function renderBandeauSemaine(dossiers) {
+  var b = document.getElementById('bandeauSemaine');
+  if (!b) return;
+  var actif = fileSuivi === 'semaine' && activeTab === 'contrat' && vueSuivi === 'nouvelle';
+  b.style.display = actif ? 'flex' : 'none';
+  var table = document.querySelector('#tableWrap_contratV2 table');
+  if (table) table.classList.toggle('mode-semaine', actif);
+  if (!actif) return;
+  var nbPassages = 0, kzManque = 0, kzEcart = 0, recus = 0, techs = {};
+  dossiers.forEach(function(item) {
+    passagesSemaine(item).forEach(function(p) {
+      nbPassages++;
+      var e = etatKizeo(item, p);
+      if (e === 'manque') kzManque++;
+      else if (e === 'ecart') kzEcart++;
+      else if (e === 'recu') recus++;
+      p.techs.forEach(function(t){ techs[t] = 1; });
+    });
+  });
+  var nonPrevenus = dossiers.filter(function(i){ return !toNotifArray(i.notifBailleur).length; }).length;
+  var s = semaineAffichee();
+  var kpi = function(val, lib, cls){ return '<div class="bs-kpi ' + (cls || '') + '"><b>' + val + '</b><span>' + lib + '</span></div>'; };
+  b.innerHTML = '<span class="bs-titre">Semaine du ' + jjmm(s.lundi) + ' au ' + jjmm(s.vendredi) + '</span>'
+    + kpi(nbPassages, 'passage' + (nbPassages > 1 ? 's' : '') + ' · ' + dossiers.length + ' dossier' + (dossiers.length > 1 ? 's' : ''))
+    + kpi(Object.keys(techs).length, 'technicien' + (Object.keys(techs).length > 1 ? 's' : '') + ' mobilisé' + (Object.keys(techs).length > 1 ? 's' : ''))
+    + kpi(kzManque + kzEcart, 'Kizeo à générer' + (kzEcart ? ' (dont ' + kzEcart + ' mauvais technicien)' : ''), (kzManque + kzEcart) ? 'alerte' : 'ok')
+    + kpi(nonPrevenus, 'bailleur' + (nonPrevenus > 1 ? 's' : '') + ' non prévenu' + (nonPrevenus > 1 ? 's' : ''), nonPrevenus ? 'alerte' : 'ok')
+    + kpi(recus, 'rapport' + (recus > 1 ? 's' : '') + ' déjà reçu' + (recus > 1 ? 's' : ''));
 }
 function choisirFileSuivi(cle) {
   fileSuivi = cle;
@@ -3564,6 +3621,7 @@ function majAffichageVue() {
   if (oldWrap) oldWrap.style.display = contrat && !v2 ? '' : 'none';
   if (newWrap) newWrap.style.display = contrat && v2 ? '' : 'none';
   document.getElementById('filesBar').style.display = contrat && v2 ? '' : 'none';
+  if (!(contrat && v2)) { var bs = document.getElementById('bandeauSemaine'); if (bs) bs.style.display = 'none'; }
   var btnVue = document.getElementById('btnVueSuivi');
   btnVue.style.display = contrat ? '' : 'none';
   btnVue.textContent = v2 ? 'Ancienne vue' : 'Nouvelle vue';
