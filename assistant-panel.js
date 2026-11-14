@@ -4,7 +4,7 @@
 // qu'un accès en lecture seule à cette base. Ce fichier ne touche à aucune donnée.
 
 const URL_AGENT = "https://europe-west1-belledonne-agent.cloudfunctions.net/assistant";
-const AVATAR = new URL("./assistant-avatar.jpg", import.meta.url).href;
+const AVATAR = new URL("./assistant-avatar.jpg?v=2", import.meta.url).href; // ?v= à incrémenter à chaque nouvelle image
 const CLE_CONV = "assistant-conversation-id";
 const CLE_FIL = "assistant-fil";          // messages affichés, pour les retrouver d'une page à l'autre
 const CLE_ETAT = "assistant-etat";        // "ouvert" ou "reduit"
@@ -22,12 +22,12 @@ const EXEMPLES = [
 ];
 
 const CSS = `
-#asst-btn{position:fixed;right:22px;bottom:22px;z-index:9998;display:flex;align-items:center;gap:10px;padding:5px 18px 5px 5px;border:none;border-radius:999px;background:#0D1B2A;color:#fff;font:600 14px 'DM Sans',sans-serif;box-shadow:0 6px 20px rgba(13,27,42,.25);cursor:pointer}
+#asst-btn{position:fixed;right:22px;bottom:22px;z-index:9998;display:flex;align-items:center;gap:12px;padding:6px 20px 6px 6px;border:none;border-radius:999px;background:#0D1B2A;color:#fff;font:600 15px 'DM Sans',sans-serif;box-shadow:0 6px 20px rgba(13,27,42,.25);cursor:pointer}
 #asst-btn:hover{background:#1DA870}
-#asst-btn img{width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid #2ECC8F}
-.asst-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #2ECC8F;flex:none}
-.asst-ligne{display:flex;align-items:flex-end;gap:8px;align-self:flex-start;max-width:94%}
-.asst-ligne img{width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none}
+#asst-btn img{width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid #2ECC8F}
+.asst-avatar{width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid #2ECC8F;flex:none}
+.asst-ligne{display:flex;align-items:flex-end;gap:9px;align-self:flex-start;max-width:94%}
+.asst-ligne img{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none;border:1.5px solid #2ECC8F}
 .asst-ligne .asst-msg{max-width:100%}
 #asst-btn .asst-point{width:8px;height:8px;border-radius:50%;background:#2ECC8F;display:none}
 #asst-btn.en-cours .asst-point{display:inline-block}
