@@ -81,10 +81,14 @@ exports.deleteAuthUser = functions
     if (!uid) { res.status(400).json({ error: "uid manquant" }); return; }
 
     try {
+      // Révocation d'abord : le compte ne peut plus rafraîchir son jeton.
+      await admin.auth().revokeRefreshTokens(uid);
       await admin.auth().deleteUser(uid);
       console.log("Utilisateur supprime de Auth:", uid);
       res.status(200).json({ success: true });
     } catch(err) {
+      // Déjà absent de Auth : c'est le résultat recherché.
+      if (err.code === "auth/user-not-found") { res.status(200).json({ success: true, dejaAbsent: true }); return; }
       console.error(err);
       res.status(500).json({ error: err.message });
     }
@@ -1449,6 +1453,14 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     const batimentA = batimentSnapA.data();
     if (batimentA.semaineId !== semaineId) { console.warn(`Kizeo campagne: semaineId incohérent pour ${refInterne}`); return false; }
 
+    // Passage déjà archivé (intégré au reporting) pour cette même soumission :
+    // un rejeu ne doit pas le remettre "à traiter".
+    const passageExistant = batimentA[passageKey] || {};
+    if (passageExistant.statut === "archive" && passageExistant.kizeoDataId === String(dataId)) {
+      console.log(`Kizeo campagne: soumission ${dataId} déjà archivée (${batimentId}.${passageKey}), ignorée`);
+      return true;
+    }
+
     // Extraction des résultats par logement depuis le champ liste "tableau".
     // statut_1er_passage = choix UNIQUE -> on lit .value (texte simple).
     // niveau_infestation = choix MULTIPLE -> on lit .valuesAsArray (liste).
@@ -1533,6 +1545,14 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     const ligne = bloc ? (bloc.lignes || []).find(l => l.id === ligneId) : null;
     if (!bloc || !ligne) { console.warn(`Kizeo: bloc/ligne garantie introuvable (${refInterne}), soumission ${dataId} laissée non lue`); return false; }
 
+    // Rapport déjà archivé (agrégé, éventuellement envoyé au client) : un rejeu
+    // ne doit ni le remettre "à traiter" ni le faire ré-agréger.
+    const dejaRecueG = await db.collection("garanties-rapports").where("kizeoDataId", "==", String(dataId)).limit(1).get();
+    if (!dejaRecueG.empty && dejaRecueG.docs[0].data().statut === "archive") {
+      console.log(`Kizeo garantie: soumission ${dataId} déjà archivée (garanties-rapports/${dejaRecueG.docs[0].id}), ignorée`);
+      return true;
+    }
+
     const typeSortieG = formConf.typeSortie === "excel" ? "excel" : "pdf";
     let fileBufferG, extG, contentTypeG;
     if (typeSortieG === "excel") {
@@ -1608,6 +1628,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   }
 
   let suiviId = null, client = "", bc = "", numPassage = null, passageLabel = "";
+  let passagesSuivi = [];
   const m = refInterne.match(/^(.+)::(\d+)$/);
   if (m) {
     const candidateSuiviId = m[1];
@@ -1620,6 +1641,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
         const s = sSnap.data();
         client = s.client || "";
         bc = s.bc || s.pl || s.devis || "";
+        passagesSuivi = Array.isArray(s.passages) ? s.passages : [];
       }
     } catch(e) {
       console.error("Kizeo: résolution suivi échouée:", e.message);
@@ -1632,6 +1654,33 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   if (!suiviId) {
     console.log(`Kizeo: soumission ${dataId} ignorée (ref_interne absent ou intervention introuvable, hors app)`);
     return;
+  }
+
+  // Soumission déjà reçue (rejeu du webhook, modification côté Kizeo) sur une
+  // ligne que le bureau a déjà prise en main : relue, validée, archivée ou
+  // envoyée. On ne la retraite pas, sinon le statut repart en arrière et les
+  // corrections de relecture sont écrasées. La donnée reste consultable chez Kizeo.
+  const dejaRecue = await db.collection("reception-rapports").where("kizeoDataId", "==", String(dataId)).limit(1).get();
+  if (!dejaRecue.empty) {
+    const r0 = dejaRecue.docs[0].data();
+    if (r0.relueAt || r0.valideeAt || r0.statut === "archive" || r0.statut === "envoye") {
+      console.log(`Kizeo: soumission ${dataId} déjà traitée (reception-rapports/${dejaRecue.docs[0].id}, statut ${r0.statut}), ignorée`);
+      return true;
+    }
+  } else if (refInterne) {
+    // Jamais reçue et plus aucune ligne en attente pour ce passage : soit le
+    // passage a été annulé, soit la ligne a été supprimée dans Gestion rapports
+    // (kizeoPush remis à null), soit le passage n'existe plus. Le formulaire
+    // était resté sur le mobile du technicien : on ne recrée pas de ligne, pour
+    // ne pas faire réapparaître un passage clos. La donnée reste chez Kizeo.
+    const enAttente = await db.collection("reception-rapports").where("refInterne", "==", refInterne).where("statut", "==", "en-attente").limit(1).get();
+    if (enAttente.empty) {
+      const vivants = passagesSuivi.filter(p => Number(p.num) === numPassage && p.statut !== "annule" && p.kizeoPush);
+      if (!vivants.length) {
+        console.log(`Kizeo: soumission ${dataId} ignorée, passage ${numPassage} de suivi/${suiviId} annulé, supprimé ou sans envoi actif`);
+        return true;
+      }
+    }
   }
 
   const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
@@ -2900,6 +2949,24 @@ exports.pushCampagnePassage1Kizeo = functions
       const results = [];
       let totalBatiments = 0;
 
+      // Renvoi sur une période déjà poussée : le remplacement se fait ici, bâtiment
+      // par bâtiment et après succès du push, et non plus en vidant la période
+      // avant l'envoi. Un bâtiment dont le rapport est déjà revenu du terrain est
+      // conservé tel quel et n'est pas renvoyé ; un bâtiment encore en attente
+      // n'est supprimé qu'une fois son remplaçant poussé.
+      const cleBatiment = (secteur, adresseRue, codePostal, ville) =>
+        [secteur, adresseRue, codePostal, ville].map(v => String(v || "").trim().toLowerCase()).join("|");
+      const anciensParCle = new Map();
+      const anciensSnap = await db.collection("campagnes-batiments").where("semaineId", "==", semaineId).get();
+      anciensSnap.docs.forEach(d => {
+        const b = d.data();
+        const cle = cleBatiment(b.secteur, b.adresseRue, b.codePostal, b.ville);
+        if (!anciensParCle.has(cle)) anciensParCle.set(cle, []);
+        anciensParCle.get(cle).push({ ref: d.ref, recu: ((b.passage1 || {}).statut || "en-attente") !== "en-attente" });
+      });
+      const clesTraitees = new Set();
+      let nbConserves = 0;
+
       for (const envoi of envois) {
         const nomFeuille = String(envoi.nomFeuille).trim();
         const recipient = String(envoi.destinataireKizeoUserId).trim();
@@ -2954,6 +3021,14 @@ exports.pushCampagnePassage1Kizeo = functions
         totalBatiments += batiments.size;
 
         for (const data of batiments.values()) {
+          const cle = cleBatiment(data.secteur, data.adresse_rue, data.code_postal, data.ville);
+          clesTraitees.add(cle);
+          const anciens = anciensParCle.get(cle) || [];
+          if (anciens.some(a => a.recu)) {
+            nbConserves++;
+            results.push({ nomFeuille, adresse: data.adresse_rue, technicien: technicienNom, success: true, conserve: true });
+            continue;
+          }
           const batimentRef = db.collection("campagnes-batiments").doc();
           const refInterne = `campagne::${semaineId}::1::${batimentRef.id}`;
           const fields = {
@@ -3000,16 +3075,30 @@ exports.pushCampagnePassage1Kizeo = functions
               updatedAt: nowIso,
             });
             results.push({ nomFeuille, adresse: data.adresse_rue, technicien: technicienNom, success: true, dataId, batimentId: batimentRef.id });
+            for (const a of anciens) { await a.ref.delete(); }
           } else {
+            // Échec : l'ancien bâtiment en attente reste en place, son formulaire
+            // est toujours sur le mobile du technicien.
             results.push({ nomFeuille, adresse: data.adresse_rue, technicien: technicienNom, success: false, error: `Kizeo a répondu ${r.status}` });
           }
         }
       }
 
-      const nbEnvoyes = results.filter(r => r.success).length;
-      const nbErreurs = results.length - nbEnvoyes;
-      console.log(`pushCampagnePassage1Kizeo: ${nbEnvoyes} envoyés, ${nbErreurs} erreurs sur ${results.length} bâtiments, ${envois.length} feuille(s)`);
-      res.status(200).json({ results, nbEnvoyes, nbErreurs, nbBatiments: totalBatiments });
+      const nbEnvoyes = results.filter(r => r.success && !r.conserve).length;
+      const nbErreurs = results.filter(r => !r.success).length;
+
+      // Bâtiments en attente absents du nouveau fichier : remplacés, donc retirés,
+      // mais seulement si l'envoi s'est déroulé sans aucune erreur. Ceux dont le
+      // rapport est revenu ne sont jamais supprimés.
+      if (nbErreurs === 0) {
+        for (const [cle, anciens] of anciensParCle) {
+          if (clesTraitees.has(cle)) continue;
+          for (const a of anciens) { if (!a.recu) await a.ref.delete(); }
+        }
+      }
+
+      console.log(`pushCampagnePassage1Kizeo: ${nbEnvoyes} envoyés, ${nbConserves} conservés, ${nbErreurs} erreurs sur ${results.length} bâtiments, ${envois.length} feuille(s)`);
+      res.status(200).json({ results, nbEnvoyes, nbConserves, nbErreurs, nbBatiments: totalBatiments });
     } catch (e) {
       console.error("pushCampagnePassage1Kizeo:", e);
       res.status(500).json({ error: e.message });

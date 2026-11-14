@@ -502,12 +502,17 @@ window.impersonate = async function(uid, identifiant) {
 window.deleteAccount = async function(docId, identifiant, uid) {
   if (!confirm("Supprimer le compte \"" + identifiant + "\" ?")) return;
   try {
-    await deleteDoc(doc(db, "users", docId));
+    // Le compte de connexion part en premier : tant qu'il existe, ses claims
+    // (role, client) lui ouvrent les données de son client. Si sa suppression
+    // échoue, on s'arrête là et la fiche reste visible pour réessayer.
     if (uid) {
       // Appel authentifié (deleteAuthUser exige un jeton admin depuis le durcissement).
       try { await callFn("deleteAuthUser", { uid }); }
-      catch(e) { console.error("deleteAuthUser:", e.message); }
+      catch(e) { showToast("Suppression annulée, compte de connexion non supprimé : " + e.message); return; }
+    } else if (!confirm("Cette fiche n'a pas d'UID : le compte de connexion ne peut pas être supprimé d'ici.\n\nSupprimer quand même la fiche ?")) {
+      return;
     }
+    await deleteDoc(doc(db, "users", docId));
     showToast("Compte supprime — " + identifiant);
     loadAccounts();
   } catch(e) { showToast("Erreur : " + e.message); }

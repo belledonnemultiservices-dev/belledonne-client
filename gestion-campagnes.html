@@ -1380,10 +1380,12 @@ function renderResultatPush(dp) {
   if (!dp || !dp.results) { box.style.display = "none"; if (avertOff) avertOff.style.display = "none"; return; }
   const quand = dp.at ? new Date(dp.at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
   document.getElementById("resultStats").textContent =
-    `${dp.nbEnvoyes} envoyé(s) · ${dp.nbErreurs} erreur(s) sur ${dp.nbBatiments} bâtiment(s), ${dp.nbFeuilles} feuille(s)`
+    `${dp.nbEnvoyes} envoyé(s) · ${dp.nbErreurs} erreur(s)`
+    + (dp.nbConserves ? ` · ${dp.nbConserves} conservé(s), rapport déjà revenu` : "")
+    + ` sur ${dp.nbBatiments} bâtiment(s), ${dp.nbFeuilles} feuille(s)`
     + (quand ? ` — le ${quand}` : "");
   document.getElementById("resultDetail").innerHTML = (dp.results || []).map(r =>
-    `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.success ? "✅" : "❌"} [${r.nomFeuille || "?"}] ${r.adresse || ""} — ${r.technicien || "?"} ${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
+    `<div style="padding:4px 0;border-bottom:1px solid var(--border);">${r.conserve ? "📄" : (r.success ? "✅" : "❌")} [${r.nomFeuille || "?"}] ${r.adresse || ""} — ${r.technicien || "?"} ${r.conserve ? `<span style="color:var(--text-muted)">(rapport déjà revenu, conservé)</span>` : ""}${r.error ? `<span style="color:var(--red)">(${r.error})</span>` : ""}</div>`
   ).join("");
   box.style.display = "block";
   const avert = document.getElementById("avertRemplacement");
@@ -1785,15 +1787,17 @@ window.pushPremierPassage = async function() {
   const noms = envois.map(e => e.nomFeuille.toLowerCase());
   if (new Set(noms).size !== noms.length) { showToast("Deux envois utilisent la même feuille"); return; }
 
-  // Renvoi sur une période déjà poussée : sans remplacement, les nouveaux
-  // bâtiments s'ajouteraient aux anciens et la période compterait deux fois le
-  // même immeuble. Les formulaires déjà partis chez Kizeo ne sont pas touchés,
-  // c'est Yacine qui les supprime dans leur interface.
+  // Renvoi sur une période déjà poussée : le remplacement est fait par la
+  // fonction, bâtiment par bâtiment et après succès du push. Les bâtiments dont
+  // le rapport est revenu sont conservés et ne sont pas renvoyés. Les formulaires
+  // déjà partis chez Kizeo ne sont pas touchés, c'est Yacine qui les supprime
+  // dans leur interface.
   const dejaPousses = _batiments.slice();
   if (dejaPousses.length) {
     const avecRapport = dejaPousses.filter(b => (b.passage1 || {}).statut && (b.passage1 || {}).statut !== "en-attente");
-    if (!confirm(`Cette période compte déjà ${dejaPousses.length} bâtiment(s) envoyé(s).\n\nUn nouvel envoi les REMPLACE : les anciens sont supprimés de l'app.\nLes formulaires déjà partis restent chez Kizeo, à supprimer depuis leur interface.\n\nContinuer ?`)) return;
-    if (avecRapport.length && !confirm(`Attention : ${avecRapport.length} bâtiment(s) ont déjà un rapport revenu du terrain.\n\nLes remplacer efface ces rapports de l'app (les PDF déjà archivés restent dans le stockage).\n\nConfirmer le remplacement ?`)) return;
+    if (!confirm(`Cette période compte déjà ${dejaPousses.length} bâtiment(s) envoyé(s).\n\nUn nouvel envoi REMPLACE ceux qui sont encore en attente, une fois le nouveau formulaire parti.`
+      + (avecRapport.length ? `\nLes ${avecRapport.length} bâtiment(s) dont le rapport est déjà revenu sont conservés et ne seront pas renvoyés.` : "")
+      + `\nLes formulaires déjà partis restent chez Kizeo, à supprimer depuis leur interface.\n\nContinuer ?`)) return;
   }
 
   const btn = document.getElementById("btnGenerate");
@@ -1811,10 +1815,6 @@ window.pushPremierPassage = async function() {
     await new Promise((resolve, reject) => {
       uploadTask.on("state_changed", (snap) => { progressFill.style.width = Math.round((snap.bytesTransferred / snap.totalBytes) * 100) + "%"; }, reject, resolve);
     });
-    if (dejaPousses.length) {
-      btn.textContent = `Remplacement de l'envoi précédent (${dejaPousses.length} bâtiment(s))...`;
-      for (const b of dejaPousses) { await deleteDoc(doc(db, "campagnes-batiments", b.id)); }
-    }
     btn.textContent = `Envoi vers Kizeo en cours (${envois.length} feuille${envois.length>1?"s":""})...`;
     const resp = await fetch(FN_PUSH1, { method: "POST", headers: await authHeaders(), body: JSON.stringify({ storagePath, envois, semaineId: _currentSemaineId }) });
     const data = await resp.json();
@@ -1823,11 +1823,11 @@ window.pushPremierPassage = async function() {
     // à la réouverture, sinon la confirmation est perdue au rechargement.
     const dernierPush = {
       at: new Date().toISOString(),
-      nbEnvoyes: data.nbEnvoyes || 0, nbErreurs: data.nbErreurs || 0,
+      nbEnvoyes: data.nbEnvoyes || 0, nbErreurs: data.nbErreurs || 0, nbConserves: data.nbConserves || 0,
       nbBatiments: data.nbBatiments || 0, nbFeuilles: envois.length,
       fichier: _selectedFile.name,
       results: (data.results || []).map(r => ({
-        success: !!r.success, nomFeuille: r.nomFeuille || "", adresse: r.adresse || "",
+        success: !!r.success, conserve: !!r.conserve, nomFeuille: r.nomFeuille || "", adresse: r.adresse || "",
         technicien: r.technicien || "", error: r.error || "",
       })),
     };
