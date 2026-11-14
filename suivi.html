@@ -3514,11 +3514,24 @@ function prochainPassage(item) {
   return datesDesPassages(item).filter(function(d){ return d >= auj; }).sort()[0] || null;
 }
 
+// Semaine affichée par la file "Semaine" : du lundi au vendredi de la semaine
+// en cours, jours passés compris ; le samedi et le dimanche, celle d'après.
+function semaineAffichee() {
+  var d = new Date(); var j = d.getDay(); // 0 = dimanche, 6 = samedi
+  var versLundi = j === 0 ? 1 : j === 6 ? 2 : 1 - j;
+  return { lundi: jourLocal(versLundi), vendredi: jourLocal(versLundi + 4) };
+}
+function premierPassageSemaine(item) {
+  var s = semaineAffichee();
+  return datesDesPassages(item).filter(function(d){ return d >= s.lundi && d <= s.vendredi; }).sort()[0] || null;
+}
+
 var FILES_SUIVI = [
   { cle: 'valider', label: 'À valider', test: function(i){ return i.statut === 'À valider'; } },
   { cle: 'planifier', label: 'À planifier', test: function(i){ return ['Terminé','Annulé','À valider','Passage annulé'].indexOf(i.statut) === -1 && !aPassageDate(i); } },
-  { cle: 'semaine', label: 'Cette semaine', test: function(i){ var a = jourLocal(0), b = jourLocal(6); return i.statut !== 'Annulé' && datesDesPassages(i).some(function(d){ return d >= a && d <= b; }); },
-    tri: function(x, y){ return (prochainPassage(x)||'9').localeCompare(prochainPassage(y)||'9'); } },
+  { cle: 'semaine', label: function(){ var s = semaineAffichee(); return 'Semaine du ' + s.lundi.substring(8,10) + ' au ' + jjmm(s.vendredi); },
+    test: function(i){ var s = semaineAffichee(); return i.statut !== 'Annulé' && datesDesPassages(i).some(function(d){ return d >= s.lundi && d <= s.vendredi; }); },
+    tri: function(x, y){ return (premierPassageSemaine(x)||'9').localeCompare(premierPassageSemaine(y)||'9'); } },
   { cle: 'annule', label: 'Passage annulé', alerte: true, test: function(i){ return i.statut === 'Passage annulé'; } },
   { cle: 'facturer', label: 'À facturer', test: function(i){ return i.statut === 'Terminé' && !i.enFacturation; } },
   { cle: 'tout', label: 'Tout', test: function(){ return true; } },
@@ -3529,7 +3542,7 @@ function renderFilesBar(base) {
   if (!bar) return;
   bar.innerHTML = FILES_SUIVI.map(function(f) {
     var n = base.filter(f.test).length;
-    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (f.alerte && n ? ' alerte' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + f.label + ' <span class="cpt">' + n + '</span></button>';
+    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (f.alerte && n ? ' alerte' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + (typeof f.label === 'function' ? f.label() : f.label) + ' <span class="cpt">' + n + '</span></button>';
   }).join('');
 }
 function choisirFileSuivi(cle) {
@@ -3626,7 +3639,7 @@ window.renderTableV2 = function(list) {
   if (!body) return;
   if (!list.length) {
     var f = FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; });
-    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>' + (f && f.cle !== 'tout' ? 'Rien dans « ' + f.label + ' » pour le moment.' : 'Aucune intervention.') + '</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>' + (f && f.cle !== 'tout' ? 'Rien dans « ' + (typeof f.label === 'function' ? f.label() : f.label) + ' » pour le moment.' : 'Aucune intervention.') + '</p></div></td></tr>';
     return;
   }
   var html = '';
