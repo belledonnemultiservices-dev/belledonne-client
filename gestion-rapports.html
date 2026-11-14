@@ -1167,7 +1167,9 @@ window.doEnvoyer = async function(mode) {
           if (sSnap.exists()) {
             const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
             const updated = passages.map(p => String(p.num) === String(r.numPassage) ? { ...p, statut: "annule" } : p);
-            await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
+            // Passage n°1 annulé (absence ou annulation) : la ligne du Suivi passe en
+            // "Passage annulé". Statut ordinaire, modifiable ensuite à la main.
+            await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated, ...(String(r.numPassage) === "1" ? { statut: "Passage annulé" } : {}) });
           }
         } catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
       }
@@ -1483,7 +1485,8 @@ window.confirmerAnnulerPassage = async function(mode) {
         if (sSnap.exists()) {
           const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
           const updated = passages.map(p => String(p.num) === String(r.numPassage) ? { ...p, statut: "annule", kizeoPush: null } : p);
-          await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
+          // Même règle que pour un constat envoyé : passage n°1 annulé => "Passage annulé".
+          await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated, ...(String(r.numPassage) === "1" ? { statut: "Passage annulé" } : {}) });
         }
       } catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
     }
