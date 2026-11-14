@@ -5,6 +5,13 @@
 
 const URL_AGENT = "https://europe-west1-belledonne-agent.cloudfunctions.net/assistant";
 const CLE_CONV = "assistant-conversation-id";
+const CLE_FIL = "assistant-fil";          // messages affichés, pour les retrouver d'une page à l'autre
+const CLE_ETAT = "assistant-etat";        // "ouvert" ou "reduit"
+const CLE_BROUILLON = "assistant-brouillon";
+
+// sessionStorage peut être indisponible (navigation privée stricte) : jamais bloquant.
+const lireSession = (k) => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
+const ecrireSession = (k, v) => { try { v === null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) { /* ignoré */ } };
 
 const EXEMPLES = [
   "Qu'est-ce que Wilfried a cette semaine ?",
@@ -17,12 +24,15 @@ const CSS = `
 #asst-btn{position:fixed;right:22px;bottom:22px;z-index:9998;display:flex;align-items:center;gap:8px;padding:12px 18px;border:none;border-radius:999px;background:#0D1B2A;color:#fff;font:600 14px 'DM Sans',sans-serif;box-shadow:0 6px 20px rgba(13,27,42,.25);cursor:pointer}
 #asst-btn:hover{background:#1DA870}
 #asst-btn svg{width:18px;height:18px}
+#asst-btn .asst-point{width:8px;height:8px;border-radius:50%;background:#2ECC8F;display:none}
+#asst-btn.en-cours .asst-point{display:inline-block}
 #asst-panel{position:fixed;right:22px;bottom:22px;z-index:9999;width:420px;max-width:calc(100vw - 32px);height:620px;max-height:calc(100vh - 44px);display:none;flex-direction:column;background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(13,27,42,.28);font-family:'DM Sans',sans-serif;color:#0D1B2A;overflow:hidden}
 #asst-panel.ouvert{display:flex}
 .asst-tete{display:flex;align-items:center;gap:8px;padding:14px 16px;background:#0D1B2A;color:#fff}
 .asst-tete b{flex:1;font:700 15px 'Syne','DM Sans',sans-serif}
 .asst-tete small{display:block;font:400 11px 'DM Sans',sans-serif;color:#8FA4B8}
-.asst-tete button{background:none;border:none;color:#fff;cursor:pointer;font-size:12px;padding:4px 8px;border-radius:6px}
+.asst-tete button{background:none;border:none;color:#fff;cursor:pointer;font-size:12px;padding:4px 8px;border-radius:6px;line-height:1}
+.asst-tete button[data-a="reduire"],.asst-tete button[data-a="fermer"]{font-size:15px;width:28px;height:28px;padding:0}
 .asst-tete button:hover{background:rgba(255,255,255,.12)}
 .asst-fil{flex:1;overflow-y:auto;padding:16px;background:#F2F5F8;display:flex;flex-direction:column;gap:10px}
 .asst-msg{max-width:88%;padding:10px 13px;border-radius:12px;font-size:13.5px;line-height:1.5;overflow-wrap:anywhere}
@@ -83,14 +93,15 @@ export function monterAssistant(auth) {
 
   const btn = document.createElement("button");
   btn.id = "asst-btn";
-  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.66 15l-1.3 4.1a.75.75 0 00.95.95l4.1-1.3A10 10 0 1012 2zm-4 11.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm4 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm4 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg>Assistant';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.66 15l-1.3 4.1a.75.75 0 00.95.95l4.1-1.3A10 10 0 1012 2zm-4 11.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm4 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm4 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg>Assistant<span class="asst-point" title="Conversation en cours"></span>';
 
   const panel = document.createElement("div");
   panel.id = "asst-panel";
   panel.innerHTML = `
     <div class="asst-tete"><b>Assistant<small>Lecture seule · questions sur vos données</small></b>
       <button data-a="nouveau" title="Nouvelle conversation">Nouveau</button>
-      <button data-a="fermer" title="Fermer">✕</button></div>
+      <button data-a="reduire" title="Réduire (la conversation est gardée)">—</button>
+      <button data-a="fermer" title="Fermer et effacer la conversation">✕</button></div>
     <div class="asst-fil"></div>
     <div class="asst-saisie"><textarea rows="1" placeholder="Pose ta question…"></textarea><button>Envoyer</button></div>`;
   document.body.append(btn, panel);
@@ -98,11 +109,11 @@ export function monterAssistant(auth) {
   const fil = panel.querySelector(".asst-fil");
   const zone = panel.querySelector("textarea");
   const envoyer = panel.querySelector(".asst-saisie button");
-  let conversationId = null;
-  try { conversationId = sessionStorage.getItem(CLE_CONV); } catch (e) { /* stockage indisponible */ }
+  let conversationId = lireSession(CLE_CONV);
   let enCours = false;
+  let historique = []; // [{classe, html}] des messages échangés, rejoués au changement de page
 
-  const ajouter = (classe, html) => {
+  const afficher = (classe, html) => {
     const d = document.createElement("div");
     d.className = classe;
     d.innerHTML = html;
@@ -110,21 +121,45 @@ export function monterAssistant(auth) {
     fil.scrollTop = fil.scrollHeight;
     return d;
   };
+  // Message gardé dans l'historique (questions, réponses, erreurs), contrairement à l'accueil et à l'attente.
+  const ajouter = (classe, html) => {
+    historique.push({ classe, html });
+    ecrireSession(CLE_FIL, JSON.stringify(historique));
+    btn.classList.add("en-cours");
+    return afficher(classe, html);
+  };
 
   function accueil() {
     fil.innerHTML = "";
-    ajouter("asst-msg asst-lui", "<p>Bonjour 👋 Je lis les données de l'app : planning, interventions, rapports Kizeo, campagnes, garanties, facturation et devis. Je ne modifie rien.</p>");
-    const ex = ajouter("asst-exemples", EXEMPLES.map(q => `<button>${echapper(q)}</button>`).join(""));
+    historique = [];
+    ecrireSession(CLE_FIL, null);
+    btn.classList.remove("en-cours");
+    afficher("asst-msg asst-lui", "<p>Bonjour 👋 Je lis les données de l'app : planning, interventions, rapports Kizeo, campagnes, garanties, facturation et devis. Je ne modifie rien.</p>");
+    const ex = afficher("asst-exemples", EXEMPLES.map(q => `<button>${echapper(q)}</button>`).join(""));
     ex.querySelectorAll("button").forEach(b => b.addEventListener("click", () => poser(b.textContent)));
   }
+
+  function restaurer() {
+    let sauve = [];
+    try { sauve = JSON.parse(lireSession(CLE_FIL) || "[]"); } catch (e) { sauve = []; }
+    if (!sauve.length) { accueil(); return; }
+    fil.innerHTML = "";
+    historique = sauve;
+    afficher("asst-msg asst-lui", "<p>Bonjour 👋 Je lis les données de l'app : planning, interventions, rapports Kizeo, campagnes, garanties, facturation et devis. Je ne modifie rien.</p>");
+    sauve.forEach(m => afficher(m.classe, m.html));
+    btn.classList.add("en-cours");
+  }
+
+  const ouvrir = () => { panel.classList.add("ouvert"); btn.style.display = "none"; ecrireSession(CLE_ETAT, "ouvert"); fil.scrollTop = fil.scrollHeight; zone.focus(); };
+  const reduire = () => { panel.classList.remove("ouvert"); btn.style.display = ""; ecrireSession(CLE_ETAT, "reduit"); };
 
   async function poser(question) {
     question = question.trim();
     if (!question || enCours) return;
-    enCours = true; envoyer.disabled = true; zone.value = "";
+    enCours = true; envoyer.disabled = true; zone.value = ""; ecrireSession(CLE_BROUILLON, null);
     fil.querySelector(".asst-exemples")?.remove();
     ajouter("asst-msg asst-moi", echapper(question));
-    const attente = ajouter("asst-attente", "L'assistant consulte les données…");
+    const attente = afficher("asst-attente", "L'assistant consulte les données…");
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Session expirée, reconnecte-toi.");
@@ -136,10 +171,10 @@ export function monterAssistant(auth) {
       const data = await rep.json().catch(() => ({}));
       if (!rep.ok) throw new Error(data.erreur || "Erreur " + rep.status);
       conversationId = data.conversationId || null;
-      try { conversationId ? sessionStorage.setItem(CLE_CONV, conversationId) : sessionStorage.removeItem(CLE_CONV); } catch (e) { /* idem */ }
+      ecrireSession(CLE_CONV, conversationId);
       attente.remove();
       ajouter("asst-msg asst-lui", versHtml(data.reponse || ""));
-      if (data.avertissement) ajouter("asst-attente", echapper(data.avertissement));
+      if (data.avertissement) afficher("asst-attente", echapper(data.avertissement));
     } catch (e) {
       attente.remove();
       ajouter("asst-err", echapper(e.message || "Erreur inattendue"));
@@ -148,16 +183,29 @@ export function monterAssistant(auth) {
     }
   }
 
-  btn.addEventListener("click", () => { panel.classList.add("ouvert"); btn.style.display = "none"; zone.focus(); });
-  panel.querySelector('[data-a="fermer"]').addEventListener("click", () => { panel.classList.remove("ouvert"); btn.style.display = ""; });
-  panel.querySelector('[data-a="nouveau"]').addEventListener("click", () => {
+  const nouvelleConversation = () => {
     conversationId = null;
-    try { sessionStorage.removeItem(CLE_CONV); } catch (e) { /* idem */ }
+    ecrireSession(CLE_CONV, null);
     accueil();
+  };
+
+  btn.addEventListener("click", ouvrir);
+  panel.querySelector('[data-a="reduire"]').addEventListener("click", reduire);
+  panel.querySelector('[data-a="fermer"]').addEventListener("click", () => {
+    nouvelleConversation();
+    zone.value = ""; ecrireSession(CLE_BROUILLON, null);
+    reduire();
   });
+  panel.querySelector('[data-a="nouveau"]').addEventListener("click", nouvelleConversation);
   envoyer.addEventListener("click", () => poser(zone.value));
   zone.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); poser(zone.value); } });
-  zone.addEventListener("input", () => { zone.style.height = "auto"; zone.style.height = Math.min(zone.scrollHeight, 110) + "px"; });
+  zone.addEventListener("input", () => {
+    zone.style.height = "auto"; zone.style.height = Math.min(zone.scrollHeight, 110) + "px";
+    ecrireSession(CLE_BROUILLON, zone.value || null);
+  });
 
-  accueil();
+  // Reprise de l'état laissé sur la page précédente : fil, brouillon, panneau ouvert ou réduit.
+  restaurer();
+  zone.value = lireSession(CLE_BROUILLON) || "";
+  if (lireSession(CLE_ETAT) === "ouvert") ouvrir();
 }
