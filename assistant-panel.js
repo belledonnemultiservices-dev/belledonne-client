@@ -4,7 +4,7 @@
 // qu'un accès en lecture seule à cette base. Ce fichier ne touche à aucune donnée.
 
 const URL_AGENT = "https://europe-west1-belledonne-agent.cloudfunctions.net/assistant";
-const AVATAR = new URL("./assistant-avatar.jpg?v=2", import.meta.url).href; // ?v= à incrémenter à chaque nouvelle image
+const AVATAR = new URL("./assistant-avatar.jpg?v=3", import.meta.url).href; // ?v= à incrémenter à chaque nouvelle image
 const CLE_CONV = "assistant-conversation-id";
 const CLE_FIL = "assistant-fil";          // messages affichés, pour les retrouver d'une page à l'autre
 const CLE_ETAT = "assistant-etat";        // "ouvert" ou "reduit"
