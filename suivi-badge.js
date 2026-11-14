@@ -75,6 +75,8 @@ function setup() {
         // "Absents / Annulations" (espace client) : idem, l'admin gère ça depuis
         // Gestion rapports (Annuler le passage), pas besoin du doublon ici.
         document.querySelectorAll('a.nav-item[href="absents.html"]').forEach(el => el.style.display = 'none');
+        // Panneau "Assistant" (agent IA en lecture seule, projet séparé belledonne-agent).
+        import('./assistant-panel.js').then(m => m.monterAssistant(auth)).catch(e => console.error('assistant:', e));
         // Injecter le lien "Services & conso" dans la sidebar admin (si absent)
         if (!document.querySelector('a.nav-item[href="services.html"]')) {
           const anchor = document.querySelector('a.nav-item[href="imports.html"]') ||
