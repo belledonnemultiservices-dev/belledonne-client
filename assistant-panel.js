@@ -14,12 +14,13 @@ const CLE_BROUILLON = "assistant-brouillon";
 const lireSession = (k) => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
 const ecrireSession = (k, v) => { try { v === null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) { /* ignoré */ } };
 
-const EXEMPLES = [
-  "Qu'est-ce que Wilfried a cette semaine ?",
-  "Quels rapports Kizeo sont en retard ?",
-  "Qu'est-ce qui reste à facturer ?",
-  "Quelles interventions n'ont aucun passage planifié ?",
-];
+const NOM = "Yacine";
+const ACCUEIL = "<p>Salut, c'est Yacine 👋 Qu'est-ce que je peux faire pour toi ?</p>";
+
+// Raccourcis affichés sous l'accueil : un clic envoie la demande. Vide pour
+// l'instant, Yacine (dirigeant) fournira les demandes fréquentes à y mettre.
+// Format : { libelle: "Texte du bouton", demande: "Question envoyée à l'agent" }
+const RACCOURCIS = [];
 
 const CSS = `
 #asst-btn{position:fixed;right:22px;bottom:22px;z-index:9998;display:flex;align-items:center;gap:12px;padding:6px 20px 6px 6px;border:none;border-radius:999px;background:#0D1B2A;color:#fff;font:600 15px 'DM Sans',sans-serif;box-shadow:0 6px 20px rgba(13,27,42,.25);cursor:pointer}
@@ -98,12 +99,12 @@ export function monterAssistant(auth) {
 
   const btn = document.createElement("button");
   btn.id = "asst-btn";
-  btn.innerHTML = `<img src="${AVATAR}" alt="">Assistant<span class="asst-point" title="Conversation en cours"></span>`;
+  btn.innerHTML = `<img src="${AVATAR}" alt="">${NOM}<span class="asst-point" title="Conversation en cours"></span>`;
 
   const panel = document.createElement("div");
   panel.id = "asst-panel";
   panel.innerHTML = `
-    <div class="asst-tete"><img class="asst-avatar" src="${AVATAR}" alt=""><b>Assistant<small>Lecture seule · questions sur vos données</small></b>
+    <div class="asst-tete"><img class="asst-avatar" src="${AVATAR}" alt=""><b>${NOM}<small>Assistant · lecture seule</small></b>
       <button data-a="nouveau" title="Nouvelle conversation">Nouveau</button>
       <button data-a="reduire" title="Réduire (la conversation est gardée)">—</button>
       <button data-a="fermer" title="Fermer et effacer la conversation">✕</button></div>
@@ -148,9 +149,11 @@ export function monterAssistant(auth) {
     historique = [];
     ecrireSession(CLE_FIL, null);
     btn.classList.remove("en-cours");
-    afficher("asst-msg asst-lui", "<p>Bonjour 👋 Je lis les données de l'app : planning, interventions, rapports Kizeo, campagnes, garanties, facturation et devis. Je ne modifie rien.</p>");
-    const ex = afficher("asst-exemples", EXEMPLES.map(q => `<button>${echapper(q)}</button>`).join(""));
-    ex.querySelectorAll("button").forEach(b => b.addEventListener("click", () => poser(b.textContent)));
+    afficher("asst-msg asst-lui", ACCUEIL);
+    if (RACCOURCIS.length) {
+      const ex = afficher("asst-exemples", RACCOURCIS.map((r, i) => `<button data-i="${i}">${echapper(r.libelle)}</button>`).join(""));
+      ex.querySelectorAll("button").forEach(b => b.addEventListener("click", () => poser(RACCOURCIS[b.dataset.i].demande)));
+    }
   }
 
   function restaurer() {
@@ -159,7 +162,7 @@ export function monterAssistant(auth) {
     if (!sauve.length) { accueil(); return; }
     fil.innerHTML = "";
     historique = sauve;
-    afficher("asst-msg asst-lui", "<p>Bonjour 👋 Je lis les données de l'app : planning, interventions, rapports Kizeo, campagnes, garanties, facturation et devis. Je ne modifie rien.</p>");
+    afficher("asst-msg asst-lui", ACCUEIL);
     sauve.forEach(m => afficher(m.classe, m.html));
     btn.classList.add("en-cours");
   }
@@ -173,7 +176,7 @@ export function monterAssistant(auth) {
     enCours = true; envoyer.disabled = true; zone.value = ""; ecrireSession(CLE_BROUILLON, null);
     fil.querySelector(".asst-exemples")?.remove();
     ajouter("asst-msg asst-moi", echapper(question));
-    const attente = afficher("asst-attente", "L'assistant consulte les données…");
+    const attente = afficher("asst-attente", `${NOM} consulte les données…`);
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Session expirée, reconnecte-toi.");
