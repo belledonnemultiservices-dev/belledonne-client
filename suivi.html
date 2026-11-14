@@ -266,6 +266,11 @@
   .btn-next.neutre{color:var(--navy);background:#EBF0F5;}
   .btn-next.neutre:hover{background:#DCE5EE;}
   .btn-ellipsis{font-size:14px;line-height:1;color:var(--text-mid);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;}
+  .kz{display:flex;flex-direction:column;gap:3px;}
+  .kz span{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+  .kz-ok{background:#E8F9F2;color:#1DA870;}
+  .kz-manque{background:#FDECEA;color:#E74C3C;}
+  .kz-ecart{background:#FFEBD6;color:#D9480F;white-space:normal!important;}
   #menuSuivi{position:fixed;z-index:600;display:none;min-width:220px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(13,27,42,.16);padding:6px;}
   #menuSuivi button,#menuSuivi a{display:block;width:100%;text-align:left;padding:8px 11px;border:none;background:none;border-radius:6px;font:13px 'DM Sans',sans-serif;color:var(--text);cursor:pointer;text-decoration:none;}
   #menuSuivi button:hover,#menuSuivi a:hover{background:var(--bg);}
@@ -446,6 +451,7 @@
             <th>Techniciens</th>
             <th>Passages</th>
             <th>Notifs</th>
+            <th id="thKizeoV2" style="display:none;">Kizeo</th>
             <th>Statut</th>
             <th style="text-align:right;">Action</th>
           </tr>
@@ -3499,7 +3505,7 @@ function passagesNorm(item) {
   var bruts = Array.isArray(item.passages) ? item.passages : [item.date1, item.date2, item.date3].filter(Boolean);
   return bruts.filter(Boolean).map(function(p, i) {
     if (typeof p === 'string') { var x = p.split('|'); return { num: i+1, debut: x[0]||'', fin: x[1]||'', techs: [], statut: '' }; }
-    return { num: p.num || (i+1), debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush };
+    return { num: p.num || (i+1), debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '' };
   }).sort(function(a, b){ return (a.num||0) - (b.num||0); });
 }
 function techsDesPassages(item) {
@@ -3603,6 +3609,36 @@ function friseHtml(item) {
   }).join('') + '</div>';
 }
 
+// Passages de la semaine affichée (non annulés), pour la colonne Kizeo.
+function passagesSemaine(item) {
+  var s = semaineAffichee();
+  return passagesNorm(item).filter(function(p){ var d = (p.debut||'').substring(0,10); return p.statut !== 'annule' && d && d >= s.lundi && d <= s.vendredi; });
+}
+// État du formulaire Kizeo d'un passage : 'ok', 'recu', 'manque' ou 'ecart' (envoyé à un autre technicien).
+function etatKizeo(item, p) {
+  var rec = window._receptionsParPassage[item.id + '::' + p.num];
+  if (rec && rec.statut !== 'en-attente') return 'recu';
+  // Envoyé = trace sur le passage, ou ligne "en attente" côté Gestion rapports.
+  if (!p.kizeo && !(rec && rec.statut === 'en-attente')) return 'manque';
+  var dest = p.kizeoTech || (rec && rec.technicien) || '';
+  if (dest && p.techs.length && p.techs.indexOf(dest) === -1) return 'ecart';
+  return 'ok';
+}
+function kizeoHtml(item) {
+  var ps = passagesSemaine(item);
+  if (!ps.length) return '<span style="color:var(--text-muted)">—</span>';
+  return '<div class="kz">' + ps.map(function(p) {
+    var n = CERCLES[(p.num||1) - 1] || ('#' + p.num);
+    var e = etatKizeo(item, p);
+    var recK = window._receptionsParPassage[item.id + '::' + p.num];
+    p.kizeoTech = p.kizeoTech || (recK && recK.technicien) || '';
+    if (e === 'recu') return '<span class="kz-ok">' + n + ' ✓ Rapport reçu</span>';
+    if (e === 'ok') return '<span class="kz-ok">' + n + ' ✓ Envoyé' + (p.kizeoTech ? ' à ' + p.kizeoTech.split(' ')[0] : '') + '</span>';
+    if (e === 'ecart') return '<span class="kz-ecart" title="Le technicien du passage a changé après l\'envoi : renvoyer le formulaire au bon technicien.">' + n + ' ⚠ Envoyé à ' + p.kizeoTech.split(' ')[0] + ', technicien actuel : ' + p.techs.map(function(t){ return t.split(' ')[0]; }).join(', ') + '</span>';
+    return '<span class="kz-manque">' + n + ' ✕ À générer</span>';
+  }).join('') + '</div>';
+}
+
 function refHtml(item) {
   var r = item.bc ? { t: 'BC', n: item.bc, u: item.bcUrl } : item.pl ? { t: 'PL', n: item.pl, u: item.plUrl } : item.devis ? { t: 'Devis', n: item.devis, u: item.devisUrl } : null;
   var autres = [item.bc && item.pl ? 'PL ' + item.pl : '', (item.bc || item.pl) && item.devis ? 'Devis ' + item.devis : ''].filter(Boolean).join(' · ');
@@ -3622,6 +3658,9 @@ function actionSuivante(item) {
   var id = item.id;
   var ps = passagesNorm(item);
   if (item.statut === 'À valider') return '<button class="btn-next" onclick="validerIntervention(\'' + id + '\')">Valider</button>';
+  if (fileSuivi === 'semaine' && passagesSemaine(item).some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) {
+    return '<button class="btn-next" onclick="openModal(\'' + id + '\')" title="Ouvre la fiche pour envoyer le formulaire Kizeo au technicien">Générer Kizeo</button>';
+  }
   if (item.statut === 'Passage annulé') return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Replanifier</button>';
   if (item.statut === 'Terminé') {
     return item.enFacturation
@@ -3637,9 +3676,13 @@ function actionSuivante(item) {
 window.renderTableV2 = function(list) {
   var body = document.getElementById('tableBodyContratV2');
   if (!body) return;
+  var modeSemaine = fileSuivi === 'semaine';
+  var nbCols = modeSemaine ? 10 : 9;
+  var thK = document.getElementById('thKizeoV2');
+  if (thK) thK.style.display = modeSemaine ? '' : 'none';
   if (!list.length) {
     var f = FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; });
-    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>' + (f && f.cle !== 'tout' ? 'Rien dans « ' + (typeof f.label === 'function' ? f.label() : f.label) + ' » pour le moment.' : 'Aucune intervention.') + '</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="' + nbCols + '"><div class="empty-state"><p>' + (f && f.cle !== 'tout' ? 'Rien dans « ' + (typeof f.label === 'function' ? f.label() : f.label) + ' » pour le moment.' : 'Aucune intervention.') + '</p></div></td></tr>';
     return;
   }
   var html = '';
@@ -3656,13 +3699,14 @@ window.renderTableV2 = function(list) {
     html += '<td>' + (techs.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + techs.map(function(a){ return assigneBadge(a); }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
     html += '<td>' + friseHtml(item) + '</td>';
     html += '<td>' + notifsHtml(item) + '</td>';
+    if (modeSemaine) html += '<td>' + kizeoHtml(item) + '</td>';
     html += '<td>' + statutSelect(item.id, item.statut) + '</td>';
     html += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;">' + actionSuivante(item) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
     html += '</tr>';
 
     // Historique des notifications (même ligne repliable que l'ancienne vue)
     var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
-    html += '<tr id="notif-row-' + item.id + '" class="notif-row hidden"><td colspan="9"><div class="notif-bar">';
+    html += '<tr id="notif-row-' + item.id + '" class="notif-row hidden"><td colspan="' + nbCols + '"><div class="notif-bar">';
     html += '<div class="notif-section">' + (hasPsg ? '<button class="btn-notif-open" onclick="openNotifFromRow(\'' + item.id + '\')">✉ Notifier</button>' : '<span class="notif-none">Ajoutez des passages pour notifier</span>') + '</div>';
     html += '<div style="width:1px;height:24px;background:var(--border);margin:0 4px;"></div>';
     html += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
@@ -5267,7 +5311,7 @@ onAuthStateChanged(auth, async (user) => {
       const r = d.data();
       if (!r.suiviId || r.numPassage == null) return;
       const k = r.suiviId + '::' + r.numPassage;
-      if (!m[k] || (RANG_RECEPTION[r.statut] ?? -1) > (RANG_RECEPTION[m[k].statut] ?? -1)) m[k] = { statut: r.statut, dateFin: r.dateFin || null };
+      if (!m[k] || (RANG_RECEPTION[r.statut] ?? -1) > (RANG_RECEPTION[m[k].statut] ?? -1)) m[k] = { statut: r.statut, dateFin: r.dateFin || null, technicien: r.technicien || '' };
     });
     window._receptionsParPassage = m;
     if (window.filterTable) window.filterTable();
