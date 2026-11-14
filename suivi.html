@@ -282,6 +282,19 @@
   .bandeau-semaine .bs-kpi.alerte b{color:#E74C3C;}
   .bandeau-semaine .bs-kpi.ok b{color:#1DA870;}
   .v2.mode-semaine thead th{background:#EEF2FF;color:#312E81;}
+  .bandeau-semaine.neutre{background:var(--surface);border-color:var(--border);}
+  .bandeau-semaine.neutre .bs-titre,.bandeau-semaine.neutre .bs-kpi b{color:var(--navy);}
+  .bs-entete{display:flex;flex-direction:column;margin-right:8px;}
+  .bs-question{font-size:11.5px;color:var(--text-muted);font-style:italic;}
+  .bandeau-semaine .bs-kpi.alerte b{color:#E74C3C;}
+  .bandeau-semaine .bs-kpi.ok b{color:#1DA870;}
+  .bs-kpi.bs-texte b{font-size:12.5px!important;font-weight:600;max-width:320px;}
+  .bs-kpi.cliquable{cursor:pointer;padding:4px 8px;margin:-4px -8px;border-radius:8px;}
+  .bs-kpi.cliquable:hover{background:rgba(231,76,60,0.08);}
+  .bs-kpi.choisi{background:rgba(231,76,60,0.12);outline:1px solid rgba(231,76,60,0.35);}
+  .bs-option{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid);margin-left:auto;cursor:pointer;}
+  .file-chip.discret{border-style:dashed;font-weight:500;}
+  .ligne-groupe td{background:var(--bg)!important;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mid);padding:8px 14px!important;}
   .kz{display:flex;flex-direction:column;gap:3px;}
   .kz span{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap;}
   .kz-ok{background:#E8F9F2;color:#1DA870;}
@@ -459,20 +472,7 @@
     <!-- TABLE EN CONTRAT, NOUVELLE VUE -->
     <div class="table-wrap" id="tableWrap_contratV2" style="display:none;">
       <table class="suivi-table v2">
-        <thead>
-          <tr>
-            <th style="width:32px;"><input type="checkbox" id="checkAllV2" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
-            <th>Réf.</th>
-            <th>Client · Nature</th>
-            <th style="min-width:180px;">Adresse</th>
-            <th>Techniciens</th>
-            <th>Passages</th>
-            <th>Notifs</th>
-            <th id="thKizeoV2" style="display:none;">Kizeo</th>
-            <th>Statut</th>
-            <th style="text-align:right;">Action</th>
-          </tr>
-        </thead>
+        <thead id="theadV2"></thead>
         <tbody id="tableBodyContratV2"></tbody>
       </table>
     </div>
@@ -3487,8 +3487,8 @@ function filterTable() {
   });
   if (v2) {
     renderFilesBar(filtered);
-    var f = FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; }) || FILES_SUIVI[FILES_SUIVI.length - 1];
-    filtered = filtered.filter(f.test);
+    var f = fileCourante();
+    filtered = appliquerSousFiltre(filtered.filter(f.test));
     if (f.tri) filtered.sort(f.tri);
   }
   document.getElementById('resultsCount').textContent = filtered.length + ' intervention' + (filtered.length!==1?'s':'');
@@ -3549,67 +3549,259 @@ function premierPassageSemaine(item) {
   return datesDesPassages(item).filter(function(d){ return d >= s.lundi && d <= s.vendredi; }).sort()[0] || null;
 }
 
+// ── Outils de pilotage ──
+var DELAI_PLANIF_JOURS = 3;     // au-delà, un dossier à planifier est en retard
+var DELAI_ATTENTE_JOURS = 7;    // au-delà, un dossier en attente est à relancer
+var DELAI_REPLANIF_JOURS = 3;   // au-delà, un passage annulé non replanifié est signalé
+var sousFiltre = '';            // indicateur du bandeau cliqué (ne garder que ces dossiers)
+var grouperCommune = (function(){ try { return localStorage.getItem('suivi.grouperCommune') === '1'; } catch(e) { return false; } })();
+
+// Arrivée dans l'app = création de la ligne (import email dans les 15 min, ou saisie).
+function dateArrivee(item) { return item.createdAt || item.dateEmission || ''; }
+function joursDepuis(iso) { if (!iso) return null; var t = new Date(iso).getTime(); return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400e3); }
+function libJours(n) { return n === null ? '—' : n === 0 ? "aujourd'hui" : n === 1 ? 'hier' : 'il y a ' + n + ' j'; }
+function recPassage(item, num) { return window._receptionsParPassage[item.id + '::' + num]; }
+function moisCourant(iso) { var d = jourLocal(0); return !!iso && iso.substring(0, 7) === d.substring(0, 7); }
+function anneeCourante(iso) { return !!iso && iso.substring(0, 4) === jourLocal(0).substring(0, 4); }
+function parClient(liste) {
+  var c = {}; liste.forEach(function(i){ var k = i.client || '—'; c[k] = (c[k] || 0) + 1; });
+  return Object.keys(c).sort(function(a, b){ return c[b] - c[a]; }).map(function(k){ return k + ' ' + c[k]; }).join(' · ');
+}
+function communeDe(item) {
+  var m = String(item.adresse || '').match(/(\d{5})\s+([^,\d]+?)\s*$/);
+  if (!m) return 'Commune non lue';
+  // Majuscule en tête de chaque mot (gère les accents et les tirets : Saint-Martin-d'Hères, Échirolles)
+  var nom = m[2].trim().replace(/\s+/g, ' ').toLowerCase().replace(/(^|[\s-])(\S)/g, function(x, sep, c){ return sep + c.toUpperCase(); });
+  return nom + ' (' + m[1] + ')';
+}
+function refsDe(item) { return [item.bc, item.pl, item.devis].filter(function(v){ return v && String(v).trim(); }).map(function(v){ return String(v).trim().toLowerCase(); }); }
+function estDoublon(item) {
+  var refs = refsDe(item); if (!refs.length) return false;
+  return (window.interventions || []).some(function(o){ return o.id !== item.id && refsDe(o).some(function(r){ return refs.indexOf(r) !== -1; }); });
+}
+function estIncomplet(item) { return !item.adresse || !refsDe(item).length || !(item.bcUrl || item.plUrl || item.devisUrl); }
+
+// Passages non annulés, classés par numéro
+function passagesActifs(item) { return passagesNorm(item).filter(function(p){ return p.statut !== 'annule'; }); }
+function passageFait(item, p) {
+  var rec = recPassage(item, p.num);
+  if (rec && rec.statut !== 'en-attente') return true;
+  return !!p.debut && p.debut.substring(0, 10) < jourLocal(0);
+}
+function passagesSansRapport(item) {
+  return passagesActifs(item).filter(function(p){ var rec = recPassage(item, p.num); return p.debut && p.debut.substring(0, 10) < jourLocal(0) && !(rec && rec.statut !== 'en-attente'); });
+}
+function rapportsNonEnvoyes(item) {
+  return passagesNorm(item).filter(function(p){ var rec = recPassage(item, p.num); return rec && ['a-relire', 'a-traiter', 'archive'].indexOf(rec.statut) !== -1; });
+}
+function rapportP1(item) { var rec = recPassage(item, 1); return rec ? rec.statut : null; }
+function aCloturer(item) { return rapportP1(item) === 'envoye' && item.statut !== 'Terminé'; }
+function kizeoAGenerer7j(item) {
+  var a = jourLocal(0), b = jourLocal(6);
+  return passagesActifs(item).some(function(p){ var d = (p.debut || '').substring(0, 10); var e = d && d >= a && d <= b ? etatKizeo(item, p) : null; return e === 'manque' || e === 'ecart'; });
+}
+function passagesSuivants(item) {
+  var auj = jourLocal(0);
+  return passagesActifs(item).filter(function(p){ return p.num > 1 && p.debut && p.debut.substring(0, 10) >= auj; });
+}
+function aNouveauPassage(item) {
+  var auj = jourLocal(0);
+  return passagesActifs(item).some(function(p){ return p.debut && p.debut.substring(0, 10) >= auj; });
+}
+
+// Onglet de chaque dossier : chaque dossier est dans un seul onglet.
+var STATUT_VERS_FILE = { 'À valider': 'valider', 'En attente': 'attente', 'Passage annulé': 'pannule', 'Annulé': 'annuleDef', 'Terminé': 'termine' };
+function fileDe(item) { return STATUT_VERS_FILE[item.statut] || (aPassageDate(item) ? 'encours' : 'planifier'); }
+
+var parAnciennete = function(x, y){ return dateArrivee(x).localeCompare(dateArrivee(y)); };
+var parRecent = function(x, y){ return String(y.updatedAt || dateArrivee(y)).localeCompare(String(x.updatedAt || dateArrivee(x))); };
+var colAttente = { titre: 'Attente', cell: function(i){ var n = joursDepuis(dateArrivee(i)); var c = n === null ? '' : n > DELAI_PLANIF_JOURS ? 'psg-retard' : n >= 2 ? 'psg-annule' : 'psg-recu'; return '<span class="psg ' + c + '" style="text-decoration:none;">' + (n === null ? '—' : n + ' j') + '</span>'; } };
+
 var FILES_SUIVI = [
-  { cle: 'valider', label: 'À valider', test: function(i){ return i.statut === 'À valider'; } },
-  { cle: 'planifier', label: 'À planifier', test: function(i){ return ['Terminé','Annulé','À valider','Passage annulé'].indexOf(i.statut) === -1 && !aPassageDate(i); } },
   { cle: 'semaine', label: function(){ var s = semaineAffichee(); return 'Semaine du ' + s.lundi.substring(8,10) + ' au ' + jjmm(s.vendredi); },
     test: function(i){ var s = semaineAffichee(); return i.statut !== 'Annulé' && datesDesPassages(i).some(function(d){ return d >= s.lundi && d <= s.vendredi; }); },
-    tri: function(x, y){ return (premierPassageSemaine(x)||'9').localeCompare(premierPassageSemaine(y)||'9'); } },
-  { cle: 'annule', label: 'Passage annulé', alerte: true, test: function(i){ return i.statut === 'Passage annulé'; } },
-  { cle: 'facturer', label: 'À facturer', test: function(i){ return i.statut === 'Terminé' && !i.enFacturation; } },
-  { cle: 'tout', label: 'Tout', test: function(){ return true; } },
+    tri: function(x, y){ return (premierPassageSemaine(x)||'9').localeCompare(premierPassageSemaine(y)||'9'); },
+    colonnes: [{ titre: 'Kizeo', cell: function(i){ return kizeoHtml(i); } }],
+    question: null,
+    kpis: function(l){
+      var nbP = 0, kz = 0, kzE = 0, recus = 0, techs = {};
+      l.forEach(function(item){ passagesSemaine(item).forEach(function(p){ nbP++; var e = etatKizeo(item, p); if (e === 'manque') kz++; else if (e === 'ecart') kzE++; else if (e === 'recu') recus++; p.techs.forEach(function(t){ techs[t] = 1; }); }); });
+      var nt = Object.keys(techs).length;
+      return [
+        { val: nbP, lib: 'passage' + (nbP > 1 ? 's' : '') + ' · ' + l.length + ' dossier' + (l.length > 1 ? 's' : '') },
+        { val: nt, lib: 'technicien' + (nt > 1 ? 's' : '') + ' mobilisé' + (nt > 1 ? 's' : '') },
+        { val: kz + kzE, lib: 'Kizeo à générer' + (kzE ? ' (dont ' + kzE + ' mauvais technicien)' : ''), alerte: true, cle: 'kz', filtre: function(i){ return passagesSemaine(i).some(function(p){ var e = etatKizeo(i, p); return e === 'manque' || e === 'ecart'; }); } },
+        { val: l.filter(function(i){ return !toNotifArray(i.notifBailleur).length; }).length, lib: 'bailleur(s) non prévenu(s)', alerte: true, cle: 'np', filtre: function(i){ return !toNotifArray(i.notifBailleur).length; } },
+        { val: recus, lib: 'rapport(s) déjà reçu(s)' },
+      ];
+    } },
+  { cle: 'valider', label: 'À valider', test: function(i){ return fileDe(i) === 'valider'; }, tri: parAnciennete,
+    question: "Qu'est-ce qui vient d'arriver, et est-ce fiable ?",
+    colonnes: [
+      { titre: 'Arrivé', cell: function(i){ return '<span style="font-size:12px;">' + libJours(joursDepuis(dateArrivee(i))) + '</span>'; } },
+      { titre: 'Contrôles', cell: function(i){ var b = []; if (estDoublon(i)) b.push('<span class="psg psg-retard" title="Ce n° de BC/PL/devis existe déjà dans le Suivi">⚠ Doublon possible</span>'); if (estIncomplet(i)) b.push('<span class="psg psg-annule" style="text-decoration:none;" title="Adresse, n° ou PDF manquant">⚠ Incomplet</span>'); return b.length ? '<div class="frise">' + b.join('') + '</div>' : '<span class="psg psg-recu">✓ OK</span>'; } },
+    ],
+    kpis: function(l){
+      var vieux = l.map(function(i){ return joursDepuis(dateArrivee(i)); }).filter(function(n){ return n !== null; });
+      return [
+        { val: l.length, lib: 'BC à valider' },
+        { val: vieux.length ? libJours(Math.max.apply(null, vieux)) : '—', lib: 'plus ancien' },
+        { val: l.filter(estDoublon).length, lib: 'doublon(s) possible(s)', alerte: true, cle: 'dbl', filtre: estDoublon },
+        { val: l.filter(estIncomplet).length, lib: 'incomplet(s)', alerte: true, cle: 'inc', filtre: estIncomplet },
+        { texte: parClient(l), lib: 'par client' },
+      ];
+    } },
+  { cle: 'planifier', label: 'À planifier', test: function(i){ return fileDe(i) === 'planifier'; }, tri: parAnciennete,
+    question: "Qu'est-ce qui attend un rendez-vous, et depuis combien de temps ?",
+    groupable: true,
+    colonnes: [colAttente],
+    kpis: function(l){
+      var vieux = l.map(function(i){ return joursDepuis(dateArrivee(i)); }).filter(function(n){ return n !== null; });
+      var retard = function(i){ var n = joursDepuis(dateArrivee(i)); return n !== null && n > DELAI_PLANIF_JOURS; };
+      return [
+        { val: l.length, lib: 'dossier(s) à planifier' },
+        { val: l.filter(retard).length, lib: 'en retard (+' + DELAI_PLANIF_JOURS + ' j)', alerte: true, cle: 'ret', filtre: retard },
+        { val: vieux.length ? vieux.reduce(function(a, b){ return Math.max(a, b); }) + ' j' : '—', lib: 'plus ancien' },
+        { texte: parClient(l), lib: 'par client' },
+      ];
+    } },
+  { cle: 'encours', label: 'En cours', test: function(i){ return fileDe(i) === 'encours'; },
+    tri: function(x, y){ var a = aCloturer(x) ? 0 : 1, b = aCloturer(y) ? 0 : 1; return (a - b) || (prochainPassage(x) || '9').localeCompare(prochainPassage(y) || '9'); },
+    question: "Qu'est-ce qui est lancé, et où ça en est ?",
+    colonnes: [
+      { titre: 'Prochain passage', cell: function(i){ var d = prochainPassage(i); return d ? '<span class="psg psg-prevu">' + (d === jourLocal(0) ? "aujourd'hui" : jjmm(d)) + '</span>' : '<span style="color:var(--text-muted)">—</span>'; } },
+      { titre: 'Avancement', cell: function(i){ var ps = passagesActifs(i); var f = ps.filter(function(p){ return passageFait(i, p); }).length; return '<span style="font-size:12px;font-weight:600;">' + f + ' / ' + ps.length + ' fait' + (f > 1 ? 's' : '') + '</span>'; } },
+    ],
+    kpis: function(l){
+      return [
+        { val: l.length, lib: 'dossier(s) en cours' },
+        { val: l.filter(function(i){ return passagesSansRapport(i).length; }).length, lib: 'passage passé sans rapport', alerte: true, cle: 'sr', filtre: function(i){ return passagesSansRapport(i).length > 0; } },
+        { val: l.filter(function(i){ return rapportsNonEnvoyes(i).length; }).length, lib: 'rapport reçu non envoyé', alerte: true, cle: 'rne', filtre: function(i){ return rapportsNonEnvoyes(i).length > 0; } },
+        { val: l.filter(aCloturer).length, lib: 'à clôturer', alerte: true, cle: 'clo', filtre: aCloturer },
+        { val: l.filter(kizeoAGenerer7j).length, lib: 'Kizeo à générer (7 j)', alerte: true, cle: 'kz7', filtre: kizeoAGenerer7j },
+      ];
+    } },
+  { cle: 'attente', label: 'En attente', test: function(i){ return fileDe(i) === 'attente'; },
+    tri: function(x, y){ return String(x.updatedAt || dateArrivee(x)).localeCompare(String(y.updatedAt || dateArrivee(y))); },
+    question: "Qu'est-ce qui est bloqué, et qui doit relancer ?",
+    colonnes: [
+      { titre: 'Dernière note', cell: function(i){ var t = String(i.notes || i.observations || '').trim(); return t ? '<span style="font-size:12px;color:var(--text-mid);display:inline-block;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + t.replace(/"/g, '&quot;') + '">' + t.replace(/</g, '&lt;') + '</span>' : '<span style="color:var(--text-muted)">—</span>'; } },
+      { titre: 'Sans nouvelles', cell: function(i){ var n = joursDepuis(i.updatedAt || dateArrivee(i)); return '<span class="psg ' + (n !== null && n > DELAI_ATTENTE_JOURS ? 'psg-retard' : 'psg-passe') + '">' + (n === null ? '—' : n + ' j') + '</span>'; } },
+    ],
+    kpis: function(l){
+      var bloque = function(i){ var n = joursDepuis(i.updatedAt || dateArrivee(i)); return n !== null && n > DELAI_ATTENTE_JOURS; };
+      var vieux = l.map(function(i){ return joursDepuis(i.updatedAt || dateArrivee(i)); }).filter(function(n){ return n !== null; });
+      return [
+        { val: l.length, lib: 'dossier(s) en attente' },
+        { val: l.filter(bloque).length, lib: 'à relancer (+' + DELAI_ATTENTE_JOURS + ' j sans nouvelles)', alerte: true, cle: 'rel', filtre: bloque },
+        { val: vieux.length ? vieux.reduce(function(a, b){ return Math.max(a, b); }) + ' j' : '—', lib: 'plus ancien' },
+        { texte: parClient(l), lib: 'par client' },
+      ];
+    } },
+  { cle: 'pannule', label: 'Passage annulé', test: function(i){ return fileDe(i) === 'pannule'; },
+    tri: function(x, y){ return String(x.updatedAt || '').localeCompare(String(y.updatedAt || '')); },
+    question: "Qu'est-ce qu'il faut replanifier ?",
+    colonnes: [
+      { titre: 'Motif', cell: function(i){ var r = recPassage(i, 1); var a = r && r.absence; return a ? '<span style="font-size:12px;"><b>' + (a.statut === 'absent' ? 'Absent' : 'Annulation') + '</b>' + (a.motif ? ' · ' + String(a.motif).replace(/</g, '&lt;') : '') + '</span>' : '<span style="color:var(--text-muted)">—</span>'; } },
+      { titre: 'Annulé', cell: function(i){ var r = recPassage(i, 1); return '<span style="font-size:12px;">' + libJours(joursDepuis((r && r.notifiedAt) || i.updatedAt)) + '</span>'; } },
+    ],
+    kpis: function(l){
+      var abs = l.filter(function(i){ var r = recPassage(i, 1); return r && r.absence && r.absence.statut === 'absent'; }).length;
+      var aRepl = function(i){ var r = recPassage(i, 1); var n = joursDepuis((r && r.notifiedAt) || i.updatedAt); return !aNouveauPassage(i) && n !== null && n > DELAI_REPLANIF_JOURS; };
+      return [
+        { val: l.length, lib: 'à replanifier' },
+        { val: abs + ' / ' + (l.length - abs), lib: 'absents / annulations' },
+        { val: l.filter(aRepl).length, lib: 'sans nouveau passage depuis +' + DELAI_REPLANIF_JOURS + ' j', alerte: true, cle: 'repl', filtre: aRepl },
+        { texte: parClient(l), lib: 'par client' },
+      ];
+    } },
+  { cle: 'annuleDef', label: 'Annulé', test: function(i){ return fileDe(i) === 'annuleDef'; }, tri: parRecent,
+    question: 'Combien de dossiers perdus, et pourquoi ?',
+    colonnes: [{ titre: 'Annulé', cell: function(i){ return '<span style="font-size:12px;">' + (i.updatedAt ? fmtDate(i.updatedAt) : '—') + '</span>'; } }],
+    kpis: function(l){
+      return [
+        { val: l.filter(function(i){ return moisCourant(i.updatedAt); }).length, lib: 'ce mois-ci' },
+        { val: l.filter(function(i){ return anneeCourante(i.updatedAt); }).length, lib: 'cette année' },
+        { texte: parClient(l), lib: 'par client' },
+      ];
+    } },
+  { cle: 'termine', label: 'Terminé', test: function(i){ return fileDe(i) === 'termine'; }, tri: parRecent,
+    question: 'Est-ce que tout est facturé et les rapports envoyés ?',
+    colonnes: [
+      { titre: 'Rapport passage 1', cell: function(i){ var s = rapportP1(i); return s === 'envoye' ? '<span class="psg psg-ok">✓ Envoyé</span>' : s && s !== 'en-attente' ? '<span class="psg psg-recu">Reçu, non envoyé</span>' : '<span class="psg psg-retard">✕ Non envoyé</span>'; } },
+      { titre: 'Passages suivants', cell: function(i){ var ps = passagesSuivants(i); return ps.length ? '<div class="frise">' + ps.map(function(p){ return '<span class="psg psg-prevu">' + (CERCLES[p.num - 1] || '#' + p.num) + ' ' + jjmm(p.debut.substring(0, 10)) + '</span>'; }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>'; } },
+    ],
+    kpis: function(l){
+      var p1 = function(i){ return rapportP1(i) !== 'envoye'; };
+      var aFact = function(i){ return !i.enFacturation; };
+      return [
+        { val: l.filter(function(i){ return moisCourant(i.updatedAt); }).length, lib: 'terminé(s) ce mois-ci' },
+        { val: l.filter(aFact).length, lib: 'à facturer', alerte: true, cle: 'fact', filtre: aFact },
+        { val: l.filter(function(i){ return i.enFacturation; }).length, lib: 'en facturation' },
+        { val: l.filter(p1).length, lib: 'rapport du passage 1 non envoyé', alerte: true, cle: 'p1', filtre: p1 },
+        { val: l.filter(function(i){ return passagesSuivants(i).length; }).length, lib: 'avec des passages suivants prévus' },
+      ];
+    } },
+  { cle: 'tout', label: 'Tout', discret: true, test: function(){ return true; }, question: null, kpis: null },
 ];
+
+function fileCourante() { return FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; }) || FILES_SUIVI[0]; }
+function libelleFile(f) { return typeof f.label === 'function' ? f.label() : f.label; }
 
 function renderFilesBar(base) {
   var bar = document.getElementById('filesBar');
   if (!bar) return;
-  var libelle = function(f){ return typeof f.label === 'function' ? f.label() : f.label; };
-  var sem = FILES_SUIVI.find(function(f){ return f.cle === 'semaine'; });
-  // La Semaine est un outil de pilotage à part : bouton distinct, à gauche, séparé des files de travail.
+  if (!FILES_SUIVI.some(function(f){ return f.cle === fileSuivi; })) fileSuivi = 'semaine'; // ancienne file mémorisée
+  var sem = FILES_SUIVI[0];
+  // La Semaine est un outil de pilotage à part : bouton distinct, à gauche, séparé des onglets de statut.
   var html = '<button class="file-semaine' + (fileSuivi === 'semaine' ? ' active' : '') + '" onclick="choisirFileSuivi(\'semaine\')">'
     + '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>'
-    + libelle(sem) + ' <span class="cpt">' + base.filter(sem.test).length + '</span></button>';
-  html += '<span class="files-sep"></span><span class="files-titre">À traiter</span>';
-  html += FILES_SUIVI.filter(function(f){ return f.cle !== 'semaine'; }).map(function(f) {
+    + libelleFile(sem) + ' <span class="cpt">' + base.filter(sem.test).length + '</span></button>';
+  html += '<span class="files-sep"></span>';
+  html += FILES_SUIVI.slice(1).map(function(f) {
     var n = base.filter(f.test).length;
-    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (f.alerte && n ? ' alerte' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + libelle(f) + ' <span class="cpt">' + n + '</span></button>';
+    var alerte = f.kpis && f.cle !== 'annuleDef' && f.kpis(base.filter(f.test)).some(function(k){ return k.alerte && Number(k.val) > 0; });
+    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (alerte ? ' alerte' : '') + (f.discret ? ' discret' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + libelleFile(f) + ' <span class="cpt">' + n + '</span></button>';
   }).join('');
   bar.innerHTML = html;
-  renderBandeauSemaine(base.filter(sem.test));
+  renderBandeau(base.filter(fileCourante().test));
 }
 
-// Bandeau de pilotage de la semaine : passages, Kizeo, notifications, rapports.
-function renderBandeauSemaine(dossiers) {
+// Bandeau de pilotage de l'onglet ouvert. Un indicateur rouge cliqué ne garde que ses dossiers.
+function renderBandeau(dossiers) {
   var b = document.getElementById('bandeauSemaine');
   if (!b) return;
-  var actif = fileSuivi === 'semaine' && activeTab === 'contrat' && vueSuivi === 'nouvelle';
+  var f = fileCourante();
+  var actif = activeTab === 'contrat' && vueSuivi === 'nouvelle' && !!f.kpis;
   b.style.display = actif ? 'flex' : 'none';
+  b.classList.toggle('neutre', f.cle !== 'semaine');
   var table = document.querySelector('#tableWrap_contratV2 table');
-  if (table) table.classList.toggle('mode-semaine', actif);
+  if (table) table.classList.toggle('mode-semaine', actif && f.cle === 'semaine');
   if (!actif) return;
-  var nbPassages = 0, kzManque = 0, kzEcart = 0, recus = 0, techs = {};
-  dossiers.forEach(function(item) {
-    passagesSemaine(item).forEach(function(p) {
-      nbPassages++;
-      var e = etatKizeo(item, p);
-      if (e === 'manque') kzManque++;
-      else if (e === 'ecart') kzEcart++;
-      else if (e === 'recu') recus++;
-      p.techs.forEach(function(t){ techs[t] = 1; });
-    });
-  });
-  var nonPrevenus = dossiers.filter(function(i){ return !toNotifArray(i.notifBailleur).length; }).length;
-  var s = semaineAffichee();
-  var kpi = function(val, lib, cls){ return '<div class="bs-kpi ' + (cls || '') + '"><b>' + val + '</b><span>' + lib + '</span></div>'; };
-  b.innerHTML = '<span class="bs-titre">Semaine du ' + jjmm(s.lundi) + ' au ' + jjmm(s.vendredi) + '</span>'
-    + kpi(nbPassages, 'passage' + (nbPassages > 1 ? 's' : '') + ' · ' + dossiers.length + ' dossier' + (dossiers.length > 1 ? 's' : ''))
-    + kpi(Object.keys(techs).length, 'technicien' + (Object.keys(techs).length > 1 ? 's' : '') + ' mobilisé' + (Object.keys(techs).length > 1 ? 's' : ''))
-    + kpi(kzManque + kzEcart, 'Kizeo à générer' + (kzEcart ? ' (dont ' + kzEcart + ' mauvais technicien)' : ''), (kzManque + kzEcart) ? 'alerte' : 'ok')
-    + kpi(nonPrevenus, 'bailleur' + (nonPrevenus > 1 ? 's' : '') + ' non prévenu' + (nonPrevenus > 1 ? 's' : ''), nonPrevenus ? 'alerte' : 'ok')
-    + kpi(recus, 'rapport' + (recus > 1 ? 's' : '') + ' déjà reçu' + (recus > 1 ? 's' : ''));
+  var titre = f.cle === 'semaine' ? (function(){ var s = semaineAffichee(); return 'Semaine du ' + jjmm(s.lundi) + ' au ' + jjmm(s.vendredi); })() : libelleFile(f);
+  var html = '<div class="bs-entete"><span class="bs-titre">' + titre + '</span>' + (f.question ? '<span class="bs-question">' + f.question + '</span>' : '') + '</div>';
+  html += f.kpis(dossiers).map(function(k) {
+    if (k.texte !== undefined) return '<div class="bs-kpi bs-texte"><b>' + (k.texte || '—') + '</b><span>' + k.lib + '</span></div>';
+    var cls = k.alerte ? (Number(k.val) > 0 ? 'alerte' : 'ok') : '';
+    var clic = k.filtre && Number(k.val) > 0 ? ' cliquable" onclick="basculerSousFiltre(\'' + k.cle + '\')" title="Ne montrer que ces dossiers' : '';
+    return '<div class="bs-kpi ' + cls + (sousFiltre === k.cle ? ' choisi' : '') + clic + '"><b>' + k.val + '</b><span>' + k.lib + (sousFiltre === k.cle ? ' · <u>tout afficher</u>' : '') + '</span></div>';
+  }).join('');
+  if (f.groupable) html += '<label class="bs-option"><input type="checkbox" ' + (grouperCommune ? 'checked' : '') + ' onchange="basculerGrouperCommune(this.checked)"> Grouper par commune</label>';
+  b.innerHTML = html;
 }
+function basculerSousFiltre(cle) { sousFiltre = sousFiltre === cle ? '' : cle; filterTable(); }
+function basculerGrouperCommune(v) { grouperCommune = v; try { localStorage.setItem('suivi.grouperCommune', v ? '1' : '0'); } catch(e) {} filterTable(); }
+// Filtre de l'indicateur cliqué, appliqué après celui de l'onglet.
+function appliquerSousFiltre(liste) {
+  var f = fileCourante();
+  if (!sousFiltre || !f.kpis) return liste;
+  var k = f.kpis(liste).find(function(x){ return x.cle === sousFiltre; });
+  return k && k.filtre ? liste.filter(k.filtre) : liste;
+}
+
 function choisirFileSuivi(cle) {
   fileSuivi = cle;
+  sousFiltre = '';
   try { localStorage.setItem('suivi.file', cle); } catch(e) {}
   filterTable();
 }
@@ -3714,69 +3906,85 @@ function notifsHtml(item) {
 // La prochaine chose à faire sur le dossier, mise en avant.
 function actionSuivante(item) {
   var id = item.id;
-  var ps = passagesNorm(item);
-  if (item.statut === 'À valider') return '<button class="btn-next" onclick="validerIntervention(\'' + id + '\')">Valider</button>';
+  var bouton = function(lib, fn, neutre, titre){ return '<button class="btn-next' + (neutre ? ' neutre' : '') + '" onclick="' + fn + '(\'' + id + '\')"' + (titre ? ' title="' + titre + '"' : '') + '>' + lib + '</button>'; };
+  var f = fileDe(item);
+  if (f === 'valider') return bouton('Valider', 'validerIntervention');
+  // Dans la Semaine, un formulaire Kizeo manquant ou mal envoyé passe avant tout.
   if (fileSuivi === 'semaine' && passagesSemaine(item).some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) {
-    return '<button class="btn-next" onclick="openModal(\'' + id + '\')" title="Ouvre la fiche pour envoyer le formulaire Kizeo au technicien">Générer Kizeo</button>';
+    return bouton('Générer Kizeo', 'openModal', false, 'Ouvre la fiche pour envoyer le formulaire Kizeo au technicien');
   }
-  if (item.statut === 'Passage annulé') return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Replanifier</button>';
-  if (item.statut === 'Terminé') {
-    return item.enFacturation
-      ? '<a class="btn-next neutre" href="facturation.html">En facturation</a>'
-      : '<button class="btn-next" onclick="basculerEnFacturation(\'' + id + '\')">Facturer</button>';
+  if (f === 'pannule') return bouton('Replanifier', 'openModal');
+  if (f === 'termine') {
+    return item.enFacturation ? '<a class="btn-next neutre" href="facturation.html">En facturation</a>' : bouton('Facturer', 'basculerEnFacturation');
   }
-  if (item.statut === 'Annulé') return '<button class="btn-next neutre" onclick="openModal(\'' + id + '\')">Ouvrir</button>';
-  if (!aPassageDate(item)) return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Planifier</button>';
-  if (!toNotifArray(item.notifBailleur).length && prochainPassage(item)) return '<button class="btn-next" onclick="openNotifFromRow(\'' + id + '\')">Notifier</button>';
-  return '<button class="btn-next neutre" onclick="openModal(\'' + id + '\')">Ouvrir</button>';
+  if (f === 'annuleDef' || f === 'attente') return bouton('Ouvrir', 'openModal', true);
+  if (f === 'planifier') return bouton('Planifier', 'openModal');
+  // En cours
+  if (aCloturer(item)) return '<button class="btn-next" onclick="setStatutRapide(\'' + id + '\',\'Terminé\')" title="Le rapport du passage 1 est envoyé : passer le dossier en Terminé">Terminer</button>';
+  if (kizeoAGenerer7j(item)) return bouton('Générer Kizeo', 'openModal', false, 'Un passage des 7 prochains jours n\'a pas son formulaire Kizeo');
+  if (!toNotifArray(item.notifBailleur).length && prochainPassage(item)) return bouton('Notifier', 'openNotifFromRow');
+  return bouton('Ouvrir', 'openModal', true);
 }
 
 window.renderTableV2 = function(list) {
   var body = document.getElementById('tableBodyContratV2');
-  if (!body) return;
-  var modeSemaine = fileSuivi === 'semaine';
-  var nbCols = modeSemaine ? 10 : 9;
-  var thK = document.getElementById('thKizeoV2');
-  if (thK) thK.style.display = modeSemaine ? '' : 'none';
+  var head = document.getElementById('theadV2');
+  if (!body || !head) return;
+  var f = fileCourante();
+  var extra = f.colonnes || [];
+  var nbCols = 9 + extra.length;
+  // En-tête : colonnes communes, puis celles propres à l'onglet, avant Statut et Action.
+  head.innerHTML = '<tr><th style="width:32px;"><input type="checkbox" id="checkAllV2" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>'
+    + '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th><th>Techniciens</th><th>Passages</th><th>Notifs</th>'
+    + extra.map(function(c){ return '<th>' + c.titre + '</th>'; }).join('')
+    + '<th>Statut</th><th style="text-align:right;">Action</th></tr>';
   if (!list.length) {
-    var f = FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; });
-    body.innerHTML = '<tr><td colspan="' + nbCols + '"><div class="empty-state"><p>' + (f && f.cle !== 'tout' ? 'Rien dans « ' + (typeof f.label === 'function' ? f.label() : f.label) + ' » pour le moment.' : 'Aucune intervention.') + '</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="' + nbCols + '"><div class="empty-state"><p>' + (sousFiltre ? 'Aucun dossier pour cet indicateur.' : 'Rien dans « ' + libelleFile(f) + ' » pour le moment.') + '</p></div></td></tr>';
     return;
   }
-  var html = '';
-  list.forEach(function(item) {
+  var ligne = function(item) {
+    var h = '';
     var hasPsg = passagesNorm(item).length > 0;
     var techs = techsDesPassages(item);
     if (!techs.length) techs = item.assignes || (item.assigne ? [item.assigne] : []);
     var isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
-    html += '<tr id="row-' + item.id + '" class="ligne-v2" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
-    html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
-    html += '<td>' + refHtml(item) + '</td>';
-    html += '<td><div class="cn-client">' + (item.client || '—') + '</div><div class="cn-nature">' + (item.nature || '') + (item.dateEmission ? ' · reçu le ' + fmtDate(item.dateEmission) : '') + '</div></td>';
-    html += '<td style="font-size:13px;">' + (item.adresse || '—') + (item.nomClient ? '<div class="cn-nature">' + item.nomClient + '</div>' : '') + '</td>';
-    html += '<td>' + (techs.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + techs.map(function(a){ return assigneBadge(a); }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
-    html += '<td>' + friseHtml(item) + '</td>';
-    html += '<td>' + notifsHtml(item) + '</td>';
-    if (modeSemaine) html += '<td>' + kizeoHtml(item) + '</td>';
-    html += '<td>' + statutSelect(item.id, item.statut) + '</td>';
-    html += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;">' + actionSuivante(item) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
-    html += '</tr>';
-
+    h += '<tr id="row-' + item.id + '" class="ligne-v2" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
+    h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
+    h += '<td>' + refHtml(item) + '</td>';
+    h += '<td><div class="cn-client">' + (item.client || '—') + '</div><div class="cn-nature">' + (item.nature || '') + (item.dateEmission ? ' · BC du ' + fmtDate(item.dateEmission) : '') + '</div></td>';
+    h += '<td style="font-size:13px;">' + (item.adresse || '—') + (item.nomClient ? '<div class="cn-nature">' + item.nomClient + '</div>' : '') + '</td>';
+    h += '<td>' + (techs.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + techs.map(function(a){ return assigneBadge(a); }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
+    h += '<td>' + friseHtml(item) + '</td>';
+    h += '<td>' + notifsHtml(item) + '</td>';
+    extra.forEach(function(c){ h += '<td>' + c.cell(item) + '</td>'; });
+    h += '<td>' + statutSelect(item.id, item.statut) + '</td>';
+    h += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;">' + actionSuivante(item) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
+    h += '</tr>';
     // Historique des notifications (même ligne repliable que l'ancienne vue)
     var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
-    html += '<tr id="notif-row-' + item.id + '" class="notif-row hidden"><td colspan="' + nbCols + '"><div class="notif-bar">';
-    html += '<div class="notif-section">' + (hasPsg ? '<button class="btn-notif-open" onclick="openNotifFromRow(\'' + item.id + '\')">✉ Notifier</button>' : '<span class="notif-none">Ajoutez des passages pour notifier</span>') + '</div>';
-    html += '<div style="width:1px;height:24px;background:var(--border);margin:0 4px;"></div>';
-    html += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
-    html += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
-    html += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
-    html += '<div class="notif-section"><span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms', nr, '🔔', 'sms') + '</div>';
-    if (hasPsg) html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(\'' + item.id + '\')">💬 Rappel SMS</button></div>';
-    html += '</div></td></tr>';
-  });
+    h += '<tr id="notif-row-' + item.id + '" class="notif-row hidden"><td colspan="' + nbCols + '"><div class="notif-bar">';
+    h += '<div class="notif-section">' + (hasPsg ? '<button class="btn-notif-open" onclick="openNotifFromRow(\'' + item.id + '\')">✉ Notifier</button>' : '<span class="notif-none">Ajoutez des passages pour notifier</span>') + '</div>';
+    h += '<div style="width:1px;height:24px;background:var(--border);margin:0 4px;"></div>';
+    h += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
+    h += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
+    h += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
+    h += '<div class="notif-section"><span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms', nr, '🔔', 'sms') + '</div>';
+    if (hasPsg) h += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(\'' + item.id + '\')">💬 Rappel SMS</button></div>';
+    h += '</div></td></tr>';
+    return h;
+  };
+  var html = '';
+  if (f.groupable && grouperCommune) {
+    var groupes = {};
+    list.forEach(function(i){ var c = communeDe(i); (groupes[c] = groupes[c] || []).push(i); });
+    Object.keys(groupes).sort(function(a, b){ return groupes[b].length - groupes[a].length || a.localeCompare(b); }).forEach(function(c) {
+      html += '<tr class="ligne-groupe"><td colspan="' + nbCols + '">' + c + ' · ' + groupes[c].length + ' dossier' + (groupes[c].length > 1 ? 's' : '') + '</td></tr>';
+      groupes[c].forEach(function(i){ html += ligne(i); });
+    });
+  } else {
+    list.forEach(function(i){ html += ligne(i); });
+  }
   body.innerHTML = html;
-  var all = document.getElementById('checkAllV2');
-  if (all) all.checked = false;
 };
 
 // Clic sur la ligne : ouvre la fiche, sauf sur un contrôle (case, bouton, menu de statut, lien).
@@ -5369,7 +5577,7 @@ onAuthStateChanged(auth, async (user) => {
       const r = d.data();
       if (!r.suiviId || r.numPassage == null) return;
       const k = r.suiviId + '::' + r.numPassage;
-      if (!m[k] || (RANG_RECEPTION[r.statut] ?? -1) > (RANG_RECEPTION[m[k].statut] ?? -1)) m[k] = { statut: r.statut, dateFin: r.dateFin || null, technicien: r.technicien || '' };
+      if (!m[k] || (RANG_RECEPTION[r.statut] ?? -1) > (RANG_RECEPTION[m[k].statut] ?? -1)) m[k] = { statut: r.statut, dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null };
     });
     window._receptionsParPassage = m;
     if (window.filterTable) window.filterTable();
