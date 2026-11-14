@@ -226,6 +226,51 @@
     .filters-bar .filter-select,.results-count{display:none;}
     .page-title{font-size:18px;}
   }
+
+  /* ── Nouvelle vue du Suivi (onglet En contrat), 14/11 ── */
+  .files-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .file-chip{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font:600 13px 'DM Sans',sans-serif;color:var(--text-mid);cursor:pointer;}
+  .file-chip:hover{border-color:var(--green);}
+  .file-chip.active{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .file-chip .cpt{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bg);color:var(--text);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+  .file-chip.active .cpt{background:rgba(255,255,255,.16);color:#fff;}
+  .file-chip.alerte .cpt{background:#FDECEA;color:#E74C3C;}
+  .file-chip.active.alerte .cpt{background:#E74C3C;color:#fff;}
+  .btn-vue{font:500 12px 'DM Sans',sans-serif;color:var(--text-mid);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 12px;height:36px;cursor:pointer;white-space:nowrap;}
+  .btn-vue:hover{border-color:var(--green);color:var(--text);}
+  .v2 tbody tr.ligne-v2{cursor:pointer;}
+  .v2 tbody tr.ligne-v2:hover td{background:#F7F9FB;}
+  .v2 td{vertical-align:middle;}
+  .ref-v2{display:flex;align-items:center;gap:6px;white-space:nowrap;}
+  .ref-type{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;}
+  .ref-num{font-family:monospace;font-size:12.5px;font-weight:700;color:var(--navy);}
+  .ref-pdf{font-size:11px;font-weight:600;color:#1A5F8A;background:#EBF0F5;padding:2px 7px;border-radius:5px;text-decoration:none;}
+  .ref-pdf:hover{background:#DCE5EE;}
+  .cn-client{font-weight:600;font-size:13px;color:var(--text);}
+  .cn-nature{font-size:12px;color:var(--text-muted);}
+  .frise{display:flex;gap:4px;flex-wrap:wrap;}
+  .psg{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:600;padding:3px 7px;border-radius:12px;white-space:nowrap;border:1px solid transparent;}
+  .psg-prevu{background:#EEF2FF;color:#4338CA;}
+  .psg-auj{background:#4338CA;color:#fff;}
+  .psg-passe{background:var(--bg);color:var(--text-mid);border-color:var(--border);}
+  .psg-recu{background:#E8F9F2;color:#1DA870;}
+  .psg-ok{background:#1DA870;color:#fff;}
+  .psg-retard{background:#FDECEA;color:#E74C3C;}
+  .psg-annule{background:#FFEBD6;color:#D9480F;text-decoration:line-through;}
+  .psg-vide{background:var(--bg);color:var(--text-muted);border-style:dashed;border-color:var(--border);}
+  .notif-ico{display:inline-flex;gap:3px;background:none;border:none;cursor:pointer;padding:2px;}
+  .notif-ico span{font-size:14px;filter:grayscale(1);opacity:.28;}
+  .notif-ico span.fait{filter:none;opacity:1;}
+  .btn-next{font:600 12px 'DM Sans',sans-serif;color:#fff;background:var(--green-dark);border:none;border-radius:6px;padding:6px 11px;cursor:pointer;white-space:nowrap;text-decoration:none;}
+  .btn-next:hover{background:#178a5c;}
+  .btn-next.neutre{color:var(--navy);background:#EBF0F5;}
+  .btn-next.neutre:hover{background:#DCE5EE;}
+  .btn-ellipsis{font-size:14px;line-height:1;color:var(--text-mid);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;}
+  #menuSuivi{position:fixed;z-index:600;display:none;min-width:220px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(13,27,42,.16);padding:6px;}
+  #menuSuivi button,#menuSuivi a{display:block;width:100%;text-align:left;padding:8px 11px;border:none;background:none;border-radius:6px;font:13px 'DM Sans',sans-serif;color:var(--text);cursor:pointer;text-decoration:none;}
+  #menuSuivi button:hover,#menuSuivi a:hover{background:var(--bg);}
+  #menuSuivi .danger{color:#E74C3C;}
+  #menuSuivi hr{border:none;border-top:1px solid var(--border);margin:4px 0;}
 </style>
 </head>
 <body>
@@ -313,6 +358,8 @@
       <button class="tab-pill" id="tab_tache" onclick="switchTab('tache')">Tâches</button>
     </div>
 
+    <!-- FILES DE TRAVAIL (nouvelle vue, onglet En contrat) -->
+    <div class="files-bar" id="filesBar" style="display:none;"></div>
     <!-- FILTERS -->
     <div class="filters-bar" style="flex-wrap:wrap;gap:8px;">
       <div class="search-wrap" style="min-width:200px;flex:1;">
@@ -341,13 +388,15 @@
       <select class="filter-select" id="filterAnnee" onchange="filterTable()">
         <option value="">Toutes les années</option>
       </select>
-      <div style="display:flex;align-items:center;gap:6px;">
+      <div style="display:flex;align-items:center;gap:6px;" id="filtreDates">
         <input type="date" class="filter-select" id="filterDateDe" onchange="filterTable()" style="font-size:12px;" title="Du">
         <span style="font-size:12px;color:var(--text-muted);">→</span>
         <input type="date" class="filter-select" id="filterDateA" onchange="filterTable()" style="font-size:12px;" title="Au">
         <button onclick="clearDates()" style="font-size:11px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:4px;" title="Effacer">✕</button>
       </div>
+      <button class="btn-vue" id="btnPlusFiltres" style="display:none;" onclick="basculerPlusFiltres()">Plus de filtres</button>
       <span class="results-count" id="resultsCount"></span>
+      <button class="btn-vue" id="btnVueSuivi" onclick="basculerVueSuivi()" title="Basculer entre la nouvelle et l'ancienne présentation du tableau">Ancienne vue</button>
     </div>
 
     <!-- SELECTION BAR -->
@@ -385,6 +434,25 @@
       </table>
     </div>
 
+    <!-- TABLE EN CONTRAT, NOUVELLE VUE -->
+    <div class="table-wrap" id="tableWrap_contratV2" style="display:none;">
+      <table class="suivi-table v2">
+        <thead>
+          <tr>
+            <th style="width:32px;"><input type="checkbox" id="checkAllV2" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
+            <th>Réf.</th>
+            <th>Client · Nature</th>
+            <th style="min-width:180px;">Adresse</th>
+            <th>Techniciens</th>
+            <th>Passages</th>
+            <th>Notifs</th>
+            <th>Statut</th>
+            <th style="text-align:right;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBodyContratV2"></tbody>
+      </table>
+    </div>
     <!-- TABLE PARTICULIERS -->
     <div class="table-wrap" id="tableWrap_particulier" style="display:none;">
       <table class="suivi-table" style="min-width:900px;">
@@ -3364,21 +3432,29 @@ function filterTable() {
   var natureFilter = (document.getElementById('filterNature')?.value)||'';
   var dateDe = (document.getElementById('filterDateDe')?.value)||'';
   var dateA = (document.getElementById('filterDateA')?.value)||'';
+  // Nouvelle vue (onglet En contrat) : technicien et dates portent aussi sur les passages.
+  var v2 = activeTab === 'contrat' && vueSuivi === 'nouvelle';
   var allData = window.interventions || [];
   var data = allData.filter(function(i){ return (i.clientType||'contrat') === activeTab; });
   var filtered = data.filter(function(i) {
     var assignesArr = (i.assignes||[]).concat(i.assigne?[i.assigne]:[]);
     var allAssignes = assignesArr.join(' ');
-    var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,allAssignes,i.siret].some(function(v){return (v||'').toLowerCase().includes(q);});
+    var mq = !q || [i.client,i.bc,i.pl,i.devis,i.adresse,i.nature,i.expediteur,allAssignes,i.siret,i.nomClient].some(function(v){return (v||'').toLowerCase().includes(q);});
     var ms = !statut || i.statut === statut;
     var mc = !clientFilter || i.client === clientFilter;
-    var mas = !assigneFilter || assignesArr.indexOf(assigneFilter) !== -1;
+    var mas = !assigneFilter || assignesArr.indexOf(assigneFilter) !== -1 || (v2 && techsDesPassages(i).indexOf(assigneFilter) !== -1);
     var mn = !natureFilter || (i.nature||'') === natureFilter;
     var dateRef = i.dateEmission || '';
     var allDates = [dateRef, (i.createdAt||'').substring(0,10)].filter(Boolean);
     var ma = !annee || allDates.some(function(d){return d && d.startsWith(annee);});
-    var mde = !dateDe || (dateRef && dateRef >= dateDe);
-    var mda = !dateA || (dateRef && dateRef <= dateA);
+    var mde, mda;
+    if (v2 && (dateDe || dateA)) {
+      var dp = datesDesPassages(i);
+      mde = mda = dp.some(function(d){ return (!dateDe || d >= dateDe) && (!dateA || d <= dateA); });
+    } else {
+      mde = !dateDe || (dateRef && dateRef >= dateDe);
+      mda = !dateA || (dateRef && dateRef <= dateA);
+    }
     return mq && ms && mc && mas && mn && ma && mde && mda;
   });
   filtered.sort(function(a, b) {
@@ -3386,13 +3462,248 @@ function filterTable() {
     var db = b.dateEmission || (b.createdAt || '').substring(0, 10) || '';
     return db.localeCompare(da);
   });
+  if (v2) {
+    renderFilesBar(filtered);
+    var f = FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; }) || FILES_SUIVI[FILES_SUIVI.length - 1];
+    filtered = filtered.filter(f.test);
+    if (f.tri) filtered.sort(f.tri);
+  }
   document.getElementById('resultsCount').textContent = filtered.length + ' intervention' + (filtered.length!==1?'s':'');
-  if (activeTab === 'contrat') { if(window.renderTable) window.renderTable(filtered); }
+  if (activeTab === 'contrat') {
+    if (v2) { window.renderTableV2(filtered); var oldBody = document.getElementById('tableBodyContrat'); if (oldBody) oldBody.innerHTML = ''; }
+    else { if(window.renderTable) window.renderTable(filtered); var newBody = document.getElementById('tableBodyContratV2'); if (newBody) newBody.innerHTML = ''; }
+  }
   else if (activeTab === 'particulier') { renderTableParticulier(filtered); }
   else if (activeTab === 'entreprise') { renderTableEntreprise(filtered); }
   else { renderTableTache(filtered); }
 }
 window.filterTable = filterTable;
+
+// ════════════════════════════════════════════════════════════════════
+// NOUVELLE VUE DU SUIVI (onglet En contrat) — 14/11
+// Affichage seulement : chaque bouton appelle les fonctions existantes
+// (openModal, validerIntervention, basculerEnFacturation, openNotifFromRow...).
+// L'ancienne vue reste disponible via le bouton "Ancienne vue".
+// ════════════════════════════════════════════════════════════════════
+var vueSuivi = (function(){ try { return localStorage.getItem('suivi.vue') || 'nouvelle'; } catch(e) { return 'nouvelle'; } })();
+var fileSuivi = (function(){ try { return localStorage.getItem('suivi.file') || 'tout'; } catch(e) { return 'tout'; } })();
+var plusFiltres = false;
+window._receptionsParPassage = window._receptionsParPassage || {};
+
+function jourLocal(offset) {
+  var d = new Date(); d.setDate(d.getDate() + (offset || 0));
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+// Passages normalisés, quel que soit le format historique.
+function passagesNorm(item) {
+  var bruts = Array.isArray(item.passages) ? item.passages : [item.date1, item.date2, item.date3].filter(Boolean);
+  return bruts.filter(Boolean).map(function(p, i) {
+    if (typeof p === 'string') { var x = p.split('|'); return { num: i+1, debut: x[0]||'', fin: x[1]||'', techs: [], statut: '' }; }
+    return { num: p.num || (i+1), debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush };
+  }).sort(function(a, b){ return (a.num||0) - (b.num||0); });
+}
+function techsDesPassages(item) {
+  var t = []; passagesNorm(item).forEach(function(p){ p.techs.forEach(function(n){ if (t.indexOf(n) === -1) t.push(n); }); }); return t;
+}
+function datesDesPassages(item) {
+  return passagesNorm(item).filter(function(p){ return p.statut !== 'annule' && p.debut; }).map(function(p){ return p.debut.substring(0,10); });
+}
+function aPassageDate(item) { return passagesNorm(item).some(function(p){ return p.debut; }); }
+function prochainPassage(item) {
+  var auj = jourLocal(0);
+  return datesDesPassages(item).filter(function(d){ return d >= auj; }).sort()[0] || null;
+}
+
+var FILES_SUIVI = [
+  { cle: 'valider', label: 'À valider', test: function(i){ return i.statut === 'À valider'; } },
+  { cle: 'planifier', label: 'À planifier', test: function(i){ return ['Terminé','Annulé','À valider','Passage annulé'].indexOf(i.statut) === -1 && !aPassageDate(i); } },
+  { cle: 'semaine', label: 'Cette semaine', test: function(i){ var a = jourLocal(0), b = jourLocal(6); return i.statut !== 'Annulé' && datesDesPassages(i).some(function(d){ return d >= a && d <= b; }); },
+    tri: function(x, y){ return (prochainPassage(x)||'9').localeCompare(prochainPassage(y)||'9'); } },
+  { cle: 'annule', label: 'Passage annulé', alerte: true, test: function(i){ return i.statut === 'Passage annulé'; } },
+  { cle: 'facturer', label: 'À facturer', test: function(i){ return i.statut === 'Terminé' && !i.enFacturation; } },
+  { cle: 'tout', label: 'Tout', test: function(){ return true; } },
+];
+
+function renderFilesBar(base) {
+  var bar = document.getElementById('filesBar');
+  if (!bar) return;
+  bar.innerHTML = FILES_SUIVI.map(function(f) {
+    var n = base.filter(f.test).length;
+    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (f.alerte && n ? ' alerte' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + f.label + ' <span class="cpt">' + n + '</span></button>';
+  }).join('');
+}
+function choisirFileSuivi(cle) {
+  fileSuivi = cle;
+  try { localStorage.setItem('suivi.file', cle); } catch(e) {}
+  filterTable();
+}
+function majAffichageVue() {
+  var v2 = vueSuivi === 'nouvelle';
+  var contrat = activeTab === 'contrat';
+  var oldWrap = document.getElementById('tableWrap_contrat');
+  var newWrap = document.getElementById('tableWrap_contratV2');
+  if (oldWrap) oldWrap.style.display = contrat && !v2 ? '' : 'none';
+  if (newWrap) newWrap.style.display = contrat && v2 ? '' : 'none';
+  document.getElementById('filesBar').style.display = contrat && v2 ? '' : 'none';
+  var btnVue = document.getElementById('btnVueSuivi');
+  btnVue.style.display = contrat ? '' : 'none';
+  btnVue.textContent = v2 ? 'Ancienne vue' : 'Nouvelle vue';
+  // Filtres secondaires repliés dans la nouvelle vue
+  var replier = contrat && v2 && !plusFiltres;
+  ['filterNature', 'filterAnnee', 'filtreDates'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = replier ? 'none' : (id === 'filtreDates' ? 'flex' : ''); });
+  var btnPlus = document.getElementById('btnPlusFiltres');
+  btnPlus.style.display = contrat && v2 ? '' : 'none';
+  btnPlus.textContent = plusFiltres ? 'Moins de filtres' : 'Plus de filtres';
+}
+function basculerVueSuivi() {
+  vueSuivi = vueSuivi === 'nouvelle' ? 'ancienne' : 'nouvelle';
+  try { localStorage.setItem('suivi.vue', vueSuivi); } catch(e) {}
+  if (window.clearSelection) clearSelection();
+  majAffichageVue();
+  filterTable();
+}
+function basculerPlusFiltres() { plusFiltres = !plusFiltres; majAffichageVue(); }
+
+var CERCLES = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
+function jjmm(d) { return d ? d.substring(8,10) + '/' + d.substring(5,7) : ''; }
+
+// Une pastille par passage : prévu, aujourd'hui, passé, rapport reçu, envoyé, en retard, annulé.
+function friseHtml(item) {
+  var ps = passagesNorm(item);
+  if (!ps.length) return '<span class="psg psg-vide" title="Aucun passage">aucun passage</span>';
+  var auj = jourLocal(0), maintenant = Date.now();
+  return '<div class="frise">' + ps.map(function(p) {
+    var n = CERCLES[(p.num||1) - 1] || ('#' + p.num);
+    var d = p.debut ? p.debut.substring(0,10) : '';
+    var rec = window._receptionsParPassage[item.id + '::' + p.num];
+    var cls, txt, titre;
+    if (p.statut === 'annule') { cls = 'psg-annule'; txt = n + ' ' + (d ? jjmm(d) : ''); titre = 'Passage annulé'; }
+    else if (rec && rec.statut === 'envoye') { cls = 'psg-ok'; txt = n + ' ✓'; titre = 'Rapport envoyé au client' + (d ? ' (passage du ' + jjmm(d) + ')' : ''); }
+    else if (rec && rec.statut !== 'en-attente') { cls = 'psg-recu'; txt = n + ' ✓'; titre = 'Rapport reçu, pas encore envoyé' + (d ? ' (passage du ' + jjmm(d) + ')' : ''); }
+    else if (rec && rec.statut === 'en-attente' && rec.dateFin && new Date(rec.dateFin).getTime() + 3600e3 < maintenant) { cls = 'psg-retard'; txt = n + ' ⚠ ' + jjmm(d); titre = 'Rapport du technicien en retard'; }
+    else if (!d) { cls = 'psg-vide'; txt = n + ' ?'; titre = 'Passage sans date'; }
+    else if (d === auj) { cls = 'psg-auj'; txt = n + " aujourd'hui"; titre = 'Passage prévu aujourd\'hui'; }
+    else if (d < auj) { cls = 'psg-passe'; txt = n + ' ' + jjmm(d); titre = 'Passage passé, pas de rapport Kizeo reçu'; }
+    else { cls = 'psg-prevu'; txt = n + ' ' + jjmm(d); titre = 'Passage prévu'; }
+    if (p.techs.length) titre += ' · ' + p.techs.join(', ');
+    return '<span class="psg ' + cls + '" title="' + titre.replace(/"/g, '&quot;') + '">' + txt + '</span>';
+  }).join('') + '</div>';
+}
+
+function refHtml(item) {
+  var r = item.bc ? { t: 'BC', n: item.bc, u: item.bcUrl } : item.pl ? { t: 'PL', n: item.pl, u: item.plUrl } : item.devis ? { t: 'Devis', n: item.devis, u: item.devisUrl } : null;
+  var autres = [item.bc && item.pl ? 'PL ' + item.pl : '', (item.bc || item.pl) && item.devis ? 'Devis ' + item.devis : ''].filter(Boolean).join(' · ');
+  if (!r) return '<span style="color:var(--text-muted)">—</span>';
+  return '<div class="ref-v2"' + (autres ? ' title="Aussi : ' + autres + '"' : '') + '><span class="ref-type">' + r.t + '</span><span class="ref-num">' + r.n + '</span>' + (r.u ? '<a class="ref-pdf" href="' + r.u + '" target="_blank">PDF</a>' : '') + (autres ? '<span class="ref-type">+</span>' : '') + '</div>';
+}
+
+function notifsHtml(item) {
+  var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
+  var t = function(lbl, arr){ return lbl + (arr.length ? ' : ' + arr.length + ' envoi(s), dernier le ' + fmtDate(arr[arr.length-1]) : ' : jamais'); };
+  var titre = [t('Bailleur', nb), t('Locataire', nl), t('SMS', ns), t('Rappel SMS', nr)].join('\n');
+  return '<button class="notif-ico" onclick="toggleNotifRow(\'' + item.id + '\')" title="' + titre + '\n(clic : historique)"><span class="' + (nb.length ? 'fait' : '') + '">🏢</span><span class="' + (nl.length ? 'fait' : '') + '">🏠</span><span class="' + (ns.length || nr.length ? 'fait' : '') + '">💬</span></button>';
+}
+
+// La prochaine chose à faire sur le dossier, mise en avant.
+function actionSuivante(item) {
+  var id = item.id;
+  var ps = passagesNorm(item);
+  if (item.statut === 'À valider') return '<button class="btn-next" onclick="validerIntervention(\'' + id + '\')">Valider</button>';
+  if (item.statut === 'Passage annulé') return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Replanifier</button>';
+  if (item.statut === 'Terminé') {
+    return item.enFacturation
+      ? '<a class="btn-next neutre" href="facturation.html">En facturation</a>'
+      : '<button class="btn-next" onclick="basculerEnFacturation(\'' + id + '\')">Facturer</button>';
+  }
+  if (item.statut === 'Annulé') return '<button class="btn-next neutre" onclick="openModal(\'' + id + '\')">Ouvrir</button>';
+  if (!aPassageDate(item)) return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Planifier</button>';
+  if (!toNotifArray(item.notifBailleur).length && prochainPassage(item)) return '<button class="btn-next" onclick="openNotifFromRow(\'' + id + '\')">Notifier</button>';
+  return '<button class="btn-next neutre" onclick="openModal(\'' + id + '\')">Ouvrir</button>';
+}
+
+window.renderTableV2 = function(list) {
+  var body = document.getElementById('tableBodyContratV2');
+  if (!body) return;
+  if (!list.length) {
+    var f = FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; });
+    body.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>' + (f && f.cle !== 'tout' ? 'Rien dans « ' + f.label + ' » pour le moment.' : 'Aucune intervention.') + '</p></div></td></tr>';
+    return;
+  }
+  var html = '';
+  list.forEach(function(item) {
+    var hasPsg = passagesNorm(item).length > 0;
+    var techs = techsDesPassages(item);
+    if (!techs.length) techs = item.assignes || (item.assigne ? [item.assigne] : []);
+    var isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
+    html += '<tr id="row-' + item.id + '" class="ligne-v2" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
+    html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
+    html += '<td>' + refHtml(item) + '</td>';
+    html += '<td><div class="cn-client">' + (item.client || '—') + '</div><div class="cn-nature">' + (item.nature || '') + (item.dateEmission ? ' · reçu le ' + fmtDate(item.dateEmission) : '') + '</div></td>';
+    html += '<td style="font-size:13px;">' + (item.adresse || '—') + (item.nomClient ? '<div class="cn-nature">' + item.nomClient + '</div>' : '') + '</td>';
+    html += '<td>' + (techs.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + techs.map(function(a){ return assigneBadge(a); }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
+    html += '<td>' + friseHtml(item) + '</td>';
+    html += '<td>' + notifsHtml(item) + '</td>';
+    html += '<td>' + statutSelect(item.id, item.statut) + '</td>';
+    html += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;">' + actionSuivante(item) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
+    html += '</tr>';
+
+    // Historique des notifications (même ligne repliable que l'ancienne vue)
+    var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
+    html += '<tr id="notif-row-' + item.id + '" class="notif-row hidden"><td colspan="9"><div class="notif-bar">';
+    html += '<div class="notif-section">' + (hasPsg ? '<button class="btn-notif-open" onclick="openNotifFromRow(\'' + item.id + '\')">✉ Notifier</button>' : '<span class="notif-none">Ajoutez des passages pour notifier</span>') + '</div>';
+    html += '<div style="width:1px;height:24px;background:var(--border);margin:0 4px;"></div>';
+    html += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
+    html += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
+    html += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
+    html += '<div class="notif-section"><span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms', nr, '🔔', 'sms') + '</div>';
+    if (hasPsg) html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(\'' + item.id + '\')">💬 Rappel SMS</button></div>';
+    html += '</div></td></tr>';
+  });
+  body.innerHTML = html;
+  var all = document.getElementById('checkAllV2');
+  if (all) all.checked = false;
+};
+
+// Clic sur la ligne : ouvre la fiche, sauf sur un contrôle (case, bouton, menu de statut, lien).
+function ouvrirLigneSuivi(ev, id) {
+  if (ev.target.closest('input,button,select,a,label')) return;
+  openModal(id);
+}
+
+// Menu "⋯" (positionné en fixe pour ne pas être coupé par le tableau)
+var menuSuivi = null;
+function fermerMenuSuivi() { if (menuSuivi) { menuSuivi.style.display = 'none'; menuSuivi.dataset.pour = ''; } }
+function ouvrirMenuSuivi(ev, id) {
+  ev.stopPropagation();
+  if (!menuSuivi) {
+    menuSuivi = document.createElement('div');
+    menuSuivi.id = 'menuSuivi';
+    document.body.appendChild(menuSuivi);
+    menuSuivi.addEventListener('click', function(e){ if (e.target.closest('button,a')) fermerMenuSuivi(); });
+    document.addEventListener('click', function(e){ if (menuSuivi && !menuSuivi.contains(e.target)) fermerMenuSuivi(); });
+    window.addEventListener('scroll', fermerMenuSuivi, true);
+  }
+  if (menuSuivi.style.display === 'block' && menuSuivi.dataset.pour === id) { fermerMenuSuivi(); return; }
+  var item = (window.interventions || []).find(function(i){ return i.id === id; });
+  if (!item) return;
+  var hasPsg = passagesNorm(item).length > 0;
+  var it = [];
+  it.push('<button onclick="openModal(\'' + id + '\')">Ouvrir la fiche</button>');
+  if (item.statut === 'À valider') it.push('<button onclick="validerIntervention(\'' + id + '\')">Valider</button><button onclick="rejeterIntervention(\'' + id + '\')">Rejeter</button>');
+  if (hasPsg) it.push('<button onclick="openNotifFromRow(\'' + id + '\')">Notifier bailleur / locataire</button><button onclick="openRappelSms(\'' + id + '\')">Rappel SMS</button>');
+  it.push('<button onclick="toggleNotifRow(\'' + id + '\')">Historique des notifications</button>');
+  if (item.statut === 'Terminé' && !item.enFacturation) it.push('<button onclick="basculerEnFacturation(\'' + id + '\')">Basculer en facturation</button>');
+  if (item.enFacturation) it.push('<a href="facturation.html">Voir en facturation</a>');
+  it.push('<hr><button class="danger" onclick="deleteIntervention(\'' + id + '\')">Supprimer</button>');
+  menuSuivi.innerHTML = it.join('');
+  menuSuivi.dataset.pour = id;
+  menuSuivi.style.display = 'block';
+  var rect = ev.currentTarget.getBoundingClientRect();
+  var h = menuSuivi.offsetHeight, w = menuSuivi.offsetWidth;
+  menuSuivi.style.top = (rect.bottom + 4 + h > window.innerHeight ? Math.max(8, rect.top - h - 4) : rect.bottom + 4) + 'px';
+  menuSuivi.style.left = Math.max(8, rect.right - w) + 'px';
+}
+
 
 
 // ── TOAST ──
@@ -3514,6 +3825,8 @@ document.getElementById('pdfViewerPanel')?.addEventListener('click', e => { if(e
 
 // ── TABS ──
 let activeTab = 'contrat';
+// Affichage initial de l'onglet En contrat selon la vue mémorisée (nouvelle ou ancienne).
+try { majAffichageVue(); } catch(e) { console.warn('majAffichageVue:', e); }
 
 function switchTab(tab) {
   activeTab = tab;
@@ -3525,6 +3838,7 @@ function switchTab(tab) {
   });
   const clientSel = document.getElementById('filterClient');
   if (clientSel) clientSel.style.display = tab === 'contrat' ? '' : 'none';
+  majAffichageVue();
   filterTable();
 }
 
@@ -4930,6 +5244,21 @@ onAuthStateChanged(auth, async (user) => {
     if (window.filterTable) window.filterTable();
     else if (window.renderTable) window.renderTable(interventions);
   });
+
+  // État des rapports par passage, pour la frise de la nouvelle vue.
+  // Clé suiviId::numPassage ; on garde l'état le plus avancé.
+  const RANG_RECEPTION = { 'en-attente': 0, 'a-relire': 1, 'a-traiter': 2, 'archive': 2, 'envoye': 3 };
+  onSnapshot(collection(db, 'reception-rapports'), (snap) => {
+    const m = {};
+    snap.docs.forEach(d => {
+      const r = d.data();
+      if (!r.suiviId || r.numPassage == null) return;
+      const k = r.suiviId + '::' + r.numPassage;
+      if (!m[k] || (RANG_RECEPTION[r.statut] ?? -1) > (RANG_RECEPTION[m[k].statut] ?? -1)) m[k] = { statut: r.statut, dateFin: r.dateFin || null };
+    });
+    window._receptionsParPassage = m;
+    if (window.filterTable) window.filterTable();
+  }, (e) => console.warn('reception-rapports (frise):', e.message));
 });
 
 // ── UPDATE NOTIF FIELDS IN FIRESTORE (array push) ──
