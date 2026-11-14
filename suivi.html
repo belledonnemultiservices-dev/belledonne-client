@@ -327,6 +327,7 @@
         <option value="En attente">En attente</option>
         <option value="Terminé">Terminé</option>
         <option value="Annulé">Annulé</option>
+        <option value="__passage_annule__">Passage annulé</option>
       </select>
       <select class="filter-select" id="filterAssigne" onchange="filterTable()">
         <option value="">Tous les techniciens</option>
@@ -3366,7 +3367,11 @@ function filterTable() {
     var assignesArr = (i.assignes||[]).concat(i.assigne?[i.assigne]:[]);
     var allAssignes = assignesArr.join(' ');
     var mq = !q || [i.client,i.bc,i.pl,i.adresse,i.nature,i.expediteur,allAssignes,i.siret].some(function(v){return (v||'').toLowerCase().includes(q);});
-    var ms = !statut || i.statut === statut;
+    // "Passage annulé" n'est pas un statut d'intervention : au moins un passage
+    // porte statut 'annule' (posé depuis Gestion rapports, absence ou annulation).
+    var ms = !statut || (statut === '__passage_annule__'
+      ? (Array.isArray(i.passages) && i.passages.some(function(p){ return p && p.statut === 'annule'; }))
+      : i.statut === statut);
     var mc = !clientFilter || i.client === clientFilter;
     var mas = !assigneFilter || assignesArr.indexOf(assigneFilter) !== -1;
     var mn = !natureFilter || (i.nature||'') === natureFilter;
