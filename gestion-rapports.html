@@ -153,6 +153,36 @@
   .toast{position:fixed;bottom:28px;right:28px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(13,27,42,0.2);transform:translateY(80px);opacity:0;transition:all 0.3s ease;z-index:999;}
   .toast.show{transform:translateY(0);opacity:1;}
   .toast svg{width:16px;height:16px;color:var(--green);}
+
+  /* Onglets, étapes et menu d'actions (refonte du 14/11) */
+  .tabs-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .tab{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font:600 13px 'DM Sans',sans-serif;color:var(--text-mid);cursor:pointer;}
+  .tab:hover{border-color:var(--green);}
+  .tab.active{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .tab .cpt{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bg);color:var(--text);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+  .tab.active .cpt{background:rgba(255,255,255,.16);color:#fff;}
+  .tab .cpt-retard{background:var(--red);color:#fff;}
+  .tabs-bar .search-input{margin-left:auto;max-width:340px;}
+  .etapes{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--text-muted);}
+  .etape{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font:500 12px 'DM Sans',sans-serif;color:var(--text-mid);cursor:pointer;}
+  .etape b{font-weight:700;color:var(--text);}
+  .etape.active{border-color:var(--green);background:var(--green-pale);color:var(--green-dark);}
+  .etape.active b{color:var(--green-dark);}
+  .etape-fleche{color:var(--border);font-size:14px;}
+  .section-row{padding:10px 14px;background:var(--bg);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mid);border-bottom:1px solid var(--border);position:sticky;left:0;}
+  .section-row.retard{color:var(--red);background:rgba(231,76,60,0.06);}
+  .btn-primaire{color:#fff;background:var(--green-dark);border:1px solid var(--green-dark);font-weight:600;}
+  .btn-primaire:hover{background:#178a5c;}
+  .btn-primaire:disabled{background:var(--text-muted);border-color:var(--text-muted);cursor:not-allowed;}
+  .btn-plus{color:var(--text-mid);background:var(--bg);border:1px solid var(--border);font-size:14px;line-height:1;padding:4px 9px;}
+  .btn-plus:hover{background:#E5EAF0;}
+  #menuActions{position:fixed;z-index:500;display:none;min-width:210px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(13,27,42,.16);padding:6px;}
+  #menuActions button,#menuActions a{display:block;width:100%;text-align:left;padding:8px 11px;border:none;background:none;border-radius:6px;font:13px 'DM Sans',sans-serif;color:var(--text);cursor:pointer;text-decoration:none;}
+  #menuActions button:hover,#menuActions a:hover{background:var(--bg);}
+  #menuActions button:disabled{color:var(--text-muted);cursor:not-allowed;background:none;}
+  #menuActions .danger{color:var(--red);}
+  #menuActions hr{border:none;border-top:1px solid var(--border);margin:4px 0;}
+  .groupe-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid);cursor:pointer;margin-left:auto;}
 </style>
 </head>
 <body>
@@ -211,24 +241,16 @@
       </div>
     </div>
 
-    <div class="filters-bar">
+    <div class="tabs-bar">
+      <button class="tab" data-tab="bureau">À traiter <span class="cpt" id="cptBureau">0</span></button>
+      <button class="tab" data-tab="attente">En attente technicien <span class="cpt" id="cptAttente">0</span><span class="cpt cpt-retard" id="cptRetard" style="display:none;"></span></button>
+      <button class="tab" data-tab="envoyes">Envoyés <span class="cpt" id="cptEnvoyes">0</span></button>
       <input class="search-input" id="searchInput" placeholder="Rechercher par client, BC, technicien...">
-      <select class="filter-select" id="filterStatut">
-        <option value="a-relire" selected>À relire</option>
-        <option value="a-traiter">À traiter</option>
-        <option value="en-retard">⚠ Non reçu</option>
-        <option value="en-attente">En attente technicien</option>
-        <option value="envoye">Envoyés</option>
-        <option value="archive">Archivés</option>
-        <option value="">Tous les statuts</option>
-      </select>
-      <span class="results-count" id="resultsCount">—</span>
     </div>
+    <div class="etapes" id="etapesBar"></div>
 
     <div class="list" id="list">
-      <div class="list-head" id="listHead">
-        <span>Date<div class="col-resizer" data-col="0"></div></span><span>Client<div class="col-resizer" data-col="1"></div></span><span>BC<div class="col-resizer" data-col="2"></div></span><span>Passage<div class="col-resizer" data-col="3"></div></span><span>Technicien<div class="col-resizer" data-col="4"></div></span><span>Libellé<div class="col-resizer" data-col="5"></div></span><span>Type<div class="col-resizer" data-col="6"></div></span><span>Statut<div class="col-resizer" data-col="7"></div></span><span></span>
-      </div>
+      <div class="list-head" id="listHead"></div>
     </div>
     <div class="empty-state" id="emptyState" style="display:none;">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
@@ -465,21 +487,43 @@ async function resyncEcheances(list) {
   }
 }
 
-// ── Colonnes redimensionnables (persistées en localStorage) ──
-const COL_WIDTHS_KEY = "gestionRapports.colWidths";
-const DEFAULT_COL_WIDTHS = [110, 110, 100, 130, 150, 180, 90, 150, 560];
-function loadColWidths() {
+// ── Onglets ──
+// "bureau"  : rapports revenus qui attendent une action du bureau (à relire, à archiver, prêts à envoyer)
+// "attente" : formulaires partis chez le technicien, pas encore revenus
+// "envoyes" : historique des rapports partis au client
+const TAB_KEY = "gestionRapports.onglet";
+const GROUPE_KEY = "gestionRapports.grouperTech";
+let ongletActif = (() => { try { return localStorage.getItem(TAB_KEY) || "bureau"; } catch(e) { return "bureau"; } })();
+let etapeActive = ""; // filtre d'étape dans l'onglet "bureau"
+let grouperParTech = (() => { try { return localStorage.getItem(GROUPE_KEY) === "1"; } catch(e) { return false; } })();
+
+const ETAPES = [
+  { statut: "a-relire",  label: "À relire" },
+  { statut: "a-traiter", label: "À archiver" },
+  { statut: "archive",   label: "Prêts à envoyer" },
+];
+const COLONNES = {
+  bureau:  { titres: ["Reçu le", "Client", "BC", "Passage", "Technicien", "Libellé", "Type", "Étape", ""], largeurs: [110, 120, 100, 110, 140, 180, 120, 120, 260] },
+  attente: { titres: ["Passage prévu", "Technicien", "Client", "BC", "Passage", "Libellé", "Retard", ""], largeurs: [150, 140, 120, 100, 110, 200, 110, 200] },
+  envoyes: { titres: ["Envoyé le", "Client", "BC", "Passage", "Technicien", "Type", "Destination", ""], largeurs: [110, 120, 100, 110, 140, 120, 160, 170] },
+};
+const STATUT_LABEL = { "en-attente": "En attente", "a-relire": "À relire", "a-traiter": "À archiver", "envoye": "Envoyé", "archive": "Prêt à envoyer" };
+const STATUT_CLASS = { "en-attente": "st-en-attente", "a-relire": "st-a-relire", "a-traiter": "st-a-traiter", "envoye": "st-envoye", "archive": "st-archive" };
+const STATUTS_BUREAU = ["a-relire", "a-traiter", "archive"];
+
+// ── Colonnes redimensionnables, largeurs mémorisées par onglet ──
+function loadColWidths(onglet) {
+  const def = COLONNES[onglet].largeurs;
   try {
-    const saved = JSON.parse(localStorage.getItem(COL_WIDTHS_KEY));
-    if (Array.isArray(saved) && saved.length === DEFAULT_COL_WIDTHS.length) return saved;
+    const saved = JSON.parse(localStorage.getItem("gestionRapports.colWidths." + onglet));
+    if (Array.isArray(saved) && saved.length === def.length) return saved;
   } catch(e) {}
-  return DEFAULT_COL_WIDTHS.slice();
+  return def.slice();
 }
-let colWidths = loadColWidths();
+let colWidths = loadColWidths(ongletActif);
 function applyColWidths() {
   document.getElementById("list").style.setProperty("--grid-cols", colWidths.map(w => w + "px").join(" "));
 }
-applyColWidths();
 (function initColResize() {
   let dragCol = null, startX = 0, startWidth = 0, dragEl = null;
   document.getElementById("listHead").addEventListener("mousedown", e => {
@@ -503,77 +547,224 @@ applyColWidths();
     if (dragEl) dragEl.classList.remove("resizing");
     dragCol = null; dragEl = null;
     document.body.style.userSelect = "";
-    localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(colWidths));
+    try { localStorage.setItem("gestionRapports.colWidths." + ongletActif, JSON.stringify(colWidths)); } catch(e) {}
   });
 })();
 
+function renderEntete() {
+  const titres = COLONNES[ongletActif].titres;
+  document.getElementById("listHead").innerHTML = titres.map((t, i) =>
+    `<span>${t}${i < titres.length - 1 ? `<div class="col-resizer" data-col="${i}"></div>` : ""}</span>`).join("");
+  colWidths = loadColWidths(ongletActif);
+  applyColWidths();
+}
+
+function changerOnglet(onglet) {
+  ongletActif = onglet;
+  etapeActive = "";
+  try { localStorage.setItem(TAB_KEY, onglet); } catch(e) {}
+  fermerMenu();
+  renderEntete();
+  render();
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => changerOnglet(t.dataset.tab)));
+
+// ── Menu "⋯" des actions secondaires (positionné en fixe : la liste coupe ce qui déborde) ──
+const menu = document.createElement("div");
+menu.id = "menuActions";
+document.body.appendChild(menu);
+function fermerMenu() { menu.style.display = "none"; menu.dataset.pour = ""; }
+window.ouvrirMenu = function(ev, id) {
+  ev.stopPropagation();
+  if (menu.style.display === "block" && menu.dataset.pour === id) { fermerMenu(); return; }
+  const r = allDocs.find(x => x.id === id);
+  if (!r) return;
+  menu.innerHTML = actionsSecondaires(r);
+  menu.dataset.pour = id;
+  menu.style.display = "block";
+  const rect = ev.currentTarget.getBoundingClientRect();
+  const h = menu.offsetHeight, w = menu.offsetWidth;
+  menu.style.top = (rect.bottom + 4 + h > window.innerHeight ? Math.max(8, rect.top - h - 4) : rect.bottom + 4) + "px";
+  menu.style.left = Math.max(8, rect.right - w) + "px";
+};
+menu.addEventListener("click", e => { if (e.target.closest("button,a")) fermerMenu(); });
+document.addEventListener("click", e => { if (!menu.contains(e.target)) fermerMenu(); });
+window.addEventListener("scroll", fermerMenu, true);
+
+const peutRenvoyer = (r) => !!(r.suiviId && r.numPassage && r.kizeoFormDocId && r.recipientUserId);
+
+// Une seule action mise en avant par ligne : la prochaine étape du circuit.
+function actionPrincipale(r) {
+  if (r.statut === "en-attente") {
+    return peutRenvoyer(r)
+      ? `<button class="btn-a btn-primaire" onclick="renvoyer('${r.id}')" title="Renvoie un nouveau formulaire au technicien, pré-rempli avec ses réponses précédentes">Renvoyer</button>`
+      : `<button class="btn-a btn-primaire" disabled title="Rapport ancien : repasser par le Suivi pour renvoyer">Renvoyer</button>`;
+  }
+  if (!r.suiviId && r.statut !== "envoye") return `<button class="btn-a btn-primaire" onclick="openRattacher('${r.id}')">Rattacher</button>`;
+  if (r.statut === "a-relire") {
+    return r.donnees
+      ? `<button class="btn-a btn-primaire" onclick="openRelecture('${r.id}')">Relire et valider</button>`
+      : (r.fileUrl ? `<a class="btn-a btn-primaire" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : "");
+  }
+  if (r.statut === "a-traiter") return `<button class="btn-a btn-primaire" onclick="archiver('${r.id}')">Archiver</button>`;
+  if (r.statut === "archive") return `<button class="btn-a btn-primaire" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>`;
+  if (r.statut === "envoye") return r.fileUrl ? `<a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : "";
+  return "";
+}
+
+function actionsSecondaires(r) {
+  const items = [];
+  if (r.statut === "en-attente") {
+    items.push(`<button onclick="ouvrirAnnulerPassage('${r.id}')">Annuler le passage</button>`);
+    items.push(`<hr><button class="danger" onclick="supprimerReception('${r.id}')">Supprimer</button>`);
+    return items.join("");
+  }
+  if (r.fileUrl && r.statut !== "envoye" && !(r.statut === "a-relire" && !r.donnees)) items.push(`<a href="${r.fileUrl}" target="_blank">Ouvrir le rapport</a>`);
+  if (r.donnees && r.statut !== "a-relire") items.push(`<button onclick="openRelecture('${r.id}')">Relire et corriger${r.relueAt ? " ✓" : ""}</button>`);
+  if (r.fileUrl) items.push(`<button onclick="openReplace('${r.id}')">Remplacer le fichier</button>`);
+  if (peutRenvoyer(r)) items.push(`<button onclick="renvoyer('${r.id}')">Renvoyer au technicien</button>`);
+  if (!r.suiviId && r.statut === "envoye") items.push(`<button onclick="openRattacher('${r.id}')">Rattacher</button>`);
+  if (r.statut === "envoye" && r.ajouteEspaceClient) items.push(`<button onclick="retirerEspaceClient('${r.id}')">Retirer de l'espace client</button>`);
+  if (r.statut === "envoye" && !r.ajouteEspaceClient) items.push(`<button onclick="openEnvoi('${r.id}')">Envoyer de nouveau / espace client</button>`);
+  items.push(`<hr><button class="danger" onclick="supprimerReception('${r.id}')">Supprimer</button>`);
+  return items.join("");
+}
+
+const cellBc = (r) => r.bc || r.reference ? `<span class="bc-chip">${r.bc || r.reference}</span>` : `<span class="cell-muted">—</span>`;
+const cellPassage = (r) => r.passageLabel ? `<span class="passage-chip">${r.passageLabel}</span>` : `<span class="cell-muted">—</span>`;
+const cellClient = (r) => r.client || `<span class="rattach-warn">Non rattaché</span>`;
+const cellLibelle = (r) => `<div class="cell-muted cell-ellipsis" style="font-size:12px;" title="${(r.libelle || "").replace(/"/g, "&quot;")}">${r.libelle || "—"}</div>`;
+function cellType(r) {
+  return `<div style="display:flex;flex-direction:column;gap:3px;">
+    <span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>
+    ${r.typeRapport === "absence-annulation" ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">Absence/Annulation</span>` : ""}
+    ${r.erreurReconstruction ? `<span class="badge-type" style="background:#FEF3C7;color:#B45309;" title="Reconstruction PDF échouée : ${String(r.erreurReconstruction).replace(/"/g, "&quot;")} — l'Excel de Kizeo a été déposé à la place.">⚠ PDF non reconstruit</span>` : ""}
+  </div>`;
+}
+const actionsCell = (r) => `<div class="actions">${actionPrincipale(r)}<button class="btn-a btn-plus" onclick="ouvrirMenu(event,'${r.id}')" title="Autres actions">⋯</button></div>`;
+function fmtCreneau(r) {
+  if (!r.dateDebut && !r.dateFin) return "—";
+  const d = new Date(r.dateDebut || r.dateFin);
+  if (isNaN(d)) return r.dateDebut || r.dateFin;
+  const j = d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" });
+  const h = (x) => x ? new Date(x).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
+  return `${j} ${h(r.dateDebut)}${r.dateFin ? "–" + h(r.dateFin) : ""}`;
+}
+
+function ligneBureau(r) {
+  return `<div class="row" id="rrow-${r.id}">
+    <div>${fmtDate(r.arriveeAt)}</div><div>${cellClient(r)}</div><div>${cellBc(r)}</div><div>${cellPassage(r)}</div>
+    <div class="cell-muted" style="font-size:12px;line-height:1.3;">${r.technicien || "—"}</div>
+    <div>${cellLibelle(r)}</div><div>${cellType(r)}</div>
+    <div><span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span></div>
+    <div>${actionsCell(r)}</div></div>`;
+}
+function ligneAttente(r) {
+  return `<div class="row" id="rrow-${r.id}">
+    <div style="font-size:12px;">${fmtCreneau(r)}</div>
+    <div class="cell-muted" style="font-size:12px;line-height:1.3;">${r.technicien || "—"}</div>
+    <div>${cellClient(r)}</div><div>${cellBc(r)}</div><div>${cellPassage(r)}</div><div>${cellLibelle(r)}</div>
+    <div>${isOverdue(r) ? `<span class="badge-retard">⚠ +${hoursLate(r)} h</span>` : `<span class="cell-muted">—</span>`}</div>
+    <div>${actionsCell(r)}</div></div>`;
+}
+function ligneEnvoye(r) {
+  const dest = [r.notifiedAt ? "Email" : "", r.ajouteEspaceClient ? "Espace client" : ""].filter(Boolean).join(" + ") || "—";
+  return `<div class="row" id="rrow-${r.id}">
+    <div>${fmtDate(r.notifiedAt || r.updatedAt)}</div><div>${cellClient(r)}</div><div>${cellBc(r)}</div><div>${cellPassage(r)}</div>
+    <div class="cell-muted" style="font-size:12px;line-height:1.3;">${r.technicien || "—"}</div>
+    <div>${cellType(r)}</div><div class="cell-muted" style="font-size:12px;">${dest}</div>
+    <div>${actionsCell(r)}</div></div>`;
+}
+const section = (titre, classe) => `<div class="section-row ${classe || ""}">${titre}</div>`;
+
 function render() {
   const q = (document.getElementById("searchInput").value || "").toLowerCase();
-  const st = document.getElementById("filterStatut").value;
-  const list = allDocs.filter(r => {
-    const ms = !st || (st === "en-retard" ? isOverdue(r) : st === "a-traiter-retard" ? (r.statut === "a-traiter" || isOverdue(r)) : r.statut === st);
-    const mq = !q || (r.client||"").toLowerCase().includes(q) || (r.bc||"").toLowerCase().includes(q) || (r.technicien||"").toLowerCase().includes(q) || (r.reference||"").toLowerCase().includes(q) || (r.libelle||"").toLowerCase().includes(q);
-    return ms && mq;
-  });
-  document.getElementById("resultsCount").textContent = list.length + " rapport" + (list.length !== 1 ? "s" : "");
-  resyncEcheances(list.filter(r => r.statut === "en-attente"));
+  const correspond = (r) => !q || [r.client, r.bc, r.technicien, r.reference, r.libelle].some(v => (v || "").toLowerCase().includes(q));
+  const docs = allDocs.filter(correspond);
+
+  const bureau = docs.filter(r => STATUTS_BUREAU.includes(r.statut));
+  const attente = docs.filter(r => r.statut === "en-attente");
+  const envoyes = docs.filter(r => r.statut === "envoye");
+  const nbRetard = attente.filter(isOverdue).length;
+
+  // Compteurs des onglets
+  document.getElementById("cptBureau").textContent = bureau.length;
+  document.getElementById("cptAttente").textContent = attente.length;
+  document.getElementById("cptEnvoyes").textContent = envoyes.length;
+  const cr = document.getElementById("cptRetard");
+  cr.style.display = nbRetard ? "" : "none";
+  cr.textContent = "⚠ " + nbRetard + " en retard";
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === ongletActif));
+  resyncEcheances(attente);
+
+  // Barre d'étapes (onglet bureau) ou option de regroupement (onglet attente)
+  const barre = document.getElementById("etapesBar");
+  if (ongletActif === "bureau") {
+    barre.style.display = "";
+    barre.innerHTML = `<button class="etape ${!etapeActive ? "active" : ""}" data-etape="">Toutes <b>${bureau.length}</b></button>`
+      + ETAPES.map((e, i) => `${i ? '<span class="etape-fleche">→</span>' : ""}<button class="etape ${etapeActive === e.statut ? "active" : ""}" data-etape="${e.statut}">${e.label} <b>${bureau.filter(r => r.statut === e.statut).length}</b></button>`).join("");
+    barre.querySelectorAll(".etape").forEach(b => b.addEventListener("click", () => { etapeActive = b.dataset.etape; render(); }));
+  } else if (ongletActif === "attente") {
+    barre.style.display = "";
+    barre.innerHTML = `<span>Formulaires partis chez les techniciens, pas encore revenus.</span>
+      <label class="groupe-toggle"><input type="checkbox" id="chkGrouper" ${grouperParTech ? "checked" : ""}> Grouper par technicien</label>`;
+    document.getElementById("chkGrouper").addEventListener("change", e => {
+      grouperParTech = e.target.checked;
+      try { localStorage.setItem(GROUPE_KEY, grouperParTech ? "1" : "0"); } catch(err) {}
+      render();
+    });
+  } else {
+    barre.style.display = "none";
+  }
+
+  // Lignes de l'onglet actif
+  let html = "", nb = 0;
+  if (ongletActif === "bureau") {
+    const ordre = { "a-relire": 0, "a-traiter": 1, "archive": 2 };
+    const liste = bureau.filter(r => !etapeActive || r.statut === etapeActive)
+      .sort((a, b) => (ordre[a.statut] - ordre[b.statut]) || (a.arriveeAt || "").localeCompare(b.arriveeAt || ""));
+    nb = liste.length;
+    html = liste.map(ligneBureau).join("");
+  } else if (ongletActif === "attente") {
+    const parEcheance = (a, b) => (a.dateFin || a.dateDebut || "").localeCompare(b.dateFin || b.dateDebut || "");
+    nb = attente.length;
+    if (grouperParTech) {
+      const groupes = {};
+      attente.forEach(r => { const t = r.technicien || "Technicien non renseigné"; (groupes[t] = groupes[t] || []).push(r); });
+      html = Object.keys(groupes).sort().map(t => {
+        const g = groupes[t].sort((a, b) => (isOverdue(b) - isOverdue(a)) || parEcheance(a, b));
+        const nr = g.filter(isOverdue).length;
+        return section(`${t} · ${g.length} formulaire${g.length > 1 ? "s" : ""}${nr ? ` · ⚠ ${nr} en retard` : ""}`, nr ? "retard" : "") + g.map(ligneAttente).join("");
+      }).join("");
+    } else {
+      const retards = attente.filter(isOverdue).sort(parEcheance);
+      const aVenir = attente.filter(r => !isOverdue(r)).sort(parEcheance);
+      if (retards.length) html += section(`⚠ En retard · ${retards.length}`, "retard") + retards.map(ligneAttente).join("");
+      if (aVenir.length) html += section(`À venir ou en cours · ${aVenir.length}`) + aVenir.map(ligneAttente).join("");
+    }
+  } else {
+    const liste = envoyes.sort((a, b) => (b.notifiedAt || b.updatedAt || "").localeCompare(a.notifiedAt || a.updatedAt || ""));
+    nb = liste.length;
+    html = liste.map(ligneEnvoye).join("");
+  }
+
   const container = document.getElementById("list");
   const empty = document.getElementById("emptyState");
   const head = container.querySelector(".list-head");
   container.innerHTML = "";
   if (head) container.appendChild(head);
-  if (!list.length) { empty.style.display = "block"; return; }
+  if (!nb) {
+    empty.style.display = "block";
+    empty.querySelector("p").textContent = { bureau: "Rien à traiter pour le moment.", attente: "Aucun formulaire en attente chez les techniciens.", envoyes: "Aucun rapport envoyé." }[ongletActif] + (q ? " (avec cette recherche)" : "");
+    return;
+  }
   empty.style.display = "none";
-
-  const STATUT_LABEL = { "en-attente": "En attente", "a-relire": "À relire", "a-traiter": "À traiter", "envoye": "Envoyé", "archive": "Archivé" };
-  const STATUT_CLASS = { "en-attente": "st-en-attente", "a-relire": "st-a-relire", "a-traiter": "st-a-traiter", "envoye": "st-envoye", "archive": "st-archive" };
-
-  const rows = list.map(r => {
-    const pending = r.statut === "en-attente";
-    const retard = isOverdue(r);
-    const canResend = !!(r.suiviId && r.numPassage && r.kizeoFormDocId && r.recipientUserId);
-    const resendBtn = canResend
-      ? `<button class="btn-a btn-replace" onclick="renvoyer('${r.id}')" title="Renvoie un nouveau formulaire au technicien, pré-rempli avec ses réponses précédentes">Renvoyer</button>`
-      : `<button class="btn-a btn-replace" disabled title="Rapport ancien : repasser par le Suivi pour renvoyer">Renvoyer</button>`;
-    const actions = pending
-      ? `${resendBtn}<button class="btn-a btn-annuler" onclick="supprimerReception('${r.id}')">Supprimer</button><button class="btn-a btn-annuler" onclick="ouvrirAnnulerPassage('${r.id}')">Annuler le passage</button>`
-      : `
-        ${r.fileUrl ? `<a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : ""}
-        ${r.donnees ? `<button class="btn-a btn-relire" onclick="openRelecture('${r.id}')" title="${r.statut === "a-relire" ? "Relire et valider pour fabriquer le PDF" : "Relire et corriger ce qu'a saisi le technicien"}">${r.statut === "a-relire" ? "Relire et valider" : "Relire"}${r.relueAt && r.statut !== "a-relire" ? " \u2713" : ""}</button>` : ""}
-        ${r.fileUrl ? `<button class="btn-a btn-replace" onclick="openReplace('${r.id}')">Remplacer</button>` : ""}
-        ${resendBtn}
-        ${!r.suiviId ? `<button class="btn-a btn-rattacher" onclick="openRattacher('${r.id}')">Rattacher</button>` : ""}
-        ${r.statut === "archive" ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>` : ""}
-        ${r.statut === "envoye" && r.ajouteEspaceClient ? `<button class="btn-a btn-annuler" onclick="retirerEspaceClient('${r.id}')">Retirer de l'espace client</button>` : ""}
-        ${r.statut === "envoye" && !r.ajouteEspaceClient ? `<button class="btn-a btn-envoyer" onclick="openEnvoi('${r.id}')">Envoyer au client</button>` : ""}
-        ${r.statut === "a-traiter" ? `<button class="btn-a btn-archiver" onclick="archiver('${r.id}')">Archiver</button>` : ""}
-        <button class="btn-a btn-archiver" style="color:var(--red);" onclick="supprimerReception('${r.id}')">Supprimer</button>`;
-    return `
-    <div class="row" id="rrow-${r.id}">
-      <div>${fmtDate(r.arriveeAt)}</div>
-      <div>${r.client || `<span class="rattach-warn">Non rattaché</span>`}</div>
-      <div>${r.bc || r.reference ? `<span class="bc-chip">${r.bc || r.reference}</span>` : `<span class="cell-muted">—</span>`}</div>
-      <div>${r.passageLabel ? `<span class="passage-chip">${r.passageLabel}</span>` : `<span class="cell-muted">—</span>`}</div>
-      <div class="cell-muted" style="font-size:12px;line-height:1.3;">${r.technicien || "—"}</div>
-      <div class="cell-muted cell-ellipsis" style="font-size:12px;" title="${(r.libelle || "").replace(/"/g, "&quot;")}">${r.libelle || "—"}</div>
-      <div style="display:flex;flex-direction:column;gap:3px;">
-        <span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>
-        ${r.typeRapport === "absence-annulation" ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">Absence/Annulation</span>` : ""}
-        ${r.erreurReconstruction ? `<span class="badge-type" style="background:#FEF3C7;color:#B45309;" title="Reconstruction PDF échouée : ${String(r.erreurReconstruction).replace(/"/g, "&quot;")} — l'Excel de Kizeo a été déposé à la place.">⚠ PDF non reconstruit</span>` : ""}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
-        <span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span>
-        ${retard ? `<span class="badge-retard">⚠ Non reçu +${hoursLate(r)}h</span>` : ""}
-      </div>
-      <div class="actions">${actions}</div>
-    </div>`;
-  }).join("");
-  container.insertAdjacentHTML("beforeend", rows);
+  container.insertAdjacentHTML("beforeend", html);
 }
-setInterval(render, 60000); // rafraîchit le badge de retard sans recharger la page
+setInterval(render, 60000); // rafraîchit les retards sans recharger la page
 
 document.getElementById("searchInput").addEventListener("input", render);
-document.getElementById("filterStatut").addEventListener("change", render);
+renderEntete();
 
 function showToast(msg) {
   const t = document.getElementById("toast");
