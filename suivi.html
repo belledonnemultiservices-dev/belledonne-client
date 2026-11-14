@@ -3686,14 +3686,14 @@ var FILES_SUIVI = [
     question: "Qu'est-ce qui est bloqué, et qui doit relancer ?",
     colonnes: [
       { titre: 'Dernière note', cell: function(i){ var t = String(i.notes || i.observations || '').trim(); return t ? '<span style="font-size:12px;color:var(--text-mid);display:inline-block;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + t.replace(/"/g, '&quot;') + '">' + t.replace(/</g, '&lt;') + '</span>' : '<span style="color:var(--text-muted)">—</span>'; } },
-      { titre: 'Sans nouvelles', cell: function(i){ var n = joursDepuis(i.updatedAt || dateArrivee(i)); return '<span class="psg ' + (n !== null && n > DELAI_ATTENTE_JOURS ? 'psg-retard' : 'psg-passe') + '">' + (n === null ? '—' : n + ' j') + '</span>'; } },
+      { titre: 'Sans activité', cell: function(i){ var n = joursDepuis(i.updatedAt || dateArrivee(i)); return '<span class="psg ' + (n !== null && n > DELAI_ATTENTE_JOURS ? 'psg-retard' : 'psg-passe') + '">' + (n === null ? '—' : n + ' j') + '</span>'; } },
     ],
     kpis: function(l){
       var bloque = function(i){ var n = joursDepuis(i.updatedAt || dateArrivee(i)); return n !== null && n > DELAI_ATTENTE_JOURS; };
       var vieux = l.map(function(i){ return joursDepuis(i.updatedAt || dateArrivee(i)); }).filter(function(n){ return n !== null; });
       return [
         { val: l.length, lib: 'dossier(s) en attente' },
-        { val: l.filter(bloque).length, lib: 'à relancer (+' + DELAI_ATTENTE_JOURS + ' j sans nouvelles)', alerte: true, cle: 'rel', filtre: bloque },
+        { val: l.filter(bloque).length, lib: 'à relancer (+' + DELAI_ATTENTE_JOURS + ' j sans activité)', alerte: true, cle: 'rel', filtre: bloque },
         { val: vieux.length ? vieux.reduce(function(a, b){ return Math.max(a, b); }) + ' j' : '—', lib: 'plus ancien' },
         { texte: parClient(l), lib: 'par client' },
       ];
@@ -3720,8 +3720,7 @@ var FILES_SUIVI = [
     colonnes: [{ titre: 'Annulé', cell: function(i){ return '<span style="font-size:12px;">' + (i.updatedAt ? fmtDate(i.updatedAt) : '—') + '</span>'; } }],
     kpis: function(l){
       return [
-        { val: l.filter(function(i){ return moisCourant(i.updatedAt); }).length, lib: 'ce mois-ci' },
-        { val: l.filter(function(i){ return anneeCourante(i.updatedAt); }).length, lib: 'cette année' },
+        { val: l.length, lib: 'dossier(s) annulé(s)' },
         { texte: parClient(l), lib: 'par client' },
       ];
     } },
@@ -3735,7 +3734,6 @@ var FILES_SUIVI = [
       var p1 = function(i){ return rapportP1(i) !== 'envoye'; };
       var aFact = function(i){ return !i.enFacturation; };
       return [
-        { val: l.filter(function(i){ return moisCourant(i.updatedAt); }).length, lib: 'terminé(s) ce mois-ci' },
         { val: l.filter(aFact).length, lib: 'à facturer', alerte: true, cle: 'fact', filtre: aFact },
         { val: l.filter(function(i){ return i.enFacturation; }).length, lib: 'en facturation' },
         { val: l.filter(p1).length, lib: 'rapport du passage 1 non envoyé', alerte: true, cle: 'p1', filtre: p1 },
