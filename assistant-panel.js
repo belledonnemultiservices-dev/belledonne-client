@@ -4,6 +4,7 @@
 // qu'un accès en lecture seule à cette base. Ce fichier ne touche à aucune donnée.
 
 const URL_AGENT = "https://europe-west1-belledonne-agent.cloudfunctions.net/assistant";
+const AVATAR = new URL("./assistant-avatar.jpg", import.meta.url).href;
 const CLE_CONV = "assistant-conversation-id";
 const CLE_FIL = "assistant-fil";          // messages affichés, pour les retrouver d'une page à l'autre
 const CLE_ETAT = "assistant-etat";        // "ouvert" ou "reduit"
@@ -21,9 +22,13 @@ const EXEMPLES = [
 ];
 
 const CSS = `
-#asst-btn{position:fixed;right:22px;bottom:22px;z-index:9998;display:flex;align-items:center;gap:8px;padding:12px 18px;border:none;border-radius:999px;background:#0D1B2A;color:#fff;font:600 14px 'DM Sans',sans-serif;box-shadow:0 6px 20px rgba(13,27,42,.25);cursor:pointer}
+#asst-btn{position:fixed;right:22px;bottom:22px;z-index:9998;display:flex;align-items:center;gap:10px;padding:5px 18px 5px 5px;border:none;border-radius:999px;background:#0D1B2A;color:#fff;font:600 14px 'DM Sans',sans-serif;box-shadow:0 6px 20px rgba(13,27,42,.25);cursor:pointer}
 #asst-btn:hover{background:#1DA870}
-#asst-btn svg{width:18px;height:18px}
+#asst-btn img{width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid #2ECC8F}
+.asst-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #2ECC8F;flex:none}
+.asst-ligne{display:flex;align-items:flex-end;gap:8px;align-self:flex-start;max-width:94%}
+.asst-ligne img{width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none}
+.asst-ligne .asst-msg{max-width:100%}
 #asst-btn .asst-point{width:8px;height:8px;border-radius:50%;background:#2ECC8F;display:none}
 #asst-btn.en-cours .asst-point{display:inline-block}
 #asst-panel{position:fixed;right:22px;bottom:22px;z-index:9999;width:420px;max-width:calc(100vw - 32px);height:620px;max-height:calc(100vh - 44px);display:none;flex-direction:column;background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(13,27,42,.28);font-family:'DM Sans',sans-serif;color:#0D1B2A;overflow:hidden}
@@ -93,12 +98,12 @@ export function monterAssistant(auth) {
 
   const btn = document.createElement("button");
   btn.id = "asst-btn";
-  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.66 15l-1.3 4.1a.75.75 0 00.95.95l4.1-1.3A10 10 0 1012 2zm-4 11.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm4 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm4 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg>Assistant<span class="asst-point" title="Conversation en cours"></span>';
+  btn.innerHTML = `<img src="${AVATAR}" alt="">Assistant<span class="asst-point" title="Conversation en cours"></span>`;
 
   const panel = document.createElement("div");
   panel.id = "asst-panel";
   panel.innerHTML = `
-    <div class="asst-tete"><b>Assistant<small>Lecture seule · questions sur vos données</small></b>
+    <div class="asst-tete"><img class="asst-avatar" src="${AVATAR}" alt=""><b>Assistant<small>Lecture seule · questions sur vos données</small></b>
       <button data-a="nouveau" title="Nouvelle conversation">Nouveau</button>
       <button data-a="reduire" title="Réduire (la conversation est gardée)">—</button>
       <button data-a="fermer" title="Fermer et effacer la conversation">✕</button></div>
@@ -117,7 +122,16 @@ export function monterAssistant(auth) {
     const d = document.createElement("div");
     d.className = classe;
     d.innerHTML = html;
-    fil.appendChild(d);
+    // Les réponses de l'assistant portent son visage, comme dans une messagerie.
+    if (classe.includes("asst-lui")) {
+      const ligne = document.createElement("div");
+      ligne.className = "asst-ligne";
+      ligne.innerHTML = `<img src="${AVATAR}" alt="">`;
+      ligne.appendChild(d);
+      fil.appendChild(ligne);
+    } else {
+      fil.appendChild(d);
+    }
     fil.scrollTop = fil.scrollHeight;
     return d;
   };
