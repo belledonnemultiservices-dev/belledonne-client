@@ -101,6 +101,8 @@ const CSS = `
 .pl-passage.jumeau{margin-left:28px;border-style:dashed;background:#FAFBFF;padding:8px 12px;}
 .pl-psg-jum{display:flex;gap:10px;align-items:flex-end;}
 .pl-psg-agenda{display:flex;flex-wrap:wrap;gap:6px;}
+.pl-apercu summary{font-size:12px;color:#4338CA;cursor:pointer;font-weight:600;}
+.pl-apercu pre{white-space:pre-wrap;font:12px 'DM Sans',sans-serif;color:#4A6078;background:#F7F9FB;border-radius:7px;padding:8px 10px;margin:4px 0 8px;}
 .pl-raps{border:1px solid #E0E7FF;background:#F8F9FF;border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
 .pl-raps-tete{display:flex;gap:10px;align-items:baseline;font-size:13px;}
 .pl-rap{display:grid;grid-template-columns:22px minmax(150px,1.2fr) minmax(110px,.8fr) minmax(160px,1.4fr) auto auto;gap:8px;align-items:center;}
@@ -531,8 +533,9 @@ function rapportDepuis(item, p, num) {
   return { pid: p.passageId || uuid(), ref: p, annule: p.statut === "annule",
     formId: String(p.kzForm ?? (kp ? kp.kizeoFormDocId : (lie ? lie.id : "")) ?? ""),
     dest: String(p.kzDest ?? (kp ? kp.recipientUserId : "") ?? ""),
-    // Nom saisi ; pour un rapport parti avant le 15/11 (pas de kzNom), le nom déjà envoyé
-    nom: p.kzNomSaisi ? (p.kzNom || "") : (kp && p.kzNom === undefined ? sansSuffixe(kp.libelle) : "") };
+    // Nom saisi à la main ; pour un rapport parti avant le 15/11 (pas de kzNom), le nom déjà envoyé
+    nom: p.kzNomSaisi ? (p.kzNom || "") : (kp && p.kzNom === undefined ? sansSuffixe(kp.libelle) : ""),
+    manuel: !!p.kzNomSaisi || (!!kp && p.kzNom === undefined && sansSuffixe(kp.libelle) !== (p.titre || titreDefaut(item))) };
 }
 function lignesDepuis(item) {
   const bruts = passagesBruts(item);
@@ -557,7 +560,7 @@ function nouvelleLigne(item, num, modele) {
   const lie = window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", num) : null;
   return { ref: null, pid, num, annule: false, debut: modele ? modele.debut : "", fin: modele ? modele.fin : "", techs: modele ? modele.techs.slice() : [],
     adresse: (modele && modele.adresse) || "", titre: "", desc: "",
-    rapports: [{ pid, ref: null, annule: false, formId: modele ? modele.rapports[0].formId : (lie ? String(lie.id) : ""), dest: "", nom: "" }] };
+    rapports: [{ pid, ref: null, annule: false, formId: modele ? modele.rapports[0].formId : (lie ? String(lie.id) : ""), dest: "", nom: "", manuel: false }] };
 }
 // Ajoute des minutes à une valeur datetime-local (AAAA-MM-JJTHH:MM), en heure locale
 function decaler(v, minutes) {
@@ -597,12 +600,12 @@ const formParId = (id) => (window._kizeoForms || []).find(f => String(f.id) === 
 const techsKizeo = (l) => l.techs.map(techParNom).filter(t => t && t.kizeoUserId);
 // Destinataire : celui choisi s'il est encore sur le passage, sinon le 1er technicien du passage ayant un compte Kizeo
 function destDe(l, r) { const tk = techsKizeo(l); return (tk.find(t => String(t.kizeoUserId) === String(r.dest)) || tk[0] || null); }
-// Nom du rapport dans l'application du technicien : saisi, sinon titre agenda (+ formulaire à partir du 2e)
+// Nom du rapport dans l'application du technicien (décidé le 15/11) : le 1er reprend le titre
+// agenda tant qu'on ne l'a pas modifié à la main ; les suivants se nomment à la main.
+const titreAuto = (item, l) => l.titre.trim() || titreDefaut(item);
 function nomRapport(item, l, r, k) {
-  if (r.nom.trim()) return r.nom.trim();
-  const base = l.titre.trim() || titreDefaut(item);
-  const f = formParId(r.formId);
-  return k === 0 ? base : base + " — " + ((f && f.nom) || "rapport " + (k + 1));
+  if (k === 0) return r.manuel && r.nom.trim() ? r.nom.trim() : titreAuto(item, l);
+  return r.nom.trim();
 }
 const rapportsActifs = (l) => l.rapports.filter(r => !r.annule && r.formId);
 // État d'un rapport : envoyé, reçu, modifié depuis l'envoi (à renvoyer), à envoyer
@@ -622,22 +625,36 @@ const LIB_KZ = { ok: ["ok", "✓ envoyé"], recu: ["ok", "✓ rapport reçu"], m
 function descriptionAuto(item, adresse) {
   const tels = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
   return [item.bc || item.pl ? "N° BC : " + (item.bc || item.pl) : "", item.nature ? "Nature : " + item.nature : "", item.nomClient ? "Client : " + item.nomClient : "",
-    tels.length ? "Téléphone(s) : " + tels.join(" / ") : "", adresse ? "Adresse : " + adresse : "", item.observations ? "Observations : " + item.observations : ""].filter(Boolean).join("\n");
+    tels.length ? "Téléphone(s) : " + tels.join(" / ") : "", adresse ? "Adresse : " + adresse : ""].filter(Boolean).join("\n");
 }
-function contenuAgenda(item, p, ps) {
+// Rendez-vous d'un technicien sur un passage principal (décidé le 15/11) :
+// description saisie (sinon automatique) + observations du dossier, toujours + rapports Kizeo
+// destinés à CE technicien (deux techniciens, deux rapports différents : chacun voit le sien).
+function contenuAgenda(item, p, ps, nom) {
   const adresse = p.adresse || item.adresse || "";
-  const noms = [p].concat(ps.filter(j => j.jumeau && j.statut !== "annule" && j.num === p.num)).filter(x => x.kzForm && x.kzNom).map(x => x.kzNom);
-  const desc = (p.desc || descriptionAuto(item, adresse)) + (noms.length ? "\n\n" + (noms.length > 1 ? "Rapports Kizeo à remplir :" : "Rapport Kizeo à remplir :") + "\n" + noms.map(n => "• " + n).join("\n") : "");
+  let desc = p.desc || descriptionAuto(item, adresse);
+  const obs = String(item.observations || "").trim();
+  if (obs && !desc.includes(obs)) desc += (desc ? "\n" : "") + "Observations : " + obs;
+  const t = nom ? techParNom(nom) : null;
+  const noms = [p].concat(ps.filter(j => j.jumeau && j.statut !== "annule" && j.num === p.num))
+    .filter(x => x.kzForm && x.kzNom && (!nom || (t && t.kizeoUserId && String(x.kzDest) === String(t.kizeoUserId)))).map(x => x.kzNom);
+  if (noms.length) desc += "\n\n" + (noms.length > 1 ? "Rapports Kizeo à remplir :" : "Rapport Kizeo à remplir :") + "\n" + noms.map(n => "• " + n).join("\n");
   return { titre: p.titre || titreDefaut(item), adresse, desc };
 }
-const empreinteAgenda = (item, p, ps) => JSON.stringify([p.debut, p.fin, (p.techs || []).slice().sort(), contenuAgenda(item, p, ps)]);
+const empreinteAgenda = (item, p, ps, nom) => JSON.stringify([p.debut, p.fin, (p.techs || []).slice().sort(), contenuAgenda(item, p, ps, nom)]);
+// Rendez-vous d'un technicien à jour ? Empreinte par technicien (calEmpreintes) ; un passage
+// synchronisé avant (calEmpreinte unique) est à refaire ; un passage de la fiche classique se juge sur calSync.
+function agendaAJour(item, p, ps, nom) {
+  const e = (p.calEmpreintes || {})[nom];
+  if (e) return e === empreinteAgenda(item, p, ps, nom);
+  if (p.calEmpreinte) return false;
+  return p.calSync === window.cleSyncAgenda(p.debut, p.fin, p.techs);
+}
 function etatAgendaTech(item, p, ps, nom) {
   const t = techParNom(nom);
   if (!t || !t.email) return "sans";
-  const ev = (p.calEvents || {})[nom];
-  if (!ev) return "manque";
-  const aJour = p.calEmpreinte ? p.calEmpreinte === empreinteAgenda(item, p, ps) : p.calSync === window.cleSyncAgenda(p.debut, p.fin, p.techs);
-  return aJour ? "ok" : "maj";
+  if (!(p.calEvents || {})[nom]) return "manque";
+  return agendaAJour(item, p, ps, nom) ? "ok" : "maj";
 }
 const LIB_AGENDA = { ok: ["ok", "✓ agenda"], maj: ["att", "agenda à mettre à jour"], manque: ["ko", "✕ pas dans l'agenda"], sans: ["att", "pas d'agenda"] };
 
@@ -660,8 +677,9 @@ function rendrePassages(item) {
         <span class="pl-rap-n">${k + 1}.</span>
         <select data-rf="formId"><option value="">— Aucun rapport Kizeo —</option>${forms.map(f => `<option value="${esc(f.id)}"${String(r.formId) === String(f.id) ? " selected" : ""}>${esc(f.nom || "Formulaire")}${lie && String(lie.id) === String(f.id) ? " (lié)" : ""}</option>`).join("")}</select>
         ${tk.length ? `<select data-rf="dest">${tk.map(x => `<option value="${esc(x.kizeoUserId)}"${t && String(t.kizeoUserId) === String(x.kizeoUserId) ? " selected" : ""}>${esc(nomTech(x))}</option>`).join("")}</select>` : `<span class="pl-manque" style="font-size:12px;">aucun technicien du passage n'a de compte Kizeo</span>`}
-        <input data-rf="nom" value="${esc(r.nom)}" placeholder="${esc(nomRapport(item, l, { ...r, nom: "" }, k))}" title="Nom du rapport dans l'application du technicien">
+        <input data-rf="nom" value="${esc(k === 0 ? nomRapport(item, l, r, 0) : r.nom)}" placeholder="${k === 0 ? "" : "Nom du rapport (à saisir)"}" title="${k === 0 ? "Reprend le titre agenda tant que tu ne le modifies pas" : "Nom du rapport dans l'application du technicien"}"${r.formId && !nomRapport(item, l, r, k) ? ' style="border-color:#E74C3C;"' : ""}>
         ${etatR ? etatHtml(...LIB_KZ[etatR]) : ""}
+        ${etatR === "modifie" ? `<button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler la modification</button>` : ""}
         ${k > 0 ? `<button class="pl-btn petit" data-a="retirerRap" title="Retirer ce rapport">✕</button>` : ""}
       </div>`;
     }).join("");
@@ -691,6 +709,7 @@ function rendrePassages(item) {
       </div>
       ${blocRapports(l)}
       ${agenda ? `<div class="pl-psg-agenda">${agenda}</div>` : ""}
+      ${p && p.statut !== "annule" && (p.techs || []).length ? `<details class="pl-apercu"><summary>Voir la description envoyée dans l'agenda</summary>${(p.techs || []).map(nom => `<div><b>${esc(nom)}</b><pre>${esc(contenuAgenda(item, p, enBase, nom).desc)}</pre></div>`).join("")}</details>` : ""}
       ${pb.length ? `<div class="pl-psg-pb">⚠ ${pb.map(esc).join(" · ")}</div>` : ""}
     </div>`;
   };
@@ -705,7 +724,15 @@ function rendrePassages(item) {
   document.querySelectorAll(".pl-corps [data-f]").forEach(inp => {
     const f = inp.dataset.f;
     // Texte : pas de redessin pendant la frappe ; n° et dates : redessin pour les contrôles
-    if (["titre", "adresse", "desc"].includes(f)) { inp.oninput = () => { ligneDe(inp)[f] = inp.value; change(false); }; inp.onchange = () => rendrePassages(item); return; }
+    if (["titre", "adresse", "desc"].includes(f)) {
+      inp.oninput = () => {
+        const l = ligneDe(inp); l[f] = inp.value;
+        // Le nom du 1er rapport suit le titre agenda en direct (s'il n'a pas été modifié à la main)
+        if (f === "titre" && !l.rapports[0].manuel) { const c = inp.closest(".pl-passage").querySelector('.pl-rap[data-r="0"] [data-rf="nom"]'); if (c) c.value = titreAuto(item, l); }
+        change(false);
+      };
+      inp.onchange = () => rendrePassages(item); return;
+    }
     inp.onchange = () => {
       const l = ligneDe(inp);
       if (f === "num") l.num = parseInt(inp.value, 10) || 0;
@@ -720,7 +747,16 @@ function rendrePassages(item) {
   });
   document.querySelectorAll(".pl-corps [data-rf]").forEach(inp => {
     const f = inp.dataset.rf;
-    if (f === "nom") { inp.oninput = () => { rapportDe(inp).nom = inp.value; change(false); }; inp.onchange = () => rendrePassages(item); return; }
+    if (f === "nom") {
+      inp.oninput = () => {
+        const l = ligneDe(inp), r = rapportDe(inp);
+        r.nom = inp.value;
+        // 1er rapport : redevient automatique (titre agenda) si on efface ou si on retape le titre
+        if (l.rapports.indexOf(r) === 0) r.manuel = !!inp.value.trim() && inp.value.trim() !== titreAuto(item, l);
+        change(false);
+      };
+      inp.onchange = () => rendrePassages(item); return;
+    }
     inp.onchange = () => { rapportDe(inp)[f] = inp.value; change(true); };
   });
   document.querySelectorAll(".pl-corps .pl-tech").forEach(ch => ch.onclick = () => {
@@ -752,6 +788,20 @@ function rendrePassages(item) {
     l.rapports.splice(l.rapports.indexOf(r), 1);
     change(true);
   });
+  // Modification abandonnée (15/11) : le rapport reprend ce qui est parti sur Kizeo
+  document.querySelectorAll(".pl-corps [data-a=annulerModif]").forEach(b => b.onclick = () => {
+    const l = ligneDe(b), r = rapportDe(b), k = l.rapports.indexOf(r);
+    const kp = (enBase.find(p => p.passageId === r.pid) || {}).kizeoPush;
+    if (!kp) return;
+    r.formId = String(kp.kizeoFormDocId || "");
+    r.dest = String(kp.recipientUserId || "");
+    const nomEnvoye = sansSuffixe(kp.libelle);
+    if (k === 0) { r.manuel = nomEnvoye !== titreAuto(item, l); r.nom = r.manuel ? nomEnvoye : ""; }
+    else r.nom = nomEnvoye;
+    change(true);
+    // Toujours « à renvoyer » : le technicien qui l'a reçu n'est plus sur le passage
+    if (etatRapportKz(item, l, r, k) === "modifie") showToast("Rapport remis comme envoyé, mais " + (kp.technicien || "son destinataire") + " n'est plus sur ce passage : remets-le dans les techniciens ou renvoie le rapport.", true);
+  });
   document.querySelectorAll(".pl-corps [data-a=envoyerKz]").forEach(b => b.onclick = () => envoyerRapports(item, ligneDe(b), b));
   const prochainNum = () => Math.max(0, ...L.map(l => l.num || 0)) + 1;
   $("[data-a=ajout]").onclick = () => { const der = L.filter(l => !l.annule).slice(-1)[0]; const n = nouvelleLigne(item, prochainNum()); if (der) n.techs = der.techs.slice(); L.push(n); rendrePassages(item); };
@@ -772,6 +822,12 @@ function rendrePassages(item) {
     return r === false ? false : undefined;
   });
   $(".pl-pied .pl-espace").insertAdjacentHTML("afterend", `<span class="pl-note" id="plAuto" style="margin-right:8px;">Enregistrement automatique</span>`);
+  // En arrivant sur l'étape : un rendez-vous dépassé (observations, contact ou adresse changés à
+  // l'étape Dossier, ou passage synchronisé avec l'ancienne description) est remis à jour
+  if (!etat.syncInitiale) {
+    etat.syncInitiale = true;
+    if (enBase.some(p => !p.jumeau && p.statut !== "annule" && (p.techs || []).some(n => etatAgendaTech(item, p, enBase, n) === "maj"))) planifierAutoPassages();
+  }
 }
 // Enregistrement automatique : 1,5 s après la dernière modification
 function planifierAutoPassages() {
@@ -816,9 +872,9 @@ async function enregistrerPassages(item, silencieux) {
           base.kzForm = r.formId || "";
           base.kzDest = t ? String(t.kizeoUserId) : "";
           base.kzNom = r.formId ? nomRapport(item, l, r, k) : "";
-          base.kzNomSaisi = !!r.nom.trim();
+          base.kzNomSaisi = k === 0 ? !!(r.manuel && r.nom.trim()) : true;
           base.libelle = jumeau ? base.kzNom : "";
-          if (jumeau) { base.calEvents = {}; base.calSync = ""; base.calEmpreinte = ""; }
+          if (jumeau) { base.calEvents = {}; base.calSync = ""; base.calEmpreinte = ""; base.calEmpreintes = {}; }
         }
         base.num = l.num; base.jumeau = jumeau; base.passageId = r.pid;
         passages.push(base);
@@ -863,6 +919,8 @@ async function envoyerRapports(item, l, bouton) {
   const it = dossier() || item;
   const aEnvoyer = rapportsActifs(l).map(r => ({ r, k: l.rapports.indexOf(r) })).map(x => ({ ...x, e: etatRapportKz(it, l, x.r, x.k) })).filter(x => x.e === "manque" || x.e === "modifie");
   if (!aEnvoyer.length) { showToast("Les rapports de ce passage sont déjà à jour sur Kizeo."); return; }
+  const sansNom = aEnvoyer.find(x => !nomRapport(it, l, x.r, x.k));
+  if (sansNom) { showToast("Donne un nom au rapport " + (sansNom.k + 1) + " du passage " + l.num + " avant de l'envoyer.", true); return; }
   const sansDest = aEnvoyer.find(x => !destDe(l, x.r));
   if (sansDest) { showToast("Aucun technicien du passage " + l.num + " n'a de compte Kizeo (page Techniciens).", true); return; }
   const bruts = passagesBruts(it);
@@ -909,27 +967,26 @@ async function synchroniserAgenda(item, passages, aRetirer) {
     const voulus = actif ? (p.techs || []) : [];
     // Techniciens retirés, passage annulé ou rapport supplémentaire : rendez-vous ôté
     for (const nom of Object.keys(cal)) { if (nom === "_" || voulus.includes(nom)) continue; await supprimer(nom, cal[nom]); delete cal[nom]; }
+    const emps = {};
     if (actif) {
-      const emp = empreinteAgenda(item, p, passages);
-      const c = contenuAgenda(item, p, passages);
       let echec = false;
       for (const nom of voulus) {
         const t = techParNom(nom);
         if (!t || !t.email) { erreurs.push(nom + " : pas d'agenda configuré (page Techniciens)"); continue; }
-        if (cal[nom] && (p.calEmpreinte ? p.calEmpreinte === emp : p.calSync === window.cleSyncAgenda(p.debut, p.fin, p.techs))) continue; // déjà à jour
+        const emp = empreinteAgenda(item, p, passages, nom);
+        const c = contenuAgenda(item, p, passages, nom);
+        if (cal[nom] && agendaAJour(item, p, passages, nom)) { emps[nom] = emp; continue; } // déjà à jour
         const base = { technicienEmail: t.email, passages: [p.debut + "|" + (p.fin || "")], customSummary: c.titre, customDescription: c.desc, adresse: c.adresse, colorId: t.calendarColorId || null, nature: item.nature || "", nomClient: item.nomClient || "", bc: item.bc || item.pl || "", observations: item.observations || "", interventionId: item.id };
         try {
           const r = cal[nom] ? await requeteAgenda({ ...base, operation: "update", calEventId: cal[nom] }) : await requeteAgenda(base);
-          if (r.success || r.created > 0 || r.updated > 0) { if (!cal[nom]) cal[nom] = (r.results && r.results[0] && r.results[0].eventId) || ""; }
+          if (r.success || r.created > 0 || r.updated > 0) { if (!cal[nom]) cal[nom] = (r.results && r.results[0] && r.results[0].eventId) || ""; if (cal[nom]) emps[nom] = emp; }
           else { echec = true; erreurs.push(nom + " : " + ((r.errors && r.errors[0] && r.errors[0].error) || r.error || "refusé")); }
         } catch (e) { echec = true; erreurs.push(nom + " : " + e.message); }
       }
-      // Échec : on ne marque pas « à jour », la prochaine sauvegarde réessaiera
-      if (!echec) {
-        p.calEmpreinte = voulus.every(nom => cal[nom]) ? emp : "";
-        p.calSync = Object.keys(cal).length ? window.cleSyncAgenda(p.debut, p.fin, p.techs) : "";
-      } else { p.calEmpreinte = ""; p.calSync = ""; }
-    } else { p.calEmpreinte = ""; p.calSync = ""; }
+      // Échec : le technicien concerné n'est pas marqué « à jour », la prochaine sauvegarde réessaiera
+      p.calSync = !echec && Object.keys(cal).length ? window.cleSyncAgenda(p.debut, p.fin, p.techs) : "";
+    } else p.calSync = "";
+    p.calEmpreintes = emps; p.calEmpreinte = "";
     p.calEvents = cal;
   }
   return erreurs;
