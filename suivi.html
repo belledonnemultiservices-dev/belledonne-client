@@ -317,6 +317,10 @@
   .sem-suivante .sem-hd{background:#F3F5F8;border-color:#64748B;}
   .sem-suivante .sem-pastille,.sem-suivante .sem-cpt{background:#64748B;}
   .sem-suivante .sem-titre{color:#334155;}
+  .sem-filtres td{padding:8px 4px 10px!important;background:transparent!important;border-bottom:1px solid var(--border)!important;}
+  .sem-fbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .sem-fbar .filter-select{height:38px;}
+  .sem-fbar .search-input{height:38px;}
   .sem-espace td{height:12px;padding:0!important;border:none!important;background:transparent!important;}
   .bs-option{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid);margin-left:auto;cursor:pointer;}
   .file-chip.discret{border-style:dashed;font-weight:500;}
@@ -457,7 +461,6 @@
       </div>
       <button class="btn-vue" id="btnPlusFiltres" style="display:none;" onclick="basculerPlusFiltres()">Plus de filtres</button>
       <span class="results-count" id="resultsCount"></span>
-      <button class="btn-vue" id="btnVueSuivi" onclick="basculerVueSuivi()" title="Basculer entre la nouvelle et l'ancienne présentation du tableau">Ancienne vue</button>
     </div>
 
     <!-- SELECTION BAR -->
@@ -468,31 +471,6 @@
         Supprimer la sélection
       </button>
       <button onclick="clearSelection()" style="font-size:12px;color:var(--text-muted);background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;">Annuler</button>
-    </div>
-
-    <!-- TABLE EN CONTRAT -->
-    <div class="table-wrap" id="tableWrap_contrat">
-      <table class="suivi-table">
-        <thead>
-          <tr>
-            <th style="width:32px;"><input type="checkbox" id="checkAll" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
-            <th>Client</th>
-            <th>Date</th>
-            <th>Affaire PL</th>
-            <th>Bon de commande</th>
-            <th>Devis</th>
-            <th>Nature mission</th>
-            <th style="min-width:200px;">Adresse</th>
-            <th>Assigné</th>
-            <th>Passages</th>
-            <th>Statut</th>
-            <th style="text-align:right;">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="tableBodyContrat">
-          <tr><td colspan="12"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>
-        </tbody>
-      </table>
     </div>
 
     <!-- TABLE EN CONTRAT, NOUVELLE VUE -->
@@ -2693,103 +2671,6 @@ function pdfBtn(url, label) {
   return `<a href="${url}" target="_blank" class="pdf-link"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>${label}</a>`;
 }
 
-window.renderTable = function renderTable(list) {
-  const body = document.getElementById('tableBodyContrat');
-  document.getElementById('resultsCount').textContent = list.length + ' intervention' + (list.length!==1?'s':'');
-  if (!list.length) {
-    body.innerHTML = '<tr><td colspan="12"><div class="empty-state"><p>Aucune intervention enregistrée.</p></div></td></tr>';
-    return;
-  }
-
-  let html = '';
-  list.forEach(function(item) {
-    const nb = toNotifArray(item.notifBailleur);
-    const nl = toNotifArray(item.notifLocataire);
-    const ns = toNotifArray(item.notifSms);
-    const nr = toNotifArray(item.notifRappelSms);
-    const hasPsg = (item.passages||[]).filter(Boolean).length > 0;
-    const totalNotifs = nb.length + nl.length + ns.length + nr.length;
-    const rowClass = item.statut==='Annulé'?'row-annule':item.statut==='Passage annulé'?'row-passage-annule':item.statut==='Terminé'?'row-termine':item.statut==='À valider'?'row-a-valider':item.statut==='À traiter'?'row-a-traiter':item.statut==='En attente'?'row-en-attente':item.statut==='En cours'?'row-en-cours':'';
-
-    // Build main row
-    const isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
-    html += '<tr id="row-' + item.id + '" class="' + rowClass + '">';
-    html += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
-    html += '<td class="client-cell">';
-    html += '<div style="display:flex;align-items:center;gap:6px;">';
-    html += '<button class="btn-toggle-notif" onclick="toggleNotifRow(\'' + item.id + '\')">🔔' + (totalNotifs > 0 ? ' (' + totalNotifs + ')' : '') + '</button>';
-    html += item.client || '—';
-    html += '</div></td>';
-
-    html += '<td style="font-size:12px;white-space:nowrap;color:var(--text-muted);">' + fmtDate(item.dateEmission) + '</td>';
-
-    html += '<td><div style="display:flex;flex-direction:column;gap:4px;">';
-    if (item.pl) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + item.pl + '</span>';
-    html += pdfBtn(item.plUrl, 'PDF') + '</div></td>';
-
-    html += '<td><div style="display:flex;flex-direction:column;gap:4px;">';
-    if (item.bc) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + item.bc + '</span>';
-    html += pdfBtn(item.bcUrl, 'PDF') + '</div></td>';
-
-    html += '<td><div style="display:flex;flex-direction:column;gap:4px;">';
-    if (item.devis) html += '<span style="font-family:monospace;font-size:12px;font-weight:600;">' + item.devis + '</span>';
-    html += pdfBtn(item.devisUrl, 'PDF') + '</div></td>';
-
-    html += '<td style="font-size:13px;">' + (item.nature || '—') + '</td>';
-    html += '<td style="min-width:200px;font-size:13px;">' + (item.adresse || '—') + '</td>';
-    const _assignes = item.assignes || (item.assigne ? [item.assigne] : []);
-    html += '<td>' + (_assignes.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + _assignes.map(a=>assigneBadge(a)).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
-    html += '<td>' + passagesDropdown(item.passages || []) + '</td>';
-    html += '<td>' + statutSelect(item.id, item.statut) + '</td>';
-
-    html += '<td style="text-align:right;white-space:nowrap;">';
-    html += '<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;">';
-    if (item.statut === 'À valider') {
-      html += '<button class="btn-row-valider" onclick="validerIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Valider</button>';
-      html += '<button class="btn-row-rejeter" onclick="rejeterIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>Rejeter</button>';
-    } else {
-      if (item.statut === 'Terminé') {
-        if (item.enFacturation) {
-          html += '<a href="facturation.html" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#1DA870;background:#E8F9F2;padding:4px 8px;border-radius:6px;text-decoration:none;white-space:nowrap;"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>Voir facture</a>';
-        } else {
-          html += '<button class="btn-row-edit" style="color:#4338CA;background:#EEF2FF;" onclick="basculerEnFacturation(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>→ Facturer</button>';
-        }
-      }
-      html += '<button class="btn-row-edit" onclick="openModal(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>Compléter</button>';
-      html += '<button class="btn-row-del" onclick="deleteIntervention(\'' + item.id + '\')"><svg viewBox="0 0 24 24" fill="currentColor" style="width:12px;height:12px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Sup.</button>';
-    }
-    html += '</div></td></tr>';
-
-    // Build notification row (hidden by default)
-    html += '<tr id="notif-row-' + item.id + '" class="notif-row hidden">';
-    html += '<td colspan="10"><div class="notif-bar">';
-
-    // Notifier button
-    html += '<div class="notif-section">';
-    if (hasPsg) {
-      html += '<button class="btn-notif-open" onclick="openNotifFromRow(\'' + item.id + '\')">✉ Notifier</button>';
-    } else {
-      html += '<span class="notif-none">Ajoutez des passages pour notifier</span>';
-    }
-    html += '</div>';
-
-    html += '<div style="width:1px;height:24px;background:var(--border);margin:0 4px;"></div>';
-
-    html += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
-    html += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
-    html += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
-    html += '<div class="notif-section"><span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms', nr, '🔔', 'sms') + '</div>';
-
-    if (hasPsg) {
-      html += '<div style="margin-left:auto;"><button class="btn-rappel" onclick="openRappelSms(\'' + item.id + '\')">💬 Rappel SMS</button></div>';
-    }
-
-    html += '</div></td></tr>';
-  });
-
-  body.innerHTML = html;
-}
-
 // ── TABS NOTIFICATION ──
 let _currentNotifTab = 'bailleur';
 function switchNotifTab(tab) {
@@ -3379,7 +3260,7 @@ function updateSelectionBar() {
   if (!bar) return;
   bar.style.display = window.selectedIds.size > 0 ? 'flex' : 'none';
   cnt.textContent = window.selectedIds.size + ' selectionne' + (window.selectedIds.size > 1 ? 's' : '');
-  var all = document.getElementById('checkAll');
+  var all = document.getElementById('checkAll') || document.getElementById('checkAllV2');
   if (all) {
     var boxes = document.querySelectorAll('.row-check');
     all.checked = boxes.length > 0 && Array.from(boxes).every(function(b){return b.checked;});
@@ -3389,7 +3270,7 @@ function updateSelectionBar() {
 function clearSelection() {
   window.selectedIds.clear();
   document.querySelectorAll('.row-check').forEach(function(box){box.checked=false;});
-  var all = document.getElementById('checkAll');
+  var all = document.getElementById('checkAll') || document.getElementById('checkAllV2');
   if (all) { all.checked=false; all.indeterminate=false; }
   updateSelectionBar();
 }
@@ -3482,7 +3363,8 @@ function filterTable() {
   var dateDe = (document.getElementById('filterDateDe')?.value)||'';
   var dateA = (document.getElementById('filterDateA')?.value)||'';
   // Nouvelle vue (onglet En contrat) : technicien et dates portent aussi sur les passages.
-  var v2 = activeTab === 'contrat' && vueSuivi === 'nouvelle';
+  var v2 = activeTab === 'contrat';
+  if (v2 && fileSuivi === 'semaine') { q = ''; statut = ''; clientFilter = ''; annee = ''; assigneFilter = ''; natureFilter = ''; dateDe = ''; dateA = ''; }
   var allData = window.interventions || [];
   var data = allData.filter(function(i){ return (i.clientType||'contrat') === activeTab; });
   var filtered = data.filter(function(i) {
@@ -3520,8 +3402,7 @@ function filterTable() {
   }
   document.getElementById('resultsCount').textContent = filtered.length + ' intervention' + (filtered.length!==1?'s':'');
   if (activeTab === 'contrat') {
-    if (v2) { window.renderTableV2(filtered); var oldBody = document.getElementById('tableBodyContrat'); if (oldBody) oldBody.innerHTML = ''; }
-    else { if(window.renderTable) window.renderTable(filtered); var newBody = document.getElementById('tableBodyContratV2'); if (newBody) newBody.innerHTML = ''; }
+    window.renderTableV2(filtered);
   }
   else if (activeTab === 'particulier') { renderTableParticulier(filtered); }
   else if (activeTab === 'entreprise') { renderTableEntreprise(filtered); }
@@ -3535,7 +3416,7 @@ window.filterTable = filterTable;
 // (openModal, validerIntervention, basculerEnFacturation, openNotifFromRow...).
 // L'ancienne vue reste disponible via le bouton "Ancienne vue".
 // ════════════════════════════════════════════════════════════════════
-var vueSuivi = (function(){ try { return localStorage.getItem('suivi.vue') || 'nouvelle'; } catch(e) { return 'nouvelle'; } })();
+var vueSuivi = 'nouvelle'; // l'ancienne vue du tableau a été retirée le 15/11
 var fileSuivi = (function(){ try { return localStorage.getItem('suivi.file') || 'tout'; } catch(e) { return 'tout'; } })();
 var plusFiltres = false;
 window._receptionsParPassage = window._receptionsParPassage || {};
@@ -3851,34 +3732,26 @@ function appliquerSousFiltre(liste) {
 function choisirFileSuivi(cle) {
   fileSuivi = cle;
   sousFiltre = '';
+  majAffichageVue();
   try { localStorage.setItem('suivi.file', cle); } catch(e) {}
   filterTable();
 }
 function majAffichageVue() {
-  var v2 = vueSuivi === 'nouvelle';
   var contrat = activeTab === 'contrat';
-  var oldWrap = document.getElementById('tableWrap_contrat');
+  var semaine = contrat && fileSuivi === 'semaine';
   var newWrap = document.getElementById('tableWrap_contratV2');
-  if (oldWrap) oldWrap.style.display = contrat && !v2 ? '' : 'none';
-  if (newWrap) newWrap.style.display = contrat && v2 ? '' : 'none';
-  document.getElementById('filesBar').style.display = contrat && v2 ? '' : 'none';
-  if (!(contrat && v2)) { var bs = document.getElementById('bandeauSemaine'); if (bs) bs.style.display = 'none'; }
-  var btnVue = document.getElementById('btnVueSuivi');
-  btnVue.style.display = contrat ? '' : 'none';
-  btnVue.textContent = v2 ? 'Ancienne vue' : 'Nouvelle vue';
-  // Filtres secondaires repliés dans la nouvelle vue
-  var replier = contrat && v2 && !plusFiltres;
+  if (newWrap) newWrap.style.display = contrat ? '' : 'none';
+  document.getElementById('filesBar').style.display = contrat ? '' : 'none';
+  if (!contrat) { var bs = document.getElementById('bandeauSemaine'); if (bs) bs.style.display = 'none'; }
+  // Dans la Semaine, chaque section a sa propre barre : la barre générale est masquée.
+  var barre = document.querySelector('.filters-bar');
+  if (barre) barre.style.display = semaine ? 'none' : '';
+  // Filtres secondaires repliés dans l'onglet En contrat
+  var replier = contrat && !plusFiltres;
   ['filterNature', 'filterAnnee', 'filtreDates'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = replier ? 'none' : (id === 'filtreDates' ? 'flex' : ''); });
   var btnPlus = document.getElementById('btnPlusFiltres');
-  btnPlus.style.display = contrat && v2 ? '' : 'none';
+  btnPlus.style.display = contrat ? '' : 'none';
   btnPlus.textContent = plusFiltres ? 'Moins de filtres' : 'Plus de filtres';
-}
-function basculerVueSuivi() {
-  vueSuivi = vueSuivi === 'nouvelle' ? 'ancienne' : 'nouvelle';
-  try { localStorage.setItem('suivi.vue', vueSuivi); } catch(e) {}
-  if (window.clearSelection) clearSelection();
-  majAffichageVue();
-  filterTable();
 }
 function basculerPlusFiltres() { plusFiltres = !plusFiltres; majAffichageVue(); }
 
@@ -4098,49 +3971,104 @@ function enteteSection(type, titre, sem, n, resume, ouvert, fn, nbCols, okVert) 
     + '<span class="sem-action">' + (fn ? (ouvert ? 'Replier' : 'Afficher') : '') + '</span>'
     + '</div></td></tr>';
 }
+// Filtres propres à chaque section (recherche, client, statut, technicien)
+var filtresSection = { passee: {}, courante: {}, suivante: {} };
+function filtreActif(cle) { var f = filtresSection[cle]; return !!(f.q || f.client || f.statut || f.tech); }
+function filtrerSection(cle, liste, psFn) {
+  var f = filtresSection[cle];
+  if (!filtreActif(cle)) return liste;
+  var q = norm2(f.q);
+  return liste.filter(function(i) {
+    var techs = []; psFn(i).forEach(function(p){ p.techs.forEach(function(t){ techs.push(t); }); });
+    if (!techs.length) techs = (i.assignes || []).concat(i.assigne ? [i.assigne] : []);
+    if (f.client && i.client !== f.client) return false;
+    if (f.statut && i.statut !== f.statut) return false;
+    if (f.tech && techs.indexOf(f.tech) === -1) return false;
+    if (q && ![i.bc, i.pl, i.devis, i.client, i.adresse, i.nature, i.nomClient, techs.join(' ')].some(function(v){ return norm2(v).indexOf(q) !== -1; })) return false;
+    return true;
+  });
+}
+function norm2(v) { return String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+function optionsUniques(valeurs) { var u = {}; valeurs.forEach(function(v){ if (v) u[v] = 1; }); return Object.keys(u).sort(function(a, b){ return a.localeCompare(b); }); }
+function barreSection(cle, brut, psFn, nbCols) {
+  var f = filtresSection[cle];
+  var techs = []; brut.forEach(function(i){ psFn(i).forEach(function(p){ techs = techs.concat(p.techs); }); techs = techs.concat(i.assignes || []); });
+  var sel = function(champ, libelle, valeurs) {
+    return '<select class="filter-select" onchange="majFiltreSection(\'' + cle + '\',\'' + champ + '\',this.value)"><option value="">' + libelle + '</option>'
+      + optionsUniques(valeurs).map(function(v){ return '<option' + (f[champ] === v ? ' selected' : '') + '>' + v.replace(/</g, '&lt;') + '</option>'; }).join('') + '</select>';
+  };
+  return '<tr class="sem-filtres sem-filtres-' + cle + '"><td colspan="' + nbCols + '"><div class="sem-fbar">'
+    + '<div class="search-wrap" style="flex:1;min-width:180px;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>'
+    + '<input class="search-input" id="fs-q-' + cle + '" placeholder="N° BC, PL, client, adresse..." value="' + String(f.q || '').replace(/"/g, '&quot;') + '" oninput="majFiltreSection(\'' + cle + '\',\'q\',this.value,this)"></div>'
+    + sel('client', 'Tous les clients', brut.map(function(i){ return i.client; }))
+    + sel('statut', 'Tous les statuts', brut.map(function(i){ return i.statut; }))
+    + sel('tech', 'Tous les techniciens', techs)
+    + (filtreActif(cle) ? '<button class="btn-vue" onclick="effacerFiltresSection(\'' + cle + '\')">Effacer</button>' : '')
+    + '</div></td></tr>';
+}
+function majFiltreSection(cle, champ, val, el) {
+  filtresSection[cle][champ] = val;
+  var pos = el && el.selectionStart;
+  filterTable();
+  // Le tableau est redessiné : on rend le curseur au champ de recherche
+  if (el) { var n = document.getElementById(el.id); if (n) { n.focus(); if (pos != null && n.setSelectionRange) n.setSelectionRange(pos, pos); } }
+}
+function effacerFiltresSection(cle) { filtresSection[cle] = {}; filterTable(); }
+
 function sectionsSemaine(list, ligne, nbCols) {
   var html = '', espace = '<tr class="sem-espace"><td colspan="' + nbCols + '"></td></tr>';
   var sp = semainePrecedente(), sa = semaineAffichee(), sn = semaineAffichee(decalageSemaine + 1);
-  var resteListe = decalageSemaine === 0 ? list.filter(estReste) : [];
-  var courante = list.filter(function(i){ return !estReste(i); });
   var kzManque = function(item, ps){ return ps.filter(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; }).length; };
+  var cptTxt = function(n, brut){ return n === brut ? String(n) : n + ' / ' + brut; };
 
   // 1. Semaine précédente : rapports encore à boucler
   if (decalageSemaine === 0) {
+    var resteBrut = list.filter(estReste);
+    var resteListe = filtrerSection('passee', resteBrut, passagesReste);
     var c = { relire: 0, envoyer: 0, retard: 0, attente: 0 };
     resteListe.forEach(function(i){ passagesReste(i).forEach(function(p){ var e = etatRapport(i, p); if (c[e] !== undefined) c[e]++; }); });
-    var resume = resteListe.length
-      ? [c.relire ? compte(c.relire, 'à relire', 'à relire') : '', c.envoyer ? compte(c.envoyer, 'à envoyer', 'à envoyer') : '', c.retard ? compte(c.retard, 'en retard', 'en retard') : '', c.attente ? compte(c.attente, 'en attente', 'en attente') : ''].filter(Boolean).join(' · ')
+    var resume = resteBrut.length
+      ? ([c.relire ? compte(c.relire, 'à relire', 'à relire') : '', c.envoyer ? compte(c.envoyer, 'à envoyer', 'à envoyer') : '', c.retard ? compte(c.retard, 'en retard', 'en retard') : '', c.attente ? compte(c.attente, 'en attente', 'en attente') : ''].filter(Boolean).join(' · ') || 'aucun résultat pour ce filtre')
       : '✓ tout est bouclé';
-    var ouvP = (resteOuvert || sousFiltre === 'reste') && resteListe.length > 0;
-    html += enteteSection('passee', 'Semaine précédente', sp, resteListe.length, resume, ouvP, resteListe.length ? 'basculerReste' : '', nbCols, !resteListe.length);
-    if (ouvP) resteListe.forEach(function(i){ html += ligne(i); });
+    var ouvP = (resteOuvert || sousFiltre === 'reste') && resteBrut.length > 0;
+    html += enteteSection('passee', 'Semaine précédente', sp, cptTxt(resteListe.length, resteBrut.length), resume, ouvP, resteBrut.length ? 'basculerReste' : '', nbCols, !resteBrut.length);
+    if (ouvP) {
+      html += barreSection('passee', resteBrut, passagesReste, nbCols);
+      resteListe.forEach(function(i){ html += ligne(i); });
+    }
     html += espace;
   }
 
   // 2. Semaine pilotée
+  var couranteBrut = list.filter(function(i){ return !estReste(i); });
+  var courante = filtrerSection('courante', couranteBrut, function(i){ return passagesSemaine(i); });
   var nbP = 0, kzC = 0;
   courante.forEach(function(i){ var ps = passagesSemaine(i); nbP += ps.length; kzC += kzManque(i, ps); });
   var npC = courante.filter(function(i){ return !toNotifArray(i.notifBailleur).length; }).length;
-  var resumeC = courante.length ? [compte(nbP, 'passage', 'passages'), kzC ? compte(kzC, 'Kizeo à générer', 'Kizeo à générer') : '✓ Kizeo prêts', npC ? compte(npC, 'non prévenu', 'non prévenus') : ''].filter(Boolean).join(' · ') : 'aucun passage';
+  var resumeC = courante.length ? [compte(nbP, 'passage', 'passages'), kzC ? compte(kzC, 'Kizeo à générer', 'Kizeo à générer') : '✓ Kizeo prêts', npC ? compte(npC, 'non prévenu', 'non prévenus') : ''].filter(Boolean).join(' · ') : (couranteBrut.length ? 'aucun résultat pour ce filtre' : 'aucun passage');
   var titreC = decalageSemaine === 0 ? 'Semaine en cours' : 'Semaine affichée';
-  html += enteteSection('courante', titreC, sa, courante.length, resumeC, courantOuvert, 'basculerCourant', nbCols, false);
+  html += enteteSection('courante', titreC, sa, cptTxt(courante.length, couranteBrut.length), resumeC, courantOuvert, 'basculerCourant', nbCols, false);
   if (courantOuvert) {
+    if (couranteBrut.length) html += barreSection('courante', couranteBrut, function(i){ return passagesSemaine(i); }, nbCols);
     if (courante.length) courante.forEach(function(i){ html += ligne(i); });
-    else html += '<tr><td colspan="' + nbCols + '"><div class="empty-state" style="padding:24px;"><p>' + (sousFiltre ? 'Aucun dossier pour cet indicateur.' : 'Aucun passage prévu sur cette semaine.') + '</p></div></td></tr>';
+    else html += '<tr><td colspan="' + nbCols + '"><div class="empty-state" style="padding:24px;"><p>' + (sousFiltre ? 'Aucun dossier pour cet indicateur.' : couranteBrut.length ? 'Aucun dossier ne correspond à ce filtre.' : 'Aucun passage prévu sur cette semaine.') + '</p></div></td></tr>';
   }
 
   // 3. Semaine suivante : tous les dossiers qui y ont un passage (même déjà affichés plus haut)
   if (!sousFiltre) {
-    var prochaine = (window._baseSuivi || []).filter(function(i){ return i.statut !== 'Annulé' && passagesSemaine(i, sn).length > 0; })
-      .sort(function(x, y){ return (passagesSemaine(x, sn)[0].debut || '').localeCompare(passagesSemaine(y, sn)[0].debut || ''); });
+    var psN = function(i){ return passagesSemaine(i, sn); };
+    var prochaineBrut = (window._baseSuivi || []).filter(function(i){ return i.statut !== 'Annulé' && psN(i).length > 0; })
+      .sort(function(x, y){ return (psN(x)[0].debut || '').localeCompare(psN(y)[0].debut || ''); });
+    var prochaine = filtrerSection('suivante', prochaineBrut, psN);
     var nbN = 0, kzN = 0;
-    prochaine.forEach(function(i){ var ps = passagesSemaine(i, sn); nbN += ps.length; kzN += kzManque(i, ps); });
+    prochaine.forEach(function(i){ var ps = psN(i); nbN += ps.length; kzN += kzManque(i, ps); });
     var npN = prochaine.filter(function(i){ return !toNotifArray(i.notifBailleur).length; }).length;
-    var resumeN = prochaine.length ? [compte(nbN, 'passage', 'passages'), kzN ? compte(kzN, 'Kizeo à générer', 'Kizeo à générer') : '✓ Kizeo prêts', npN ? compte(npN, 'non prévenu', 'non prévenus') : ''].filter(Boolean).join(' · ') : 'aucun passage';
+    var resumeN = prochaine.length ? [compte(nbN, 'passage', 'passages'), kzN ? compte(kzN, 'Kizeo à générer', 'Kizeo à générer') : '✓ Kizeo prêts', npN ? compte(npN, 'non prévenu', 'non prévenus') : ''].filter(Boolean).join(' · ') : (prochaineBrut.length ? 'aucun résultat pour ce filtre' : 'aucun passage');
     html += espace;
-    html += enteteSection('suivante', 'Semaine suivante', sn, prochaine.length, resumeN, prochaineOuvert && prochaine.length > 0, prochaine.length ? 'basculerProchaine' : '', nbCols, false);
-    if (prochaineOuvert) {
+    var ouvN = prochaineOuvert && prochaineBrut.length > 0;
+    html += enteteSection('suivante', 'Semaine suivante', sn, cptTxt(prochaine.length, prochaineBrut.length), resumeN, ouvN, prochaineBrut.length ? 'basculerProchaine' : '', nbCols, false);
+    if (ouvN) {
+      html += barreSection('suivante', prochaineBrut, psN, nbCols);
       contexteLigne = 'prochaine';
       try { prochaine.forEach(function(i){ html += ligne(i); }); } finally { contexteLigne = ''; }
     }
@@ -5800,7 +5728,7 @@ onAuthStateChanged(auth, async (user) => {
     window.interventions = interventions;
     if (window.populateFilterDropdowns) window.populateFilterDropdowns();
     if (window.filterTable) window.filterTable();
-    else if (window.renderTable) window.renderTable(interventions);
+
   });
 
   // Trace d'une relance WhatsApp ouverte pour un rapport en retard.
