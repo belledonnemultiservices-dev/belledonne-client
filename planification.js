@@ -1209,21 +1209,64 @@ function rendreRecap(item) {
   });
   const faits = etatsEtapes(item);
   const toutOk = faits.every(Boolean);
+  const manque = manquesPlanification(item);
+  const manqueNotif = manquesNotification(item);
   $(".pl-corps").innerHTML = `
-    <p class="pl-intro">${toutOk ? "Tout est prêt : les passages sont planifiés, dans l'agenda, sur Kizeo, et le client et le locataire sont prévenus." : "Il reste des étapes à faire. Tu peux les reprendre maintenant ou plus tard depuis la vue Semaine."}</p>
+    <p class="pl-intro">${toutOk ? "Tout est prêt : les passages sont planifiés, dans l'agenda, sur Kizeo, et le client et le locataire sont prévenus." : manque.length ? "Le dossier ne peut pas encore passer en Pilotage : l'étape Passages, agenda & Kizeo n'est pas terminée." : "Les passages sont prêts. Il reste à prévenir le client ou le locataire (tu peux le faire maintenant ou plus tard)."}</p>
     <table class="pl-table pl-recap"><thead><tr><th>Passage</th><th>Agenda</th><th>Kizeo</th><th>Client</th><th>Locataire</th></tr></thead><tbody>${lignes.join("") || '<tr><td colspan="5">Aucun passage</td></tr>'}</tbody></table>
-    <p class="pl-note" style="margin-top:12px;">Les rapports (reçu, envoyé au client) se suivront après l'intervention, dans la vue Semaine.</p>`;
-  pied(`<button class="pl-btn" data-a="prec">← Précédent</button><span class="pl-espace"></span><button class="pl-btn prim" data-a="fin">Terminer</button>`);
+    ${manque.length ? `<div class="pl-psg-pb" style="margin-top:12px;">À terminer avant de passer en Pilotage :<br>${manque.map(x => "• " + esc(x)).join("<br>")}</div>` : ""}
+    ${!manque.length && manqueNotif.length ? `<div class="pl-psg-pb" style="margin-top:12px;background:#FFF4E5;color:#B45309;">Rappel :<br>${manqueNotif.map(x => "• " + esc(x)).join("<br>")}</div>` : ""}
+    <p class="pl-note" style="margin-top:12px;">Les rapports (reçu, envoyé au client) se suivront après l'intervention, dans le Pilotage quotidien.</p>`;
+  pied(`<button class="pl-btn" data-a="prec">← Précédent</button><span class="pl-espace"></span>${manque.length ? `<button class="pl-btn" data-a="aller">Reprendre l'étape Passages →</button>` : ""}<button class="pl-btn prim" data-a="fin">Terminer</button>`);
   $(".pl-pied [data-a=prec]").onclick = () => { etat.etape--; rendre(); };
+  const ba = $(".pl-pied [data-a=aller]"); if (ba) ba.onclick = () => { etat.etape = 1; etat.lignes = null; rendre(); };
+  // Décidé le 15/11 : le dossier passe « En cours » (Pilotage) si et seulement si l'étape Passages,
+  // agenda & Kizeo est entièrement validée. Notifications manquantes : bascule après un rappel.
   $(".pl-pied [data-a=fin]").onclick = async () => {
+    const it = dossier() || item;
+    const m1 = manquesPlanification(it);
+    if (m1.length) { alert("Le dossier reste en Planification tant que l'étape Passages, agenda & Kizeo n'est pas terminée :\n\n" + m1.map(x => "• " + x).join("\n")); return; }
+    const m2 = manquesNotification(it);
+    if (m2.length && !confirm("Rappel :\n\n" + m2.map(x => "• " + x).join("\n") + "\n\nPasser quand même le dossier en Pilotage ? Tu pourras notifier depuis le Pilotage quotidien.")) return;
     // Planification faite : le dossier passe de « À traiter » à « En cours »
     // (de même pour un dossier replanifié après un passage annulé)
-    if (["À traiter", "Passage annulé", "Nouveau", "", undefined, null].includes(item.statut) && ns.length) {
-      await window._updateSuivi(item.id, { statut: "En cours", updatedAt: new Date().toISOString() });
-      showToast("Dossier planifié · passé en « En cours »");
+    if (["À traiter", "Passage annulé", "Nouveau", "", undefined, null].includes(it.statut)) {
+      await window._updateSuivi(it.id, { statut: "En cours", updatedAt: new Date().toISOString() });
+      showToast("Dossier planifié · passé en Pilotage quotidien");
     }
     fermer();
   };
+}
+// Ce qui manque à l'étape Passages, agenda & Kizeo (vide = étape validée)
+function manquesPlanification(item) {
+  const m = [];
+  if (!(item.adresse && (item.bc || item.pl || item.devis))) m.push("Dossier : adresse ou référence (BC, PL, devis) manquante");
+  const bruts = passagesBruts(item);
+  const ps = actifs(item);
+  const pr = ps.filter(p => !p.jumeau);
+  if (!pr.length) { m.push("Aucun passage daté"); return m; }
+  pr.forEach(p => {
+    const n = norm(item, p);
+    if (!(p.techs || []).length) m.push("Passage " + p.num + " : aucun technicien");
+    else if (n && window.etatAgenda(n) !== "ok") m.push("Passage " + p.num + " : rendez-vous agenda pas à jour");
+  });
+  ps.forEach(p => {
+    const b = bruts.find(x => x.passageId && x.passageId === p.passageId) || p;
+    const veut = b.kzForm === undefined || !!b.kzForm || !!b.kizeoPush;
+    const n = norm(item, p);
+    const e = n ? window.etatKizeo(item, n) : "manque";
+    if (veut && e !== "ok" && e !== "recu") m.push("Passage " + p.num + " : rapport Kizeo " + (b.kzNom ? "« " + b.kzNom + " » " : "") + (e === "ecart" ? "chez le mauvais technicien (à renvoyer)" : "pas envoyé"));
+  });
+  return m;
+}
+// Notifications manquantes (rappel, non bloquant)
+function manquesNotification(item) {
+  const ns = actifs(item).filter(p => !p.jumeau).map(p => norm(item, p)).filter(Boolean);
+  if (!ns.length) return [];
+  const m = [];
+  if (!ns.every(p => window.notifOk(window.notifPassage(item, p, "notifBailleur")))) m.push("le client n'est pas notifié" + (ns.some(p => (window.notifPassage(item, p, "notifBailleur") || {}).change) ? " (date modifiée depuis la notification)" : ""));
+  if (item.emailClient && !ns.every(p => window.notifOk(window.notifPassage(item, p, "notifLocataire")))) m.push("le locataire n'est pas notifié");
+  return m;
 }
 
 window.ouvrirPlanification = ouvrirPlanification;
