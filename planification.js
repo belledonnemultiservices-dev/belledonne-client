@@ -283,7 +283,8 @@ function navigation(suivantLib, surSuivant) {
 // techniciens, qui ont leur étape), avec le PDF de référence ouvert à droite.
 const DOCS = [["pl", "PL", "N° affaire"], ["bc", "BC", "N° de bon de commande"], ["devis", "Devis", "N° de devis"]];
 function rendreDossier(item) {
-  const tel = (Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : []).join(", ");
+  const tels = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
+  const champTel = (val) => `<input class="pl-tel" value="${esc(val)}" placeholder="06…">`;
   const clients = (window._allClients || []).slice();
   if (item.client && !clients.includes(item.client)) clients.unshift(item.client);
   const champ = (lib, html, large) => `<div class="pl-champ${large ? " large" : ""}"><label>${lib}</label>${html}</div>`;
@@ -301,24 +302,26 @@ function rendreDossier(item) {
     <div class="pl-grille">
       <div class="pl-section">Client</div>
       ${champ("Client", `<select id="plClient"><option value="">— Sélectionner —</option>${clients.map(c => `<option value="${esc(c)}"${c === item.client ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`)}
-      ${champ("N° SIRET", inp("plSiret", item.siret, "XXX XXX XXX XXXXX"))}
-      ${champ("Code service Chorus", inp("plChorus", item.chorus))}
+      ${champ("N° Chorus", inp("plChorus", item.chorus))}
       <div class="pl-section">Mission</div>
       ${champ("Nature de la mission", `<div id="plNatureWrap"></div>`)}
       ${champ("Date d'émission", inp("plDateEmission", item.dateEmission, "", "date"))}
       ${champ("Expéditeur", inp("plExpediteur", item.expediteur))}
+      ${champ("Adresse", inp("plAdresse", item.adresse, "Adresse d'intervention"), true)}
       <div class="pl-section">Références</div>
       ${DOCS.map(doc).join("")}
-      <div class="pl-section">Intervention</div>
-      ${champ("Adresse", inp("plAdresse", item.adresse, "Adresse d'intervention"), true)}
-      ${champ("Locataire", inp("plNom", item.nomClient, "Nom du locataire"))}
-      ${champ("Téléphone(s) du locataire", inp("plTel", tel, "06…, séparés par des virgules"))}
-      ${champ("Email du locataire", inp("plEmail", item.emailClient, "Pour lui envoyer la notification"), true)}
+      <div class="pl-section">Contact</div>
+      ${champ("Nom du contact client", inp("plNom", item.nomClient))}
+      ${champ(`<span style="display:flex;justify-content:space-between;align-items:center;">Téléphone(s)<button type="button" class="pl-btn petit" data-a="ajoutTel" style="padding:2px 9px;font-size:11px;">+ Ajouter</button></span>`,
+        `<div id="plTels" style="display:flex;flex-direction:column;gap:6px;">${(tels.length ? tels : [""]).map(champTel).join("")}</div>`)}
+      ${champ("Email client", inp("plEmail", item.emailClient, "", "email"), true)}
       <div class="pl-section">Notes</div>
       ${champ("Observations", `<textarea id="plObservations" placeholder="Détails, contexte, contraintes...">${esc(item.observations)}</textarea>`, true)}
       ${champ("Notes internes", `<textarea id="plNotes" placeholder="Notes internes, suivi, rappels...">${esc(item.notes)}</textarea>`, true)}
     </div>
     <div class="pl-actions"><button class="pl-btn" data-a="attente">Mettre en attente…</button><span class="pl-note">Si une information bloque la planification (locataire injoignable, accès…)</span></div>`;
+  // Téléphones : un champ par numéro, comme la fiche
+  $("[data-a=ajoutTel]").onclick = () => { $("#plTels").insertAdjacentHTML("beforeend", champTel("")); $("#plTels input:last-child").focus(); };
   // Liste des natures habituelle (config/naturesMission, avec « Ajouter une nature »)
   if (window.renderNatureField) window.renderNatureField("plNature", item.nature || "");
   else $("#plNatureWrap").innerHTML = inp("plNature", item.nature);
@@ -386,7 +389,7 @@ async function enregistrerDossier(item, silencieux) {
   if (!item) return;
   const v = (id) => ($("#" + id) ? $("#" + id).value.trim() : "");
   const saisie = {
-    client: v("plClient"), siret: v("plSiret"), chorus: v("plChorus"),
+    client: v("plClient"), chorus: v("plChorus"),
     nature: v("plNature") === "__new__" ? (item.nature || "") : v("plNature"),
     dateEmission: v("plDateEmission"), expediteur: v("plExpediteur"),
     pl: v("pl_pl"), bc: v("pl_bc"), devis: v("pl_devis"),
@@ -401,7 +404,7 @@ async function enregistrerDossier(item, silencieux) {
   // Seuls les champs modifiés partent en base
   const maj = {};
   Object.entries(saisie).forEach(([k, val]) => { if (val !== String(item[k] ?? "").trim()) maj[k] = val; });
-  const coords = v("plTel").split(",").map(s => s.trim()).filter(Boolean);
+  const coords = [...document.querySelectorAll("#plTels .pl-tel")].map(i => i.value.trim()).filter(Boolean);
   const coordsAvant = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
   if (JSON.stringify(coords) !== JSON.stringify(coordsAvant)) maj.coordonnees = coords;
   if (!Object.keys(maj).length) return;
@@ -513,6 +516,9 @@ async function enregistrerPassages(item) {
   const assignes = [...new Set(passages.filter(p => p.statut !== "annule").flatMap(p => p.techs || []))];
   try {
     await window._updateSuivi(item.id, { passages, calEventIds: passages.map(p => p.calEvents || {}), assignes, assigne: assignes[0] || "", updatedAt: new Date().toISOString() });
+    // Comme la fiche : un rapport Kizeo en attente garde la date du passage au moment de l'envoi ;
+    // si le passage est déplacé, son échéance suit (sinon il passe à tort « en retard »)
+    if (window._syncEcheancesReception) await window._syncEcheancesReception(item.id, passages);
     showToast("Passages enregistrés");
   } finally { etat.occupe = false; }
   await pause(400); // laisse l'écoute temps réel rapporter la fiche à jour
