@@ -4123,8 +4123,7 @@ function sectionsSemaine(list, ligne, nbCols) {
   courante.forEach(function(i){ var ps = passagesSemaine(i); nbP += ps.length; kzC += kzManque(i, ps); });
   var npC = courante.filter(function(i){ return !toNotifArray(i.notifBailleur).length; }).length;
   var resumeC = courante.length ? [compte(nbP, 'passage', 'passages'), kzC ? compte(kzC, 'Kizeo à générer', 'Kizeo à générer') : '✓ Kizeo prêts', npC ? compte(npC, 'non prévenu', 'non prévenus') : ''].filter(Boolean).join(' · ') : 'aucun passage';
-  var jourSem = new Date().getDay();
-  var titreC = decalageSemaine === 0 ? (jourSem === 0 || jourSem === 6 ? 'Semaine qui arrive' : 'Cette semaine') : 'Semaine affichée';
+  var titreC = decalageSemaine === 0 ? 'Semaine en cours' : 'Semaine affichée';
   html += enteteSection('courante', titreC, sa, courante.length, resumeC, courantOuvert, 'basculerCourant', nbCols, false);
   if (courantOuvert) {
     if (courante.length) courante.forEach(function(i){ html += ligne(i); });
