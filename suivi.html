@@ -269,6 +269,10 @@
   .bs-ajout{margin-left:auto;align-self:center;}
   .bs-ajout2{margin-left:8px;background:#4338CA;}
   .ref-tache{background:#EEF2FF;color:#4338CA;}
+  /* Tâches (15/11) : fond lavande léger pour les distinguer des interventions sur bon */
+  tr.ligne-tache > td{background:#F6F4FF;}
+  tr.ligne-tache:hover > td{background:#EFEBFF;}
+  tr.ligne-tache > td:first-child{box-shadow:inset 3px 0 0 #A5B4FC;}
   .avancement{display:flex;gap:3px;flex-wrap:nowrap;}
   .av-etape{font:600 10.5px 'DM Sans',sans-serif;padding:3px 6px;border-radius:5px;background:#EEF1F4;color:var(--text-muted);white-space:nowrap;cursor:default;}
   .av-etape.fait{background:#E3F5EC;color:#178a5c;}
@@ -4368,7 +4372,7 @@ function ligneSemaine(item, nbCols) {
   var tous = passagesNorm(item);
   var h = '';
   var isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
-  h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2 ligne-sem' + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
+  h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2 ligne-sem' + (item.clientType === 'tache' ? ' ligne-tache' : '') + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
   h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
   h += '<td>' + refHtml(item) + '</td>';
   h += '<td><div class="cn-client">' + (item.client || '—') + (item.nature ? ' <span class="cn-nature">· ' + item.nature + '</span>' : '') + (fileDe(item) !== 'pilotage' ? ' ' + etiquetteEtape(item) : '') + '</div><div class="cn-nature">' + (item.adresse || '—') + (item.nomClient ? ' · ' + item.nomClient : '') + '</div></td>';
@@ -4551,7 +4555,7 @@ window.renderTableV2 = function(list) {
     var techs = techsDesPassages(item);
     if (!techs.length) techs = item.assignes || (item.assigne ? [item.assigne] : []);
     var isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
-    h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2' + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
+    h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2' + (item.clientType === 'tache' ? ' ligne-tache' : '') + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
     h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
     h += '<td>' + refHtml(item) + '</td>';
     h += '<td><div class="cn-client">' + (item.client || '—') + '</div><div class="cn-nature">' + (item.nature || '') + (item.dateEmission ? ' · BC du ' + fmtDate(item.dateEmission) : '') + '</div></td>';
