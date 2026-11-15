@@ -239,6 +239,7 @@
         <div class="page-title">Gestion rapports</div>
         <div class="page-sub">Suivi des rapports demandés aux techniciens : en attente, reçus, envoyés au client.</div>
       </div>
+      <a id="retourSuivi" href="suivi.html" class="btn-a btn-open" style="display:none;font-size:13px;padding:9px 14px;">← Retour au Suivi</a>
     </div>
 
     <div class="tabs-bar">
@@ -440,7 +441,33 @@ function loadList() {
     allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     allDocs.sort((a, b) => (b.arriveeAt || "").localeCompare(a.arriveeAt || ""));
     render();
+    traiterLienDirect();
   }, (e) => console.error("reception-rapports:", e));
+}
+
+// ── Ouverture directe depuis le Suivi ──
+// gestion-rapports.html?rapport=<id>&action=relire|envoyer|renvoyer&from=suivi
+// Ouvre le bon onglet, met la ligne en évidence et lance l'action demandée, une seule fois.
+let _lienDirectTraite = false;
+function traiterLienDirect() {
+  if (_lienDirectTraite) return;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("from") === "suivi") document.getElementById("retourSuivi").style.display = "";
+  const id = params.get("rapport");
+  if (!id) { _lienDirectTraite = true; return; }
+  const r = allDocs.find(x => x.id === id);
+  if (!r) return; // pas encore chargé : on réessaiera au prochain instantané
+  _lienDirectTraite = true;
+  const onglet = r.statut === "en-attente" ? "attente" : r.statut === "envoye" ? "envoyes" : "bureau";
+  if (onglet !== ongletActif) changerOnglet(onglet);
+  const ligne = document.getElementById("rrow-" + id);
+  if (ligne) { if (ligne.scrollIntoView) ligne.scrollIntoView({ block: "center" }); ligne.style.transition = "background 1.5s"; ligne.style.background = "#E8F9F2"; setTimeout(() => { ligne.style.background = ""; }, 2500); }
+  const action = params.get("action");
+  if (action === "relire" && r.donnees) openRelecture(id);
+  else if (action === "envoyer" && (r.statut === "a-traiter" || r.statut === "archive")) openEnvoi(id);
+  else if (action === "renvoyer" && r.statut === "en-attente") renvoyer(id);
+  // Nettoie l'adresse pour qu'un rechargement ne relance pas l'action
+  history.replaceState(null, "", "gestion-rapports.html" + (params.get("from") === "suivi" ? "?from=suivi" : ""));
 }
 
 function fmtDate(iso) {
