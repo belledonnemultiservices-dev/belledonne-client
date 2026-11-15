@@ -1217,7 +1217,13 @@ exports.pushKizeoForm = functions
     // Format figé par le contrat externe Kizeo (webhook attend suiviId::numPassage, cf. regex
     // de réception) : ne pas y injecter passageId, qui ne sert qu'à cibler la bonne occurrence
     // ci-dessus quand plusieurs passages partagent le même num (contrat récurrent relancé).
-    const refInterne = `${suiviId}::${numPassage}`;
+    // Passage jumeau (même n°, autre adresse ou autre type d'intervention, cf. fenêtre de
+    // planification du 15/11) : référence suffixée par son passageId, pour que son rapport
+    // ne soit pris ni pour un renvoi ni pour le rapport de l'autre passage du même n°.
+    // Le premier passage d'un n° garde la référence simple (compatibilité totale).
+    const refInterne = passage.jumeau && passage.passageId
+      ? `${suiviId}::${numPassage}::${passage.passageId}`
+      : `${suiviId}::${numPassage}`;
 
     // Ligne existante pour ce passage (même en attente, déjà reçue, envoyée...) :
     // détermine si c'est un premier envoi ou un renvoi (compteur + suffixe libellé),
@@ -1629,7 +1635,9 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
 
   let suiviId = null, client = "", bc = "", numPassage = null, passageLabel = "";
   let passagesSuivi = [];
-  const m = refInterne.match(/^(.+)::(\d+)$/);
+  // dossier::n° ou, pour un passage jumeau, dossier::n°::passageId
+  const m = refInterne.match(/^(.+?)::(\d+)(?:::([A-Za-z0-9_-]+))?$/);
+  const passageIdRef = m && m[3] ? m[3] : null;
   if (m) {
     const candidateSuiviId = m[1];
     numPassage = parseInt(m[2], 10);
@@ -1675,7 +1683,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     // ne pas faire réapparaître un passage clos. La donnée reste chez Kizeo.
     const enAttente = await db.collection("reception-rapports").where("refInterne", "==", refInterne).where("statut", "==", "en-attente").limit(1).get();
     if (enAttente.empty) {
-      const vivants = passagesSuivi.filter(p => Number(p.num) === numPassage && p.statut !== "annule" && p.kizeoPush);
+      const vivants = passagesSuivi.filter(p => (passageIdRef ? p.passageId === passageIdRef : Number(p.num) === numPassage) && p.statut !== "annule" && p.kizeoPush);
       if (!vivants.length) {
         console.log(`Kizeo: soumission ${dataId} ignorée, passage ${numPassage} de suivi/${suiviId} annulé, supprimé ou sans envoi actif`);
         return true;
@@ -1879,6 +1887,8 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     console.log(`Kizeo: soumission ${dataId} mise à jour (reception-rapports/${existing.docs[0].id})`);
   } else {
     docData.createdAt = now;
+    // Ligne créée faute de ligne en attente : le passageId d'un jumeau vient de sa référence
+    if (passageIdRef) docData.passageId = passageIdRef;
     const ref = await db.collection("reception-rapports").add(docData);
     console.log(`Kizeo: soumission ${dataId} reçue -> reception-rapports/${ref.id}`);
   }

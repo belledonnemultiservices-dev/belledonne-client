@@ -422,6 +422,27 @@ const FUNCTION_URL = "https://europe-west1-belledonne-client.cloudfunctions.net/
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app, "belledonne-client");
+
+// ── Statut du dossier après le rapport d'un passage n° 1 (15/11) ──
+// Un passage se reconnaît par son passageId : des passages jumeaux partagent le n° 1
+// (deux adresses ou deux types d'intervention, un rapport chacun).
+// - plus aucun passage n° 1 actif (tous annulés : absence, annulation) → « Passage annulé »
+// - tous les passages n° 1 actifs ont leur rapport envoyé → « Terminé »
+// - sinon (un jumeau attend encore son rapport) : rien ne change
+function memePassage(p, r) { return r.passageId && p.passageId ? p.passageId === r.passageId : String(p.num) === String(r.numPassage); }
+async function majStatutApresPassage1(suiviId) {
+  const sSnap = await getDoc(doc(db, "suivi", suiviId));
+  if (!sSnap.exists()) return;
+  const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
+  const actifs1 = passages.filter(p => String(p.num) === "1" && p.statut !== "annule");
+  if (!actifs1.length) { await updateDoc(doc(db, "suivi", suiviId), { statut: "Passage annulé" }); return; }
+  const recs = (await getDocs(query(collection(db, "reception-rapports"), where("suiviId", "==", suiviId), where("numPassage", "==", 1)))).docs.map(d => d.data());
+  const envoyes = recs.filter(r => r.statut === "envoye" && r.typeRapport !== "absence-annulation");
+  // Un seul passage n° 1 : n'importe quel rapport envoyé du n° 1 compte (anciens rapports sans passageId)
+  const ok = actifs1.length === 1 ? envoyes.some(r => !r.passageId || !actifs1[0].passageId || r.passageId === actifs1[0].passageId)
+    : actifs1.every(p => envoyes.some(r => r.passageId && r.passageId === p.passageId));
+  if (ok) await updateDoc(doc(db, "suivi", suiviId), { statut: "Terminé" });
+}
 const storage = getStorage(app);
 
 let allDocs = [];
@@ -877,7 +898,7 @@ window.supprimerReception = async function(id) {
         const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
         if (sSnap.exists()) {
           const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
-          const updated = passages.map(p => String(p.num) === String(r.numPassage) ? { ...p, kizeoPush: null } : p);
+          const updated = passages.map(p => memePassage(p, r) ? { ...p, kizeoPush: null } : p); // le jumeau garde son envoi
           await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
         }
       } catch(e) { console.warn("Réinitialisation du badge Suivi échouée:", e.message); }
@@ -1377,8 +1398,9 @@ window.doEnvoyer = async function(mode) {
       // (anciennement fait par le bouton Archiver, supprimé). Les rapports des
       // passages suivants se rangent sur leur passage sans changer le statut.
       // Un renvoi depuis "Envoyés" ne retouche pas un statut modifié depuis.
+      // Avec des jumeaux n° 1, « Terminé » attend que chacun ait son rapport envoyé.
       if (!isAbsAnnul && r.statut !== "envoye" && r.suiviId && String(r.numPassage) === "1") {
-        try { await updateDoc(doc(db, "suivi", r.suiviId), { statut: "Terminé" }); }
+        try { await majStatutApresPassage1(r.suiviId); }
         catch(e) { console.warn("Mise à jour statut Suivi échouée:", e.message); }
       }
       // Un rapport d'absence/annulation constaté par le technicien signifie que le
@@ -1388,10 +1410,12 @@ window.doEnvoyer = async function(mode) {
           const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
           if (sSnap.exists()) {
             const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
-            const updated = passages.map(p => String(p.num) === String(r.numPassage) ? { ...p, statut: "annule" } : p);
-            // Passage n°1 annulé (absence ou annulation) : la ligne du Suivi passe en
-            // "Passage annulé". Statut ordinaire, modifiable ensuite à la main.
-            await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated, ...(String(r.numPassage) === "1" ? { statut: "Passage annulé" } : {}) });
+            // Seul le passage concerné est annulé (par passageId : un jumeau n'emporte pas l'autre)
+            const updated = passages.map(p => memePassage(p, r) ? { ...p, statut: "annule" } : p);
+            await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
+            // Passage n°1 : « Passage annulé » si plus aucun n° 1 actif, « Terminé » si les jumeaux restants sont envoyés.
+            // Statut ordinaire, modifiable ensuite à la main.
+            if (String(r.numPassage) === "1") await majStatutApresPassage1(r.suiviId);
           }
         } catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
       }
@@ -1706,9 +1730,10 @@ window.confirmerAnnulerPassage = async function(mode) {
         const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
         if (sSnap.exists()) {
           const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
-          const updated = passages.map(p => String(p.num) === String(r.numPassage) ? { ...p, statut: "annule", kizeoPush: null } : p);
-          // Même règle que pour un constat envoyé : passage n°1 annulé => "Passage annulé".
-          await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated, ...(String(r.numPassage) === "1" ? { statut: "Passage annulé" } : {}) });
+          const updated = passages.map(p => memePassage(p, r) ? { ...p, statut: "annule", kizeoPush: null } : p);
+          await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
+          // Même règle que pour un constat envoyé
+          if (String(r.numPassage) === "1") await majStatutApresPassage1(r.suiviId);
         }
       } catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
     }

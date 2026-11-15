@@ -1599,6 +1599,9 @@ function getPassagesFromDOM() {
     passages.push({
       num: parseInt(document.getElementById('fPassageNum' + n)?.value) || null,
       passageId: div.dataset.passageId || null,
+      jumeau: div.dataset.jumeau === '1',
+      libelle: div.dataset.libelle || '',
+      ...(function(){ try { const x = JSON.parse(div.dataset.extra || '{}'); Object.keys(x).forEach(k => { if (x[k] === undefined) delete x[k]; }); return x; } catch(e) { return {}; } })(),
       debut: document.getElementById('fDateDebut' + n)?.value || '',
       fin: document.getElementById('fDateFin' + n)?.value || '',
       titre: document.getElementById('fTitre' + n)?.value || '',
@@ -1785,6 +1788,11 @@ function addPassage(value = '', calEventId = '') {
   div.dataset.calSync = (value && typeof value === 'object' && value.calSync) || '';
   div.dataset.statutPassage = savedStatut;
   div.dataset.manualRapport = JSON.stringify(savedManualRapport);
+  // Passage jumeau (fenêtre de planification) : conservé tel quel à l'enregistrement de la fiche
+  div.dataset.jumeau = (value && typeof value === 'object' && value.jumeau) ? '1' : '';
+  div.dataset.libelle = (value && typeof value === 'object' && value.libelle) || '';
+  // Rapports Kizeo préparés et empreinte agenda de la fenêtre de planification : conservés tels quels
+  div.dataset.extra = JSON.stringify((value && typeof value === 'object') ? { kzForm: value.kzForm, kzDest: value.kzDest, kzNom: value.kzNom, kzNomSaisi: value.kzNomSaisi, calEmpreinte: value.calEmpreinte } : {});
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
   div.innerHTML = `
     <div style="display:grid;grid-template-columns:68px 1fr 1fr 28px;gap:8px;align-items:center;">
@@ -2821,7 +2829,8 @@ window.openNotifFromRow = function(id) {
 
 window.openNotifFromItem = async function(item) {
   const client = item.client;
-  const passages = (item.passages || []).filter(Boolean);
+  // Un jumeau est la même visite que son passage principal : une seule date annoncée
+  const passages = (item.passages || []).filter(p => p && !(typeof p === 'object' && p.jumeau));
   const passagesStr = passages.map((p, i) => {
     const debut = typeof p === 'object' ? (p.debut || '') : (p.includes('|') ? p.split('|')[0] : p);
     return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
@@ -2900,7 +2909,7 @@ window.openNotifSuivi = async function() {
   if (!client) { alert('Sélectionnez un client.'); return; }
 
   // Build passages string from form
-  const passages = getPassageDates();
+  const passages = getPassageDates().filter(p => !(p && typeof p === 'object' && p.jumeau));
   const passagesStr = passages.filter(Boolean).map((p, i) => {
     const debut = typeof p === 'object' ? (p.debut || '') : (p.includes('|') ? p.split('|')[0] : p);
     return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
@@ -3501,12 +3510,22 @@ function jourLocal(offset) {
 // Passages normalisés, quel que soit le format historique.
 function passagesNorm(item) {
   var bruts = Array.isArray(item.passages) ? item.passages : [item.date1, item.date2, item.date3].filter(Boolean);
-  return bruts.filter(Boolean).map(function(p, i) {
+  var liste = bruts.filter(Boolean).map(function(p, i) {
     if (typeof p === 'string') { var x = p.split('|'); return { num: i+1, debut: x[0]||'', fin: x[1]||'', techs: [], statut: '' }; }
     var cal = (p.calEvents && typeof p.calEvents === 'object') ? p.calEvents : ((item.calEventIds || [])[i] || {});
     if (typeof cal !== 'object' || cal === null) cal = cal ? { _: cal } : {};
-    return { num: p.num || (i+1), debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null, calSync: p.calSync || '' };
-  }).sort(function(a, b){ return (a.num||0) - (b.num||0); });
+    return { num: p.num || (i+1), passageId: p.passageId || null, jumeau: !!p.jumeau, libelle: p.libelle || '', adresse: p.adresse || '', titre: p.titre || '', debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null, calSync: p.calSync || '' };
+  }).sort(function(a, b){ return (a.num||0) - (b.num||0) || (a.jumeau ? 1 : 0) - (b.jumeau ? 1 : 0); });
+  // Jumeau (15/11) : même visite que son passage principal, autre type d'intervention. Il en
+  // reprend date, créneau, techniciens, rendez-vous agenda et notifications ; seuls son
+  // formulaire Kizeo et son rapport lui sont propres.
+  liste.forEach(function(p) {
+    if (!p.jumeau) return;
+    var pr = liste.find(function(x){ return !x.jumeau && x.num === p.num && x.statut !== 'annule'; });
+    if (!pr) return;
+    p.debut = pr.debut; p.fin = pr.fin; p.techs = pr.techs; p.calEvents = pr.calEvents; p.calSync = pr.calSync; p.notifs = pr.notifs;
+  });
+  return liste;
 }
 function techsDesPassages(item) {
   var t = []; passagesNorm(item).forEach(function(p){ p.techs.forEach(function(n){ if (t.indexOf(n) === -1) t.push(n); }); }); return t;
@@ -3556,7 +3575,16 @@ var grouperCommune = (function(){ try { return localStorage.getItem('suivi.group
 function dateArrivee(item) { return item.createdAt || item.dateEmission || ''; }
 function joursDepuis(iso) { if (!iso) return null; var t = new Date(iso).getTime(); return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400e3); }
 function libJours(n) { return n === null ? '—' : n === 0 ? "aujourd'hui" : n === 1 ? 'hier' : 'il y a ' + n + ' j'; }
-function recPassage(item, num) { return window._receptionsParPassage[item.id + '::' + num]; }
+// Rapport d'un passage. On passe le passage lui-même (p) : recherche par son identifiant,
+// ce qui distingue des passages jumeaux de même n° (15/11). Repli sur le n° pour les
+// rapports plus anciens sans identifiant, sauf s'il appartient à un autre passage.
+function recPassage(item, x) {
+  var num = (x && typeof x === 'object') ? x.num : x, pid = (x && typeof x === 'object') ? x.passageId : null;
+  if (pid && window._receptionsParPid && window._receptionsParPid[pid]) return window._receptionsParPid[pid];
+  var r = window._receptionsParPassage[item.id + '::' + num];
+  if (r && pid && r.passageId && r.passageId !== pid) return undefined;
+  return r;
+}
 function moisCourant(iso) { var d = jourLocal(0); return !!iso && iso.substring(0, 7) === d.substring(0, 7); }
 function anneeCourante(iso) { return !!iso && iso.substring(0, 4) === jourLocal(0).substring(0, 4); }
 function parClient(liste) {
@@ -3601,8 +3629,8 @@ function planifCommencee(item) { var e = etapesPlanif(item); return !!e && e.sli
 function avancementHtml(item) {
   var e = etapesPlanif(item);
   if (!e) return '<span style="color:var(--text-muted)">—</span>';
-  var libs = ['Dossier', 'Passages', 'Agenda', 'Kizeo', 'Notif'];
-  var ps = passagesActifs(item).filter(function(p){ return p.debut; });
+  var libs = ['Dossier', 'Passages', 'Notif']; // Passages comprend l'agenda et les rapports Kizeo (15/11)
+  var ps = passagesActifs(item).filter(function(p){ return p.debut && !p.jumeau; });
   var detailPsg = ps.length ? '\n' + ps.map(function(p){ return 'Passage ' + p.num + ' : ' + fmtDate(p.debut) + (p.techs.length ? ' · ' + p.techs.join(', ') : ' · sans technicien'); }).join('\n') : '\nAucun passage';
   return '<div class="avancement">' + libs.map(function(l, k){
     return '<span class="av-etape' + (e[k] ? ' fait' : '') + '" title="' + l + (e[k] ? ' : fait' : ' : à faire') + (k === 1 ? detailPsg : '') + '">' + (e[k] ? '✓ ' : '') + l + '</span>';
@@ -3628,17 +3656,26 @@ function titreDoublon(item) {
 // Passages non annulés, classés par numéro
 function passagesActifs(item) { return passagesNorm(item).filter(function(p){ return p.statut !== 'annule'; }); }
 function passageFait(item, p) {
-  var rec = recPassage(item, p.num);
+  var rec = recPassage(item, p);
   if (rec && rec.statut !== 'en-attente') return true;
   return !!p.debut && p.debut.substring(0, 10) < jourLocal(0);
 }
 function passagesSansRapport(item) {
-  return passagesActifs(item).filter(function(p){ var rec = recPassage(item, p.num); return p.debut && p.debut.substring(0, 10) < jourLocal(0) && !(rec && rec.statut !== 'en-attente'); });
+  return passagesActifs(item).filter(function(p){ var rec = recPassage(item, p); return p.debut && p.debut.substring(0, 10) < jourLocal(0) && !(rec && rec.statut !== 'en-attente'); });
 }
 function rapportsNonEnvoyes(item) {
-  return passagesNorm(item).filter(function(p){ var rec = recPassage(item, p.num); return rec && ['a-relire', 'a-traiter', 'archive'].indexOf(rec.statut) !== -1; });
+  return passagesNorm(item).filter(function(p){ var rec = recPassage(item, p); return rec && ['a-relire', 'a-traiter', 'archive'].indexOf(rec.statut) !== -1; });
 }
-function rapportP1(item) { var rec = recPassage(item, 1); return rec ? rec.statut : null; }
+// État du rapport du passage 1. Avec des jumeaux n° 1 : « envoyé » seulement quand tous le sont,
+// sinon l'état le moins avancé (le dossier attend le dernier rapport).
+var RANG_RAPPORT = { 'en-attente': 0, 'a-relire': 1, 'a-traiter': 2, 'archive': 2, 'envoye': 3 };
+function rapportP1(item) {
+  var ps = passagesActifs(item).filter(function(p){ return p.num === 1; });
+  if (ps.length < 2) { var rec = recPassage(item, ps[0] || 1); return rec ? rec.statut : null; }
+  var etats = ps.map(function(p){ var r = recPassage(item, p); return r ? r.statut : null; });
+  if (etats.indexOf(null) !== -1) return etats.some(Boolean) ? 'en-attente' : null;
+  return etats.sort(function(a, b){ return (RANG_RAPPORT[a] || 0) - (RANG_RAPPORT[b] || 0); })[0];
+}
 function aCloturer(item) { return rapportP1(item) === 'envoye' && item.statut !== 'Terminé'; }
 function kizeoAGenerer7j(item) {
   var a = jourLocal(0), b = jourLocal(6);
@@ -3659,7 +3696,7 @@ function aNouveauPassage(item) {
 // Un passage est exécuté quand son rapport est envoyé au client (passage passé sans
 // suivi Kizeo, ex. rapport manuel : compté comme exécuté, l'app ne peut pas le savoir).
 function passageExecute(item, p) {
-  var rec = recPassage(item, p.num);
+  var rec = recPassage(item, p);
   if (rec) return rec.statut === 'envoye';
   var d = (p.debut || '').substring(0, 10);
   return !!d && d < jourLocal(0) && !p.kizeo;
@@ -3956,7 +3993,7 @@ function friseHtml(item) {
   return '<div class="frise">' + ps.map(function(p) {
     var n = CERCLES[(p.num||1) - 1] || ('#' + p.num);
     var d = p.debut ? p.debut.substring(0,10) : '';
-    var rec = window._receptionsParPassage[item.id + '::' + p.num];
+    var rec = recPassage(item, p);
     var cls, txt, titre;
     if (p.statut === 'annule') { cls = 'psg-annule'; txt = n + ' ' + (d ? jjmm(d) : ''); titre = 'Passage annulé'; }
     else if (rec && rec.statut === 'envoye') { cls = 'psg-ok'; txt = n + ' ✓'; titre = 'Rapport envoyé au client' + (d ? ' (passage du ' + jjmm(d) + ')' : ''); }
@@ -3978,7 +4015,7 @@ function passagesSemaine(item, sem) {
 }
 // Rapport encore à traiter pour un passage : 'retard', 'attente', 'relire', 'envoyer', ou null.
 function etatRapport(item, p) {
-  var rec = recPassage(item, p.num);
+  var rec = recPassage(item, p);
   if (!rec) return null;
   if (rec.statut === 'a-relire') return 'relire';
   if (rec.statut === 'a-traiter' || rec.statut === 'archive') return 'envoyer';
@@ -4001,7 +4038,7 @@ function actionRapport(item, ps) {
   var ordre = ['relire', 'envoyer', 'retard'];
   for (var k = 0; k < ordre.length; k++) {
     var p = ps.find(function(x){ return etatRapport(item, x) === ordre[k]; });
-    if (p) return { action: ordre[k], num: p.num, recId: recPassage(item, p.num).id };
+    if (p) return { action: ordre[k], num: p.num, recId: recPassage(item, p).id };
   }
   return null;
 }
@@ -4074,7 +4111,7 @@ function envoyerRelanceSms() {
 var LIEN_ACTION_RAPPORT = { relire: 'relire', envoyer: 'envoyer', retard: 'renvoyer' };
 // État du formulaire Kizeo d'un passage : 'ok', 'recu', 'manque' ou 'ecart' (envoyé à un autre technicien).
 function etatKizeo(item, p) {
-  var rec = window._receptionsParPassage[item.id + '::' + p.num];
+  var rec = recPassage(item, p);
   if (rec && rec.statut !== 'en-attente') return 'recu';
   // Envoyé = trace sur le passage, ou ligne "en attente" côté Gestion rapports.
   if (!p.kizeo && !(rec && rec.statut === 'en-attente')) return 'manque';
@@ -4088,7 +4125,7 @@ function kizeoHtml(item) {
   return '<div class="kz">' + ps.map(function(p) {
     var n = CERCLES[(p.num||1) - 1] || ('#' + p.num);
     var e = etatKizeo(item, p);
-    var recK = window._receptionsParPassage[item.id + '::' + p.num];
+    var recK = recPassage(item, p);
     p.kizeoTech = p.kizeoTech || (recK && recK.technicien) || '';
     var r = etatRapport(item, p);
     if (r === 'relire') return '<span class="kz-ecart">' + n + ' Rapport à relire</span>';
@@ -4150,8 +4187,8 @@ function actionSuivante(item) {
   // Pilotage quotidien
   if (aCloturer(item)) return '<button class="btn-next" onclick="setStatutRapide(\'' + id + '\',\'Terminé\')" title="Le rapport du passage 1 est envoyé : passer le dossier en Terminé">Terminer</button>';
   var auj7 = jourLocal(0), fin7 = jourLocal(6);
-  if (passagesActifs(item).some(function(p){ var d = (p.debut || '').substring(0, 10); return d && d >= auj7 && d <= fin7 && etatAgenda(p) !== 'ok'; })) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',2)" title="Un passage des 7 prochains jours n\'est pas à jour dans l\'agenda">Mettre à l\'agenda</button>';
-  if (kizeoAGenerer7j(item)) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',3)" title="Un passage des 7 prochains jours n\'a pas son formulaire Kizeo">Générer Kizeo</button>';
+  if (passagesActifs(item).some(function(p){ var d = (p.debut || '').substring(0, 10); return d && d >= auj7 && d <= fin7 && etatAgenda(p) !== 'ok'; })) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)" title="Un passage des 7 prochains jours n\'est pas à jour dans l\'agenda">Mettre à l\'agenda</button>';
+  if (kizeoAGenerer7j(item)) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)" title="Un passage des 7 prochains jours n\'a pas son formulaire Kizeo">Générer Kizeo</button>';
   if (!toNotifArray(item.notifBailleur).length && prochainPassage(item)) return bouton('Notifier', 'openNotifFromRow');
   return bouton('Ouvrir', 'openModal', true);
 }
@@ -4195,7 +4232,7 @@ function libPassageSemaine(p) {
 // Étape 5 : 'ok' (reçu), 'retard', 'manque' (formulaire envoyé, passage fait, rien reçu),
 // 'horsKizeo' (passage fait sans formulaire Kizeo, ex. rapport déposé à la main), null (pas encore dû)
 function etapeRapportRecu(item, p) {
-  var rec = recPassage(item, p.num);
+  var rec = recPassage(item, p);
   if (rec && rec.statut !== 'en-attente') return 'ok';
   var r = etatRapport(item, p);
   if (r === 'retard') return 'retard';
@@ -4205,7 +4242,7 @@ function etapeRapportRecu(item, p) {
 }
 // Étape 6 : 'ok' (envoyé), 'relire', 'envoyer', null (pas encore dû)
 function etapeRapportEnvoye(item, p) {
-  var rec = recPassage(item, p.num);
+  var rec = recPassage(item, p);
   if (!rec) return null;
   if (rec.statut === 'envoye') return 'ok';
   if (rec.statut === 'a-relire') return 'relire';
@@ -4227,15 +4264,15 @@ function actionSemaine(item, ps) {
   for (var k = 0; k < candidats.length; k++) {
     var p = candidats[k], fait = p.debut.substring(0, 10) < auj, n = ' (passage ' + p.num + ')';
     if (!fait) {
-      if (etatAgenda(p) !== 'ok') return bouton("Mettre à l'agenda", "ouvrirPlanification('" + id + "',2)", 'Étape 1' + n);
+      if (etatAgenda(p) !== 'ok') return bouton("Mettre à l'agenda", "ouvrirPlanification('" + id + "',1)", 'Étape 1' + n);
       var kz = etatKizeo(item, p);
-      if (kz === 'manque' || kz === 'ecart') return bouton('Générer Kizeo', "ouvrirPlanification('" + id + "',3)", 'Étape 2' + n);
-      if (!notifOk(notifPassage(item, p, 'notifBailleur'))) return bouton('Notifier le client', "ouvrirPlanification('" + id + "',4)", 'Étape 3' + n);
-      if (item.emailClient && !notifOk(notifPassage(item, p, 'notifLocataire'))) return bouton('Notifier le locataire', "ouvrirPlanification('" + id + "',4)", 'Étape 4' + n);
+      if (kz === 'manque' || kz === 'ecart') return bouton('Générer Kizeo', "ouvrirPlanification('" + id + "',1)", 'Étape 2' + n);
+      if (!notifOk(notifPassage(item, p, 'notifBailleur'))) return bouton('Notifier le client', "ouvrirPlanification('" + id + "',2)", 'Étape 3' + n);
+      if (item.emailClient && !notifOk(notifPassage(item, p, 'notifLocataire'))) return bouton('Notifier le locataire', "ouvrirPlanification('" + id + "',2)", 'Étape 4' + n);
     } else {
       var r5 = etapeRapportRecu(item, p);
       if (r5 === 'retard' || r5 === 'manque') return bouton('Relancer sur WhatsApp', "ouvrirRelanceSms('" + id + "'," + p.num + ")", 'Étape 5' + n + ' : rapport attendu du technicien');
-      var r6 = etapeRapportEnvoye(item, p), rec = recPassage(item, p.num);
+      var r6 = etapeRapportEnvoye(item, p), rec = recPassage(item, p);
       if (r6 === 'relire') return '<a class="btn-next" href="' + lienRapport(rec.id, 'relire') + '" title="Étape 6' + n + '">Relire le rapport</a>';
       if (r6 === 'envoyer') return '<a class="btn-next" href="' + lienRapport(rec.id, 'envoyer') + '" title="Étape 6' + n + '">Envoyer le rapport</a>';
     }
@@ -4268,7 +4305,7 @@ function ligneSemaine(item, nbCols) {
   // 2. Kizeo : formulaire envoyé au bon technicien
   h += '<td class="ck-td">' + colonne(function(p){
     var e = etatKizeo(item, p);
-    var rec = recPassage(item, p.num), dest = p.kizeoTech || (rec && rec.technicien) || '';
+    var rec = recPassage(item, p), dest = p.kizeoTech || (rec && rec.technicien) || '';
     return e === 'ok' || e === 'recu' ? marque('ok', 'Formulaire envoyé à ' + (dest || 'le technicien') + (p.kizeoLe ? ' le ' + fmtDate(p.kizeoLe) : ''))
       : e === 'ecart' ? marque('att', 'Envoyé à ' + dest + ', mais le technicien du passage est ' + p.techs.join(', '))
       : marque('ko', 'Formulaire Kizeo pas encore envoyé');
@@ -4509,8 +4546,8 @@ function ouvrirMenuSuivi(ev, id) {
     var e = etatRapport(item, p);
     if (e === 'retard') {
       it.push('<button onclick="ouvrirRelanceSms(\'' + id + '\',' + p.num + ')">Relancer sur WhatsApp · passage ' + p.num + '</button>');
-      it.push('<a href="' + lienRapport(recPassage(item, p.num).id, 'renvoyer') + '" title="Envoie un nouveau formulaire Kizeo au technicien ; l\'ancien reste sur son téléphone, à supprimer dans Kizeo">Renvoyer le formulaire · passage ' + p.num + '</a>');
-    } else if (e && e !== 'attente') it.push('<a href="' + lienRapport(recPassage(item, p.num).id, LIEN_ACTION_RAPPORT[e]) + '">' + LIB_ACTION_RAPPORT[e] + ' · passage ' + p.num + '</a>');
+      it.push('<a href="' + lienRapport(recPassage(item, p).id, 'renvoyer') + '" title="Envoie un nouveau formulaire Kizeo au technicien ; l\'ancien reste sur son téléphone, à supprimer dans Kizeo">Renvoyer le formulaire · passage ' + p.num + '</a>');
+    } else if (e && e !== 'attente') it.push('<a href="' + lienRapport(recPassage(item, p).id, LIEN_ACTION_RAPPORT[e]) + '">' + LIB_ACTION_RAPPORT[e] + ' · passage ' + p.num + '</a>');
   });
   it.push('<button onclick="toggleNotifRow(\'' + id + '\')">Historique des notifications</button>');
   if (item.statut === 'Terminé' && !item.enFacturation) it.push('<button onclick="basculerEnFacturation(\'' + id + '\')">Basculer en facturation</button>');
@@ -6100,15 +6137,20 @@ onAuthStateChanged(auth, async (user) => {
   // État des rapports par passage, pour la frise de la nouvelle vue.
   // Clé suiviId::numPassage ; on garde l'état le plus avancé.
   const RANG_RECEPTION = { 'en-attente': 0, 'a-relire': 1, 'a-traiter': 2, 'archive': 2, 'envoye': 3 };
+  // Deuxième index par passageId : distingue les passages jumeaux de même n° (15/11).
   onSnapshot(collection(db, 'reception-rapports'), (snap) => {
-    const m = {};
+    const m = {}, parPid = {};
+    const plusAvance = (a, b) => !a || (RANG_RECEPTION[b.statut] ?? -1) > (RANG_RECEPTION[a.statut] ?? -1);
     snap.docs.forEach(d => {
       const r = d.data();
       if (!r.suiviId || r.numPassage == null) return;
+      const e = { id: d.id, statut: r.statut, passageId: r.passageId || null, dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, relances: [].concat(Array.isArray(r.relancesWhatsapp) ? r.relancesWhatsapp : [], Array.isArray(r.relancesSms) ? r.relancesSms : []).sort() };
       const k = r.suiviId + '::' + r.numPassage;
-      if (!m[k] || (RANG_RECEPTION[r.statut] ?? -1) > (RANG_RECEPTION[m[k].statut] ?? -1)) m[k] = { id: d.id, statut: r.statut, dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, relances: [].concat(Array.isArray(r.relancesWhatsapp) ? r.relancesWhatsapp : [], Array.isArray(r.relancesSms) ? r.relancesSms : []).sort() };
+      if (plusAvance(m[k], e)) m[k] = e;
+      if (e.passageId && plusAvance(parPid[e.passageId], e)) parPid[e.passageId] = e;
     });
     window._receptionsParPassage = m;
+    window._receptionsParPid = parPid;
     if (window.filterTable) window.filterTable();
   }, (e) => console.warn('reception-rapports (frise):', e.message));
 });
