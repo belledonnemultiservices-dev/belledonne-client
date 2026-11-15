@@ -2847,6 +2847,9 @@ window.openNotifFromItem = async function(item) {
   document.getElementById('nsSuccess').style.display = 'none';
   document.getElementById('nsFooter').innerHTML = '<button class="btn-cancel" onclick="closeNotifSuivi()">Annuler</button><button class="btn-save" id="nsBtnSend" onclick="sendNotifSuivi()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>Envoyer</button>';
   await window._loadNsBailleurContacts(client);
+  // L'expéditeur du dossier est coché d'office ; s'il n'est pas dans les contacts, rien n'est coché
+  const exp = window._contactExpediteur(item, window._nsContactsCharges || []);
+  if (exp) document.querySelectorAll('#nsBailleurContacts input[type=checkbox]').forEach(cb => { if (cb.value.toLowerCase() === String(exp.email).toLowerCase()) cb.checked = true; });
 
   // Populate locataire tab from item data
   const emailLoc = item.emailClient || '';
@@ -2860,6 +2863,26 @@ window.openNotifFromItem = async function(item) {
 };
 
 // ── DESTINATAIRES BAILLEUR (cases à cocher, multi, + nouveau contact) ──
+// ── Expéditeur du dossier ↔ contacts du client (15/11) ──
+// Nom normalisé : sans accents ni majuscules, mots dans l'ordre alphabétique
+// (« ETAME MBAPPE Thomson » = « Thomson Etame Mbappé »).
+window._normNom = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean).sort().join(' ');
+// Un contact par email (la base contient des doublons)
+window._contactsUniques = function(contacts) {
+  const vus = {};
+  return (contacts || []).filter(c => { const k = String(c.email || '').trim().toLowerCase(); if (!k || vus[k]) return false; vus[k] = 1; return true; });
+};
+// Contact correspondant à l'expéditeur : identifiant enregistré, sinon email, sinon même nom
+window._contactExpediteur = function(item, contacts) {
+  if (!item || !contacts || !contacts.length) return null;
+  if (item.expediteurContactId) { const c = contacts.find(x => x.id === item.expediteurContactId); if (c) return c; }
+  const brut = String(item.expediteur || '');
+  const email = String(item.expediteurEmail || (brut.match(/[^\s<>]+@[^\s<>]+/) || [])[0] || '').toLowerCase();
+  if (email) { const c = contacts.find(x => String(x.email || '').toLowerCase() === email); if (c) return c; }
+  const n = window._normNom(brut.replace(/[^\s<>]+@[^\s<>]+/, ''));
+  if (!n) return null;
+  return contacts.find(x => window._normNom((x.prenom || '') + ' ' + (x.nom || '')) === n) || null;
+};
 window._loadNsBailleurContacts = async function(client) {
   const listEl = document.getElementById('nsBailleurContacts');
   if (!listEl) return;
@@ -2867,7 +2890,8 @@ window._loadNsBailleurContacts = async function(client) {
   const f = document.getElementById('nsNewContactForm'); if (f) f.style.display = 'none';
   ['nsNewPrenom', 'nsNewNom', 'nsNewEmail', 'nsNewPoste', 'nsNewTel'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   try {
-    const contacts = await window._loadRapportContacts(client);
+    const contacts = window._contactsUniques(await window._loadRapportContacts(client));
+    window._nsContactsCharges = contacts;
     if (!contacts.length) {
       listEl.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 2px;">Aucun contact enregistré pour ce client. Ajoute-en un ci-dessous.</div>';
     } else {

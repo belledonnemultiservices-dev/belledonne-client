@@ -112,6 +112,7 @@ const CSS = `
 .pl-tbloc .pl-raps{background:rgba(67,56,202,.04);}
 .pl-tbloc-tete{display:flex;align-items:center;gap:10px;font-size:13.5px;color:#312E81;}
 .pl-rap-etat,.pl-rap-act{display:flex;gap:6px;align-items:center;white-space:nowrap;}
+.pl-exp-form{margin-top:8px;padding:10px 12px;border:1px solid #E0E7FF;border-radius:9px;background:#F8F9FF;}
 .pl-raps{border:1px solid #E0E7FF;background:#F8F9FF;border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
 .pl-raps-tete{display:flex;gap:10px;align-items:baseline;font-size:13px;}
 .pl-rap{display:grid;grid-template-columns:22px minmax(150px,1fr) minmax(170px,1.4fr) auto auto;gap:8px;align-items:center;}
@@ -348,7 +349,7 @@ function rendreDossier(item) {
       <div class="pl-section">Mission</div>
       ${champ("Nature de la mission", `<div id="plNatureWrap"></div>`)}
       ${champ("Date d'émission", inp("plDateEmission", item.dateEmission, "", "date"))}
-      ${champ("Expéditeur", inp("plExpediteur", item.expediteur))}
+      ${champ("Expéditeur <span style=\"text-transform:none;font-weight:400;\">· contact du client, coché d'office à la notification</span>", `<div id="plExpWrap"><div class="pl-note">Chargement des contacts…</div></div>`, true)}
       ${champ("Adresse", inp("plAdresse", item.adresse, "Adresse d'intervention"), true)}
       <div class="pl-section">Références</div>
       ${DOCS.map(doc).join("")}
@@ -363,6 +364,9 @@ function rendreDossier(item) {
     </div>
     <div class="pl-actions"><button class="pl-btn" data-a="attente">Mettre en attente…</button><span class="pl-note">Si une information bloque la planification (locataire injoignable, accès…)</span></div>
     <div class="pl-actions" style="margin-top:6px;"><button class="pl-btn" data-a="annuler" style="color:#C0392B;border-color:#F5C6C0;background:#FDECEA;">Annuler la commande…</button><span class="pl-note">Le dossier part dans l'onglet Annulé</span></div>`;
+  // Expéditeur : liste des contacts du client (Contacts clients), ou nouveau contact
+  remplirExpediteur(item, item.client || "");
+  $("#plClient").addEventListener("change", (e) => remplirExpediteur({ ...item, expediteurContactId: "" }, e.target.value));
   // Téléphones : un champ par numéro, comme la fiche
   $("[data-a=ajoutTel]").onclick = () => { $("#plTels").insertAdjacentHTML("beforeend", champTel("")); $("#plTels input:last-child").focus(); };
   // Liste des natures habituelle (config/naturesMission, avec « Ajouter une nature »)
@@ -454,6 +458,93 @@ function rendreDossier(item) {
   $(".pl-pied .pl-espace").insertAdjacentHTML("afterend", `<span class="pl-note" id="plAuto" style="margin-right:8px;">Enregistrement automatique</span>`);
 }
 let minuterieDossier = null;
+// ── Expéditeur = un contact du client (décidé le 15/11) ──
+// Même base que la page Contacts & Notifications > Contacts clients. L'expéditeur est coché
+// d'office parmi les destinataires quand on notifie le client.
+const nomContact = (c) => ((c.prenom || "") + " " + (c.nom || "")).trim() || c.email;
+async function contactsDuClient(client) {
+  etat.contacts = etat.contacts || {};
+  if (!etat.contacts[client]) {
+    const liste = client && window._loadRapportContacts ? await window._loadRapportContacts(client) : [];
+    etat.contacts[client] = window._contactsUniques ? window._contactsUniques(liste) : liste;
+  }
+  return etat.contacts[client];
+}
+async function remplirExpediteur(item, client) {
+  const wrap = $("#plExpWrap"); if (!wrap) return;
+  let contacts = [];
+  try { contacts = await contactsDuClient(client); } catch (e) { /* liste vide */ }
+  if (!$("#plExpWrap") || !etat) return;
+  const trouve = window._contactExpediteur ? window._contactExpediteur(item, contacts) : null;
+  const texte = String(item.expediteur || "").trim();
+  const choix = trouve ? trouve.id : texte ? "__texte__" : "";
+  wrap.innerHTML = `<div style="display:flex;gap:8px;align-items:center;">
+      <select id="plExpSel" style="flex:1;">
+        <option value="">— Aucun —</option>
+        ${!trouve && texte ? `<option value="__texte__" selected>« ${esc(texte)} » (pas dans les contacts)</option>` : ""}
+        ${contacts.map(c => `<option value="${esc(c.id)}"${c.id === choix ? " selected" : ""}>${esc(nomContact(c))}${c.role ? " · " + esc(c.role) : ""} (${esc(c.email)})</option>`).join("")}
+        <option value="__nouveau__">＋ Nouveau contact…</option>
+      </select>
+      ${!trouve && texte ? `<button type="button" class="pl-btn petit" data-a="expAjout">Ajouter aux contacts</button>` : ""}
+    </div>
+    <div id="plExpForm" class="pl-exp-form" style="display:none;">
+      <div class="pl-grille">
+        <div class="pl-champ"><label>Prénom</label><input id="plExpPrenom"></div>
+        <div class="pl-champ"><label>Nom</label><input id="plExpNom"></div>
+        <div class="pl-champ"><label>Email *</label><input id="plExpEmail" type="email" placeholder="pour pouvoir le notifier"></div>
+        <div class="pl-champ"><label>Rôle</label><input id="plExpRole" placeholder="ex. Chargé de secteur"></div>
+        <div class="pl-champ"><label>Téléphone</label><input id="plExpTel"></div>
+      </div>
+      <div class="pl-actions" style="margin:8px 0 0;"><button type="button" class="pl-btn indigo petit" data-a="expCreer">Ajouter le contact à ${esc(client || "ce client")}</button><button type="button" class="pl-btn lien" data-a="expAnnuler">Annuler</button></div>
+    </div>`;
+  wrap.dataset.client = client;
+  const sel = $("#plExpSel"), form = $("#plExpForm");
+  const ouvrir = (prerempli) => {
+    form.style.display = "block";
+    // « ETAME MBAPPE Thomson » : les mots en majuscules font le nom, les autres le prénom
+    if (prerempli) {
+      const mots = prerempli.replace(/[^\s<>]+@[^\s<>]+/, "").split(/\s+/).filter(Boolean);
+      const maj = mots.filter(m => m.length > 1 && m === m.toUpperCase());
+      $("#plExpNom").value = (maj.length ? maj : mots.slice(-1)).join(" ");
+      $("#plExpPrenom").value = mots.filter(m => !(maj.length ? maj : mots.slice(-1)).includes(m)).join(" ");
+      const mail = (prerempli.match(/[^\s<>]+@[^\s<>]+/) || [])[0]; if (mail) $("#plExpEmail").value = mail;
+    }
+    $("#plExpEmail").focus();
+  };
+  sel.onchange = () => { if (sel.value === "__nouveau__") ouvrir(""); else form.style.display = "none"; };
+  const ba = $("[data-a=expAjout]", wrap); if (ba) ba.onclick = () => { sel.value = "__nouveau__"; ouvrir(texte); };
+  $("[data-a=expAnnuler]", wrap).onclick = () => { form.style.display = "none"; sel.value = choix; };
+  $("[data-a=expCreer]", wrap).onclick = async (ev) => {
+    const prenom = $("#plExpPrenom").value.trim(), nom = $("#plExpNom").value.trim(), email = $("#plExpEmail").value.trim();
+    if (!/.+@.+\..+/.test(email)) { showToast("Email du contact invalide.", true); return; }
+    if (!prenom && !nom) { showToast("Renseigne au moins un nom ou un prénom.", true); return; }
+    if (!client) { showToast("Choisis d'abord le client.", true); return; }
+    // Email déjà connu pour ce client : on reprend le contact existant, pas de doublon
+    let c = contacts.find(x => (x.email || "").toLowerCase() === email.toLowerCase());
+    if (!c) {
+      ev.target.disabled = true; ev.target.textContent = "Ajout…";
+      try {
+        const data = { prenom, nom, email, role: $("#plExpRole").value.trim(), telephone: $("#plExpTel").value.trim(), client };
+        c = { id: await window._addContact(data), ...data };
+        contacts.push(c);
+        showToast("Contact ajouté aux Contacts clients de " + client);
+      } catch (e) { showToast("Erreur à l'ajout du contact : " + e.message, true); ev.target.disabled = false; ev.target.textContent = "Ajouter le contact"; return; }
+    } else showToast("Ce contact existait déjà : il est sélectionné.");
+    await remplirExpediteur({ ...item, expediteurContactId: c.id }, client);
+    // Enregistré aussitôt
+    if (etat && etat.etape === 0) enregistrerDossier(dossier() || item, true);
+  };
+}
+// Expéditeur choisi, prêt à enregistrer ; null tant que la liste charge ou qu'un nouveau contact est en cours
+function lireExpediteur(item) {
+  const sel = $("#plExpSel"); if (!sel) return null;
+  const v = sel.value;
+  if (v === "__nouveau__") return null;
+  if (v === "") return { expediteur: "", expediteurContactId: "", expediteurEmail: "" };
+  if (v === "__texte__") return { expediteur: String(item.expediteur || "").trim(), expediteurContactId: "", expediteurEmail: String(item.expediteurEmail || "").trim() };
+  const c = ((etat.contacts || {})[$("#plExpWrap").dataset.client] || []).find(x => x.id === v);
+  return c ? { expediteur: nomContact(c), expediteurContactId: c.id, expediteurEmail: c.email || "" } : null;
+}
 // Motif obligatoire : redemande tant que la réponse est vide, null si l'utilisateur annule
 function demanderMotif(question, action) {
   for (;;) {
@@ -484,7 +575,7 @@ async function enregistrerDossier(item, silencieux) {
   const saisie = {
     client: v("plClient"), chorus: v("plChorus"),
     nature: v("plNature") === "__new__" ? (item.nature || "") : v("plNature"),
-    dateEmission: v("plDateEmission"), expediteur: v("plExpediteur"),
+    dateEmission: v("plDateEmission"),
     pl: v("pl_pl"), bc: v("pl_bc"), devis: v("pl_devis"),
     adresse: v("plAdresse"), nomClient: v("plNom"), emailClient: v("plEmail"),
     observations: v("plObservations"), // notes internes : plus saisies ici, jamais écrasées
@@ -500,6 +591,9 @@ async function enregistrerDossier(item, silencieux) {
   const coords = [...document.querySelectorAll("#plTels .pl-tel")].map(i => i.value.trim()).filter(Boolean);
   const coordsAvant = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
   if (JSON.stringify(coords) !== JSON.stringify(coordsAvant)) maj.coordonnees = coords;
+  // Expéditeur (contact du client) : nom affiché, identifiant et email du contact
+  const ex = lireExpediteur(item);
+  if (ex) Object.entries(ex).forEach(([k, val]) => { if (val !== String(item[k] ?? "").trim()) maj[k] = val; });
   if (!Object.keys(maj).length) return;
   // Garde-fou : le formulaire Kizeo est choisi selon le client et la nature.
   // En automatique, un avertissement non bloquant ; sur « Continuer », une confirmation.
