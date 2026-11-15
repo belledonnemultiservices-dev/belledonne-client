@@ -2896,7 +2896,7 @@ function updateNotifRow(itemId) {
     const bar = notifRow.querySelector('.notif-bar');
     if (bar) {
       const sects = bar.querySelectorAll('.notif-section');
-      if (sects[1]) sects[1].innerHTML = '<span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur',nb,'🏢','bailleur');
+      if (sects[1]) sects[1].innerHTML = '<span class="notif-label">🏢 Client</span>' + notifHistoryHtml('bailleur',nb,'🏢','bailleur');
       if (sects[2]) sects[2].innerHTML = '<span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire',nl,'🏠','locataire');
       if (sects[3]) sects[3].innerHTML = '<span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms',ns,'💬','sms');
       if (sects[4]) sects[4].innerHTML = '<span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms',nr,'🔔','sms');
@@ -2946,7 +2946,7 @@ function updateNotifBadge(itemId, field, ts) {
   if (field === 'notifBailleur') {
     badge.className = 'notif-badge-bailleur';
     badge.innerHTML = '🏢 ' + label;
-    badge.title = 'Bailleur notifié le ' + d.toLocaleDateString('fr-FR');
+    badge.title = 'Client notifié le ' + d.toLocaleDateString('fr-FR');
   } else if (field === 'notifLocataire') {
     badge.className = 'notif-badge-locataire';
     badge.innerHTML = '🏠 ' + label;
@@ -3571,7 +3571,7 @@ var FILES_SUIVI = [
         { val: nbP, lib: 'passage' + (nbP > 1 ? 's' : '') + ' · ' + l.length + ' dossier' + (l.length > 1 ? 's' : '') },
         { val: nt, lib: 'technicien' + (nt > 1 ? 's' : '') + ' mobilisé' + (nt > 1 ? 's' : '') },
         { val: kz + kzE, lib: 'Kizeo à générer' + (kzE ? ' (dont ' + kzE + ' mauvais technicien)' : ''), alerte: true, cle: 'kz', filtre: function(i){ return passagesSemaine(i).some(function(p){ var e = etatKizeo(i, p); return e === 'manque' || e === 'ecart'; }); } },
-        { val: l.filter(bailleurAPrevenir).length, lib: 'bailleur(s) non prévenu(s)', alerte: true, cle: 'np', filtre: bailleurAPrevenir },
+        { val: l.filter(bailleurAPrevenir).length, lib: 'client(s) non prévenu(s)', alerte: true, cle: 'np', filtre: bailleurAPrevenir },
         { val: tous.filter(aRelire).length, lib: 'rapport(s) à relire', alerte: true, cle: 'rel', filtre: aRelire },
         { val: tous.filter(aEnvoyer).length, lib: 'rapport(s) à envoyer', alerte: true, cle: 'env', filtre: aEnvoyer },
       ]);
@@ -3934,7 +3934,7 @@ function refHtml(item) {
 function notifsHtml(item) {
   var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
   var t = function(lbl, arr){ return lbl + (arr.length ? ' : ' + arr.length + ' envoi(s), dernier le ' + fmtDate(arr[arr.length-1]) : ' : jamais'); };
-  var titre = [t('Bailleur', nb), t('Locataire', nl), t('SMS', ns), t('Rappel SMS', nr)].join('\n');
+  var titre = [t('Client', nb), t('Locataire', nl), t('SMS', ns), t('Rappel SMS', nr)].join('\n');
   return '<button class="notif-ico" onclick="toggleNotifRow(\'' + item.id + sfxLigne() + '\')" title="' + titre + '\n(clic : historique)"><span class="' + (nb.length ? 'fait' : '') + '">🏢</span><span class="' + (nl.length ? 'fait' : '') + '">🏠</span><span class="' + (ns.length || nr.length ? 'fait' : '') + '">💬</span></button>';
 }
 
@@ -3962,6 +3962,8 @@ function actionSuivante(item) {
   if (f === 'planifier') return bouton('Planifier', 'openModal');
   // En cours
   if (aCloturer(item)) return '<button class="btn-next" onclick="setStatutRapide(\'' + id + '\',\'Terminé\')" title="Le rapport du passage 1 est envoyé : passer le dossier en Terminé">Terminer</button>';
+  var auj7 = jourLocal(0), fin7 = jourLocal(6);
+  if (passagesActifs(item).some(function(p){ var d = (p.debut || '').substring(0, 10); return d && d >= auj7 && d <= fin7 && etatAgenda(p) !== 'ok'; })) return bouton('Mettre à l\'agenda', 'openModal', false, 'Un passage des 7 prochains jours n\'est pas dans l\'agenda du technicien');
   if (kizeoAGenerer7j(item)) return bouton('Générer Kizeo', 'openModal', false, 'Un passage des 7 prochains jours n\'a pas son formulaire Kizeo');
   if (!toNotifArray(item.notifBailleur).length && prochainPassage(item)) return bouton('Notifier', 'openNotifFromRow');
   return bouton('Ouvrir', 'openModal', true);
@@ -4000,19 +4002,20 @@ function libPassageSemaine(p) {
   return '<div class="ck-l ps-l"><b>' + (CERCLES[(p.num || 1) - 1] || '#' + p.num) + '</b> ' + j + '<span class="ps-h">' + h + '</span>'
     + (p.techs.length ? ' · ' + p.techs.map(function(t){ return t.split(' ')[0]; }).join(', ') : ' · <span style="color:#E74C3C;">sans technicien</span>') + '</div>';
 }
-// Première action utile sur la ligne : rapport à boucler, puis Kizeo, agenda, notification.
+// Première action utile sur la ligne : rapport à boucler, puis agenda, Kizeo, notification
+// (ordre de travail : on planifie dans l'agenda, on envoie le Kizeo, on notifie).
 function actionSemaine(item, ps) {
   var id = item.id;
   var ar = actionRapport(item, passagesNorm(item));
   if (ar && ar.action === 'retard') return '<button class="btn-next" onclick="ouvrirRelanceSms(\'' + id + '\',' + ar.num + ')">Relancer sur WhatsApp</button>';
   if (ar) return '<a class="btn-next" href="' + lienRapport(ar.recId, LIEN_ACTION_RAPPORT[ar.action]) + '">' + LIB_ACTION_RAPPORT[ar.action] + '</a>';
   if (item.statut === 'À valider') return '<button class="btn-next" onclick="validerIntervention(\'' + id + '\')">Valider</button>';
-  if (ps.some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Générer Kizeo</button>';
   if (ps.some(function(p){ return etatAgenda(p) !== 'ok'; })) return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Mettre à l\'agenda</button>';
+  if (ps.some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Générer Kizeo</button>';
   if (ps.some(function(p){ return !notifOk(notifPassage(item, p, 'notifBailleur')) || (item.emailClient && !notifOk(notifPassage(item, p, 'notifLocataire'))); })) return '<button class="btn-next" onclick="openNotifFromRow(\'' + id + '\')">Notifier</button>';
   return '<button class="btn-next neutre" onclick="openModal(\'' + id + '\')">Ouvrir</button>';
 }
-var TITRES_SEMAINE = '<th>Réf.</th><th>Client · Adresse</th><th>Passage de la semaine</th><th class="ck-th">Agenda</th><th class="ck-th">Kizeo</th><th class="ck-th">Bailleur</th><th class="ck-th">Locataire</th><th>Statut</th><th style="text-align:right;">Action</th>';
+var TITRES_SEMAINE = '<th>Réf.</th><th>Client · Adresse</th><th>Passage de la semaine</th><th class="ck-th">Agenda</th><th class="ck-th">Kizeo</th><th class="ck-th">Client</th><th class="ck-th">Locataire</th><th>Statut</th><th style="text-align:right;">Action</th>';
 function ligneSemaine(item, nbCols) {
   var ps = passagesLigneSemaine(item);
   var reste = contexteLigne !== 'prochaine' && estReste(item);
@@ -4041,13 +4044,13 @@ function ligneSemaine(item, nbCols) {
       : e === 'ecart' ? marque('att', 'Envoyé à ' + dest + ', mais le technicien du passage est ' + p.techs.join(', '))
       : marque('ko', 'Formulaire Kizeo pas encore envoyé');
   }).join('') + '</td>';
-  // Bailleur et locataire
+  // Client (champ notifBailleur) et locataire
   ['notifBailleur', 'notifLocataire'].forEach(function(champ) {
     h += '<td class="ck-td">' + ps.map(function(p){
       if (champ === 'notifLocataire' && !item.emailClient && !toNotifArray(item.notifLocataire).length) return marque('na', 'Pas d\'email locataire dans la fiche');
       var r = notifPassage(item, p, champ);
       if (r && r.change) return marque('att', 'Notifié le ' + fmtDate(r.le) + ' pour le ' + fmtDate(r.annonce) + ' : date modifiée depuis, à re-notifier');
-      return r ? marque('ok', 'Notifié le ' + fmtDate(r.le) + (r.estime ? ' (estimation : notification envoyée avant cette date)' : '')) : marque('ko', champ === 'notifBailleur' ? 'Bailleur pas encore notifié pour ce passage' : 'Locataire pas encore notifié pour ce passage');
+      return r ? marque('ok', 'Notifié le ' + fmtDate(r.le) + (r.estime ? ' (estimation : notification envoyée avant cette date)' : '')) : marque('ko', champ === 'notifBailleur' ? 'Client pas encore notifié pour ce passage' : 'Locataire pas encore notifié pour ce passage');
     }).join('') + '</td>';
   });
   h += '<td>' + statutSelect(item.id, item.statut) + '</td>';
@@ -4057,7 +4060,7 @@ function ligneSemaine(item, nbCols) {
   var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
   h += '<tr id="notif-row-' + item.id + sfxLigne() + '" class="notif-row hidden"><td colspan="' + nbCols + '"><div class="notif-bar">';
   h += '<div class="notif-section"><button class="btn-notif-open" onclick="openNotifFromRow(\'' + item.id + '\')">✉ Notifier</button></div>';
-  h += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
+  h += '<div class="notif-section"><span class="notif-label">🏢 Client</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
   h += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
   h += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
   h += '<div class="notif-section"><span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms', nr, '🔔', 'sms') + '</div>';
@@ -4205,7 +4208,7 @@ window.renderTableV2 = function(list) {
     h += '<tr id="notif-row-' + item.id + sfxLigne() + '" class="notif-row hidden"><td colspan="' + nbCols + '"><div class="notif-bar">';
     h += '<div class="notif-section">' + (hasPsg ? '<button class="btn-notif-open" onclick="openNotifFromRow(\'' + item.id + '\')">✉ Notifier</button>' : '<span class="notif-none">Ajoutez des passages pour notifier</span>') + '</div>';
     h += '<div style="width:1px;height:24px;background:var(--border);margin:0 4px;"></div>';
-    h += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
+    h += '<div class="notif-section"><span class="notif-label">🏢 Client</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
     h += '<div class="notif-section"><span class="notif-label">🏠 Locataire</span>' + notifHistoryHtml('locataire', nl, '🏠', 'locataire') + '</div>';
     h += '<div class="notif-section"><span class="notif-label">💬 SMS</span>' + notifHistoryHtml('sms', ns, '💬', 'sms') + '</div>';
     h += '<div class="notif-section"><span class="notif-label">🔔 Rappel</span>' + notifHistoryHtml('rappelSms', nr, '🔔', 'sms') + '</div>';
@@ -4257,7 +4260,7 @@ function ouvrirMenuSuivi(ev, id) {
   var it = [];
   it.push('<button onclick="openModal(\'' + id + '\')">Ouvrir la fiche</button>');
   if (item.statut === 'À valider') it.push('<button onclick="validerIntervention(\'' + id + '\')">Valider</button><button onclick="rejeterIntervention(\'' + id + '\')">Rejeter</button>');
-  if (hasPsg) it.push('<button onclick="openNotifFromRow(\'' + id + '\')">Notifier bailleur / locataire</button><button onclick="openRappelSms(\'' + id + '\')">Rappel SMS</button>');
+  if (hasPsg) it.push('<button onclick="openNotifFromRow(\'' + id + '\')">Notifier client / locataire</button><button onclick="openRappelSms(\'' + id + '\')">Rappel SMS</button>');
   passagesNorm(item).forEach(function(p) {
     var e = etatRapport(item, p);
     if (e === 'retard') {
