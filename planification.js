@@ -63,6 +63,29 @@ const CSS = `
 .pl-recap td:first-child{text-align:left;}
 .pl-cercle{color:#4338CA;font-weight:700;}
 @media (max-width:640px){.pl-grille{grid-template-columns:1fr;}}
+#plOverlay.avec-droite{justify-content:flex-start;padding-right:calc(48vw + 16px);}
+#plDroite{position:fixed;top:0;right:0;width:48vw;height:100vh;z-index:260;display:none;flex-direction:column;background:#2a2a2a;box-shadow:-8px 0 32px rgba(0,0,0,.35);font-family:'DM Sans',sans-serif;}
+#plDroite.ouvert{display:flex;}
+#plDroite.agenda{background:#fff;}
+.pld-tete{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.12);flex-shrink:0;}
+#plDroite.agenda .pld-tete{border-bottom-color:#e5e7eb;}
+.pld-titre{font-size:13px;font-weight:600;color:#fff;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#plDroite.agenda .pld-titre{color:#1e293b;}
+.pld-onglet{font:600 12px 'DM Sans',sans-serif;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;}
+.pld-onglet.on{background:#fff;color:#0D1B2A;}
+.pld-btn{font:600 12px 'DM Sans',sans-serif;border:1px solid #C7D2FE;background:#EEF2FF;color:#4338CA;border-radius:6px;padding:5px 10px;cursor:pointer;}
+.pld-x{width:30px;height:30px;border:none;border-radius:6px;cursor:pointer;font-size:16px;background:rgba(255,255,255,.12);color:#fff;}
+#plDroite.agenda .pld-x{background:#f1f5f9;color:#64748b;}
+#plDroite iframe{flex:1;width:100%;border:none;background:#fff;}
+.pld-vide{flex:1;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:13px;padding:24px;text-align:center;}
+.pl-voir-droite{font:600 12px 'DM Sans',sans-serif;border:1px solid #C7D2FE;background:#EEF2FF;color:#4338CA;border-radius:8px;padding:6px 11px;cursor:pointer;margin-right:8px;}
+.pl-section{grid-column:1/-1;font:700 11px 'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.06em;color:#4338CA;margin-top:6px;padding-bottom:4px;border-bottom:1px solid rgba(13,27,42,.08);}
+.pl-champ textarea{height:64px;padding:8px 10px;resize:vertical;}
+.pl-champ.large{grid-column:1/-1;}
+.pl-doc{display:flex;gap:6px;align-items:center;}
+.pl-doc input:not([type=file]){flex:1;min-width:0;}
+.pl-doc .pl-btn{white-space:nowrap;}
+.pl-doc-nom{font-size:11.5px;color:#1DA870;margin-top:3px;}
 `;
 
 let etat = null; // { id, etape, lignes (étape Passages), occupe }
@@ -95,7 +118,8 @@ export function ouvrirPlanification(id, etape) {
   const item = (window.interventions || []).find(i => i.id === id);
   if (!item) return;
   monter();
-  etat = { id, etape: etape ?? etapeConseillee(item), lignes: null, occupe: false };
+  libererFichiers();
+  etat = { id, etape: etape ?? etapeConseillee(item), lignes: null, occupe: false, droiteFermee: {}, docVu: null, fichiers: {} };
   $("#plOverlay").classList.add("ouvert");
   rendre();
   // La fiche se met à jour en temps réel (envois Kizeo, notifications…) : on redessine
@@ -105,12 +129,16 @@ export function ouvrirPlanification(id, etape) {
     const it = dossier();
     if (!it || etat.occupe) return;
     const e = JSON.stringify(it);
-    if (e !== empreinte) { empreinte = e; if (etat.etape !== 1) rendre(); else rendreEtapes(); }
+    // Étapes avec saisie (Dossier, Passages) : on ne redessine que les coches, pour ne pas perdre la frappe
+    if (e !== empreinte) { empreinte = e; if (etat.etape > 1) rendre(); else rendreEtapes(); }
   }, 1200);
 }
 function fermer() {
+  viderDossier();
   clearInterval(surveillance);
   $("#plOverlay").classList.remove("ouvert");
+  cacherDroite();
+  libererFichiers();
   etat = null;
   if (window.filterTable) window.filterTable();
 }
@@ -140,6 +168,67 @@ function monter() {
   ov.innerHTML = `<div class="pl-box"><div class="pl-tete"></div><div class="pl-corps"></div><div class="pl-pied"></div></div>`;
   document.body.appendChild(ov);
   ov.addEventListener("click", (e) => { if (e.target === ov) fermer(); });
+  const dr = document.createElement("div"); dr.id = "plDroite";
+  dr.innerHTML = `<div class="pld-tete"></div><div class="pld-corps" style="flex:1;display:flex;flex-direction:column;"></div>`;
+  document.body.appendChild(dr);
+}
+
+// ── Panneau de droite ─────────────────────────────────────────────
+// Décidé le 15/11 : ouvert par défaut. Étape Dossier → le PDF de référence (BC, PL, devis) ;
+// étapes Passages et Agenda → l'agenda Google des techniciens ; rien aux autres étapes.
+// Le ✕ le ferme pour l'étape en cours ; un bouton dans l'en-tête le rouvre.
+function typeDroite(k) { return k === 0 ? "pdf" : (k === 1 || k === 2) ? "agenda" : null; }
+// Documents du dossier : PDF enregistrés, remplacés à l'écran par un fichier choisi et pas encore enregistré
+function documents(item) {
+  return [["bc", "BC", item.bcUrl], ["pl", "PL", item.plUrl], ["devis", "Devis", item.devisUrl]]
+    .map(([cle, lib, url]) => ({ cle, lib, url: (etat.fichiers[cle] && etat.fichiers[cle].blob) || url || "", local: !!etat.fichiers[cle] }))
+    .filter(d => d.url);
+}
+function libererFichiers() {
+  if (!etat || !etat.fichiers) return;
+  Object.values(etat.fichiers).forEach(f => { try { URL.revokeObjectURL(f.blob); } catch (e) { /* déjà libéré */ } });
+  etat.fichiers = {};
+}
+function cacherDroite() {
+  const dr = $("#plDroite"); if (dr) dr.classList.remove("ouvert");
+  const ov = $("#plOverlay"); if (ov) ov.classList.remove("avec-droite");
+}
+function rendreDroite(item) {
+  const type = typeDroite(etat.etape);
+  const dr = $("#plDroite");
+  if (!type || etat.droiteFermee[etat.etape]) { cacherDroite(); return; }
+  const tete = $(".pld-tete", dr), corps = $(".pld-corps", dr);
+  dr.classList.toggle("agenda", type === "agenda");
+  if (type === "pdf") {
+    const docs = documents(item);
+    if (!docs.length) {
+      tete.innerHTML = `<span class="pld-titre">Document de référence</span><button class="pld-x" title="Fermer">✕</button>`;
+      corps.innerHTML = `<div class="pld-vide">Aucun PDF sur ce dossier.<br>Ajoute le BC, la PL ou le devis à gauche.</div>`;
+      dr.dataset.src = "";
+    } else {
+      const vu = docs.find(d => d.cle === etat.docVu) || docs[0];
+      etat.docVu = vu.cle;
+      tete.innerHTML = (docs.length > 1 ? docs.map(d => `<button class="pld-onglet${d.cle === vu.cle ? " on" : ""}" data-doc="${d.cle}">${d.lib}</button>`).join("") : "")
+        + `<span class="pld-titre">${docs.length > 1 ? "" : vu.lib}${vu.local && !etat.fichiers[vu.cle].envoye ? " (envoi en cours…)" : ""}</span>`
+        + (vu.local ? "" : `<button class="pld-btn" data-a="onglet" title="Ouvrir le PDF dans un nouvel onglet">Nouvel onglet</button>`)
+        + `<button class="pld-x" title="Fermer">✕</button>`;
+      // Fichier choisi à l'écran : lu tel quel ; PDF enregistré : visionneuse Google (contourne le CORS du Storage)
+      const src = vu.local ? vu.url + "#toolbar=1&navpanes=0&view=FitH" : "https://docs.google.com/viewer?url=" + encodeURIComponent(vu.url) + "&embedded=true";
+      if (dr.dataset.src !== src) { corps.innerHTML = `<iframe allowfullscreen></iframe>`; $("iframe", corps).src = src; dr.dataset.src = src; }
+      tete.querySelectorAll("[data-doc]").forEach(b => b.onclick = () => { etat.docVu = b.dataset.doc; rendreDroite(dossier() || item); });
+      const bo = $("[data-a=onglet]", tete); if (bo) bo.onclick = () => window.open(vu.url, "_blank", "noopener");
+    }
+  } else {
+    tete.innerHTML = `<span class="pld-titre">Agenda des techniciens</span><button class="pld-btn" data-a="onglet" title="Si l'agenda ne s'affiche pas (Safari)">Nouvel onglet</button><button class="pld-x" title="Fermer">✕</button>`;
+    const src = typeof window.buildCalendarUrl === "function" ? window.buildCalendarUrl() : "";
+    // Déjà chargé (passage de l'étape Passages à Agenda) : on ne recharge pas
+    if (dr.dataset.src !== "agenda") { corps.innerHTML = `<iframe allow="storage-access" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>`; $("iframe", corps).src = src; dr.dataset.src = "agenda"; }
+    $("[data-a=onglet]", tete).onclick = () => window.open(src, "_blank", "noopener");
+  }
+  // Pas de rendre() : il redessinerait le formulaire de l'étape Dossier en cours de saisie
+  $(".pld-x", tete).onclick = () => { etat.droiteFermee[etat.etape] = true; rendreEtapes(); rendreDroite(dossier() || item); };
+  dr.classList.add("ouvert");
+  $("#plOverlay").classList.add("avec-droite");
 }
 
 function rendreEtapes() {
@@ -148,9 +237,11 @@ function rendreEtapes() {
   const ref = item.bc ? "BC " + item.bc : item.pl ? "PL " + item.pl : item.devis ? "Devis " + item.devis : "Sans référence";
   $(".pl-tete").innerHTML = `
     <div class="pl-titre"><div style="flex:1"><h2>Planifier · ${esc(ref)}</h2><small>${esc(item.client || "")}${item.nature ? " · " + esc(item.nature) : ""}${item.adresse ? " · " + esc(item.adresse) : ""}</small></div>
+      ${typeDroite(etat.etape) && etat.droiteFermee[etat.etape] ? `<button class="pl-voir-droite" data-a="droite">${typeDroite(etat.etape) === "pdf" ? "📄 Afficher le PDF" : "📅 Afficher l'agenda"}</button>` : ""}
       <button class="pl-fermer" data-a="fermer" title="Fermer (tout est déjà enregistré)">×</button></div>
     <div class="pl-etapes">${ETAPES.map((nom, k) => `<div class="pl-etape${k === etat.etape ? " active" : ""}${k < 5 && faits[k] ? " faite" : ""}" data-etape="${k}"><span class="pl-num">${k < 5 && faits[k] ? "✓" : k + 1}</span>${nom}</div>`).join("")}</div>`;
   $(".pl-tete [data-a=fermer]").onclick = fermer;
+  const bd = $(".pl-tete [data-a=droite]"); if (bd) bd.onclick = () => { delete etat.droiteFermee[etat.etape]; rendreEtapes(); rendreDroite(dossier() || item); };
   document.querySelectorAll(".pl-etape").forEach(el => el.onclick = () => { etat.etape = Number(el.dataset.etape); etat.lignes = null; rendre(); });
 }
 
@@ -158,8 +249,12 @@ function rendre() {
   if (!etat) return;
   const item = dossier();
   if (!item) { fermer(); return; }
+  // On quitte (ou redessine) l'étape Dossier : la saisie pas encore enregistrée part avant
+  viderDossier();
+  $(".pl-corps").oninput = $(".pl-corps").onchange = null;
   rendreEtapes();
   [rendreDossier, rendrePassages, rendreAgenda, rendreKizeo, rendreNotifications, rendreRecap][etat.etape](item);
+  rendreDroite(item);
 }
 function pied(html) { $(".pl-pied").innerHTML = html; }
 function navigation(suivantLib, surSuivant) {
@@ -176,22 +271,84 @@ function navigation(suivantLib, surSuivant) {
 }
 
 // ── 1. Dossier ─────────────────────────────────────────────────────
+// Décidé le 15/11 : tous les champs de la fiche sont modifiables ici (sauf passages et
+// techniciens, qui ont leur étape), avec le PDF de référence ouvert à droite.
+const DOCS = [["pl", "PL", "N° affaire"], ["bc", "BC", "N° de bon de commande"], ["devis", "Devis", "N° de devis"]];
 function rendreDossier(item) {
   const tel = (Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : []).join(", ");
-  const ref = [item.bc && "BC " + item.bc, item.pl && "PL " + item.pl, item.devis && "Devis " + item.devis].filter(Boolean).join(" · ");
+  const clients = (window._allClients || []).slice();
+  if (item.client && !clients.includes(item.client)) clients.unshift(item.client);
+  const champ = (lib, html, large) => `<div class="pl-champ${large ? " large" : ""}"><label>${lib}</label>${html}</div>`;
+  const inp = (id, val, ph, type) => `<input id="${id}"${type ? ` type="${type}"` : ""} value="${esc(val)}" placeholder="${esc(ph || "")}">`;
+  const doc = ([cle, lib, ph]) => {
+    const url = item[cle + "Url"], f = etat.fichiers[cle];
+    return champ(lib, `<div class="pl-doc">${inp("pl_" + cle, item[cle], ph)}
+        <input type="file" accept=".pdf" id="plFile_${cle}" style="display:none">
+        ${url || f ? `<button class="pl-btn petit" data-voir="${cle}">Voir</button>` : ""}
+        <button class="pl-btn petit" data-choisir="${cle}">${url || f ? "Remplacer" : "Ajouter le PDF"}</button></div>
+        ${f ? `<div class="pl-doc-nom">${esc(f.nom)} · ${f.envoye ? "enregistré ✓" : "envoi en cours…"}</div>` : ""}`);
+  };
   $(".pl-corps").innerHTML = `
-    <p class="pl-intro">Vérifie qu'on a tout ce qu'il faut pour planifier et prévenir le locataire. Complète ce qui manque.</p>
+    <p class="pl-intro">Vérifie le dossier avec le document de référence à droite et corrige ce qu'il faut.</p>
     <div class="pl-grille">
-      <div class="pl-champ"><label>Client</label><div class="pl-lecture">${esc(item.client || "—")}</div></div>
-      <div class="pl-champ"><label>Référence</label><div class="pl-lecture">${ref ? esc(ref) : '<span class="pl-manque">Aucune référence</span>'}</div></div>
-      <div class="pl-champ"><label>Nature</label><div class="pl-lecture">${esc(item.nature || "—")}</div></div>
-      <div class="pl-champ"><label>Adresse</label><input id="plAdresse" value="${esc(item.adresse)}" placeholder="Adresse d'intervention"></div>
-      <div class="pl-champ"><label>Locataire</label><input id="plNom" value="${esc(item.nomClient)}" placeholder="Nom du locataire"></div>
-      <div class="pl-champ"><label>Téléphone(s) du locataire</label><input id="plTel" value="${esc(tel)}" placeholder="06…, séparés par des virgules"></div>
-      <div class="pl-champ"><label>Email du locataire</label><input id="plEmail" value="${esc(item.emailClient)}" placeholder="Pour lui envoyer la notification"></div>
-      <div class="pl-champ"><label>Observations</label><div class="pl-lecture" style="font-size:12.5px;color:#4A6078;">${esc(item.observations || "—")}</div></div>
+      <div class="pl-section">Client</div>
+      ${champ("Client", `<select id="plClient"><option value="">— Sélectionner —</option>${clients.map(c => `<option value="${esc(c)}"${c === item.client ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`)}
+      ${champ("N° SIRET", inp("plSiret", item.siret, "XXX XXX XXX XXXXX"))}
+      ${champ("Code service Chorus", inp("plChorus", item.chorus))}
+      <div class="pl-section">Mission</div>
+      ${champ("Nature de la mission", `<div id="plNatureWrap"></div>`)}
+      ${champ("Date d'émission", inp("plDateEmission", item.dateEmission, "", "date"))}
+      ${champ("Expéditeur", inp("plExpediteur", item.expediteur))}
+      <div class="pl-section">Références</div>
+      ${DOCS.map(doc).join("")}
+      <div class="pl-section">Intervention</div>
+      ${champ("Adresse", inp("plAdresse", item.adresse, "Adresse d'intervention"), true)}
+      ${champ("Locataire", inp("plNom", item.nomClient, "Nom du locataire"))}
+      ${champ("Téléphone(s) du locataire", inp("plTel", tel, "06…, séparés par des virgules"))}
+      ${champ("Email du locataire", inp("plEmail", item.emailClient, "Pour lui envoyer la notification"), true)}
+      <div class="pl-section">Notes</div>
+      ${champ("Observations", `<textarea id="plObservations" placeholder="Détails, contexte, contraintes...">${esc(item.observations)}</textarea>`, true)}
+      ${champ("Notes internes", `<textarea id="plNotes" placeholder="Notes internes, suivi, rappels...">${esc(item.notes)}</textarea>`, true)}
     </div>
     <div class="pl-actions"><button class="pl-btn" data-a="attente">Mettre en attente…</button><span class="pl-note">Si une information bloque la planification (locataire injoignable, accès…)</span></div>`;
+  // Liste des natures habituelle (config/naturesMission, avec « Ajouter une nature »)
+  if (window.renderNatureField) window.renderNatureField("plNature", item.nature || "");
+  else $("#plNatureWrap").innerHTML = inp("plNature", item.nature);
+  // PDF : « Voir » l'affiche à droite ; « Ajouter / Remplacer » le montre aussitôt, il part au Storage en continuant
+  document.querySelectorAll(".pl-corps [data-voir]").forEach(b => b.onclick = () => { etat.docVu = b.dataset.voir; delete etat.droiteFermee[0]; rendreEtapes(); rendreDroite(dossier() || item); });
+  document.querySelectorAll(".pl-corps [data-choisir]").forEach(b => b.onclick = () => $("#plFile_" + b.dataset.choisir).click());
+  DOCS.forEach(([cle]) => {
+    $("#plFile_" + cle).onchange = async (ev) => {
+      const file = ev.target.files[0]; if (!file) return;
+      ev.stopPropagation();
+      if (etat.fichiers[cle]) URL.revokeObjectURL(etat.fichiers[cle].blob);
+      const f = etat.fichiers[cle] = { nom: file.name, blob: URL.createObjectURL(file), envoye: false };
+      etat.docVu = cle; delete etat.droiteFermee[0];
+      // On garde la saisie en cours : on ne redessine que la ligne du document et le panneau
+      const ligne = $("#plFile_" + cle).closest(".pl-champ");
+      let note = $(".pl-doc-nom", ligne);
+      if (!note) { note = document.createElement("div"); note.className = "pl-doc-nom"; ligne.appendChild(note); }
+      note.textContent = file.name + " · envoi en cours…";
+      rendreEtapes(); rendreDroite(dossier() || item);
+      // Envoi immédiat (même emplacement que la fiche classique : suivi/<type>/<horodatage>_<nom>)
+      try {
+        const url = await window._uploadPdf(file, `suivi/${cle}/${Date.now()}_${file.name}`);
+        await window._updateSuivi(item.id, { [cle + "Url"]: url, updatedAt: new Date().toISOString() });
+        f.envoye = true;
+        if (note.isConnected) note.textContent = file.name + " · enregistré ✓";
+        indiquerAuto("PDF enregistré ✓");
+      } catch (e) {
+        if (note.isConnected) { note.textContent = file.name + " · échec de l'envoi : " + e.message; note.style.color = "#E74C3C"; }
+        showToast("Le PDF n'a pas pu être envoyé : " + e.message, true);
+      }
+    };
+  });
+  // Enregistrement automatique, comme la fiche : 1,2 s après la dernière frappe
+  $(".pl-corps").oninput = $(".pl-corps").onchange = (ev) => {
+    if (ev.target.type === "file") return;
+    clearTimeout(minuterieDossier);
+    minuterieDossier = setTimeout(() => { minuterieDossier = null; if (etat && etat.etape === 0 && $("#plClient")) enregistrerDossier(dossier() || item, true); }, 1200);
+  };
   $("[data-a=attente]").onclick = async () => {
     const note = prompt("Pourquoi ce dossier est-il en attente ? (la note est ajoutée au dossier)");
     if (note === null) return;
@@ -200,14 +357,63 @@ function rendreDossier(item) {
     showToast("Dossier mis en attente");
     fermer();
   };
-  navigation("Enregistrer et continuer →", async () => {
-    const coords = $("#plTel").value.split(",").map(s => s.trim()).filter(Boolean);
-    const maj = { adresse: $("#plAdresse").value.trim(), nomClient: $("#plNom").value.trim(), coordonnees: coords, emailClient: $("#plEmail").value.trim(), updatedAt: new Date().toISOString() };
-    const avant = { adresse: item.adresse || "", nomClient: item.nomClient || "", coordonnees: JSON.stringify(item.coordonnees || []), emailClient: item.emailClient || "" };
-    if (maj.adresse !== avant.adresse || maj.nomClient !== avant.nomClient || JSON.stringify(coords) !== avant.coordonnees || maj.emailClient !== avant.emailClient) {
-      await window._updateSuivi(item.id, maj);
-    }
-  });
+  navigation("Continuer →", () => { clearTimeout(minuterieDossier); minuterieDossier = null; return enregistrerDossier(dossier() || item); });
+  $(".pl-pied .pl-espace").insertAdjacentHTML("afterend", `<span class="pl-note" id="plAuto" style="margin-right:8px;">Enregistrement automatique</span>`);
+}
+let minuterieDossier = null;
+// Saisie en attente d'enregistrement automatique : on l'enregistre tout de suite
+// (changement d'étape, fermeture). Les valeurs sont lues avant que le formulaire disparaisse.
+function viderDossier() {
+  if (!minuterieDossier) return;
+  clearTimeout(minuterieDossier); minuterieDossier = null;
+  if (etat && $("#plClient")) enregistrerDossier(dossier(), true);
+}
+function indiquerAuto(txt) {
+  const el = $("#plAuto"); if (!el) return;
+  el.textContent = txt; el.style.color = "#1DA870";
+  clearTimeout(el._t); el._t = setTimeout(() => { if (el.isConnected) { el.textContent = "Enregistrement automatique"; el.style.color = ""; } }, 1500);
+}
+// silencieux = enregistrement automatique : pas de message, rien de bloquant
+async function enregistrerDossier(item, silencieux) {
+  if (!item) return;
+  const v = (id) => ($("#" + id) ? $("#" + id).value.trim() : "");
+  const saisie = {
+    client: v("plClient"), siret: v("plSiret"), chorus: v("plChorus"),
+    nature: v("plNature") === "__new__" ? (item.nature || "") : v("plNature"),
+    dateEmission: v("plDateEmission"), expediteur: v("plExpediteur"),
+    pl: v("pl_pl"), bc: v("pl_bc"), devis: v("pl_devis"),
+    adresse: v("plAdresse"), nomClient: v("plNom"), emailClient: v("plEmail"),
+    observations: v("plObservations"), notes: v("plNotes"),
+  };
+  if (!saisie.client) {
+    // Client vidé : jamais enregistré à vide ; en automatique on enregistre le reste
+    if (!silencieux) { showToast("Le client est obligatoire.", true); return false; }
+    delete saisie.client;
+  }
+  // Seuls les champs modifiés partent en base
+  const maj = {};
+  Object.entries(saisie).forEach(([k, val]) => { if (val !== String(item[k] ?? "").trim()) maj[k] = val; });
+  const coords = v("plTel").split(",").map(s => s.trim()).filter(Boolean);
+  const coordsAvant = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
+  if (JSON.stringify(coords) !== JSON.stringify(coordsAvant)) maj.coordonnees = coords;
+  if (!Object.keys(maj).length) return;
+  // Garde-fou : le formulaire Kizeo est choisi selon le client et la nature.
+  // En automatique, un avertissement non bloquant ; sur « Continuer », une confirmation.
+  if ((maj.client !== undefined || maj.nature !== undefined) && actifs(item).some(p => p.kizeoPush)) {
+    const msg = "Le client ou la nature change alors qu'un formulaire Kizeo est déjà parti. Le formulaire envoyé n'est peut-être plus le bon : vérifie-le à l'étape Kizeo.";
+    if (silencieux) showToast(msg, true);
+    else if (!confirm(msg + "\n\nEnregistrer quand même ?")) return false;
+  }
+  if (etat) etat.occupe = true;
+  try {
+    maj.updatedAt = new Date().toISOString();
+    await window._updateSuivi(item.id, maj);
+    if (silencieux) indiquerAuto("Enregistré ✓");
+  } catch (e) {
+    showToast("Erreur à l'enregistrement : " + e.message, true);
+    return false;
+  } finally { if (etat) etat.occupe = false; }
+  if (!silencieux) await pause(400); // laisse l'écoute temps réel rapporter la fiche à jour
 }
 
 // ── 2. Passages ────────────────────────────────────────────────────
