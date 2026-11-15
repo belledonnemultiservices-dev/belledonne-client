@@ -297,6 +297,7 @@
   .bs-nav button:hover{border-color:#4338CA;}
   .bs-nav .bs-nav-retour{font-size:12px;}
   .ligne-groupe.reste td{background:#FDECEA!important;color:#E74C3C;}
+  .ligne-groupe.prochaine td{background:#EEF2FF!important;color:#4338CA;}
   .bs-option{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid);margin-left:auto;cursor:pointer;}
   .file-chip.discret{border-style:dashed;font-weight:500;}
   .ligne-groupe td{background:var(--bg)!important;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mid);padding:8px 14px!important;}
@@ -3492,6 +3493,7 @@ function filterTable() {
   });
   if (v2) {
     renderFilesBar(filtered);
+    window._baseSuivi = filtered;
     var f = fileCourante();
     filtered = appliquerSousFiltre(filtered.filter(f.test));
     if (f.tri) filtered.sort(f.tri);
@@ -3547,6 +3549,10 @@ function prochainPassage(item) {
 var decalageSemaine = 0; // navigation ← → (0 = semaine par défaut)
 // Bloc "Reste de la semaine précédente" replié par défaut (choix mémorisé)
 var resteOuvert = (function(){ try { return localStorage.getItem('suivi.resteOuvert') === '1'; } catch(e) { return false; } })();
+// Bloc "Semaine prochaine" replié par défaut (choix mémorisé), pour anticiper
+var prochaineOuvert = (function(){ try { return localStorage.getItem('suivi.prochaineOuvert') === '1'; } catch(e) { return false; } })();
+function basculerProchaine() { prochaineOuvert = !prochaineOuvert; try { localStorage.setItem('suivi.prochaineOuvert', prochaineOuvert ? '1' : '0'); } catch(e) {} filterTable(); }
+var contexteLigne = ''; // 'prochaine' pendant le rendu du bloc Semaine prochaine
 function basculerReste() { resteOuvert = !resteOuvert; try { localStorage.setItem('suivi.resteOuvert', resteOuvert ? '1' : '0'); } catch(e) {} filterTable(); }
 function semaineAffichee(decalage) {
   var d = new Date(); var j = d.getDay(); // 0 = dimanche, 6 = samedi
@@ -3900,7 +3906,10 @@ function passagesReste(item) {
 }
 function estReste(item) { return passagesSemaine(item).length === 0 && passagesReste(item).length > 0 && item.statut !== 'Annulé'; }
 // Passages montrés sur la ligne de la Semaine : ceux de la semaine, ou ceux du reste.
-function passagesLigneSemaine(item) { return estReste(item) ? passagesReste(item) : passagesSemaine(item); }
+function passagesLigneSemaine(item) {
+  if (contexteLigne === 'prochaine') return passagesSemaine(item, semaineAffichee(decalageSemaine + 1));
+  return estReste(item) ? passagesReste(item) : passagesSemaine(item);
+}
 // Prochaine action sur un rapport, par ordre d'urgence : relire, envoyer, relancer.
 function actionRapport(item, ps) {
   var ordre = ['relire', 'envoyer', 'retard'];
@@ -4033,7 +4042,7 @@ function actionSuivante(item) {
     if (ar) return '<a class="btn-next" href="' + lienRapport(ar.recId, LIEN_ACTION_RAPPORT[ar.action]) + '" title="Ouvre Gestion rapports sur ce rapport (passage ' + ar.num + ')">' + LIB_ACTION_RAPPORT[ar.action] + '</a>';
   }
   // Dans la Semaine, un formulaire Kizeo manquant ou mal envoyé passe avant tout.
-  if (fileSuivi === 'semaine' && passagesSemaine(item).some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) {
+  if (fileSuivi === 'semaine' && passagesLigneSemaine(item).some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) {
     return bouton('Générer Kizeo', 'openModal', false, 'Ouvre la fiche pour envoyer le formulaire Kizeo au technicien');
   }
   if (f === 'pannule') return bouton('Replanifier', 'openModal');
@@ -4061,9 +4070,11 @@ window.renderTableV2 = function(list) {
     + '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th><th>Techniciens</th><th>Passages</th><th>Notifs</th>'
     + extra.map(function(c){ return '<th>' + c.titre + '</th>'; }).join('')
     + '<th>Statut</th><th style="text-align:right;">Action</th></tr>';
+  var vide = '';
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="' + nbCols + '"><div class="empty-state"><p>' + (sousFiltre ? 'Aucun dossier pour cet indicateur.' : 'Rien dans « ' + libelleFile(f) + ' » pour le moment.') + '</p></div></td></tr>';
-    return;
+    vide = '<tr><td colspan="' + nbCols + '"><div class="empty-state"><p>' + (sousFiltre ? 'Aucun dossier pour cet indicateur.' : 'Rien dans « ' + libelleFile(f) + ' » pour le moment.') + '</p></div></td></tr>';
+    // La Semaine garde son bloc "Semaine prochaine" même vide
+    if (f.cle !== 'semaine' || sousFiltre) { body.innerHTML = vide; return; }
   }
   var ligne = function(item) {
     var h = '';
@@ -4096,7 +4107,7 @@ window.renderTableV2 = function(list) {
     h += '</div></td></tr>';
     return h;
   };
-  var html = '';
+  var html = vide;
   var resteListe = f.cle === 'semaine' ? list.filter(estReste) : [];
   if (resteListe.length) {
     var sp = semainePrecedente(), sa = semaineAffichee();
@@ -4117,6 +4128,20 @@ window.renderTableV2 = function(list) {
     });
   } else {
     list.forEach(function(i){ html += ligne(i); });
+  }
+  // Semaine prochaine : dossiers ayant un passage la semaine suivante et pas déjà affichés.
+  if (f.cle === 'semaine' && !sousFiltre) {
+    var sn = semaineAffichee(decalageSemaine + 1);
+    var dejaLa = {}; list.forEach(function(i){ dejaLa[i.id] = 1; });
+    var prochaine = (window._baseSuivi || []).filter(function(i){
+      return !dejaLa[i.id] && i.statut !== 'Annulé' && passagesSemaine(i, sn).length > 0;
+    }).sort(function(x, y){ return (passagesSemaine(x, sn)[0].debut || '').localeCompare(passagesSemaine(y, sn)[0].debut || ''); });
+    var nDeja = list.filter(function(i){ return passagesSemaine(i, sn).length > 0; }).length;
+    html += '<tr class="ligne-groupe prochaine" style="cursor:pointer;" onclick="basculerProchaine()" title="' + (prochaineOuvert ? 'Replier' : 'Déplier') + '"><td colspan="' + nbCols + '">' + (prochaineOuvert ? '▾' : '▸') + ' Semaine prochaine du ' + jjmm(sn.lundi) + ' au ' + jjmm(sn.vendredi) + ' · ' + prochaine.length + ' dossier' + (prochaine.length > 1 ? 's' : '') + (nDeja ? ' (+ ' + nDeja + ' déjà affiché' + (nDeja > 1 ? 's' : '') + ' ci-dessus)' : '') + ' <span style="float:right;font-weight:600;text-transform:none;letter-spacing:0;">' + (prochaineOuvert ? 'Replier' : 'Afficher') + '</span></td></tr>';
+    if (prochaineOuvert) {
+      contexteLigne = 'prochaine';
+      try { prochaine.forEach(function(i){ html += ligne(i); }); } finally { contexteLigne = ''; }
+    }
   }
   body.innerHTML = html;
 };
