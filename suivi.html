@@ -3545,6 +3545,9 @@ function prochainPassage(item) {
 // Semaine affichée par la file "Semaine" : du lundi au vendredi de la semaine
 // en cours, jours passés compris ; le samedi et le dimanche, celle d'après.
 var decalageSemaine = 0; // navigation ← → (0 = semaine par défaut)
+// Bloc "Reste de la semaine précédente" replié par défaut (choix mémorisé)
+var resteOuvert = (function(){ try { return localStorage.getItem('suivi.resteOuvert') === '1'; } catch(e) { return false; } })();
+function basculerReste() { resteOuvert = !resteOuvert; try { localStorage.setItem('suivi.resteOuvert', resteOuvert ? '1' : '0'); } catch(e) {} filterTable(); }
 function semaineAffichee(decalage) {
   var d = new Date(); var j = d.getDay(); // 0 = dimanche, 6 = samedi
   var versLundi = (j === 0 ? 1 : j === 6 ? 2 : 1 - j) + 7 * (decalage === undefined ? decalageSemaine : decalage);
@@ -4098,8 +4101,9 @@ window.renderTableV2 = function(list) {
   if (resteListe.length) {
     var sp = semainePrecedente(), sa = semaineAffichee();
     var semaineListe = list.filter(function(i){ return !estReste(i); });
-    html += '<tr class="ligne-groupe reste"><td colspan="' + nbCols + '">⚠ Reste de la semaine du ' + jjmm(sp.lundi) + ' au ' + jjmm(sp.vendredi) + ' · ' + resteListe.length + ' dossier' + (resteListe.length > 1 ? 's' : '') + ' à boucler</td></tr>';
-    resteListe.forEach(function(i){ html += ligne(i); });
+    var ouvert = resteOuvert || sousFiltre === 'reste';
+    html += '<tr class="ligne-groupe reste" style="cursor:pointer;" onclick="basculerReste()" title="' + (ouvert ? 'Replier' : 'Déplier') + '"><td colspan="' + nbCols + '">' + (ouvert ? '▾' : '▸') + ' ⚠ Reste de la semaine du ' + jjmm(sp.lundi) + ' au ' + jjmm(sp.vendredi) + ' · ' + resteListe.length + ' dossier' + (resteListe.length > 1 ? 's' : '') + ' à boucler <span style="float:right;font-weight:600;text-transform:none;letter-spacing:0;">' + (ouvert ? 'Replier' : 'Afficher') + '</span></td></tr>';
+    if (ouvert) resteListe.forEach(function(i){ html += ligne(i); });
     if (semaineListe.length) {
       html += '<tr class="ligne-groupe"><td colspan="' + nbCols + '">Semaine du ' + jjmm(sa.lundi) + ' au ' + jjmm(sa.vendredi) + ' · ' + semaineListe.length + ' dossier' + (semaineListe.length > 1 ? 's' : '') + '</td></tr>';
       semaineListe.forEach(function(i){ html += ligne(i); });
