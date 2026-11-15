@@ -321,6 +321,7 @@
   .sem-fbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .sem-fbar .filter-select{height:38px;}
   .sem-fbar .search-input{height:38px;}
+  .sem-thead th{padding:9px 14px;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);font-weight:600;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);}
   .sem-espace td{height:12px;padding:0!important;border:none!important;background:transparent!important;}
   .bs-option{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid);margin-left:auto;cursor:pointer;}
   .file-chip.discret{border-style:dashed;font-weight:500;}
@@ -3971,6 +3972,14 @@ function enteteSection(type, titre, sem, n, resume, ouvert, fn, nbCols, okVert) 
     + '<span class="sem-action">' + (fn ? (ouvert ? 'Replier' : 'Afficher') : '') + '</span>'
     + '</div></td></tr>';
 }
+var sectionRendu = ''; // section de la Semaine en cours de rendu (sélection par section)
+function toggleSelectSection(cb, cle) {
+  document.querySelectorAll('tr.sec-' + cle + ' .row-check').forEach(function(box) {
+    box.checked = cb.checked;
+    if (cb.checked) window.selectedIds.add(box.dataset.id); else window.selectedIds.delete(box.dataset.id);
+  });
+  updateSelectionBar();
+}
 // Filtres propres à chaque section (recherche, client, statut, technicien)
 var filtresSection = { passee: {}, courante: {}, suivante: {} };
 function filtreActif(cle) { var f = filtresSection[cle]; return !!(f.q || f.client || f.statut || f.tech); }
@@ -4033,8 +4042,9 @@ function sectionsSemaine(list, ligne, nbCols) {
     var ouvP = (resteOuvert || sousFiltre === 'reste') && resteBrut.length > 0;
     html += enteteSection('passee', 'Semaine précédente', sp, cptTxt(resteListe.length, resteBrut.length), resume, ouvP, resteBrut.length ? 'basculerReste' : '', nbCols, !resteBrut.length);
     if (ouvP) {
-      html += barreSection('passee', resteBrut, passagesReste, nbCols);
-      resteListe.forEach(function(i){ html += ligne(i); });
+      html += barreSection('passee', resteBrut, passagesReste, nbCols) + window._enteteSection('passee');
+      sectionRendu = 'passee';
+      try { resteListe.forEach(function(i){ html += ligne(i); }); } finally { sectionRendu = ''; }
     }
     html += espace;
   }
@@ -4050,7 +4060,11 @@ function sectionsSemaine(list, ligne, nbCols) {
   html += enteteSection('courante', titreC, sa, cptTxt(courante.length, couranteBrut.length), resumeC, courantOuvert, 'basculerCourant', nbCols, false);
   if (courantOuvert) {
     if (couranteBrut.length) html += barreSection('courante', couranteBrut, function(i){ return passagesSemaine(i); }, nbCols);
-    if (courante.length) courante.forEach(function(i){ html += ligne(i); });
+    if (courante.length) {
+      html += window._enteteSection('courante');
+      sectionRendu = 'courante';
+      try { courante.forEach(function(i){ html += ligne(i); }); } finally { sectionRendu = ''; }
+    }
     else html += '<tr><td colspan="' + nbCols + '"><div class="empty-state" style="padding:24px;"><p>' + (sousFiltre ? 'Aucun dossier pour cet indicateur.' : couranteBrut.length ? 'Aucun dossier ne correspond à ce filtre.' : 'Aucun passage prévu sur cette semaine.') + '</p></div></td></tr>';
   }
 
@@ -4068,9 +4082,9 @@ function sectionsSemaine(list, ligne, nbCols) {
     var ouvN = prochaineOuvert && prochaineBrut.length > 0;
     html += enteteSection('suivante', 'Semaine suivante', sn, cptTxt(prochaine.length, prochaineBrut.length), resumeN, ouvN, prochaineBrut.length ? 'basculerProchaine' : '', nbCols, false);
     if (ouvN) {
-      html += barreSection('suivante', prochaineBrut, psN, nbCols);
-      contexteLigne = 'prochaine';
-      try { prochaine.forEach(function(i){ html += ligne(i); }); } finally { contexteLigne = ''; }
+      html += barreSection('suivante', prochaineBrut, psN, nbCols) + window._enteteSection('suivante');
+      contexteLigne = 'prochaine'; sectionRendu = 'suivante';
+      try { prochaine.forEach(function(i){ html += ligne(i); }); } finally { contexteLigne = ''; sectionRendu = ''; }
     }
   }
   return html;
@@ -4084,10 +4098,18 @@ window.renderTableV2 = function(list) {
   var extra = f.colonnes || [];
   var nbCols = 9 + extra.length;
   // En-tête : colonnes communes, puis celles propres à l'onglet, avant Statut et Action.
-  head.innerHTML = '<tr><th style="width:32px;"><input type="checkbox" id="checkAllV2" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>'
-    + '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th><th>Techniciens</th><th>Passages</th><th>Notifs</th>'
+  var titresCols = '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th><th>Techniciens</th><th>Passages</th><th>Notifs</th>'
     + extra.map(function(c){ return '<th>' + c.titre + '</th>'; }).join('')
-    + '<th>Statut</th><th style="text-align:right;">Action</th></tr>';
+    + '<th>Statut</th><th style="text-align:right;">Action</th>';
+  if (f.cle === 'semaine') {
+    head.innerHTML = '';
+    // Ligne de titres propre à une section, avec sa case « tout sélectionner » limitée à la section
+    window._enteteSection = function(cle) {
+      return '<tr class="sem-thead"><th style="width:32px;"><input type="checkbox" onchange="toggleSelectSection(this,\'' + cle + '\')" style="cursor:pointer;"></th>' + titresCols + '</tr>';
+    };
+  } else {
+    head.innerHTML = '<tr><th style="width:32px;"><input type="checkbox" id="checkAllV2" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>' + titresCols + '</tr>';
+  }
   var vide = '';
   if (!list.length) {
     vide = '<tr><td colspan="' + nbCols + '"><div class="empty-state"><p>' + (sousFiltre ? 'Aucun dossier pour cet indicateur.' : 'Rien dans « ' + libelleFile(f) + ' » pour le moment.') + '</p></div></td></tr>';
@@ -4100,7 +4122,7 @@ window.renderTableV2 = function(list) {
     var techs = techsDesPassages(item);
     if (!techs.length) techs = item.assignes || (item.assigne ? [item.assigne] : []);
     var isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
-    h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
+    h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2' + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
     h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
     h += '<td>' + refHtml(item) + '</td>';
     h += '<td><div class="cn-client">' + (item.client || '—') + '</div><div class="cn-nature">' + (item.nature || '') + (item.dateEmission ? ' · BC du ' + fmtDate(item.dateEmission) : '') + '</div></td>';
