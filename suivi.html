@@ -3574,11 +3574,20 @@ function tousExecutes(item) {
   var ps = passagesActifs(item).filter(function(p){ return p.debut; });
   return ps.length > 0 && ps.every(function(p){ return passageExecute(item, p); });
 }
+// Historique (décidé le 15/11) : un dossier facturé dont le dernier passage date de plus
+// de 30 jours, sans passage à venir, est clôturé d'office même si des rapports n'ont
+// jamais été envoyés (formulaires abandonnés, rapports manuels). Calcul seul, aucune donnée modifiée.
+function clotureHistorique(item) {
+  if (item.statut !== 'Terminé' || !item.enFacturation || tousExecutes(item)) return false;
+  var dates = passagesActifs(item).map(function(p){ return (p.debut || '').substring(0, 10); }).filter(Boolean).sort();
+  // Aucun passage enregistré : rien à exécuter, le dossier facturé est clôturé
+  return dates.length === 0 || dates[dates.length - 1] < jourLocal(-30);
+}
 var STATUT_VERS_FILE = { 'À valider': 'validation', 'En attente': 'attente', 'Passage annulé': 'pannule', 'Annulé': 'annuleDef' };
 function fileDe(item) {
   if (STATUT_VERS_FILE[item.statut]) return STATUT_VERS_FILE[item.statut];
   // Passage 1 fait (rapport envoyé) : à facturer ; une fois facturé, clôturé si tout est exécuté
-  if (item.statut === 'Terminé') return item.enFacturation ? (tousExecutes(item) ? 'cloture' : 'pilotage') : 'afacturer';
+  if (item.statut === 'Terminé') return item.enFacturation ? (tousExecutes(item) || clotureHistorique(item) ? 'cloture' : 'pilotage') : 'afacturer';
   // Planification terminée (statut En cours) : pilotage
   if (item.statut === 'En cours' && aPassageDate(item)) return 'pilotage';
   return 'planification';
@@ -3717,8 +3726,8 @@ var FILES_SUIVI = [
     } },
   { cle: 'cloture', label: 'Clôturé', test: function(i){ return fileDe(i) === 'cloture'; }, tri: parRecent,
     question: 'Facturés et tous les passages exécutés.',
-    colonnes: [{ titre: 'Passages', cell: function(i){ var n = passagesActifs(i).length; return '<span style="font-size:12px;">' + n + ' passage' + (n > 1 ? 's' : '') + ' exécuté' + (n > 1 ? 's' : '') + '</span>'; } }],
-    kpis: function(l){ return [{ val: l.length, lib: 'dossier(s) clôturé(s)' }, { texte: parClient(l), lib: 'par client' }]; } },
+    colonnes: [{ titre: 'Passages', cell: function(i){ var n = passagesActifs(i).length; return clotureHistorique(i) ? (n === 0 ? '<span class="psg psg-passe">clôturé · aucun passage enregistré</span>' : '<span class="psg psg-passe" title="Facturé, dernier passage il y a plus de 30 jours, mais tous les rapports n\'ont pas été envoyés au client">clôturé d\'office · rapports non suivis</span>') : '<span style="font-size:12px;">' + n + ' passage' + (n > 1 ? 's' : '') + ' exécuté' + (n > 1 ? 's' : '') + '</span>'; } }],
+    kpis: function(l){ return [{ val: l.length, lib: 'dossier(s) clôturé(s)' }, { val: l.filter(clotureHistorique).length, lib: 'dont clôturés d\'office (rapports non suivis)', cle: 'histo', filtre: clotureHistorique }, { texte: parClient(l), lib: 'par client' }]; } },
 ];
 
 function fileCourante() { return FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; }) || FILES_SUIVI[0]; }
