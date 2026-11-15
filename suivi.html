@@ -2556,8 +2556,21 @@ async function rejeterIntervention(id) {
   } catch(e) { alert('Erreur : ' + e.message); }
 }
 
+// Suppression définitive (15/11) : réservée aux doublons, erreurs de saisie et essais. Un dossier
+// planifié (rendez-vous dans l'agenda ou rapport Kizeo parti) s'annule, pour retirer les rendez-vous,
+// lister les formulaires à supprimer et garder une trace dans l'onglet Annulé.
+function estPlanifieEnLigne(item) {
+  return (Array.isArray(item && item.passages) ? item.passages : []).some(p => p && typeof p === 'object' && p.statut !== 'annule'
+    && (p.kizeoPush || Object.values(p.calEvents || {}).some(Boolean)));
+}
 async function deleteIntervention(id) {
-  if (!confirm('Supprimer cette intervention ?')) return;
+  const item = (window.interventions || []).find(i => i.id === id);
+  if (item && estPlanifieEnLigne(item)) {
+    if (item.statut !== 'Annulé' && confirm("Ce dossier est planifié : rendez-vous dans l'agenda ou rapports Kizeo envoyés.\nIl ne peut pas être supprimé définitivement : utilise « Annuler la commande », qui retire les rendez-vous et liste les rapports à supprimer dans Kizeo.\n\nOuvrir l'annulation maintenant ?") && window.annulerCommandePlanif) window.annulerCommandePlanif(id);
+    else if (item.statut === 'Annulé') alert("Ce dossier a encore des rendez-vous ou des rapports Kizeo rattachés : il ne peut pas être supprimé définitivement.");
+    return;
+  }
+  if (!confirm('Supprimer définitivement ce dossier ?\n\nÀ réserver aux doublons, erreurs de saisie et essais : il disparaît sans laisser de trace (pas d\'onglet Annulé).')) return;
   try {
     await window._deleteSuivi(id);
     if (window.interventions && window.interventions.length) interventions = window.interventions;
@@ -3377,8 +3390,12 @@ function clearSelection() {
 }
 async function deleteSelected() {
   if (!window.selectedIds.size) return;
-  if (!confirm('Supprimer ' + window.selectedIds.size + ' intervention(s) ?')) return;
-  var ids = Array.from(window.selectedIds);
+  // Les dossiers planifiés sont écartés : ils s'annulent un par un (menu ⋯ > Annuler la commande)
+  var tous = Array.from(window.selectedIds);
+  var ids = tous.filter(function(id){ var it = (window.interventions || []).find(function(i){ return i.id === id; }); return !(it && estPlanifieEnLigne(it)); });
+  var ecartes = tous.length - ids.length;
+  if (!ids.length) { alert('Les dossiers sélectionnés sont planifiés (agenda ou Kizeo) : ils ne peuvent pas être supprimés définitivement. Utilise « Annuler la commande » dans le menu ⋯ de chaque ligne.'); return; }
+  if (!confirm('Supprimer définitivement ' + ids.length + ' dossier(s) ?' + (ecartes ? '\n\n' + ecartes + ' dossier(s) planifié(s) écarté(s) : à annuler un par un.' : '') + '\n\nÀ réserver aux doublons, erreurs de saisie et essais.')) return;
   for (var i=0;i<ids.length;i++) {
     try {
       await window._deleteSuivi(ids[i]);
@@ -4578,7 +4595,7 @@ function ouvrirMenuSuivi(ev, id) {
   if (item.enFacturation) it.push('<a href="facturation.html">Voir en facturation</a>');
   // Annulation propre (15/11) : motif, rendez-vous retirés des agendas, rapports Kizeo listés à supprimer
   if (['Annulé', 'À valider'].indexOf(item.statut) === -1) it.push('<button class="danger" onclick="annulerCommandePlanif(\'' + id + '\')">Annuler la commande…</button>');
-  it.push('<hr><button class="danger" onclick="deleteIntervention(\'' + id + '\')">Supprimer</button>');
+  it.push('<hr><button class="danger" onclick="deleteIntervention(\'' + id + '\')" title="Doublon, erreur de saisie ou essai. Un dossier planifié s\'annule.">Supprimer définitivement</button>');
   menuSuivi.innerHTML = it.join('');
   menuSuivi.dataset.pour = id;
   menuSuivi.style.display = 'block';

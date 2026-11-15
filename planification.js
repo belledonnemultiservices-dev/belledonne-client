@@ -702,8 +702,11 @@ function chargeTech(nom, date, idDossier) {
 }
 const fmtDT = (v) => v ? v.substring(8, 10) + "/" + v.substring(5, 7) + "/" + v.substring(0, 4) + " " + v.substring(11, 16) : "";
 // Problèmes d'un passage : affichés sous la carte, ils bloquent l'enregistrement
+// Passage vierge : ajouté mais jamais rempli (ni date, ni technicien) ; ignoré à l'enregistrement
+const vierge = (l) => !l.annule && !l.ref && !l.debut && !l.techs.length;
 function problemesLigne(l, L) {
-  if (l.annule) return [];
+  if (l.annule || vierge(l)) return [];
+  L = L.filter(a => !vierge(a));
   const pb = [];
   if (!l.num || l.num < 1) pb.push("numéro de passage invalide");
   else if (L.some(a => a !== l && !a.annule && a.num === l.num && !(a.ref && a.ref.kizeoPush && l.ref && l.ref.kizeoPush))) pb.push("numéro déjà pris par un autre passage (pour un 2e rapport, utilise « + Ajouter un rapport »)");
@@ -839,7 +842,7 @@ function rendrePassages(item) {
   };
   $(".pl-corps").innerHTML = `
     <p class="pl-intro">Chaque modification est enregistrée toute seule et l'agenda de chaque technicien suit : rendez-vous créé, déplacé ou retiré. Chaque rapport Kizeo s'envoie avec son bouton.</p>
-    ${L.map(carte).join("")}
+    ${L.map(carte).join("") || '<p class="pl-note" style="margin:6px 0 12px;">Aucun passage pour ce dossier. Le dossier reste en Planification tant qu\'il n\'a pas de passage.</p>'}
     <div class="pl-actions"><button class="pl-btn" data-a="ajout">+ Ajouter un passage</button>
       <button class="pl-btn" data-a="dupli">Dupliquer le dernier à +</button><input id="plEcart" type="number" min="1" value="15" style="width:60px;height:34px;border:1px solid rgba(13,27,42,.15);border-radius:7px;padding:0 8px;"> jours</div>`;
   const ligneDe = (el) => L[Number(el.closest(".pl-passage").dataset.k)];
@@ -1009,10 +1012,11 @@ async function enregistrerPassages(item, silencieux) {
   // Une sauvegarde à la fois ; une modification arrivée pendant ce temps relance après
   if (sauvegardeEnCours) { aRefaire = true; await sauvegardeEnCours; if (!silencieux) return enregistrerPassages(dossier() || item, false); return; }
   const L = etat.lignes;
+  // Aucun passage : permis (tous supprimés) ; le dossier ne pourra simplement pas passer en Pilotage
   const vivants = L.filter(l => !l.annule);
   const enDefaut = vivants.map(l => ({ l, pb: problemesLigne(l, L) })).filter(x => x.pb.length);
-  if (!vivants.length || enDefaut.length) {
-    const msg = !vivants.length ? "ajoute au moins un passage" : "passage " + enDefaut[0].l.num + " : " + enDefaut[0].pb[0];
+  if (enDefaut.length) {
+    const msg = "passage " + enDefaut[0].l.num + " : " + enDefaut[0].pb[0];
     if (silencieux) indiquerAuto("⚠ Non enregistré : " + msg, true); else showToast(msg.charAt(0).toUpperCase() + msg.slice(1) + ".", true);
     return false;
   }
@@ -1021,7 +1025,7 @@ async function enregistrerPassages(item, silencieux) {
     const parPid = Object.fromEntries(frais.filter(p => p.passageId).map(p => [p.passageId, p]));
     const passages = [];
     const effaces = []; // rapports supprimés dont le formulaire était parti
-    L.forEach(l => {
+    L.filter(l => !vierge(l)).forEach(l => {
       // Rendez-vous de chaque technicien ; le 1er technicien alimente aussi titre/adresse/description
       // du passage, lus par le reste de l'app (vue Semaine, ancienne fiche)
       const agendaTech = {};
