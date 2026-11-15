@@ -2591,6 +2591,19 @@ async function setStatutRapide(id, newStatut) {
   } catch(e) { alert('Erreur: ' + e.message); }
 }
 
+// Saisie manuelle (15/11) : même circuit que les BC importés, sans passer par Validation.
+// Un brouillon est créé et la fenêtre de planification s'ouvre sur l'étape Dossier ; s'il est
+// refermé sans client ni référence, il est supprimé (voir planification.js).
+async function creerDossierManuel() {
+  try {
+    const maintenant = new Date().toISOString();
+    const data = { client: '', clientType: 'contrat', statut: 'À traiter', source: 'manuel', brouillon: true, passages: [], createdAt: maintenant, updatedAt: maintenant };
+    const id = await window._addSuivi(data);
+    if (!(window.interventions || []).some(i => i.id === id)) { interventions = [{ id, ...data }].concat(window.interventions || []); window.interventions = interventions; }
+    if (window.ouvrirPlanification) window.ouvrirPlanification(id, 0);
+  } catch (e) { alert('Création impossible : ' + e.message); }
+}
+
 // Reprise d'un dossier en attente : retour en Planification, motif effacé
 // (il ne doit pas réapparaître si le dossier repasse en attente par un autre chemin)
 async function reprendreAttente(id) {
@@ -3973,7 +3986,7 @@ function renderBandeau(dossiers) {
       + (decalageSemaine !== 0 ? '<button class="bs-nav-retour" onclick="changerSemaine(0)">Revenir à cette semaine</button>' : '') + '</div>';
   }
   // Point d'entrée unique d'une intervention saisie à la main : elle naît directement en Planification
-  if (f.cle === 'planification') html += '<button class="btn-primary bs-ajout" onclick="openModal()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Nouvelle intervention</button>';
+  if (f.cle === 'planification') html += '<button class="btn-primary bs-ajout" onclick="creerDossierManuel()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Nouvelle intervention</button>';
   if (f.groupable) html += '<label class="bs-option"><input type="checkbox" ' + (grouperCommune ? 'checked' : '') + ' onchange="basculerGrouperCommune(this.checked)"> Grouper par commune</label>';
   b.innerHTML = html;
 }

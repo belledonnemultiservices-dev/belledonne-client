@@ -112,6 +112,7 @@ const CSS = `
 .pl-tbloc .pl-raps{background:rgba(67,56,202,.04);}
 .pl-tbloc-tete{display:flex;align-items:center;gap:10px;font-size:13.5px;color:#312E81;}
 .pl-rap-etat,.pl-rap-act{display:flex;gap:6px;align-items:center;white-space:nowrap;}
+.pl-doublon{font-size:12px;font-weight:600;color:#B45309;background:#FFF4E5;border-radius:7px;padding:5px 9px;margin-top:5px;}
 .pl-exp-form{margin-top:8px;padding:10px 12px;border:1px solid #E0E7FF;border-radius:9px;background:#F8F9FF;}
 .pl-raps{border:1px solid #E0E7FF;background:#F8F9FF;border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
 .pl-raps-tete{display:flex;gap:10px;align-items:baseline;font-size:13px;}
@@ -172,7 +173,20 @@ export function ouvrirPlanification(id, etape) {
     if (e !== empreinte) { empreinte = e; if (etat.etape > 1) rendre(); else rendreEtapes(); }
   }, 1200);
 }
+// Brouillon de saisie manuelle refermé sans client, sans référence, sans PDF ni passage : supprimé
+function brouillonVide(it) {
+  if (!it || !it.brouillon) return false;
+  const val = (id, k) => ($("#" + id) ? $("#" + id).value.trim() : String(it[k] || "").trim());
+  return !val("plClient", "client") && !val("pl_bc", "bc") && !val("pl_pl", "pl") && !val("pl_devis", "devis")
+    && !it.bcUrl && !it.plUrl && !it.devisUrl && !passagesBruts(it).length && !Object.keys((etat && etat.fichiers) || {}).length;
+}
 function fermer() {
+  const it = etat ? dossier() : null;
+  if (brouillonVide(it)) {
+    clearTimeout(minuterieDossier); minuterieDossier = null;
+    window._deleteSuivi(it.id).then(() => { window.interventions = (window.interventions || []).filter(i => i.id !== it.id); if (window.filterTable) window.filterTable(); }).catch(() => {});
+    showToast("Saisie vide abandonnée");
+  }
   viderDossier();
   viderPassages();
   clearInterval(surveillance);
@@ -367,6 +381,18 @@ function rendreDossier(item) {
   // Expéditeur : liste des contacts du client (Contacts clients), ou nouveau contact
   remplirExpediteur(item, item.client || "");
   $("#plClient").addEventListener("change", (e) => remplirExpediteur({ ...item, expediteurContactId: "" }, e.target.value));
+  // Doublon : n° de BC, PL ou devis déjà présent dans le Suivi (pour un import, c'est l'étape Validation)
+  const alerteDoublon = (cle) => {
+    const champ = $("#pl_" + cle); if (!champ) return;
+    const ligne = champ.closest(".pl-champ");
+    let n = $(".pl-doublon", ligne);
+    const v = champ.value.trim().toLowerCase();
+    const autres = v ? (window.interventions || []).filter(o => o.id !== item.id && [o.bc, o.pl, o.devis].some(x => String(x || "").trim().toLowerCase() === v)) : [];
+    if (!autres.length) { if (n) n.remove(); return; }
+    if (!n) { n = document.createElement("div"); n.className = "pl-doublon"; ligne.appendChild(n); }
+    n.textContent = "⚠ Existe déjà dans le Suivi : " + autres.slice(0, 3).map(o => [o.client || "—", o.adresse || "sans adresse", window.LIB_ETAPE && window.fileDe ? window.LIB_ETAPE[window.fileDe(o)] : o.statut].join(" · ")).join(" | ");
+  };
+  DOCS.forEach(([cle]) => { const c = $("#pl_" + cle); if (c) { c.addEventListener("input", () => alerteDoublon(cle)); alerteDoublon(cle); } });
   // Téléphones : un champ par numéro, comme la fiche
   $("[data-a=ajoutTel]").onclick = () => { $("#plTels").insertAdjacentHTML("beforeend", champTel("")); $("#plTels input:last-child").focus(); };
   // Liste des natures habituelle (config/naturesMission, avec « Ajouter une nature »)
@@ -597,6 +623,7 @@ async function enregistrerDossier(item, silencieux) {
   // Expéditeur (contact du client) : nom affiché, identifiant et email du contact
   const ex = lireExpediteur(item);
   if (ex) Object.entries(ex).forEach(([k, val]) => { if (val !== String(item[k] ?? "").trim()) maj[k] = val; });
+  if (item.brouillon && ((maj.client ?? item.client) || (maj.bc ?? item.bc) || (maj.pl ?? item.pl) || (maj.devis ?? item.devis))) maj.brouillon = false;
   if (!Object.keys(maj).length) return;
   // Garde-fou : le formulaire Kizeo est choisi selon le client et la nature.
   // En automatique, un avertissement non bloquant ; sur « Continuer », une confirmation.
