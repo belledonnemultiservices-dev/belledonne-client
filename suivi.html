@@ -266,7 +266,10 @@
   .btn-next.neutre{color:var(--navy);background:#EBF0F5;}
   .btn-next.neutre:hover{background:#DCE5EE;}
   .btn-ellipsis{font-size:14px;line-height:1;color:var(--text-mid);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;}
-  .files-bar{align-items:center;}
+  .files-bar{align-items:center;flex-direction:column;align-items:stretch;gap:8px;}
+  .files-ligne{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .files-ligne2 .file-chip{height:32px;font-size:12.5px;}
+  .files-fleche{color:var(--text-muted);font-size:15px;}
   .file-semaine{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 16px;border:2px solid #C7D2FE;border-radius:var(--radius-sm);background:#EEF2FF;font:700 13px 'DM Sans',sans-serif;color:#4338CA;cursor:pointer;}
   .file-semaine svg{width:16px;height:16px;}
   .file-semaine:hover{border-color:#4338CA;}
@@ -3441,7 +3444,7 @@ window.filterTable = filterTable;
 // L'ancienne vue reste disponible via le bouton "Ancienne vue".
 // ════════════════════════════════════════════════════════════════════
 var vueSuivi = 'nouvelle'; // l'ancienne vue du tableau a été retirée le 15/11
-var fileSuivi = (function(){ try { return localStorage.getItem('suivi.file') || 'tout'; } catch(e) { return 'tout'; } })();
+var fileSuivi = (function(){ try { return localStorage.getItem('suivi.file') || 'semaine'; } catch(e) { return 'semaine'; } })();
 var plusFiltres = false;
 window._receptionsParPassage = window._receptionsParPassage || {};
 
@@ -3557,16 +3560,43 @@ function aNouveauPassage(item) {
 }
 
 // Onglet de chaque dossier : chaque dossier est dans un seul onglet.
-var STATUT_VERS_FILE = { 'À valider': 'valider', 'En attente': 'attente', 'Passage annulé': 'pannule', 'Annulé': 'annuleDef', 'Terminé': 'termine' };
-function fileDe(item) { return STATUT_VERS_FILE[item.statut] || (aPassageDate(item) ? 'encours' : 'planifier'); }
+// Parcours d'un bon : Validation → Planification → Pilotage quotidien → À facturer → Clôturé,
+// plus trois situations qui le sortent du parcours : En attente, Passage annulé, Annulé.
+// Un passage est exécuté quand son rapport est envoyé au client (passage passé sans
+// suivi Kizeo, ex. rapport manuel : compté comme exécuté, l'app ne peut pas le savoir).
+function passageExecute(item, p) {
+  var rec = recPassage(item, p.num);
+  if (rec) return rec.statut === 'envoye';
+  var d = (p.debut || '').substring(0, 10);
+  return !!d && d < jourLocal(0) && !p.kizeo;
+}
+function tousExecutes(item) {
+  var ps = passagesActifs(item).filter(function(p){ return p.debut; });
+  return ps.length > 0 && ps.every(function(p){ return passageExecute(item, p); });
+}
+var STATUT_VERS_FILE = { 'À valider': 'validation', 'En attente': 'attente', 'Passage annulé': 'pannule', 'Annulé': 'annuleDef' };
+function fileDe(item) {
+  if (STATUT_VERS_FILE[item.statut]) return STATUT_VERS_FILE[item.statut];
+  // Passage 1 fait (rapport envoyé) : à facturer ; une fois facturé, clôturé si tout est exécuté
+  if (item.statut === 'Terminé') return item.enFacturation ? (tousExecutes(item) ? 'cloture' : 'pilotage') : 'afacturer';
+  // Planification terminée (statut En cours) : pilotage
+  if (item.statut === 'En cours' && aPassageDate(item)) return 'pilotage';
+  return 'planification';
+}
+// Le pilotage montre les bons de l'étape Pilotage, et les passages restants des bons
+// À facturer (le bon est rangé dans À facturer, mais ses passages doivent rester visibles).
+function dansPilotage(i) { var e = fileDe(i); return e === 'pilotage' || e === 'afacturer'; }
+var LIB_ETAPE = { validation: 'Validation', planification: 'Planification', pilotage: 'Pilotage quotidien', afacturer: 'À facturer', cloture: 'Clôturé', attente: 'En attente', pannule: 'Passage annulé', annuleDef: 'Annulé' };
+var CLS_ETAPE = { validation: 'psg-passe', planification: 'psg-prevu', pilotage: 'psg-auj', afacturer: 'psg-annule', cloture: 'psg-ok', attente: 'psg-passe', pannule: 'psg-annule', annuleDef: 'psg-retard' };
+function etiquetteEtape(item) { var e = fileDe(item); return '<span class="psg ' + CLS_ETAPE[e] + '" style="text-decoration:none;">' + LIB_ETAPE[e] + '</span>'; }
 
 var parAnciennete = function(x, y){ return dateArrivee(x).localeCompare(dateArrivee(y)); };
 var parRecent = function(x, y){ return String(y.updatedAt || dateArrivee(y)).localeCompare(String(x.updatedAt || dateArrivee(x))); };
 var colAttente = { titre: 'Attente', cell: function(i){ var n = joursDepuis(dateArrivee(i)); var c = n === null ? '' : n > DELAI_PLANIF_JOURS ? 'psg-retard' : n >= 2 ? 'psg-annule' : 'psg-recu'; return '<span class="psg ' + c + '" style="text-decoration:none;">' + (n === null ? '—' : n + ' j') + '</span>'; } };
 
 var FILES_SUIVI = [
-  { cle: 'semaine', label: function(){ var s = semaineAffichee(); return 'Semaine du ' + s.lundi.substring(8,10) + ' au ' + jjmm(s.vendredi); },
-    test: function(i){ var s = semaineAffichee(); return (i.statut !== 'Annulé' && datesDesPassages(i).some(function(d){ return d >= s.lundi && d <= s.vendredi; })) || estReste(i); },
+  { cle: 'semaine', label: 'Pilotage quotidien',
+    test: function(i){ if (!dansPilotage(i)) return false; var s = semaineAffichee(); return datesDesPassages(i).some(function(d){ return d >= s.lundi && d <= s.vendredi; }) || estReste(i); },
     tri: function(x, y){ var a = estReste(x) ? 0 : 1, b = estReste(y) ? 0 : 1; return (a - b) || (premierPassageSemaine(x)||'0').localeCompare(premierPassageSemaine(y)||'0'); },
     colonnes: [{ titre: 'Kizeo · rapport', cell: function(i){ return kizeoHtml(i); } }],
     question: null,
@@ -3589,7 +3619,7 @@ var FILES_SUIVI = [
         { val: tous.filter(aEnvoyer).length, lib: 'rapport(s) à envoyer', alerte: true, cle: 'env', filtre: aEnvoyer },
       ]);
     } },
-  { cle: 'valider', label: 'À valider', test: function(i){ return fileDe(i) === 'valider'; }, tri: parAnciennete,
+  { cle: 'validation', label: 'Validation', test: function(i){ return fileDe(i) === 'validation'; }, tri: parAnciennete,
     question: "Qu'est-ce qui vient d'arriver, et est-ce fiable ?",
     colonnes: [
       { titre: 'Arrivé', cell: function(i){ return '<span style="font-size:12px;">' + libJours(joursDepuis(dateArrivee(i))) + '</span>'; } },
@@ -3605,7 +3635,7 @@ var FILES_SUIVI = [
         { texte: parClient(l), lib: 'par client' },
       ];
     } },
-  { cle: 'planifier', label: 'À planifier', test: function(i){ return fileDe(i) === 'planifier'; }, tri: parAnciennete,
+  { cle: 'planification', label: 'Planification', test: function(i){ return fileDe(i) === 'planification'; }, tri: parAnciennete,
     question: "Qu'est-ce qui attend un rendez-vous, et depuis combien de temps ?",
     groupable: true,
     colonnes: [colAttente],
@@ -3619,23 +3649,15 @@ var FILES_SUIVI = [
         { texte: parClient(l), lib: 'par client' },
       ];
     } },
-  { cle: 'encours', label: 'En cours', test: function(i){ return fileDe(i) === 'encours'; },
-    tri: function(x, y){ var a = aCloturer(x) ? 0 : 1, b = aCloturer(y) ? 0 : 1; return (a - b) || (prochainPassage(x) || '9').localeCompare(prochainPassage(y) || '9'); },
-    question: "Qu'est-ce qui est lancé, et où ça en est ?",
-    colonnes: [
-      { titre: 'Prochain passage', cell: function(i){ var d = prochainPassage(i); return d ? '<span class="psg psg-prevu">' + (d === jourLocal(0) ? "aujourd'hui" : jjmm(d)) + '</span>' : '<span style="color:var(--text-muted)">—</span>'; } },
-      { titre: 'Avancement', cell: function(i){ var ps = passagesActifs(i); var f = ps.filter(function(p){ return passageFait(i, p); }).length; return '<span style="font-size:12px;font-weight:600;">' + f + ' / ' + ps.length + ' fait' + (f > 1 ? 's' : '') + '</span>'; } },
-    ],
+  { cle: 'encours', label: 'En cours', ligne2: true, test: function(){ return true; }, tri: parRecent,
+    question: "Tous les bons : cherche un n° de BC, un client, une adresse pour savoir où il en est.",
+    colonnes: [{ titre: 'Étape', cell: etiquetteEtape }],
     kpis: function(l){
-      return [
-        { val: l.length, lib: 'dossier(s) en cours' },
-        { val: l.filter(function(i){ return passagesSansRapport(i).length; }).length, lib: 'passage passé sans rapport', alerte: true, cle: 'sr', filtre: function(i){ return passagesSansRapport(i).length > 0; } },
-        { val: l.filter(function(i){ return rapportsNonEnvoyes(i).length; }).length, lib: 'rapport reçu non envoyé', alerte: true, cle: 'rne', filtre: function(i){ return rapportsNonEnvoyes(i).length > 0; } },
-        { val: l.filter(aCloturer).length, lib: 'à clôturer', alerte: true, cle: 'clo', filtre: aCloturer },
-        { val: l.filter(kizeoAGenerer7j).length, lib: 'Kizeo à générer (7 j)', alerte: true, cle: 'kz7', filtre: kizeoAGenerer7j },
-      ];
+      var c = {}; l.forEach(function(i){ var e = fileDe(i); c[e] = (c[e] || 0) + 1; });
+      return ['validation', 'planification', 'pilotage', 'afacturer', 'cloture', 'attente', 'pannule', 'annuleDef']
+        .map(function(e){ return { val: c[e] || 0, lib: LIB_ETAPE[e].toLowerCase(), cle: 'e-' + e, filtre: c[e] ? function(i){ return fileDe(i) === e; } : null }; });
     } },
-  { cle: 'attente', label: 'En attente', test: function(i){ return fileDe(i) === 'attente'; },
+  { cle: 'attente', label: 'En attente', ligne2: true, test: function(i){ return fileDe(i) === 'attente'; },
     tri: function(x, y){ return String(x.updatedAt || dateArrivee(x)).localeCompare(String(y.updatedAt || dateArrivee(y))); },
     question: "Qu'est-ce qui est bloqué, et qui doit relancer ?",
     colonnes: [
@@ -3652,7 +3674,7 @@ var FILES_SUIVI = [
         { texte: parClient(l), lib: 'par client' },
       ];
     } },
-  { cle: 'pannule', label: 'Passage annulé', test: function(i){ return fileDe(i) === 'pannule'; },
+  { cle: 'pannule', label: 'Passage annulé', ligne2: true, test: function(i){ return fileDe(i) === 'pannule'; },
     tri: function(x, y){ return String(x.updatedAt || '').localeCompare(String(y.updatedAt || '')); },
     question: "Qu'est-ce qu'il faut replanifier ?",
     colonnes: [
@@ -3669,7 +3691,7 @@ var FILES_SUIVI = [
         { texte: parClient(l), lib: 'par client' },
       ];
     } },
-  { cle: 'annuleDef', label: 'Annulé', test: function(i){ return fileDe(i) === 'annuleDef'; }, tri: parRecent,
+  { cle: 'annuleDef', label: 'Annulé', ligne2: true, test: function(i){ return fileDe(i) === 'annuleDef'; }, tri: parRecent,
     question: 'Combien de dossiers perdus, et pourquoi ?',
     colonnes: [{ titre: 'Annulé', cell: function(i){ return '<span style="font-size:12px;">' + (i.updatedAt ? fmtDate(i.updatedAt) : '—') + '</span>'; } }],
     kpis: function(l){
@@ -3678,8 +3700,8 @@ var FILES_SUIVI = [
         { texte: parClient(l), lib: 'par client' },
       ];
     } },
-  { cle: 'termine', label: 'Terminé', test: function(i){ return fileDe(i) === 'termine'; }, tri: parRecent,
-    question: 'Est-ce que tout est facturé et les rapports envoyés ?',
+  { cle: 'afacturer', label: 'À facturer', test: function(i){ return fileDe(i) === 'afacturer'; }, tri: parRecent,
+    question: 'Passage 1 fait et rapport envoyé : qu\'est-ce qui reste à facturer ?',
     colonnes: [
       { titre: 'Rapport passage 1', cell: function(i){ var s = rapportP1(i); return s === 'envoye' ? '<span class="psg psg-ok">✓ Envoyé</span>' : s && s !== 'en-attente' ? '<span class="psg psg-recu">Reçu, non envoyé</span>' : '<span class="psg psg-retard">✕ Non envoyé</span>'; } },
       { titre: 'Passages suivants', cell: function(i){ var ps = passagesSuivants(i); return ps.length ? '<div class="frise">' + ps.map(function(p){ return '<span class="psg psg-prevu">' + (CERCLES[p.num - 1] || '#' + p.num) + ' ' + jjmm(p.debut.substring(0, 10)) + '</span>'; }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>'; } },
@@ -3689,13 +3711,14 @@ var FILES_SUIVI = [
       var aFact = function(i){ return !i.enFacturation; };
       return [
         { val: l.filter(aFact).length, lib: 'à facturer', alerte: true, cle: 'fact', filtre: aFact },
-        { val: l.filter(function(i){ return i.enFacturation; }).length, lib: 'en facturation' },
-        { val: l.filter(p1).length, lib: 'rapport du passage 1 non envoyé', alerte: true, cle: 'p1', filtre: p1 },
         { val: l.filter(function(i){ return rapportsNonEnvoyes(i).length; }).length, lib: 'rapport reçu non envoyé (tous passages)', alerte: true, cle: 'rneT', filtre: function(i){ return rapportsNonEnvoyes(i).length > 0; } },
         { val: l.filter(function(i){ return passagesSuivants(i).length; }).length, lib: 'avec des passages suivants prévus' },
       ];
     } },
-  { cle: 'tout', label: 'Tout', discret: true, test: function(){ return true; }, question: null, kpis: null },
+  { cle: 'cloture', label: 'Clôturé', test: function(i){ return fileDe(i) === 'cloture'; }, tri: parRecent,
+    question: 'Facturés et tous les passages exécutés.',
+    colonnes: [{ titre: 'Passages', cell: function(i){ var n = passagesActifs(i).length; return '<span style="font-size:12px;">' + n + ' passage' + (n > 1 ? 's' : '') + ' exécuté' + (n > 1 ? 's' : '') + '</span>'; } }],
+    kpis: function(l){ return [{ val: l.length, lib: 'dossier(s) clôturé(s)' }, { texte: parClient(l), lib: 'par client' }]; } },
 ];
 
 function fileCourante() { return FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; }) || FILES_SUIVI[0]; }
@@ -3705,17 +3728,22 @@ function renderFilesBar(base) {
   var bar = document.getElementById('filesBar');
   if (!bar) return;
   if (!FILES_SUIVI.some(function(f){ return f.cle === fileSuivi; })) fileSuivi = 'semaine'; // ancienne file mémorisée
-  var sem = FILES_SUIVI[0];
-  // La Semaine est un outil de pilotage à part : bouton distinct, à gauche, séparé des onglets de statut.
-  var html = '<button class="file-semaine' + (fileSuivi === 'semaine' ? ' active' : '') + '" onclick="choisirFileSuivi(\'semaine\')">'
-    + '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>'
-    + libelleFile(sem) + ' <span class="cpt">' + base.filter(sem.test).length + '</span></button>';
-  html += '<span class="files-sep"></span>';
-  html += FILES_SUIVI.slice(1).map(function(f) {
-    var n = base.filter(f.test).length;
-    var alerte = f.kpis && f.cle !== 'annuleDef' && f.kpis(base.filter(f.test)).some(function(k){ return k.alerte && Number(k.val) > 0; });
-    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (alerte ? ' alerte' : '') + (f.discret ? ' discret' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + libelleFile(f) + ' <span class="cpt">' + n + '</span></button>';
-  }).join('');
+  var trouve = function(cle){ return FILES_SUIVI.find(function(f){ return f.cle === cle; }); };
+  var puce = function(f) {
+    var liste = base.filter(f.test), n = liste.length;
+    var alerte = f.kpis && f.cle !== 'annuleDef' && f.cle !== 'encours' && f.cle !== 'cloture' && f.kpis(liste).some(function(k){ return k.alerte && Number(k.val) > 0; });
+    if (f.cle === 'semaine') {
+      return '<button class="file-semaine' + (fileSuivi === 'semaine' ? ' active' : '') + '" onclick="choisirFileSuivi(\'semaine\')">'
+        + '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>'
+        + libelleFile(f) + ' <span class="cpt">' + n + '</span></button>';
+    }
+    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (alerte ? ' alerte' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + libelleFile(f) + ' <span class="cpt">' + n + '</span></button>';
+  };
+  // Rangée 1 : le parcours d'un bon, dans l'ordre
+  var parcours = ['validation', 'planification', 'semaine', 'afacturer', 'cloture'].map(trouve);
+  var html = '<div class="files-ligne">' + parcours.map(puce).join('<span class="files-fleche">→</span>') + '</div>';
+  // Rangée 2 : recherche globale et situations hors parcours
+  html += '<div class="files-ligne files-ligne2">' + ['encours', 'attente', 'pannule', 'annuleDef'].map(trouve).map(puce).join('') + '</div>';
   bar.innerHTML = html;
   renderBandeau(base.filter(fileCourante().test));
 }
@@ -3956,9 +3984,9 @@ function actionSuivante(item) {
   var id = item.id;
   var bouton = function(lib, fn, neutre, titre){ return '<button class="btn-next' + (neutre ? ' neutre' : '') + '" onclick="' + fn + '(\'' + id + '\')"' + (titre ? ' title="' + titre + '"' : '') + '>' + lib + '</button>'; };
   var f = fileDe(item);
-  if (f === 'valider') return bouton('Valider', 'validerIntervention');
-  // Semaine et En cours : un rapport à relire, à envoyer ou en retard passe en premier.
-  if (fileSuivi === 'semaine' || f === 'encours') {
+  if (f === 'validation') return bouton('Valider', 'validerIntervention');
+  // Pilotage : un rapport à relire, à envoyer ou en retard passe en premier.
+  if (fileSuivi === 'semaine' || f === 'pilotage') {
     var ar = actionRapport(item, passagesNorm(item));
     if (ar && ar.action === 'retard') return '<button class="btn-next" onclick="ouvrirRelanceSms(\'' + id + '\',' + ar.num + ')" title="Rapport du passage ' + ar.num + ' en retard : message WhatsApp au technicien">Relancer sur WhatsApp</button>';
     if (ar) return '<a class="btn-next" href="' + lienRapport(ar.recId, LIEN_ACTION_RAPPORT[ar.action]) + '" title="Ouvre Gestion rapports sur ce rapport (passage ' + ar.num + ')">' + LIB_ACTION_RAPPORT[ar.action] + '</a>';
@@ -3968,12 +3996,13 @@ function actionSuivante(item) {
     return bouton('Générer Kizeo', 'openModal', false, 'Ouvre la fiche pour envoyer le formulaire Kizeo au technicien');
   }
   if (f === 'pannule') return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)">Replanifier</button>';
-  if (f === 'termine') {
-    return item.enFacturation ? '<a class="btn-next neutre" href="facturation.html">En facturation</a>' : bouton('Facturer', 'basculerEnFacturation');
-  }
-  if (f === 'annuleDef' || f === 'attente') return bouton('Ouvrir', 'openModal', true);
-  if (f === 'planifier') return bouton('Planifier', 'ouvrirPlanification', false, 'Ouvre la fenêtre de planification (passages, agenda, Kizeo, notifications)');
-  // En cours
+  if (f === 'afacturer') return bouton('Facturer', 'basculerEnFacturation');
+  if (f === 'cloture') return '<a class="btn-next neutre" href="facturation.html">Voir la facturation</a>';
+  // Reprendre un dossier en attente : retour en Planification
+  if (f === 'attente') return '<button class="btn-next" onclick="setStatutRapide(\'' + id + '\',\'À traiter\')" title="Le blocage est levé : le dossier revient en Planification">Reprendre</button>';
+  if (f === 'annuleDef') return bouton('Ouvrir', 'openModal', true);
+  if (f === 'planification') return bouton('Planifier', 'ouvrirPlanification', false, 'Ouvre la fenêtre de planification (passages, agenda, Kizeo, notifications)');
+  // Pilotage quotidien
   if (aCloturer(item)) return '<button class="btn-next" onclick="setStatutRapide(\'' + id + '\',\'Terminé\')" title="Le rapport du passage 1 est envoyé : passer le dossier en Terminé">Terminer</button>';
   var auj7 = jourLocal(0), fin7 = jourLocal(6);
   if (passagesActifs(item).some(function(p){ var d = (p.debut || '').substring(0, 10); return d && d >= auj7 && d <= fin7 && etatAgenda(p) !== 'ok'; })) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',2)" title="Un passage des 7 prochains jours n\'est pas à jour dans l\'agenda">Mettre à l\'agenda</button>';
@@ -4081,7 +4110,7 @@ function ligneSemaine(item, nbCols) {
   h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2 ligne-sem' + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
   h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
   h += '<td>' + refHtml(item) + '</td>';
-  h += '<td><div class="cn-client">' + (item.client || '—') + (item.nature ? ' <span class="cn-nature">· ' + item.nature + '</span>' : '') + '</div><div class="cn-nature">' + (item.adresse || '—') + (item.nomClient ? ' · ' + item.nomClient : '') + '</div></td>';
+  h += '<td><div class="cn-client">' + (item.client || '—') + (item.nature ? ' <span class="cn-nature">· ' + item.nature + '</span>' : '') + (fileDe(item) !== 'pilotage' ? ' ' + etiquetteEtape(item) : '') + '</div><div class="cn-nature">' + (item.adresse || '—') + (item.nomClient ? ' · ' + item.nomClient : '') + '</div></td>';
   // Une ligne par passage dans chaque colonne, alignées
   var classe = function(p){ return p.statut === 'annule' ? 'ps-annule' : dansSemaine[cleP(p)] ? 'ps-in' : 'ps-out'; };
   var colonne = function(rendu){ return tous.map(function(p){ return '<div class="ps-row ' + classe(p) + '">' + (p.statut === 'annule' ? (rendu === libPassageSemaine ? rendu(p) : marque('na', 'Passage annulé')) : rendu(p)) + '</div>'; }).join(''); };
@@ -4204,7 +4233,7 @@ function sectionsSemaine(list, ligne, nbCols) {
   // 3. Semaine suivante : tous les dossiers qui y ont un passage (même déjà affichés plus haut)
   if (!sousFiltre) {
     var psN = function(i){ return passagesSemaine(i, sn); };
-    var prochaineBrut = (window._baseSuivi || []).filter(function(i){ return i.statut !== 'Annulé' && psN(i).length > 0; })
+    var prochaineBrut = (window._baseSuivi || []).filter(function(i){ return dansPilotage(i) && psN(i).length > 0; })
       .sort(function(x, y){ return (psN(x)[0].debut || '').localeCompare(psN(y)[0].debut || ''); });
     var prochaine = prochaineBrut;
     var nbN = 0, kzN = 0;

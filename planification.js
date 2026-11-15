@@ -488,7 +488,8 @@ function rendreRecap(item) {
   $(".pl-pied [data-a=prec]").onclick = () => { etat.etape--; rendre(); };
   $(".pl-pied [data-a=fin]").onclick = async () => {
     // Planification faite : le dossier passe de « À traiter » à « En cours »
-    if (["À traiter", "", undefined, null].includes(item.statut) && ns.length) {
+    // (de même pour un dossier replanifié après un passage annulé)
+    if (["À traiter", "Passage annulé", "Nouveau", "", undefined, null].includes(item.statut) && ns.length) {
       await window._updateSuivi(item.id, { statut: "En cours", updatedAt: new Date().toISOString() });
       showToast("Dossier planifié · passé en « En cours »");
     }
