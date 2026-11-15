@@ -498,3 +498,7 @@ function rendreRecap(item) {
 }
 
 window.ouvrirPlanification = ouvrirPlanification;
+// Lus par l'onglet Planification du Suivi (colonne Avancement, bouton Reprendre)
+window.etatsEtapesPlanif = etatsEtapes;
+window.etapeConseilleePlanif = etapeConseillee;
+window.ETAPES_PLANIF = ETAPES;

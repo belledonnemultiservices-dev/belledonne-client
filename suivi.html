@@ -267,6 +267,9 @@
   .btn-next.rejeter{color:#C0392B;background:#FDECEA;}
   .btn-next.rejeter:hover{background:#F9D6D2;}
   .bs-ajout{margin-left:auto;align-self:center;}
+  .avancement{display:flex;gap:3px;flex-wrap:nowrap;}
+  .av-etape{font:600 10.5px 'DM Sans',sans-serif;padding:3px 6px;border-radius:5px;background:#EEF1F4;color:var(--text-muted);white-space:nowrap;cursor:default;}
+  .av-etape.fait{background:#E3F5EC;color:#178a5c;}
   .btn-next.neutre:hover{background:#DCE5EE;}
   .btn-ellipsis{font-size:14px;line-height:1;color:var(--text-mid);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;}
   .files-bar{align-items:center;flex-direction:column;align-items:stretch;gap:8px;}
@@ -2414,9 +2417,10 @@ async function validerIntervention(id) {
   // Doublon possible ou fiche incomplète : la fenêtre s'ouvre pour corriger avant de valider.
   if (!estDoublon(item) && !estIncomplet(item)) {
     try {
-      await window._updateSuivi(id, { statut: 'À traiter' });
+      const changes = { statut: 'À traiter', validatedAt: new Date().toISOString() };
+      await window._updateSuivi(id, changes);
       const idx = interventions.findIndex(i => i.id === id);
-      if (idx !== -1) { interventions[idx].statut = 'À traiter'; window.interventions = interventions; }
+      if (idx !== -1) { Object.assign(interventions[idx], changes); window.interventions = interventions; }
       filterTable();
       showToast('Validé — passé en Planification.');
     } catch(e) { alert('Erreur : ' + e.message); }
@@ -2468,6 +2472,7 @@ async function confirmerValidation() {
   try {
     const changes = {
       statut: 'À traiter',
+      validatedAt: new Date().toISOString(), // départ du délai de planification
       bc: document.getElementById('vBC').value.trim(),
       nature: document.getElementById('vNature').value.trim(),
       nomClient: document.getElementById('vNomClient').value.trim(),
@@ -3416,6 +3421,8 @@ function filterTable() {
   var v2 = activeTab === 'contrat';
   // Validation : pas de recherche ni de filtres (barre masquée), un filtre resté actif ailleurs ne doit rien cacher
   if (v2 && fileSuivi === 'validation') q = statut = clientFilter = annee = assigneFilter = natureFilter = dateDe = dateA = '';
+  // Planification : la recherche seule, les autres filtres (masqués) ne s'appliquent pas
+  if (v2 && fileSuivi === 'planification') statut = clientFilter = annee = assigneFilter = natureFilter = dateDe = dateA = '';
   // Recherche ou filtre actif : dans la Semaine, les sections contenant un résultat se déplient
   window._rechercheActive = !!(q || statut || clientFilter || annee || assigneFilter || natureFilter || dateDe || dateA);
   var allData = window.interventions || [];
@@ -3556,6 +3563,32 @@ function estDoublon(item) {
   return (window.interventions || []).some(function(o){ return o.id !== item.id && refsDe(o).some(function(r){ return refs.indexOf(r) !== -1; }); });
 }
 function estIncomplet(item) { return manquesDe(item).length > 0; }
+// Jours ouvrés (lundi-vendredi) écoulés depuis une date, aujourd'hui exclu du décompte du jour de départ
+function joursOuvresDepuis(iso) {
+  if (!iso) return null;
+  var d = new Date(iso); if (isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  var fin = new Date(); fin.setHours(0, 0, 0, 0);
+  var n = 0;
+  while (d < fin) { d.setDate(d.getDate() + 1); var j = d.getDay(); if (j !== 0 && j !== 6) n++; }
+  return n;
+}
+// Entrée en Planification : date de validation, sinon (dossiers antérieurs au 15/11, saisie manuelle) l'arrivée
+function entreePlanif(item) { return item.validatedAt || dateArrivee(item); }
+function attentePlanif(item) { return joursOuvresDepuis(entreePlanif(item)); }
+function etapesPlanif(item) { return typeof window.etatsEtapesPlanif === 'function' ? window.etatsEtapesPlanif(item) : null; }
+// Commencé : au moins une étape faite au-delà du dossier lui-même (qui est complet dès la validation)
+function planifCommencee(item) { var e = etapesPlanif(item); return !!e && e.slice(1).some(Boolean); }
+function avancementHtml(item) {
+  var e = etapesPlanif(item);
+  if (!e) return '<span style="color:var(--text-muted)">—</span>';
+  var libs = ['Dossier', 'Passages', 'Agenda', 'Kizeo', 'Notif'];
+  var ps = passagesActifs(item).filter(function(p){ return p.debut; });
+  var detailPsg = ps.length ? '\n' + ps.map(function(p){ return 'Passage ' + p.num + ' : ' + fmtDate(p.debut) + (p.techs.length ? ' · ' + p.techs.join(', ') : ' · sans technicien'); }).join('\n') : '\nAucun passage';
+  return '<div class="avancement">' + libs.map(function(l, k){
+    return '<span class="av-etape' + (e[k] ? ' fait' : '') + '" title="' + l + (e[k] ? ' : fait' : ' : à faire') + (k === 1 ? detailPsg : '') + '">' + (e[k] ? '✓ ' : '') + l + '</span>';
+  }).join('') + '</div>';
+}
 function manquesDe(item) {
   var m = [];
   if (!item.adresse) m.push('Adresse');
@@ -3688,18 +3721,25 @@ var FILES_SUIVI = [
         { val: l.filter(estIncomplet).length, lib: 'incomplet(s)', alerte: true, cle: 'inc', filtre: estIncomplet },
       ];
     } },
-  { cle: 'planification', label: 'Planification', test: function(i){ return fileDe(i) === 'planification'; }, tri: parAnciennete,
+  // Décidé le 15/11 : plus ancien en premier, attente en jours ouvrés depuis la validation,
+  // une colonne Avancement (les 5 étapes de la fenêtre de planification) à la place de
+  // Techniciens / Passages / Notifs, ni statut, ni regroupement par commune.
+  { cle: 'planification', label: 'Planification', test: function(i){ return fileDe(i) === 'planification'; },
+    tri: function(x, y){ return entreePlanif(x).localeCompare(entreePlanif(y)); },
     question: "Qu'est-ce qui attend un rendez-vous, et depuis combien de temps ?",
-    groupable: true,
-    colonnes: [colAttente],
+    reduit: true,
+    colonnes: [
+      { titre: 'Avancement', cell: avancementHtml },
+      { titre: 'Attente', cell: function(i){ var n = attentePlanif(i); var c = n === null ? '' : n > DELAI_PLANIF_JOURS ? 'psg-retard' : n >= 2 ? 'psg-annule' : 'psg-recu'; return '<span class="psg ' + c + '" style="text-decoration:none;" title="Jours ouvrés depuis la validation (hors samedi et dimanche)">' + (n === null ? '—' : n + ' j') + '</span>'; } },
+    ],
     kpis: function(l){
-      var vieux = l.map(function(i){ return joursDepuis(dateArrivee(i)); }).filter(function(n){ return n !== null; });
-      var retard = function(i){ var n = joursDepuis(dateArrivee(i)); return n !== null && n > DELAI_PLANIF_JOURS; };
+      var vieux = l.map(attentePlanif).filter(function(n){ return n !== null; });
+      var retard = function(i){ var n = attentePlanif(i); return n !== null && n > DELAI_PLANIF_JOURS; };
       return [
         { val: l.length, lib: 'dossier(s) à planifier' },
-        { val: l.filter(retard).length, lib: 'en retard (+' + DELAI_PLANIF_JOURS + ' j)', alerte: true, cle: 'ret', filtre: retard },
-        { val: vieux.length ? vieux.reduce(function(a, b){ return Math.max(a, b); }) + ' j' : '—', lib: 'plus ancien' },
-        { texte: parClient(l), lib: 'par client' },
+        { val: l.filter(retard).length, lib: 'en retard (+' + DELAI_PLANIF_JOURS + ' j ouvrés)', alerte: true, cle: 'ret', filtre: retard },
+        { val: l.filter(planifCommencee).length, lib: 'commencé(s) non terminé(s)', cle: 'com', filtre: planifCommencee },
+        { val: vieux.length ? vieux.reduce(function(a, b){ return Math.max(a, b); }) + ' j' : '—', lib: 'plus ancien (j ouvrés)' },
       ];
     } },
   { cle: 'encours', label: 'En cours', ligne2: true, test: function(){ return true; }, tri: parRecent,
@@ -3865,6 +3905,13 @@ function majAffichageVue() {
   var btnPlus = document.getElementById('btnPlusFiltres');
   btnPlus.style.display = contrat ? '' : 'none';
   btnPlus.textContent = plusFiltres ? 'Moins de filtres' : 'Plus de filtres';
+  // Planification : seulement la barre de recherche
+  if (contrat && fileSuivi === 'planification') {
+    ['filterClient', 'filterStatut', 'filterAssigne', 'filterNature', 'filterAnnee', 'filtreDates', 'btnPlusFiltres'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  } else {
+    ['filterStatut', 'filterAssigne'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = ''; });
+    var fc = document.getElementById('filterClient'); if (fc) fc.style.display = contrat ? '' : 'none';
+  }
 }
 function basculerPlusFiltres() { plusFiltres = !plusFiltres; majAffichageVue(); }
 
@@ -4061,7 +4108,15 @@ function actionSuivante(item) {
   // Reprendre un dossier en attente : retour en Planification
   if (f === 'attente') return '<button class="btn-next" onclick="setStatutRapide(\'' + id + '\',\'À traiter\')" title="Le blocage est levé : le dossier revient en Planification">Reprendre</button>';
   if (f === 'annuleDef') return bouton('Ouvrir', 'openModal', true);
-  if (f === 'planification') return bouton('Planifier', 'ouvrirPlanification', false, 'Ouvre la fenêtre de planification (passages, agenda, Kizeo, notifications)');
+  if (f === 'planification') {
+    // Commencé : on rouvre la fenêtre directement sur la première étape manquante
+    if (planifCommencee(item) && typeof window.etapeConseilleePlanif === 'function') {
+      var k = window.etapeConseilleePlanif(item);
+      var lib = (window.ETAPES_PLANIF || [])[k] || 'suite';
+      return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',' + k + ')" title="Reprend la planification à l\'étape ' + lib + '">Reprendre · ' + lib + '</button>';
+    }
+    return bouton('Planifier', 'ouvrirPlanification', false, 'Ouvre la fenêtre de planification (passages, agenda, Kizeo, notifications)');
+  }
   // Pilotage quotidien
   if (aCloturer(item)) return '<button class="btn-next" onclick="setStatutRapide(\'' + id + '\',\'Terminé\')" title="Le rapport du passage 1 est envoyé : passer le dossier en Terminé">Terminer</button>';
   var auj7 = jourLocal(0), fin7 = jourLocal(6);
