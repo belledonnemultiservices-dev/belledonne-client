@@ -323,6 +323,14 @@
   .ps-l{font-size:12.5px;white-space:nowrap;gap:4px;}
   .ps-l b{color:#4338CA;}
   .ps-h{color:var(--text-muted);}
+  .ps-row{height:24px;display:flex;align-items:center;}
+  .ck-td .ps-row{justify-content:center;}
+  .ps-row .ck-l{height:24px;}
+  .ps-out{opacity:.45;}
+  .ps-in .ps-l{font-weight:600;}
+  .ps-in .ps-l b::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#4338CA;margin-right:5px;vertical-align:middle;}
+  .ps-annule{opacity:.45;}
+  .ps-annule .ps-l{text-decoration:line-through;}
   .ck-th,.ck-td{text-align:center!important;}
   .ck-td .ck-l{justify-content:center;}
   .ck{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
@@ -4017,41 +4025,49 @@ function actionSemaine(item, ps) {
 }
 var TITRES_SEMAINE = '<th>Réf.</th><th>Client · Adresse</th><th>Passage de la semaine</th><th class="ck-th">Agenda</th><th class="ck-th">Kizeo</th><th class="ck-th">Client</th><th class="ck-th">Locataire</th><th>Statut</th><th style="text-align:right;">Action</th>';
 function ligneSemaine(item, nbCols) {
+  // Tous les passages du dossier, avec la check-list de chacun. Ceux de la semaine
+  // affichée sont en évidence, les autres en grisé, les annulés barrés.
   var ps = passagesLigneSemaine(item);
-  var reste = contexteLigne !== 'prochaine' && estReste(item);
+  var cleP = function(p){ return p.num + '|' + p.debut; };
+  var dansSemaine = {}; ps.forEach(function(p){ dansSemaine[cleP(p)] = 1; });
+  var tous = passagesNorm(item);
   var h = '';
   var isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
   h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2 ligne-sem' + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
   h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
   h += '<td>' + refHtml(item) + '</td>';
   h += '<td><div class="cn-client">' + (item.client || '—') + (item.nature ? ' <span class="cn-nature">· ' + item.nature + '</span>' : '') + '</div><div class="cn-nature">' + (item.adresse || '—') + (item.nomClient ? ' · ' + item.nomClient : '') + '</div></td>';
-  h += '<td>' + ps.map(libPassageSemaine).join('') + '</td>';
+  // Une ligne par passage dans chaque colonne, alignées
+  var classe = function(p){ return p.statut === 'annule' ? 'ps-annule' : dansSemaine[cleP(p)] ? 'ps-in' : 'ps-out'; };
+  var colonne = function(rendu){ return tous.map(function(p){ return '<div class="ps-row ' + classe(p) + '">' + (p.statut === 'annule' ? (rendu === libPassageSemaine ? rendu(p) : marque('na', 'Passage annulé')) : rendu(p)) + '</div>'; }).join(''); };
+  h += '<td>' + (tous.length ? colonne(libPassageSemaine) : '<span class="cn-nature">aucun passage</span>') + '</td>';
   // Agenda
-  h += '<td class="ck-td">' + ps.map(function(p){
+  h += '<td class="ck-td">' + colonne(function(p){
     var e = etatAgenda(p);
     return e === 'ok' ? marque('ok', "Dans l'agenda de " + (p.techs.join(', ') || 'du technicien')) : e === 'partiel' ? marque('att', "Agenda incomplet : pas chez tous les techniciens du passage") : marque('ko', "Pas encore dans l'agenda du technicien");
-  }).join('') + '</td>';
-  // Kizeo (semaine précédente : état du rapport)
-  h += '<td class="ck-td">' + ps.map(function(p){
-    if (reste) {
-      var r = etatRapport(item, p);
-      return r === 'relire' ? marque('att', 'Rapport à relire') : r === 'envoyer' ? marque('att', 'Rapport prêt, pas encore envoyé au client') : r === 'retard' ? marque('ko', 'Rapport en retard') : r === 'attente' ? marque('att', 'Rapport attendu') : marque('ok', 'Rapport envoyé au client');
-    }
+  }) + '</td>';
+  // Kizeo : formulaire chez le technicien ; une fois le rapport revenu, état du rapport
+  h += '<td class="ck-td">' + colonne(function(p){
+    var rec = recPassage(item, p.num);
+    if (rec && rec.statut === 'envoye') return marque('ok', 'Rapport envoyé au client');
+    var r = etatRapport(item, p);
+    if (r === 'relire') return marque('att', 'Rapport reçu, à relire');
+    if (r === 'envoyer') return marque('att', 'Rapport prêt, pas encore envoyé au client');
+    if (r === 'retard') return marque('ko', 'Rapport du technicien en retard');
     var e = etatKizeo(item, p);
-    var rec = recPassage(item, p.num), dest = p.kizeoTech || (rec && rec.technicien) || '';
+    var dest = p.kizeoTech || (rec && rec.technicien) || '';
     return e === 'ok' ? marque('ok', 'Formulaire envoyé à ' + (dest || 'le technicien') + (p.kizeoLe ? ' le ' + fmtDate(p.kizeoLe) : ''))
-      : e === 'recu' ? marque('ok', 'Rapport déjà revenu du technicien')
       : e === 'ecart' ? marque('att', 'Envoyé à ' + dest + ', mais le technicien du passage est ' + p.techs.join(', '))
       : marque('ko', 'Formulaire Kizeo pas encore envoyé');
-  }).join('') + '</td>';
+  }) + '</td>';
   // Client (champ notifBailleur) et locataire
   ['notifBailleur', 'notifLocataire'].forEach(function(champ) {
-    h += '<td class="ck-td">' + ps.map(function(p){
+    h += '<td class="ck-td">' + colonne(function(p){
       if (champ === 'notifLocataire' && !item.emailClient && !toNotifArray(item.notifLocataire).length) return marque('na', 'Pas d\'email locataire dans la fiche');
       var r = notifPassage(item, p, champ);
       if (r && r.change) return marque('att', 'Notifié le ' + fmtDate(r.le) + ' pour le ' + fmtDate(r.annonce) + ' : date modifiée depuis, à re-notifier');
       return r ? marque('ok', 'Notifié le ' + fmtDate(r.le) + (r.estime ? ' (estimation : notification envoyée avant cette date)' : '')) : marque('ko', champ === 'notifBailleur' ? 'Client pas encore notifié pour ce passage' : 'Locataire pas encore notifié pour ce passage');
-    }).join('') + '</td>';
+    }) + '</td>';
   });
   h += '<td>' + statutSelect(item.id, item.statut) + '</td>';
   h += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;">' + actionSemaine(item, ps) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
