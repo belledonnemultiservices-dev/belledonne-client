@@ -3553,6 +3553,9 @@ var resteOuvert = (function(){ try { return localStorage.getItem('suivi.resteOuv
 var prochaineOuvert = (function(){ try { return localStorage.getItem('suivi.prochaineOuvert') === '1'; } catch(e) { return false; } })();
 function basculerProchaine() { prochaineOuvert = !prochaineOuvert; try { localStorage.setItem('suivi.prochaineOuvert', prochaineOuvert ? '1' : '0'); } catch(e) {} filterTable(); }
 var contexteLigne = ''; // 'prochaine' pendant le rendu du bloc Semaine prochaine
+// Un dossier peut apparaître dans la semaine et dans le bloc Semaine prochaine :
+// ses lignes du bloc prennent un suffixe d'identifiant pour rester distinctes.
+function sfxLigne() { return contexteLigne === 'prochaine' ? '-prochaine' : ''; }
 function basculerReste() { resteOuvert = !resteOuvert; try { localStorage.setItem('suivi.resteOuvert', resteOuvert ? '1' : '0'); } catch(e) {} filterTable(); }
 function semaineAffichee(decalage) {
   var d = new Date(); var j = d.getDay(); // 0 = dimanche, 6 = samedi
@@ -4026,7 +4029,7 @@ function notifsHtml(item) {
   var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
   var t = function(lbl, arr){ return lbl + (arr.length ? ' : ' + arr.length + ' envoi(s), dernier le ' + fmtDate(arr[arr.length-1]) : ' : jamais'); };
   var titre = [t('Bailleur', nb), t('Locataire', nl), t('SMS', ns), t('Rappel SMS', nr)].join('\n');
-  return '<button class="notif-ico" onclick="toggleNotifRow(\'' + item.id + '\')" title="' + titre + '\n(clic : historique)"><span class="' + (nb.length ? 'fait' : '') + '">🏢</span><span class="' + (nl.length ? 'fait' : '') + '">🏠</span><span class="' + (ns.length || nr.length ? 'fait' : '') + '">💬</span></button>';
+  return '<button class="notif-ico" onclick="toggleNotifRow(\'' + item.id + sfxLigne() + '\')" title="' + titre + '\n(clic : historique)"><span class="' + (nb.length ? 'fait' : '') + '">🏢</span><span class="' + (nl.length ? 'fait' : '') + '">🏠</span><span class="' + (ns.length || nr.length ? 'fait' : '') + '">💬</span></button>';
 }
 
 // La prochaine chose à faire sur le dossier, mise en avant.
@@ -4082,7 +4085,7 @@ window.renderTableV2 = function(list) {
     var techs = techsDesPassages(item);
     if (!techs.length) techs = item.assignes || (item.assigne ? [item.assigne] : []);
     var isChecked = window.selectedIds ? window.selectedIds.has(item.id) : false;
-    h += '<tr id="row-' + item.id + '" class="ligne-v2" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
+    h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
     h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
     h += '<td>' + refHtml(item) + '</td>';
     h += '<td><div class="cn-client">' + (item.client || '—') + '</div><div class="cn-nature">' + (item.nature || '') + (item.dateEmission ? ' · BC du ' + fmtDate(item.dateEmission) : '') + '</div></td>';
@@ -4096,7 +4099,7 @@ window.renderTableV2 = function(list) {
     h += '</tr>';
     // Historique des notifications (même ligne repliable que l'ancienne vue)
     var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
-    h += '<tr id="notif-row-' + item.id + '" class="notif-row hidden"><td colspan="' + nbCols + '"><div class="notif-bar">';
+    h += '<tr id="notif-row-' + item.id + sfxLigne() + '" class="notif-row hidden"><td colspan="' + nbCols + '"><div class="notif-bar">';
     h += '<div class="notif-section">' + (hasPsg ? '<button class="btn-notif-open" onclick="openNotifFromRow(\'' + item.id + '\')">✉ Notifier</button>' : '<span class="notif-none">Ajoutez des passages pour notifier</span>') + '</div>';
     h += '<div style="width:1px;height:24px;background:var(--border);margin:0 4px;"></div>';
     h += '<div class="notif-section"><span class="notif-label">🏢 Bailleur</span>' + notifHistoryHtml('bailleur', nb, '🏢', 'bailleur') + '</div>';
@@ -4129,15 +4132,14 @@ window.renderTableV2 = function(list) {
   } else {
     list.forEach(function(i){ html += ligne(i); });
   }
-  // Semaine prochaine : dossiers ayant un passage la semaine suivante et pas déjà affichés.
+  // Semaine prochaine : tous les dossiers qui y ont un passage, même s'ils figurent
+  // aussi dans la semaine affichée (la colonne Kizeo montre alors leur passage suivant).
   if (f.cle === 'semaine' && !sousFiltre) {
     var sn = semaineAffichee(decalageSemaine + 1);
-    var dejaLa = {}; list.forEach(function(i){ dejaLa[i.id] = 1; });
     var prochaine = (window._baseSuivi || []).filter(function(i){
-      return !dejaLa[i.id] && i.statut !== 'Annulé' && passagesSemaine(i, sn).length > 0;
+      return i.statut !== 'Annulé' && passagesSemaine(i, sn).length > 0;
     }).sort(function(x, y){ return (passagesSemaine(x, sn)[0].debut || '').localeCompare(passagesSemaine(y, sn)[0].debut || ''); });
-    var nDeja = list.filter(function(i){ return passagesSemaine(i, sn).length > 0; }).length;
-    html += '<tr class="ligne-groupe prochaine" style="cursor:pointer;" onclick="basculerProchaine()" title="' + (prochaineOuvert ? 'Replier' : 'Déplier') + '"><td colspan="' + nbCols + '">' + (prochaineOuvert ? '▾' : '▸') + ' Semaine prochaine du ' + jjmm(sn.lundi) + ' au ' + jjmm(sn.vendredi) + ' · ' + prochaine.length + ' dossier' + (prochaine.length > 1 ? 's' : '') + (nDeja ? ' (+ ' + nDeja + ' déjà affiché' + (nDeja > 1 ? 's' : '') + ' ci-dessus)' : '') + ' <span style="float:right;font-weight:600;text-transform:none;letter-spacing:0;">' + (prochaineOuvert ? 'Replier' : 'Afficher') + '</span></td></tr>';
+    html += '<tr class="ligne-groupe prochaine" style="cursor:pointer;" onclick="basculerProchaine()" title="' + (prochaineOuvert ? 'Replier' : 'Déplier') + '"><td colspan="' + nbCols + '">' + (prochaineOuvert ? '▾' : '▸') + ' Semaine prochaine du ' + jjmm(sn.lundi) + ' au ' + jjmm(sn.vendredi) + ' · ' + prochaine.length + ' dossier' + (prochaine.length > 1 ? 's' : '') + ' <span style="float:right;font-weight:600;text-transform:none;letter-spacing:0;">' + (prochaineOuvert ? 'Replier' : 'Afficher') + '</span></td></tr>';
     if (prochaineOuvert) {
       contexteLigne = 'prochaine';
       try { prochaine.forEach(function(i){ html += ligne(i); }); } finally { contexteLigne = ''; }
