@@ -3573,8 +3573,14 @@ function joursOuvresDepuis(iso) {
   while (d < fin) { d.setDate(d.getDate() + 1); var j = d.getDay(); if (j !== 0 && j !== 6) n++; }
   return n;
 }
-// Entrée en Planification : date de validation, sinon (dossiers antérieurs au 15/11, saisie manuelle) l'arrivée
-function entreePlanif(item) { return item.validatedAt || dateArrivee(item); }
+// Entrée en Planification (classement et attente) :
+// - BC importé : date de validation, sinon (validé avant le 15/11) son arrivée
+// - saisie manuelle : date d'émission du BC si renseignée (décidé le 15/11), sinon la date de saisie
+function entreePlanif(item) {
+  if (item.validatedAt) return item.validatedAt;
+  if (item.source !== 'auto' && item.dateEmission) return item.dateEmission;
+  return dateArrivee(item);
+}
 function attentePlanif(item) { return joursOuvresDepuis(entreePlanif(item)); }
 function etapesPlanif(item) { return typeof window.etatsEtapesPlanif === 'function' ? window.etatsEtapesPlanif(item) : null; }
 // Commencé : au moins une étape faite au-delà du dossier lui-même (qui est complet dès la validation)
@@ -3726,7 +3732,7 @@ var FILES_SUIVI = [
   // Techniciens / Passages / Notifs, ni statut, ni regroupement par commune.
   { cle: 'planification', label: 'Planification', test: function(i){ return fileDe(i) === 'planification'; },
     tri: function(x, y){ return entreePlanif(x).localeCompare(entreePlanif(y)); },
-    question: "Qu'est-ce qui attend un rendez-vous, et depuis combien de temps ?",
+    question: null,
     reduit: true,
     colonnes: [
       { titre: 'Avancement', cell: avancementHtml },
