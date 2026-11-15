@@ -3414,6 +3414,8 @@ function filterTable() {
   var dateA = (document.getElementById('filterDateA')?.value)||'';
   // Nouvelle vue (onglet En contrat) : technicien et dates portent aussi sur les passages.
   var v2 = activeTab === 'contrat';
+  // Validation : pas de recherche ni de filtres (barre masquée), un filtre resté actif ailleurs ne doit rien cacher
+  if (v2 && fileSuivi === 'validation') q = statut = clientFilter = annee = assigneFilter = natureFilter = dateDe = dateA = '';
   // Recherche ou filtre actif : dans la Semaine, les sections contenant un résultat se déplient
   window._rechercheActive = !!(q || statut || clientFilter || annee || assigneFilter || natureFilter || dateDe || dateA);
   var allData = window.interventions || [];
@@ -3669,7 +3671,7 @@ var FILES_SUIVI = [
       ]);
     } },
   { cle: 'validation', label: 'Validation', test: function(i){ return fileDe(i) === 'validation'; }, tri: parAnciennete,
-    question: "Qu'est-ce qui vient d'arriver, et est-ce fiable ?",
+    question: null,
     // Décidé le 15/11 : seulement ce qui sert à décider valider / rejeter.
     // Techniciens, passages, notifications et statut n'ont pas de sens avant la planification.
     reduit: true,
@@ -3684,7 +3686,6 @@ var FILES_SUIVI = [
         { val: vieux.length ? libJours(Math.max.apply(null, vieux)) : '—', lib: 'plus ancien' },
         { val: l.filter(estDoublon).length, lib: 'doublon(s) possible(s)', alerte: true, cle: 'dbl', filtre: estDoublon },
         { val: l.filter(estIncomplet).length, lib: 'incomplet(s)', alerte: true, cle: 'inc', filtre: estIncomplet },
-        { texte: parClient(l), lib: 'par client' },
       ];
     } },
   { cle: 'planification', label: 'Planification', test: function(i){ return fileDe(i) === 'planification'; }, tri: parAnciennete,
@@ -3857,7 +3858,7 @@ function majAffichageVue() {
   var btnAj = document.getElementById('btnAjouter');
   if (btnAj) btnAj.style.display = contrat ? 'none' : '';
   var barre = document.querySelector('.filters-bar');
-  if (barre) barre.style.display = '';
+  if (barre) barre.style.display = contrat && fileSuivi === 'validation' ? 'none' : '';
   // Filtres secondaires repliés dans l'onglet En contrat
   var replier = contrat && !plusFiltres;
   ['filterNature', 'filterAnnee', 'filtreDates'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = replier ? 'none' : (id === 'filtreDates' ? 'flex' : ''); });
