@@ -264,6 +264,9 @@
   .btn-next{font:600 12px 'DM Sans',sans-serif;color:#fff;background:var(--green-dark);border:none;border-radius:6px;padding:6px 11px;cursor:pointer;white-space:nowrap;text-decoration:none;}
   .btn-next:hover{background:#178a5c;}
   .btn-next.neutre{color:var(--navy);background:#EBF0F5;}
+  .btn-next.rejeter{color:#C0392B;background:#FDECEA;}
+  .btn-next.rejeter:hover{background:#F9D6D2;}
+  .bs-ajout{margin-left:auto;align-self:center;}
   .btn-next.neutre:hover{background:#DCE5EE;}
   .btn-ellipsis{font-size:14px;line-height:1;color:var(--text-mid);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;}
   .files-bar{align-items:center;flex-direction:column;align-items:stretch;gap:8px;}
@@ -2371,9 +2374,16 @@ async function saveIntervention(silent) {
       if (idx !== -1) interventions[idx] = {...interventions[idx], ...data};
     window.interventions = interventions;
     window._syncEcheancesReception(editId, passages);
-    } else {
+    }
+    let nouvelId = null;
+    if (!editId) {
       data.createdAt = new Date().toISOString();
-      await window._addSuivi(data);
+      nouvelId = await window._addSuivi(data);
+      // L'écoute temps réel l'ajoute d'ordinaire tout de suite ; filet si elle n'est pas encore passée
+      if (nouvelId && !(window.interventions || []).some(i => i.id === nouvelId)) {
+        interventions = [{ id: nouvelId, ...data }, ...(window.interventions || [])];
+        window.interventions = interventions;
+      }
     }
 
     if (silent) {
@@ -2383,6 +2393,8 @@ async function saveIntervention(silent) {
       closeModal();
       filterTable();
       showToast(editId ? 'Intervention mise à jour !' : 'Intervention enregistrée !');
+      // Nouvelle intervention : on enchaîne sur sa planification
+      if (nouvelId && typeof window.ouvrirPlanification === 'function') window.ouvrirPlanification(nouvelId);
     }
   } catch(e) {
     console.error(e);
@@ -2398,6 +2410,18 @@ let _validerItemId = null;
 async function validerIntervention(id) {
   const item = (window.interventions||[]).find(i => i.id === id);
   if (!item) return;
+  // Contrôles au vert : validation directe, sans fenêtre de relecture (décidé le 15/11).
+  // Doublon possible ou fiche incomplète : la fenêtre s'ouvre pour corriger avant de valider.
+  if (!estDoublon(item) && !estIncomplet(item)) {
+    try {
+      await window._updateSuivi(id, { statut: 'À traiter' });
+      const idx = interventions.findIndex(i => i.id === id);
+      if (idx !== -1) { interventions[idx].statut = 'À traiter'; window.interventions = interventions; }
+      filterTable();
+      showToast('Validé — passé en Planification.');
+    } catch(e) { alert('Erreur : ' + e.message); }
+    return;
+  }
   _validerItemId = id;
 
   document.getElementById('vClient').textContent = item.client || '—';
@@ -3529,7 +3553,23 @@ function estDoublon(item) {
   var refs = refsDe(item); if (!refs.length) return false;
   return (window.interventions || []).some(function(o){ return o.id !== item.id && refsDe(o).some(function(r){ return refs.indexOf(r) !== -1; }); });
 }
-function estIncomplet(item) { return !item.adresse || !refsDe(item).length || !(item.bcUrl || item.plUrl || item.devisUrl); }
+function estIncomplet(item) { return manquesDe(item).length > 0; }
+function manquesDe(item) {
+  var m = [];
+  if (!item.adresse) m.push('Adresse');
+  if (!refsDe(item).length) m.push('N° BC/PL/devis');
+  if (!(item.bcUrl || item.plUrl || item.devisUrl)) m.push('PDF');
+  return m;
+}
+// Infobulle du doublon : les dossiers existants qui portent le même n°, avec leur étape
+function titreDoublon(item) {
+  var refs = refsDe(item);
+  var autres = (window.interventions || []).filter(function(o){ return o.id !== item.id && refsDe(o).some(function(r){ return refs.indexOf(r) !== -1; }); });
+  return 'Même n° déjà dans le Suivi :\n' + autres.slice(0, 5).map(function(o){
+    var r = o.bc ? 'BC ' + o.bc : o.pl ? 'PL ' + o.pl : 'Devis ' + o.devis;
+    return '• ' + r + ' · ' + (o.client || '—') + ' · ' + (o.adresse || 'sans adresse') + ' · ' + LIB_ETAPE[fileDe(o)];
+  }).join('\n') + (autres.length > 5 ? '\n…' : '');
+}
 
 // Passages non annulés, classés par numéro
 function passagesActifs(item) { return passagesNorm(item).filter(function(p){ return p.statut !== 'annule'; }); }
@@ -3630,9 +3670,12 @@ var FILES_SUIVI = [
     } },
   { cle: 'validation', label: 'Validation', test: function(i){ return fileDe(i) === 'validation'; }, tri: parAnciennete,
     question: "Qu'est-ce qui vient d'arriver, et est-ce fiable ?",
+    // Décidé le 15/11 : seulement ce qui sert à décider valider / rejeter.
+    // Techniciens, passages, notifications et statut n'ont pas de sens avant la planification.
+    reduit: true,
     colonnes: [
+      { titre: 'Contrôles', cell: function(i){ var b = []; if (estDoublon(i)) b.push('<span class="psg psg-retard" title="' + titreDoublon(i).replace(/"/g, '&quot;') + '">⚠ Doublon possible</span>'); if (estIncomplet(i)) b.push('<span class="psg psg-annule" style="text-decoration:none;" title="' + manquesDe(i).join(', ') + ' manquant(s)">⚠ Incomplet</span>'); return b.length ? '<div class="frise">' + b.join('') + '</div>' : '<span class="psg psg-recu">✓ OK</span>'; } },
       { titre: 'Arrivé', cell: function(i){ return '<span style="font-size:12px;">' + libJours(joursDepuis(dateArrivee(i))) + '</span>'; } },
-      { titre: 'Contrôles', cell: function(i){ var b = []; if (estDoublon(i)) b.push('<span class="psg psg-retard" title="Ce n° de BC/PL/devis existe déjà dans le Suivi">⚠ Doublon possible</span>'); if (estIncomplet(i)) b.push('<span class="psg psg-annule" style="text-decoration:none;" title="Adresse, n° ou PDF manquant">⚠ Incomplet</span>'); return b.length ? '<div class="frise">' + b.join('') + '</div>' : '<span class="psg psg-recu">✓ OK</span>'; } },
     ],
     kpis: function(l){
       var vieux = l.map(function(i){ return joursDepuis(dateArrivee(i)); }).filter(function(n){ return n !== null; });
@@ -3780,6 +3823,8 @@ function renderBandeau(dossiers) {
     html += '<div class="bs-nav"><button onclick="changerSemaine(-1)" title="Semaine précédente">‹</button><button onclick="changerSemaine(1)" title="Semaine suivante">›</button>'
       + (decalageSemaine !== 0 ? '<button class="bs-nav-retour" onclick="changerSemaine(0)">Revenir à cette semaine</button>' : '') + '</div>';
   }
+  // Point d'entrée unique d'une intervention saisie à la main : elle naît directement en Planification
+  if (f.cle === 'planification') html += '<button class="btn-primary bs-ajout" onclick="openModal()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Nouvelle intervention</button>';
   if (f.groupable) html += '<label class="bs-option"><input type="checkbox" ' + (grouperCommune ? 'checked' : '') + ' onchange="basculerGrouperCommune(this.checked)"> Grouper par commune</label>';
   b.innerHTML = html;
 }
@@ -3807,6 +3852,10 @@ function majAffichageVue() {
   if (newWrap) newWrap.style.display = contrat ? '' : 'none';
   document.getElementById('filesBar').style.display = contrat ? '' : 'none';
   if (!contrat) { var bs = document.getElementById('bandeauSemaine'); if (bs) bs.style.display = 'none'; }
+  // En contrat, la création se fait depuis l'onglet Planification ; le bouton du haut reste
+  // pour Particuliers, Entreprises et Tâches.
+  var btnAj = document.getElementById('btnAjouter');
+  if (btnAj) btnAj.style.display = contrat ? 'none' : '';
   var barre = document.querySelector('.filters-bar');
   if (barre) barre.style.display = '';
   // Filtres secondaires repliés dans l'onglet En contrat
@@ -3993,7 +4042,8 @@ function actionSuivante(item) {
   var id = item.id;
   var bouton = function(lib, fn, neutre, titre){ return '<button class="btn-next' + (neutre ? ' neutre' : '') + '" onclick="' + fn + '(\'' + id + '\')"' + (titre ? ' title="' + titre + '"' : '') + '>' + lib + '</button>'; };
   var f = fileDe(item);
-  if (f === 'validation') return bouton('Valider', 'validerIntervention');
+  if (f === 'validation') return bouton('Valider', 'validerIntervention', false, estDoublon(item) || estIncomplet(item) ? 'Contrôle en alerte : ouvre la fiche de relecture' : 'Valide directement et passe en Planification')
+    + '<button class="btn-next rejeter" onclick="rejeterIntervention(\'' + id + '\')">Rejeter</button>';
   // Pilotage : un rapport à relire, à envoyer ou en retard passe en premier.
   if (fileSuivi === 'semaine' || f === 'pilotage') {
     var ar = actionRapport(item, passagesNorm(item));
@@ -4267,11 +4317,14 @@ window.renderTableV2 = function(list) {
   if (!body || !head) return;
   var f = fileCourante();
   var extra = f.colonnes || [];
-  var nbCols = f.cle === 'semaine' ? 12 : 9 + extra.length;
+  // Onglet réduit (Validation) : ni techniciens, ni passages, ni notifications, ni statut
+  var reduit = !!f.reduit;
+  var nbCols = f.cle === 'semaine' ? 12 : (reduit ? 5 : 9) + extra.length;
   // En-tête : colonnes communes, puis celles propres à l'onglet, avant Statut et Action.
-  var titresCols = '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th><th>Techniciens</th><th>Passages</th><th>Notifs</th>'
+  var titresCols = '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th>'
+    + (reduit ? '' : '<th>Techniciens</th><th>Passages</th><th>Notifs</th>')
     + extra.map(function(c){ return '<th>' + c.titre + '</th>'; }).join('')
-    + '<th>Action</th><th>Statut</th>';
+    + '<th>Action</th>' + (reduit ? '' : '<th>Statut</th>');
   if (f.cle === 'semaine') {
     head.innerHTML = '';
     // Ligne de titres propre à une section, avec sa case « tout sélectionner » limitée à la section
@@ -4298,12 +4351,14 @@ window.renderTableV2 = function(list) {
     h += '<td>' + refHtml(item) + '</td>';
     h += '<td><div class="cn-client">' + (item.client || '—') + '</div><div class="cn-nature">' + (item.nature || '') + (item.dateEmission ? ' · BC du ' + fmtDate(item.dateEmission) : '') + '</div></td>';
     h += '<td style="font-size:13px;">' + (item.adresse || '—') + (item.nomClient ? '<div class="cn-nature">' + item.nomClient + '</div>' : '') + '</td>';
-    h += '<td>' + (techs.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + techs.map(function(a){ return assigneBadge(a); }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
-    h += '<td>' + friseHtml(item) + '</td>';
-    h += '<td>' + notifsHtml(item) + '</td>';
+    if (!reduit) {
+      h += '<td>' + (techs.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + techs.map(function(a){ return assigneBadge(a); }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
+      h += '<td>' + friseHtml(item) + '</td>';
+      h += '<td>' + notifsHtml(item) + '</td>';
+    }
     extra.forEach(function(c){ h += '<td>' + c.cell(item) + '</td>'; });
     h += '<td style="white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-start;align-items:center;">' + actionSuivante(item) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
-    h += '<td>' + statutSelect(item.id, item.statut) + '</td>';
+    if (!reduit) h += '<td>' + statutSelect(item.id, item.statut) + '</td>';
     h += '</tr>';
     // Historique des notifications (même ligne repliable que l'ancienne vue)
     var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
