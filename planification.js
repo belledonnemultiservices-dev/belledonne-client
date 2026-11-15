@@ -14,9 +14,12 @@ const URL_KIZEO = "https://europe-west1-belledonne-client.cloudfunctions.net/pus
 const ETAPES = ["Dossier", "Passages", "Agenda", "Kizeo", "Notifications", "Récapitulatif"];
 
 const CSS = `
-#plOverlay{position:fixed;inset:0;z-index:250;background:rgba(13,27,42,.38);display:none;align-items:center;justify-content:center;padding:16px;}
+/* Décidé le 15/11 : même taille et même place à toutes les étapes, panneau de droite ouvert ou non.
+   La fenêtre occupe la partie gauche (52 % de l'écran), le panneau la partie droite (48 %), toute hauteur. */
+#plOverlay{position:fixed;inset:0;z-index:250;background:rgba(13,27,42,.38);display:none;align-items:stretch;justify-content:flex-start;padding:16px calc(48vw + 16px) 16px 16px;}
 #plOverlay.ouvert{display:flex;}
-.pl-box{background:#fff;border-radius:14px;width:920px;max-width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(13,27,42,.3);font-family:'DM Sans',sans-serif;color:#0D1B2A;}
+.pl-box{background:#fff;border-radius:14px;width:100%;height:100%;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(13,27,42,.3);font-family:'DM Sans',sans-serif;color:#0D1B2A;}
+@media (max-width:900px){#plOverlay{padding-right:16px;}#plDroite{display:none !important;}}
 .pl-tete{padding:18px 24px 12px;border-bottom:1px solid rgba(13,27,42,.09);}
 .pl-titre{display:flex;align-items:center;gap:10px;}
 .pl-titre h2{margin:0;font:700 17px 'Syne','DM Sans',sans-serif;flex:1;}
@@ -63,7 +66,6 @@ const CSS = `
 .pl-recap td:first-child{text-align:left;}
 .pl-cercle{color:#4338CA;font-weight:700;}
 @media (max-width:640px){.pl-grille{grid-template-columns:1fr;}}
-#plOverlay.avec-droite{justify-content:flex-start;padding-right:calc(48vw + 16px);}
 #plDroite{position:fixed;top:0;right:0;width:48vw;height:100vh;z-index:260;display:none;flex-direction:column;background:#2a2a2a;box-shadow:-8px 0 32px rgba(0,0,0,.35);font-family:'DM Sans',sans-serif;}
 #plDroite.ouvert{display:flex;}
 #plDroite.agenda{background:#fff;}
@@ -119,7 +121,9 @@ export function ouvrirPlanification(id, etape) {
   if (!item) return;
   monter();
   libererFichiers();
-  etat = { id, etape: etape ?? etapeConseillee(item), lignes: null, occupe: false, droiteFermee: {}, docVu: null, fichiers: {} };
+  // « Planifier » ouvre toujours sur l'étape Dossier (décidé le 15/11) ; les boutons ciblés
+  // (Reprendre · Kizeo, Replanifier, Mettre à l'agenda…) passent leur étape
+  etat = { id, etape: etape ?? 0, lignes: null, occupe: false, droiteFermee: {}, docVu: null, fichiers: {} };
   $("#plOverlay").classList.add("ouvert");
   rendre();
   // La fiche se met à jour en temps réel (envois Kizeo, notifications…) : on redessine
@@ -191,7 +195,7 @@ function libererFichiers() {
 }
 function cacherDroite() {
   const dr = $("#plDroite"); if (dr) dr.classList.remove("ouvert");
-  const ov = $("#plOverlay"); if (ov) ov.classList.remove("avec-droite");
+
 }
 function rendreDroite(item) {
   const type = typeDroite(etat.etape);
@@ -213,7 +217,11 @@ function rendreDroite(item) {
         + (vu.local ? "" : `<button class="pld-btn" data-a="onglet" title="Ouvrir le PDF dans un nouvel onglet">Nouvel onglet</button>`)
         + `<button class="pld-x" title="Fermer">✕</button>`;
       // Fichier choisi à l'écran : lu tel quel ; PDF enregistré : visionneuse Google (contourne le CORS du Storage)
-      const src = vu.local ? vu.url + "#toolbar=1&navpanes=0&view=FitH" : "https://docs.google.com/viewer?url=" + encodeURIComponent(vu.url) + "&embedded=true";
+      // PDF (fichier choisi ou stocké en application/pdf) : affiché directement par le navigateur.
+      // La visionneuse Google restait souvent blanche au premier chargement ; on ne la garde
+      // que pour un document Word (BC reçu en .doc/.docx), que le navigateur ne sait pas lire.
+      const estPdf = vu.local || /\.pdf$/i.test(decodeURIComponent(vu.url.split("?")[0]));
+      const src = estPdf ? vu.url + "#toolbar=1&navpanes=0&view=FitH" : "https://docs.google.com/viewer?url=" + encodeURIComponent(vu.url) + "&embedded=true";
       if (dr.dataset.src !== src) { corps.innerHTML = `<iframe allowfullscreen></iframe>`; $("iframe", corps).src = src; dr.dataset.src = src; }
       tete.querySelectorAll("[data-doc]").forEach(b => b.onclick = () => { etat.docVu = b.dataset.doc; rendreDroite(dossier() || item); });
       const bo = $("[data-a=onglet]", tete); if (bo) bo.onclick = () => window.open(vu.url, "_blank", "noopener");
@@ -228,7 +236,7 @@ function rendreDroite(item) {
   // Pas de rendre() : il redessinerait le formulaire de l'étape Dossier en cours de saisie
   $(".pld-x", tete).onclick = () => { etat.droiteFermee[etat.etape] = true; rendreEtapes(); rendreDroite(dossier() || item); };
   dr.classList.add("ouvert");
-  $("#plOverlay").classList.add("avec-droite");
+
 }
 
 function rendreEtapes() {
