@@ -101,7 +101,15 @@ const CSS = `
 .pl-passage.jumeau{margin-left:28px;border-style:dashed;background:#FAFBFF;padding:8px 12px;}
 .pl-psg-jum{display:flex;gap:10px;align-items:flex-end;}
 .pl-psg-agenda{display:flex;flex-wrap:wrap;gap:6px;}
-.pl-tbloc{border:1px solid rgba(67,56,202,.18);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:10px;background:#fff;}
+/* Fonds (15/11) : une teinte légère par passage, en alternance ; à l'intérieur, les blocs
+   techniciens alternent blanc et blanc teinté pour se distinguer sur ce fond */
+.pl-passage.teinte-0{background:#F1F5FD;border-color:#D6E0F5;}
+.pl-passage.teinte-1{background:#FDF5EC;border-color:#F0DCC4;}
+.pl-passage.teinte-2{background:#EFF8F3;border-color:#CFE8DA;}
+.pl-passage.teinte-3{background:#F5F1FC;border-color:#E0D5F3;}
+.pl-tbloc{border:1px solid rgba(13,27,42,.10);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:10px;background:#fff;}
+.pl-tbloc.alt{background:#F5F7FA;border-color:rgba(13,27,42,.16);}
+.pl-tbloc .pl-raps{background:rgba(67,56,202,.04);}
 .pl-tbloc-tete{display:flex;align-items:center;gap:10px;font-size:13.5px;color:#312E81;}
 .pl-rap-etat,.pl-rap-act{display:flex;gap:6px;align-items:center;white-space:nowrap;}
 .pl-raps{border:1px solid #E0E7FF;background:#F8F9FF;border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
@@ -698,12 +706,12 @@ function rendrePassages(item) {
     </div>`;
   };
   // Bloc d'un technicien : son rendez-vous et ses rapports
-  const blocTech = (l, nom, p) => {
+  const blocTech = (l, nom, p, i) => {
     const a = l.agenda[nom] || (l.agenda[nom] = agendaVide());
     const t = techParNom(nom);
     const etatA = p && p.statut !== "annule" && (p.techs || []).includes(nom) ? etatAgendaTech(item, p, enBase, nom) : null;
     const raps = l.rapports.filter(r => !r.annule && r.tech === nom);
-    return `<div class="pl-tbloc" data-tech="${esc(nom)}">
+    return `<div class="pl-tbloc${i % 2 ? " alt" : ""}" data-tech="${esc(nom)}">
       <div class="pl-tbloc-tete"><b>${esc(nom)}</b>${etatA ? etatHtml(...LIB_AGENDA[etatA]) : ""}</div>
       <div class="pl-grille">
         <div class="pl-champ"><label>Titre agenda</label><input data-af="titre" value="${esc(a.titre)}" placeholder="${esc(titreDefaut(item))}"></div>
@@ -719,7 +727,7 @@ function rendrePassages(item) {
     const pb = problemesLigne(l, L);
     if (l.annule) return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}</span></div></div>`;
     const p = enBase.find(x => x.passageId === l.pid);
-    return `<div class="pl-passage" data-k="${k}">
+    return `<div class="pl-passage teinte-${k % 4}" data-k="${k}">
       <div class="pl-psg-l1">
         <div class="pl-psg-num"><label>Passage</label><div style="display:flex;align-items:center;gap:4px;"><input type="number" min="1" data-f="num" value="${esc(l.num)}"><span class="pl-cercle">${cercle(l.num)}</span></div></div>
         <div class="pl-champ"><label>Début</label>${dt("debut", l.debut)}</div>
@@ -728,7 +736,7 @@ function rendrePassages(item) {
       </div>
       <div class="pl-champ"><label>Technicien(s)</label><div class="pl-techs">${techs.map(t => `<span class="pl-tech${l.techs.includes(nomTech(t)) ? " on" : ""}" data-t="${esc(nomTech(t))}">${esc(nomTech(t))}</span>`).join("")}</div>
         ${l.techs.map(t => { const c = chargeTech(t, (l.debut || "").substring(0, 10), item.id); return c ? `<div class="pl-charge">${esc(t.split(" ")[0])} a déjà ${c} passage${c > 1 ? "s" : ""} ce jour-là</div>` : ""; }).join("")}</div>
-      ${l.techs.map(nom => blocTech(l, nom, p)).join("")}
+      ${l.techs.map((nom, i) => blocTech(l, nom, p, i)).join("")}
       ${pb.length ? `<div class="pl-psg-pb">⚠ ${pb.map(esc).join(" · ")}</div>` : ""}
     </div>`;
   };
