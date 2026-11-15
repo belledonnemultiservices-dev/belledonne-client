@@ -15,6 +15,15 @@ const URL_KIZEO = "https://europe-west1-belledonne-client.cloudfunctions.net/pus
 const ETAPES = ["Dossier", "Passages, agenda & Kizeo", "Notifications", "Récapitulatif"];
 // Noms courts (bouton « Reprendre · … » de l'onglet Planification)
 const ETAPES_COURTES = ["Dossier", "Passages", "Notifications", "Récapitulatif"];
+// ── Tâches (décidé le 15/11) ──
+// Même parcours qu'un bon, sans BC ni facturation : étape 1 « Tâche », Kizeo facultatif
+// (aucun rapport par défaut), notifications facultatives et sans rappel.
+const estTache = (item) => !!item && item.clientType === "tache";
+const TYPES_TACHE = { devis: "Devis", inspection: "Inspection / diagnostic", affiches: "Pose d'affiches", cles: "Récupération de clés", autre: "Autre" };
+const libTypeTache = (item) => item.typeIntervention === "autre" ? (item.typeInterventionAutre || "Autre") : (TYPES_TACHE[item.typeIntervention] || item.nature || "Tâche");
+const nomsEtapes = (item) => estTache(item) ? ["Tâche", "Passages, agenda & Kizeo", "Notifications (facultatif)", "Récapitulatif"] : ETAPES;
+// Rapport Kizeo exigé ? Bon : sauf « Aucun rapport » choisi ; tâche : seulement si un formulaire est choisi ou parti
+const rapportExige = (item, b) => !b ? !estTache(item) : estTache(item) ? (!!b.kzForm || !!b.kizeoPush) : (b.kzForm === undefined || !!b.kzForm || !!b.kizeoPush);
 const DERNIERE = ETAPES.length - 1;
 
 const CSS = `
@@ -177,6 +186,7 @@ export function ouvrirPlanification(id, etape) {
 function brouillonVide(it) {
   if (!it || !it.brouillon) return false;
   const val = (id, k) => ($("#" + id) ? $("#" + id).value.trim() : String(it[k] || "").trim());
+  if (estTache(it)) return !val("plClient", "client") && !val("plAdresse", "adresse") && !val("plNom", "nomClient") && !passagesBruts(it).length;
   return !val("plClient", "client") && !val("pl_bc", "bc") && !val("pl_pl", "pl") && !val("pl_devis", "devis")
     && !it.bcUrl && !it.plUrl && !it.devisUrl && !passagesBruts(it).length && !Object.keys((etat && etat.fichiers) || {}).length;
 }
@@ -209,16 +219,16 @@ function etatsEtapes(item) {
   const pr = ps.filter(p => !p.jumeau);
   const ns = ps.map(p => norm(item, p)).filter(Boolean);
   const nsPr = pr.map(p => norm(item, p)).filter(Boolean);
-  const dossierOk = !!(item.adresse && (item.bc || item.pl || item.devis));
+  const dossierOk = estTache(item) ? !!item.adresse : !!(item.adresse && (item.bc || item.pl || item.devis));
   const passagesOk = pr.length > 0 && pr.every(p => (p.techs || []).length);
   const agendaOk = nsPr.length > 0 && nsPr.every(p => window.etatAgenda(p) === "ok");
   // Rapport Kizeo exigé sauf « Aucun rapport Kizeo » choisi (kzForm vide) sur un passage jamais envoyé
   const bruts = passagesBruts(item);
-  const veutKizeo = (n) => { const b = bruts.find(x => x.passageId && x.passageId === n.passageId); return !b || b.kzForm === undefined || !!b.kzForm || !!b.kizeoPush; };
+  const veutKizeo = (n) => rapportExige(item, bruts.find(x => x.passageId && x.passageId === n.passageId));
   const kizeoOk = ns.filter(veutKizeo).every(p => { const e = window.etatKizeo(item, p); return e === "ok" || e === "recu"; });
   const clientOk = nsPr.length > 0 && nsPr.every(p => window.notifOk(window.notifPassage(item, p, "notifBailleur")));
   const locOk = !item.emailClient || (nsPr.length > 0 && nsPr.every(p => window.notifOk(window.notifPassage(item, p, "notifLocataire"))));
-  return [dossierOk, passagesOk && agendaOk && kizeoOk, clientOk && locOk];
+  return [dossierOk, passagesOk && agendaOk && kizeoOk, estTache(item) || (clientOk && locOk)];
 }
 
 function monter() {
@@ -237,7 +247,8 @@ function monter() {
 // Décidé le 15/11 : ouvert par défaut. Étape Dossier → le PDF de référence (BC, PL, devis) ;
 // étapes Passages et Agenda → l'agenda Google des techniciens ; rien aux autres étapes.
 // Le ✕ le ferme pour l'étape en cours ; un bouton dans l'en-tête le rouvre.
-function typeDroite(k) { return k === 0 ? "pdf" : k === 1 ? "agenda" : null; }
+// Tâche : pas de document de référence à l'étape 1
+function typeDroite(k) { const it = etat ? dossier() : null; return k === 0 ? (estTache(it) ? null : "pdf") : k === 1 ? "agenda" : null; }
 // Documents du dossier : PDF enregistrés, remplacés à l'écran par un fichier choisi et pas encore enregistré
 function documents(item) {
   return [["bc", "BC", item.bcUrl], ["pl", "PL", item.plUrl], ["devis", "Devis", item.devisUrl]]
@@ -303,7 +314,7 @@ function rendreEtapes() {
     <div class="pl-titre"><div style="flex:1"><h2>Planifier · ${esc(ref)}</h2><small>${esc(item.client || "")}${item.nature ? " · " + esc(item.nature) : ""}${item.adresse ? " · " + esc(item.adresse) : ""}</small></div>
       ${typeDroite(etat.etape) && etat.droiteFermee[etat.etape] ? `<button class="pl-voir-droite" data-a="droite">${typeDroite(etat.etape) === "pdf" ? "📄 Afficher le PDF" : "📅 Afficher l'agenda"}</button>` : ""}
       <button class="pl-fermer" data-a="fermer" title="Fermer (tout est déjà enregistré)">×</button></div>
-    <div class="pl-etapes">${ETAPES.map((nom, k) => `<div class="pl-etape${k === etat.etape ? " active" : ""}${k < DERNIERE && faits[k] ? " faite" : ""}" data-etape="${k}"><span class="pl-num">${k < DERNIERE && faits[k] ? "✓" : k + 1}</span>${nom}</div>`).join("")}</div>`;
+    <div class="pl-etapes">${nomsEtapes(item).map((nom, k) => `<div class="pl-etape${k === etat.etape ? " active" : ""}${k < DERNIERE && faits[k] ? " faite" : ""}" data-etape="${k}"><span class="pl-num">${k < DERNIERE && faits[k] ? "✓" : k + 1}</span>${nom}</div>`).join("")}</div>`;
   $(".pl-tete [data-a=fermer]").onclick = fermer;
   const bd = $(".pl-tete [data-a=droite]"); if (bd) bd.onclick = () => { delete etat.droiteFermee[etat.etape]; rendreEtapes(); rendreDroite(dossier() || item); };
   document.querySelectorAll(".pl-etape").forEach(el => el.onclick = () => { etat.etape = Number(el.dataset.etape); etat.lignes = null; rendre(); });
@@ -340,6 +351,7 @@ function navigation(suivantLib, surSuivant) {
 // techniciens, qui ont leur étape), avec le PDF de référence ouvert à droite.
 const DOCS = [["pl", "PL", "N° affaire"], ["bc", "BC", "N° de bon de commande"], ["devis", "Devis", "N° de devis"]];
 function rendreDossier(item) {
+  if (estTache(item)) return rendreTache(item);
   const tels = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
   const champTel = (val) => `<input class="pl-tel" value="${esc(val)}" placeholder="06…">`;
   const clients = (window._allClients || []).slice();
@@ -433,6 +445,75 @@ function rendreDossier(item) {
     clearTimeout(minuterieDossier);
     minuterieDossier = setTimeout(() => { minuterieDossier = null; if (etat && etat.etape === 0 && $("#plClient")) enregistrerDossier(dossier() || item, true); }, 1200);
   };
+  brancherAttenteAnnulation(item);
+  navigation("Continuer →", () => { clearTimeout(minuterieDossier); minuterieDossier = null; return enregistrerDossier(dossier() || item); });
+  $(".pl-pied .pl-espace").insertAdjacentHTML("afterend", `<span class="pl-note" id="plAuto" style="margin-right:8px;">Enregistrement automatique</span>`);
+}
+// ── 1 bis. Tâche ───────────────────────────────────────────────────
+// Type, précision, client en contrat lié (facultatif), adresse, contact, observations.
+// Pas de BC, de PDF ni d'expéditeur. Enregistrement automatique comme l'étape Dossier.
+function rendreTache(item) {
+  const tels = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
+  const champTel = (val) => `<input class="pl-tel" value="${esc(val)}" placeholder="06…">`;
+  const clients = (window._allClients || []).slice();
+  if (item.client && !clients.includes(item.client)) clients.unshift(item.client);
+  const champ = (lib, html, large) => `<div class="pl-champ${large ? " large" : ""}"><label>${lib}</label>${html}</div>`;
+  const inp = (id, val, ph, type) => `<input id="${id}"${type ? ` type="${type}"` : ""} value="${esc(val)}" placeholder="${esc(ph || "")}">`;
+  const type = item.typeIntervention || "devis";
+  $(".pl-corps").innerHTML = `
+    <p class="pl-intro">Une tâche se planifie comme un bon (agenda, rapport Kizeo si besoin), mais sans facturation ni notification obligatoire.</p>
+    <div class="pl-grille">
+      <div class="pl-section">Tâche</div>
+      ${champ("Type de tâche", `<select id="plType">${Object.entries(TYPES_TACHE).map(([k, v]) => `<option value="${k}"${k === type ? " selected" : ""}>${esc(v)}</option>`).join("")}</select>`)}
+      ${champ("Préciser", inp("plTypeAutre", item.typeInterventionAutre, "si « Autre »"))}
+      ${champ("Client en contrat <span style=\"text-transform:none;font-weight:400;\">· facultatif</span>", `<select id="plClient"><option value="">— Aucun / non lié —</option>${clients.map(c => `<option value="${esc(c)}"${c === item.client ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`)}
+      ${champ("Adresse", inp("plAdresse", item.adresse, "Adresse de la tâche"), true)}
+      <div class="pl-section">Contact</div>
+      ${champ("Nom du contact", inp("plNom", item.nomClient))}
+      ${champ(`<span style="display:flex;justify-content:space-between;align-items:center;">Téléphone(s)<button type="button" class="pl-btn petit" data-a="ajoutTel" style="padding:2px 9px;font-size:11px;">+ Ajouter</button></span>`,
+        `<div id="plTels" style="display:flex;flex-direction:column;gap:6px;">${(tels.length ? tels : [""]).map(champTel).join("")}</div>`)}
+      ${champ("Email", inp("plEmail", item.emailClient, "", "email"), true)}
+      <div class="pl-section">Notes</div>
+      ${champ("Observations", `<textarea id="plObservations" placeholder="Détails, contexte, contraintes...">${esc(item.observations)}</textarea>`, true)}
+      ${String(item.notes || "").trim() ? champ("Anciennes notes <span style=\"text-transform:none;font-weight:400;\">· lecture seule</span>", `<div class="pl-lecture" style="white-space:pre-wrap;font-size:12.5px;color:#4A6078;background:#F7F9FB;border-radius:8px;padding:8px 10px;">${esc(item.notes)}</div>`, true) : ""}
+    </div>
+    <div class="pl-actions"><button class="pl-btn" data-a="attente">Mettre en attente…</button><span class="pl-note">Si une information bloque la planification</span></div>
+    <div class="pl-actions" style="margin-top:6px;"><button class="pl-btn" data-a="annuler" style="color:#C0392B;border-color:#F5C6C0;background:#FDECEA;">Annuler la tâche…</button><span class="pl-note">La tâche part dans l'onglet Annulé</span></div>`;
+  $("[data-a=ajoutTel]").onclick = () => { $("#plTels").insertAdjacentHTML("beforeend", champTel("")); $("#plTels input:last-child").focus(); };
+  $(".pl-corps").oninput = $(".pl-corps").onchange = () => {
+    clearTimeout(minuterieDossier);
+    minuterieDossier = setTimeout(() => { minuterieDossier = null; if (etat && etat.etape === 0 && $("#plClient")) enregistrerTache(dossier() || item, true); }, 1200);
+  };
+  brancherAttenteAnnulation(item);
+  navigation("Continuer →", () => { clearTimeout(minuterieDossier); minuterieDossier = null; return enregistrerTache(dossier() || item); });
+  $(".pl-pied .pl-espace").insertAdjacentHTML("afterend", `<span class="pl-note" id="plAuto" style="margin-right:8px;">Enregistrement automatique</span>`);
+}
+async function enregistrerTache(item, silencieux) {
+  if (!item || !$("#plType")) return;
+  const v = (id) => ($("#" + id) ? $("#" + id).value.trim() : "");
+  const type = v("plType") || "devis";
+  const saisie = { typeIntervention: type, typeInterventionAutre: type === "autre" ? v("plTypeAutre") : "", nature: TYPES_TACHE[type] || "Tâche",
+    client: v("plClient"), adresse: v("plAdresse"), nomClient: v("plNom"), emailClient: v("plEmail"), observations: v("plObservations") };
+  if (!silencieux && !saisie.adresse) { showToast("L'adresse de la tâche est obligatoire.", true); return false; }
+  const maj = {};
+  Object.entries(saisie).forEach(([k, val]) => { if (val !== String(item[k] ?? "").trim()) maj[k] = val; });
+  const coords = [...document.querySelectorAll("#plTels .pl-tel")].map(i => i.value.trim()).filter(Boolean);
+  const avant = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
+  if (JSON.stringify(coords) !== JSON.stringify(avant)) maj.coordonnees = coords;
+  if (item.brouillon && ((maj.adresse ?? item.adresse) || (maj.client ?? item.client) || (maj.nomClient ?? item.nomClient))) maj.brouillon = false;
+  if (!Object.keys(maj).length) return;
+  if (etat) etat.occupe = true;
+  try {
+    maj.updatedAt = new Date().toISOString();
+    await window._updateSuivi(item.id, maj);
+    if (silencieux) indiquerAuto("Enregistré ✓");
+  } catch (e) { showToast("Erreur à l'enregistrement : " + e.message, true); return false; }
+  finally { if (etat) etat.occupe = false; }
+  if (!silencieux) await pause(400);
+}
+
+// Mise en attente et annulation (bon de commande ou tâche)
+function brancherAttenteAnnulation(item) {
   // Décidé le 15/11 : motif obligatoire, rangé dans son propre champ (affiché dans l'onglet
   // En attente), et non plus ajouté aux notes internes.
   $("[data-a=attente]").onclick = async () => {
@@ -454,9 +535,9 @@ function rendreDossier(item) {
     const kizeo = ps.filter(p => p.kizeoPush).map(p => "• Passage " + p.num + (p.libelle ? " " + p.libelle : "") + (p.debut ? " du " + (window.fmtDate ? window.fmtDate(p.debut) : p.debut.substring(0, 10)) : "")
       + " : « " + (p.kizeoPush.libelle || p.titre || titreDefaut(it, p)) + " »" + (p.kizeoPush.technicien ? " (chez " + p.kizeoPush.technicien + ")" : ""));
     const avecKizeo = kizeo.length;
-    const motif = demanderMotif("Motif de l'annulation de la commande (obligatoire) :\nex. annulée par le bailleur, doublon, locataire parti…", "annuler la commande");
+    const motif = demanderMotif(estTache(it) ? "Motif de l'annulation de la tâche (obligatoire) :" : "Motif de l'annulation de la commande (obligatoire) :\nex. annulée par le bailleur, doublon, locataire parti…", estTache(it) ? "annuler la tâche" : "annuler la commande");
     if (!motif) return;
-    if (!confirm("Annuler définitivement cette commande ?\n\nMotif : " + motif
+    if (!confirm("Annuler définitivement " + (estTache(it) ? "cette tâche" : "cette commande") + " ?\n\nMotif : " + motif
       + (avecAgenda.length ? "\n\n" + avecAgenda.length + " passage(s) dans l'agenda : les rendez-vous seront retirés." : "")
       + (avecKizeo ? "\n\n" + avecKizeo + " formulaire(s) Kizeo déjà envoyé(s), à supprimer à la main dans Kizeo :\n" + kizeo.join("\n") : ""))) return;
     viderDossier();
@@ -483,8 +564,6 @@ function rendreDossier(item) {
     } finally { if (etat) etat.occupe = false; }
     fermer();
   };
-  navigation("Continuer →", () => { clearTimeout(minuterieDossier); minuterieDossier = null; return enregistrerDossier(dossier() || item); });
-  $(".pl-pied .pl-espace").insertAdjacentHTML("afterend", `<span class="pl-note" id="plAuto" style="margin-right:8px;">Enregistrement automatique</span>`);
 }
 let minuterieDossier = null;
 // ── Expéditeur = un contact du client (décidé le 15/11) ──
@@ -600,6 +679,7 @@ function indiquerAuto(txt, erreur) {
 // silencieux = enregistrement automatique : pas de message, rien de bloquant
 async function enregistrerDossier(item, silencieux) {
   if (!item) return;
+  if (estTache(item)) return enregistrerTache(item, silencieux);
   const v = (id) => ($("#" + id) ? $("#" + id).value.trim() : "");
   const saisie = {
     client: v("plClient"), chorus: v("plChorus"),
@@ -671,7 +751,7 @@ function techDuRapport(p, techs) {
 }
 function rapportDepuis(item, p, num, techs, agenda) {
   const kp = p.kizeoPush || null;
-  const lie = window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", num) : null;
+  const lie = !estTache(item) && window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", num) : null;
   const tech = techDuRapport(p, techs);
   const titreTech = ((agenda[tech] || {}).titre || "").trim() || titreDefaut(item);
   return { pid: p.passageId || uuid(), ref: p, annule: p.statut === "annule", tech,
@@ -701,7 +781,7 @@ function lignesDepuis(item) {
 }
 function nouvelleLigne(item, num, modele) {
   const pid = uuid();
-  const lie = window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", num) : null;
+  const lie = !estTache(item) && window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", num) : null;
   const techs = modele ? modele.techs.slice() : [];
   const agenda = {}; techs.forEach(n => { agenda[n] = modele && modele.agenda[n] ? { ...modele.agenda[n] } : agendaVide(); });
   const rapports = modele
@@ -774,6 +854,8 @@ const LIB_KZ = { ok: ["ok", "✓ envoyé"], recu: ["ok", "✓ rapport reçu"], m
 // ── Agenda ──
 function descriptionAuto(item, adresse) {
   const tels = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
+  if (estTache(item)) return ["Tâche : " + libTypeTache(item), item.client ? "Client : " + item.client : "", item.nomClient ? "Contact : " + item.nomClient : "",
+    tels.length ? "Téléphone(s) : " + tels.join(" / ") : "", adresse ? "Adresse : " + adresse : ""].filter(Boolean).join("\n");
   return [item.bc || item.pl ? "N° BC : " + (item.bc || item.pl) : "", item.nature ? "Nature : " + item.nature : "", item.nomClient ? "Client : " + item.nomClient : "",
     tels.length ? "Téléphone(s) : " + tels.join(" / ") : "", adresse ? "Adresse : " + adresse : ""].filter(Boolean).join("\n");
 }
@@ -819,7 +901,7 @@ function rendrePassages(item) {
   // Ligne d'un rapport, dans le bloc de son technicien
   const ligneRapport = (l, r, i) => {
     const k = l.rapports.indexOf(r);
-    const lie = window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", l.num) : null;
+    const lie = !estTache(item) && window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", l.num) : null;
     const etatR = r.formId ? etatRapportKz(item, l, r) : null;
     const premier = premierDuTech(l, r);
     const nom = nomRapport(item, l, r);
@@ -1154,7 +1236,7 @@ async function requeteAgenda(payload) {
   return r.json();
 }
 // Titre par défaut d'un rendez-vous ; ajoute un libellé s'il y en a un
-const titreDefaut = (item, p) => [item.nature || "Intervention", item.client, item.bc ? "BC " + item.bc : item.pl ? "PL " + item.pl : "", p && p.libelle ? p.libelle : ""].filter(Boolean).join(" — ");
+const titreDefaut = (item, p) => (estTache(item) ? ["Tâche · " + libTypeTache(item), item.client || item.adresse] : [item.nature || "Intervention", item.client, item.bc ? "BC " + item.bc : item.pl ? "PL " + item.pl : ""]).concat(p && p.libelle ? [p.libelle] : []).filter(Boolean).join(" — ");
 const nomPassage = (p) => (p.jumeau ? "↳ " : "") + cercle(p.num) + (p.libelle ? ' <span style="color:#0D1B2A;font-weight:600;">' + esc(p.libelle) + '</span>' : "");
 // Met les passages (modifiés en place : calEvents, calSync, calEmpreintes) en accord avec l'agenda.
 // Un rendez-vous par technicien, avec son contenu. Ne contacte Google que pour ce qui a changé.
@@ -1274,7 +1356,7 @@ function rendreRecap(item) {
 // Ce qui manque à l'étape Passages, agenda & Kizeo (vide = étape validée)
 function manquesPlanification(item) {
   const m = [];
-  if (!(item.adresse && (item.bc || item.pl || item.devis))) m.push("Dossier : adresse ou référence (BC, PL, devis) manquante");
+  if (estTache(item) ? !item.adresse : !(item.adresse && (item.bc || item.pl || item.devis))) m.push(estTache(item) ? "Tâche : adresse manquante" : "Dossier : adresse ou référence (BC, PL, devis) manquante");
   const bruts = passagesBruts(item);
   const ps = actifs(item);
   const pr = ps.filter(p => !p.jumeau);
@@ -1286,7 +1368,7 @@ function manquesPlanification(item) {
   });
   ps.forEach(p => {
     const b = bruts.find(x => x.passageId && x.passageId === p.passageId) || p;
-    const veut = b.kzForm === undefined || !!b.kzForm || !!b.kizeoPush;
+    const veut = rapportExige(item, b);
     const n = norm(item, p);
     const e = n ? window.etatKizeo(item, n) : "manque";
     if (veut && e !== "ok" && e !== "recu") m.push("Passage " + p.num + " : rapport Kizeo " + (b.kzNom ? "« " + b.kzNom + " » " : "") + (e === "ecart" ? "chez le mauvais technicien (à renvoyer)" : "pas envoyé"));
@@ -1295,6 +1377,7 @@ function manquesPlanification(item) {
 }
 // Notifications manquantes (rappel, non bloquant)
 function manquesNotification(item) {
+  if (estTache(item)) return []; // facultatives pour une tâche, pas de rappel
   const ns = actifs(item).filter(p => !p.jumeau).map(p => norm(item, p)).filter(Boolean);
   if (!ns.length) return [];
   const m = [];

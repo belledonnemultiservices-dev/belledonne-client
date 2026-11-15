@@ -267,6 +267,8 @@
   .btn-next.rejeter{color:#C0392B;background:#FDECEA;}
   .btn-next.rejeter:hover{background:#F9D6D2;}
   .bs-ajout{margin-left:auto;align-self:center;}
+  .bs-ajout2{margin-left:8px;background:#4338CA;}
+  .ref-tache{background:#EEF2FF;color:#4338CA;}
   .avancement{display:flex;gap:3px;flex-wrap:nowrap;}
   .av-etape{font:600 10.5px 'DM Sans',sans-serif;padding:3px 6px;border-radius:5px;background:#EEF1F4;color:var(--text-muted);white-space:nowrap;cursor:default;}
   .av-etape.fait{background:#E3F5EC;color:#178a5c;}
@@ -445,7 +447,7 @@
       <button class="tab-pill active" id="tab_contrat" onclick="switchTab('contrat')">En contrat</button>
       <button class="tab-pill" id="tab_particulier" onclick="switchTab('particulier')">Particuliers</button>
       <button class="tab-pill" id="tab_entreprise" onclick="switchTab('entreprise')">Entreprises</button>
-      <button class="tab-pill" id="tab_tache" onclick="switchTab('tache')">Tâches</button>
+      <!-- Onglet Tâches retiré le 15/11 : les tâches suivent le parcours En contrat -->
     </div>
 
     <!-- FILES DE TRAVAIL (nouvelle vue, onglet En contrat) -->
@@ -2594,6 +2596,15 @@ async function setStatutRapide(id, newStatut) {
 // Saisie manuelle (15/11) : même circuit que les BC importés, sans passer par Validation.
 // Un brouillon est créé et la fenêtre de planification s'ouvre sur l'étape Dossier ; s'il est
 // refermé sans client ni référence, il est supprimé (voir planification.js).
+async function creerTacheManuelle() {
+  try {
+    const maintenant = new Date().toISOString();
+    const data = { client: '', clientType: 'tache', typeIntervention: 'devis', nature: TYPE_TACHE_LABELS.devis, statut: 'À traiter', source: 'manuel', brouillon: true, passages: [], createdAt: maintenant, updatedAt: maintenant };
+    const id = await window._addSuivi(data);
+    if (!(window.interventions || []).some(i => i.id === id)) { interventions = [{ id, ...data }].concat(window.interventions || []); window.interventions = interventions; }
+    if (window.ouvrirPlanification) window.ouvrirPlanification(id, 0);
+  } catch (e) { alert('Création impossible : ' + e.message); }
+}
 async function creerDossierManuel() {
   try {
     const maintenant = new Date().toISOString();
@@ -3502,7 +3513,8 @@ function filterTable() {
   // Recherche ou filtre actif : dans la Semaine, les sections contenant un résultat se déplient
   window._rechercheActive = !!(q || statut || clientFilter || annee || assigneFilter || natureFilter || dateDe || dateA);
   var allData = window.interventions || [];
-  var data = allData.filter(function(i){ return (i.clientType||'contrat') === activeTab; });
+  // Tâches (15/11) : dans le parcours « En contrat » (Planification, En cours, Pilotage, Clôturé)
+  var data = allData.filter(function(i){ var t = i.clientType || 'contrat'; return activeTab === 'contrat' ? (t === 'contrat' || t === 'tache') : t === activeTab; });
   var filtered = data.filter(function(i) {
     var assignesArr = (i.assignes||[]).concat(i.assigne?[i.assigne]:[]);
     var allAssignes = assignesArr.join(' ');
@@ -3568,7 +3580,7 @@ function passagesNorm(item) {
     if (typeof p === 'string') { var x = p.split('|'); return { num: i+1, debut: x[0]||'', fin: x[1]||'', techs: [], statut: '' }; }
     var cal = (p.calEvents && typeof p.calEvents === 'object') ? p.calEvents : ((item.calEventIds || [])[i] || {});
     if (typeof cal !== 'object' || cal === null) cal = cal ? { _: cal } : {};
-    return { num: p.num || (i+1), passageId: p.passageId || null, jumeau: !!p.jumeau, libelle: p.libelle || '', adresse: p.adresse || '', titre: p.titre || '', debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null, calSync: p.calSync || '' };
+    return { num: p.num || (i+1), passageId: p.passageId || null, kzForm: p.kzForm, jumeau: !!p.jumeau, libelle: p.libelle || '', adresse: p.adresse || '', titre: p.titre || '', debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null, calSync: p.calSync || '' };
   }).sort(function(a, b){ return (a.num||0) - (b.num||0) || (a.jumeau ? 1 : 0) - (b.jumeau ? 1 : 0); });
   // Jumeau (15/11) : même visite que son passage principal, autre type d'intervention. Il en
   // reprend date, créneau, techniciens, rendez-vous agenda et notifications ; seuls son
@@ -3751,7 +3763,8 @@ function aNouveauPassage(item) {
 // suivi Kizeo, ex. rapport manuel : compté comme exécuté, l'app ne peut pas le savoir).
 function passageExecute(item, p) {
   var rec = recPassage(item, p);
-  if (rec) return rec.statut === 'envoye';
+  // Tâche : le rapport reçu suffit (pas d'envoi client obligatoire)
+  if (rec) return item.clientType === 'tache' ? rec.statut !== 'en-attente' : rec.statut === 'envoye';
   var d = (p.debut || '').substring(0, 10);
   return !!d && d < jourLocal(0) && !p.kizeo;
 }
@@ -3771,6 +3784,12 @@ function clotureHistorique(item) {
 var STATUT_VERS_FILE = { 'À valider': 'validation', 'En attente': 'attente', 'Passage annulé': 'pannule', 'Annulé': 'annuleDef' };
 function fileDe(item) {
   if (STATUT_VERS_FILE[item.statut]) return STATUT_VERS_FILE[item.statut];
+  // Tâche : pas de facturation ; clôturée quand tous ses passages sont faits
+  if (item.clientType === 'tache') {
+    if (item.statut === 'Terminé') return 'cloture';
+    if (item.statut === 'En cours' && aPassageDate(item)) return tousExecutes(item) ? 'cloture' : 'pilotage';
+    return 'planification';
+  }
   // Passage 1 fait (rapport envoyé) : à facturer ; une fois facturé, clôturé si tout est exécuté
   if (item.statut === 'Terminé') return item.enFacturation ? (tousExecutes(item) || clotureHistorique(item) ? 'cloture' : 'pilotage') : 'afacturer';
   // Planification terminée (statut En cours) : pilotage
@@ -3800,7 +3819,7 @@ var FILES_SUIVI = [
       var nbP = 0, kz = 0, kzE = 0, recus = 0, techs = {};
       l.forEach(function(item){ passagesSemaine(item).forEach(function(p){ nbP++; var e = etatKizeo(item, p); if (e === 'manque') kz++; else if (e === 'ecart') kzE++; else if (e === 'recu') recus++; p.techs.forEach(function(t){ techs[t] = 1; }); }); });
       var nt = Object.keys(techs).length;
-      var bailleurAPrevenir = function(i){ return passagesSemaine(i).some(function(p){ return !notifOk(notifPassage(i, p, 'notifBailleur')); }); };
+      var bailleurAPrevenir = function(i){ return i.clientType !== 'tache' && passagesSemaine(i).some(function(p){ return !notifOk(notifPassage(i, p, 'notifBailleur')); }); };
       var aRelire = function(i){ return passagesNorm(i).some(function(p){ return etatRapport(i, p) === 'relire'; }); };
       var aEnvoyer = function(i){ return passagesNorm(i).some(function(p){ return etatRapport(i, p) === 'envoyer'; }); };
       var tous = l.concat(reste);
@@ -3987,6 +4006,7 @@ function renderBandeau(dossiers) {
   }
   // Point d'entrée unique d'une intervention saisie à la main : elle naît directement en Planification
   if (f.cle === 'planification') html += '<button class="btn-primary bs-ajout" onclick="creerDossierManuel()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Nouvelle intervention</button>';
+  if (f.cle === 'planification') html += '<button class="btn-primary bs-ajout bs-ajout2" onclick="creerTacheManuelle()"><svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Nouvelle tâche</button>';
   if (f.groupable) html += '<label class="bs-option"><input type="checkbox" ' + (grouperCommune ? 'checked' : '') + ' onchange="basculerGrouperCommune(this.checked)"> Grouper par commune</label>';
   b.innerHTML = html;
 }
@@ -4166,6 +4186,8 @@ var LIEN_ACTION_RAPPORT = { relire: 'relire', envoyer: 'envoyer', retard: 'renvo
 // État du formulaire Kizeo d'un passage : 'ok', 'recu', 'manque' ou 'ecart' (envoyé à un autre technicien).
 function etatKizeo(item, p) {
   var rec = recPassage(item, p);
+  // Tâche sans rapport prévu : rien à envoyer ('na')
+  if (item.clientType === 'tache' && !rec && !p.kizeo && !p.kzForm) return 'na';
   if (rec && rec.statut !== 'en-attente') return 'recu';
   // Envoyé = trace sur le passage, ou ligne "en attente" côté Gestion rapports.
   if (!p.kizeo && !(rec && rec.statut === 'en-attente')) return 'manque';
@@ -4193,6 +4215,7 @@ function kizeoHtml(item) {
 }
 
 function refHtml(item) {
+  if (item.clientType === 'tache') { var tl = item.typeIntervention === 'autre' ? (item.typeInterventionAutre || 'Autre') : (TYPE_TACHE_LABELS[item.typeIntervention] || item.nature || 'Tâche'); return '<div class="ref-v2"><span class="ref-type ref-tache">Tâche</span><span class="ref-num" style="font-weight:600;">' + tl + '</span></div>'; }
   var r = item.bc ? { t: 'BC', n: item.bc, u: item.bcUrl } : item.pl ? { t: 'PL', n: item.pl, u: item.plUrl } : item.devis ? { t: 'Devis', n: item.devis, u: item.devisUrl } : null;
   var autres = [item.bc && item.pl ? 'PL ' + item.pl : '', (item.bc || item.pl) && item.devis ? 'Devis ' + item.devis : ''].filter(Boolean).join(' · ');
   if (!r) return '<span style="color:var(--text-muted)">—</span>';
@@ -4243,7 +4266,7 @@ function actionSuivante(item) {
   var auj7 = jourLocal(0), fin7 = jourLocal(6);
   if (passagesActifs(item).some(function(p){ var d = (p.debut || '').substring(0, 10); return d && d >= auj7 && d <= fin7 && etatAgenda(p) !== 'ok'; })) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)" title="Un passage des 7 prochains jours n\'est pas à jour dans l\'agenda">Mettre à l\'agenda</button>';
   if (kizeoAGenerer7j(item)) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)" title="Un passage des 7 prochains jours n\'a pas son formulaire Kizeo">Générer Kizeo</button>';
-  if (!toNotifArray(item.notifBailleur).length && prochainPassage(item)) return bouton('Notifier', 'openNotifFromRow');
+  if (item.clientType !== 'tache' && !toNotifArray(item.notifBailleur).length && prochainPassage(item)) return bouton('Notifier', 'openNotifFromRow');
   return bouton('Ouvrir', 'openModal', true);
 }
 
@@ -4287,6 +4310,7 @@ function libPassageSemaine(p) {
 // 'horsKizeo' (passage fait sans formulaire Kizeo, ex. rapport déposé à la main), null (pas encore dû)
 function etapeRapportRecu(item, p) {
   var rec = recPassage(item, p);
+  if (!rec && etatKizeo(item, p) === 'na') return 'na';
   if (rec && rec.statut !== 'en-attente') return 'ok';
   var r = etatRapport(item, p);
   if (r === 'retard') return 'retard';
@@ -4321,6 +4345,7 @@ function actionSemaine(item, ps) {
       if (etatAgenda(p) !== 'ok') return bouton("Mettre à l'agenda", "ouvrirPlanification('" + id + "',1)", 'Étape 1' + n);
       var kz = etatKizeo(item, p);
       if (kz === 'manque' || kz === 'ecart') return bouton('Générer Kizeo', "ouvrirPlanification('" + id + "',1)", 'Étape 2' + n);
+      if (item.clientType === 'tache') continue;
       if (!notifOk(notifPassage(item, p, 'notifBailleur'))) return bouton('Notifier le client', "ouvrirPlanification('" + id + "',2)", 'Étape 3' + n);
       if (item.emailClient && !notifOk(notifPassage(item, p, 'notifLocataire'))) return bouton('Notifier le locataire', "ouvrirPlanification('" + id + "',2)", 'Étape 4' + n);
     } else {
@@ -4359,6 +4384,7 @@ function ligneSemaine(item, nbCols) {
   // 2. Kizeo : formulaire envoyé au bon technicien
   h += '<td class="ck-td">' + colonne(function(p){
     var e = etatKizeo(item, p);
+    if (e === 'na') return marque('na', 'Pas de rapport Kizeo prévu pour cette tâche');
     var rec = recPassage(item, p), dest = p.kizeoTech || (rec && rec.technicien) || '';
     return e === 'ok' || e === 'recu' ? marque('ok', 'Formulaire envoyé à ' + (dest || 'le technicien') + (p.kizeoLe ? ' le ' + fmtDate(p.kizeoLe) : ''))
       : e === 'ecart' ? marque('att', 'Envoyé à ' + dest + ', mais le technicien du passage est ' + p.techs.join(', '))
@@ -4369,6 +4395,7 @@ function ligneSemaine(item, nbCols) {
     h += '<td class="ck-td">' + colonne(function(p){
       if (champ === 'notifLocataire' && !item.emailClient && !toNotifArray(item.notifLocataire).length) return marque('na', 'Pas d\'email locataire dans la fiche');
       var r = notifPassage(item, p, champ);
+      if (item.clientType === 'tache' && !r) return marque('na', 'Notification facultative pour une tâche');
       if (r && r.change) return marque('att', 'Notifié le ' + fmtDate(r.le) + ' pour le ' + fmtDate(r.annonce) + ' : date modifiée depuis, à re-notifier');
       return r ? marque('ok', 'Notifié le ' + fmtDate(r.le) + (r.estime ? ' (estimation : notification envoyée avant cette date)' : '')) : marque('ko', champ === 'notifBailleur' ? 'Client pas encore notifié pour ce passage' : 'Locataire pas encore notifié pour ce passage');
     }) + '</td>';
@@ -4376,6 +4403,7 @@ function ligneSemaine(item, nbCols) {
   // 5. Rapport reçu du technicien  ·  6. Rapport envoyé au client
   h += '<td class="ck-td">' + colonne(function(p){
     var e = etapeRapportRecu(item, p);
+    if (e === 'na') return marque('na', 'Pas de rapport prévu pour cette tâche');
     return e === 'ok' ? marque('ok', 'Rapport reçu du technicien') : e === 'retard' ? marque('ko', 'Rapport du technicien en retard') : e === 'manque' ? marque('ko', 'Passage fait, aucun rapport reçu') : e === 'horsKizeo' ? marque('na', 'Pas de suivi Kizeo pour ce passage (rapport manuel ?)') : marque('na', 'Pas encore dû (passage à venir)');
   }) + '</td>';
   h += '<td class="ck-td">' + colonne(function(p){
@@ -4604,7 +4632,7 @@ function ouvrirMenuSuivi(ev, id) {
     } else if (e && e !== 'attente') it.push('<a href="' + lienRapport(recPassage(item, p).id, LIEN_ACTION_RAPPORT[e]) + '">' + LIB_ACTION_RAPPORT[e] + ' · passage ' + p.num + '</a>');
   });
   it.push('<button onclick="toggleNotifRow(\'' + id + '\')">Historique des notifications</button>');
-  if (item.statut === 'Terminé' && !item.enFacturation) it.push('<button onclick="basculerEnFacturation(\'' + id + '\')">Basculer en facturation</button>');
+  if (item.statut === 'Terminé' && !item.enFacturation && item.clientType !== 'tache') it.push('<button onclick="basculerEnFacturation(\'' + id + '\')">Basculer en facturation</button>');
   if (item.enFacturation) it.push('<a href="facturation.html">Voir en facturation</a>');
   // Annulation propre (15/11) : motif, rendez-vous retirés des agendas, rapports Kizeo listés à supprimer
   if (['Annulé', 'À valider'].indexOf(item.statut) === -1) it.push('<button class="danger" onclick="annulerCommandePlanif(\'' + id + '\')">Annuler la commande…</button>');
