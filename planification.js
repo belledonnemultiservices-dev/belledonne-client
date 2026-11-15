@@ -149,11 +149,21 @@ const etatHtml = (cls, txt, titre) => `<span class="pl-etat pl-${cls}"${titre ? 
 const pause = (ms) => new Promise(r => setTimeout(r, ms));
 
 // Passages bruts du dossier (format de la fiche), anciens formats convertis.
+// Rendez-vous agenda d'un passage. Les dossiers planifiés avec l'ancienne fiche les rangent au
+// niveau du dossier (calEventIds[i], même rang que passages[i]) et non sur le passage : on les
+// reprend, sinon la fenêtre les croirait absents et créerait des doublons dans l'agenda (15/11).
+// Une clé « _ » (rendez-vous sans technicien nommé) revient au technicien s'il est seul.
+function calDuPassage(item, p, i) {
+  let cal = p.calEvents && typeof p.calEvents === "object" && Object.keys(p.calEvents).some(k => p.calEvents[k]) ? { ...p.calEvents } : null;
+  if (!cal) { const c = (item.calEventIds || [])[i]; cal = !c ? {} : typeof c === "string" ? { _: c } : (typeof c === "object" ? { ...c } : {}); }
+  if (cal._ && Array.isArray(p.techs) && p.techs.length === 1 && !cal[p.techs[0]]) { cal[p.techs[0]] = cal._; delete cal._; }
+  return cal;
+}
 function passagesBruts(item) {
   const bruts = Array.isArray(item.passages) ? item.passages : [item.date1, item.date2, item.date3].filter(Boolean);
-  return bruts.filter(Boolean).map((p, i) => {
-    if (typeof p === "string") { const [debut, fin] = p.split("|"); return { num: i + 1, passageId: null, debut: debut || "", fin: fin || "", techs: [] }; }
-    return { ...p };
+  return bruts.map((p, i) => ({ p, i })).filter(x => x.p).map(({ p, i }) => {
+    if (typeof p === "string") { const [debut, fin] = p.split("|"); return { num: i + 1, passageId: null, debut: debut || "", fin: fin || "", techs: [], calEvents: calDuPassage(item, {}, i) }; }
+    return { ...p, calEvents: calDuPassage(item, p, i) };
   }).sort((a, b) => (a.num || 0) - (b.num || 0));
 }
 const actifs = (item) => passagesBruts(item).filter(p => p.statut !== "annule" && p.debut);
@@ -880,6 +890,9 @@ function agendaAJour(item, p, ps, nom) {
   const e = (p.calEmpreintes || {})[nom];
   if (e) return e === empreinteAgenda(item, p, ps, nom);
   if (p.calEmpreinte) return false;
+  // Rendez-vous posé par l'ancienne fiche sans repère de synchronisation : considéré à jour, comme
+  // dans le Suivi (il sera mis à jour à la prochaine vraie modification du passage, sans doublon)
+  if (!p.calSync) return true;
   return p.calSync === window.cleSyncAgenda(p.debut, p.fin, p.techs);
 }
 function etatAgendaTech(item, p, ps, nom) {
@@ -944,7 +957,7 @@ function rendrePassages(item) {
         <div class="pl-psg-actions"><button class="pl-btn petit" data-a="suppr" title="Supprimer ce passage">✕</button></div>
       </div>
       <div class="pl-champ"><label>Technicien(s)</label><div class="pl-techs">${techs.map(t => `<span class="pl-tech${l.techs.includes(nomTech(t)) ? " on" : ""}" data-t="${esc(nomTech(t))}">${esc(nomTech(t))}</span>`).join("")}</div>
-        ${l.techs.map(t => { const c = chargeTech(t, (l.debut || "").substring(0, 10), item.id); return c ? `<div class="pl-charge">${esc(t.split(" ")[0])} a déjà ${c} passage${c > 1 ? "s" : ""} ce jour-là</div>` : ""; }).join("")}</div>
+</div>
       ${l.techs.map((nom, i) => blocTech(l, nom, p, i)).join("")}
       ${pb.length ? `<div class="pl-psg-pb">⚠ ${pb.map(esc).join(" · ")}</div>` : ""}
     </div>`;
@@ -955,6 +968,13 @@ function rendrePassages(item) {
     <div class="pl-actions"><button class="pl-btn" data-a="ajout">+ Ajouter un passage</button>
       <button class="pl-btn" data-a="dupli">Dupliquer le dernier à +</button><input id="plEcart" type="number" min="1" value="15" style="width:60px;height:34px;border:1px solid rgba(13,27,42,.15);border-radius:7px;padding:0 8px;"> jours</div>`;
   const ligneDe = (el) => L[Number(el.closest(".pl-passage").dataset.k)];
+  // Passage touché à la main : son rendez-vous sera mis à jour même s'il vient de l'ancienne fiche
+  const corps = $(".pl-corps");
+  if (!corps._marqueur) {
+    corps._marqueur = true;
+    const marquer = (e) => { if (!etat || etat.etape !== 1 || !etat.lignes) return; const c = e.target.closest && e.target.closest(".pl-passage"); if (c) { const l = etat.lignes[Number(c.dataset.k)]; if (l) l.modifie = true; } };
+    ["input", "change", "click"].forEach(t => corps.addEventListener(t, marquer, true));
+  }
   const techDe = (el) => el.closest(".pl-tbloc").dataset.tech;
   const rapportDe = (el) => ligneDe(el).rapports[Number(el.closest(".pl-rap").dataset.r)];
   const change = (redessiner) => { if (redessiner) rendrePassages(item); planifierAutoPassages(); };
@@ -1142,7 +1162,8 @@ async function enregistrerPassages(item, silencieux) {
       const a0 = agendaTech[l.techs[0]] || agendaVide();
       l.rapports.forEach((r, k) => {
         // Base : la version en base (envoi Kizeo, rendez-vous, notifications faits entre-temps)
-        const base = parPid[r.pid] ? { ...parPid[r.pid] } : { passageId: r.pid, statut: "", kizeoPush: null, calEvents: {}, notifs: null, manualRapport: null };
+        // (passage ancien sans identifiant : on repart de sa version lue, rendez-vous compris)
+        const base = parPid[r.pid] ? { ...parPid[r.pid] } : r.ref ? { ...r.ref } : { passageId: r.pid, statut: "", kizeoPush: null, calEvents: {}, notifs: null, manualRapport: null };
         const jumeau = k > 0;
         if (!l.annule && !r.annule) {
           base.debut = l.debut; base.fin = l.fin || l.debut; base.techs = l.techs.slice();
@@ -1162,6 +1183,8 @@ async function enregistrerPassages(item, silencieux) {
           if (jumeau) { base.calEvents = {}; base.calSync = ""; base.calEmpreinte = ""; base.calEmpreintes = {}; }
         }
         base.num = l.num; base.jumeau = jumeau; base.passageId = r.pid;
+        // Rendez-vous de l'ancienne fiche (sans repère) sur un passage modifié : mise à jour forcée, en place
+        if (l.modifie && !jumeau && !Object.keys(base.calEmpreintes || {}).length) base.calEmpreinte = "modifie";
         passages.push(base);
       });
     });
@@ -1181,7 +1204,7 @@ async function enregistrerPassages(item, silencieux) {
       if (partisRetires.length && window._supprimerAttentesRapport) await window._supprimerAttentesRapport(item.id, partisRetires);
     } finally { if (etat) etat.occupe = false; }
     L.forEach(l => l.rapports.forEach(r => { delete r.effacerEnvoi; }));
-    L.forEach(l => { l.ref = passages.find(p => p.passageId === l.pid) || l.ref; l.rapports.forEach(r => { r.ref = passages.find(p => p.passageId === r.pid) || r.ref; }); });
+    L.forEach(l => { delete l.modifie; l.ref = passages.find(p => p.passageId === l.pid) || l.ref; l.rapports.forEach(r => { r.ref = passages.find(p => p.passageId === r.pid) || r.ref; }); });
     if (erreurs.length) { indiquerAuto("⚠ Agenda : " + erreurs[0], true); if (!silencieux) alert("Passages enregistrés, mais l'agenda n'a pas pu être mis à jour pour :\n\n" + erreurs.join("\n")); }
     else indiquerAuto("Enregistré ✓ · agenda à jour");
     rechargerAgenda();
