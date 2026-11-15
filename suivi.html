@@ -4060,7 +4060,7 @@ function actionSemaine(item, ps) {
   }
   return '<button class="btn-next neutre" onclick="openModal(\'' + id + '\')">Ouvrir</button>';
 }
-var TITRES_SEMAINE = '<th>Réf.</th><th>Client · Adresse</th><th>Passages</th><th class="ck-th">Agenda</th><th class="ck-th">Kizeo</th><th class="ck-th">Client</th><th class="ck-th">Locataire</th><th class="ck-th">Rapport<br>reçu</th><th class="ck-th">Rapport<br>envoyé</th><th>Statut</th><th style="text-align:right;">Action</th>';
+var TITRES_SEMAINE = '<th>Réf.</th><th>Client · Adresse</th><th>Passages</th><th class="ck-th">Agenda</th><th class="ck-th">Kizeo</th><th class="ck-th">Client</th><th class="ck-th">Locataire</th><th class="ck-th">Rapport<br>reçu</th><th class="ck-th">Rapport<br>envoyé</th><th>Action</th><th>Statut</th>';
 function ligneSemaine(item, nbCols) {
   // Tous les passages du dossier, avec la check-list de chacun. Ceux de la semaine
   // affichée sont en évidence, les autres en grisé, les annulés barrés.
@@ -4109,8 +4109,8 @@ function ligneSemaine(item, nbCols) {
     var e = etapeRapportEnvoye(item, p);
     return e === 'ok' ? marque('ok', 'Rapport envoyé au client') : e === 'relire' ? marque('att', 'Rapport à relire avant envoi') : e === 'envoyer' ? marque('ko', 'Rapport prêt, pas encore envoyé au client') : marque('na', 'Pas encore dû');
   }) + '</td>';
+  h += '<td style="white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-start;align-items:center;">' + actionSemaine(item, ps) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
   h += '<td>' + statutSelect(item.id, item.statut) + '</td>';
-  h += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;">' + actionSemaine(item, ps) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
   h += '</tr>';
   // Historique des notifications (menu ⋯)
   var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
@@ -4225,7 +4225,7 @@ window.renderTableV2 = function(list) {
   // En-tête : colonnes communes, puis celles propres à l'onglet, avant Statut et Action.
   var titresCols = '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th><th>Techniciens</th><th>Passages</th><th>Notifs</th>'
     + extra.map(function(c){ return '<th>' + c.titre + '</th>'; }).join('')
-    + '<th>Statut</th><th style="text-align:right;">Action</th>';
+    + '<th>Action</th><th>Statut</th>';
   if (f.cle === 'semaine') {
     head.innerHTML = '';
     // Ligne de titres propre à une section, avec sa case « tout sélectionner » limitée à la section
@@ -4256,8 +4256,8 @@ window.renderTableV2 = function(list) {
     h += '<td>' + friseHtml(item) + '</td>';
     h += '<td>' + notifsHtml(item) + '</td>';
     extra.forEach(function(c){ h += '<td>' + c.cell(item) + '</td>'; });
+    h += '<td style="white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-start;align-items:center;">' + actionSuivante(item) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
     h += '<td>' + statutSelect(item.id, item.statut) + '</td>';
-    h += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;">' + actionSuivante(item) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
     h += '</tr>';
     // Historique des notifications (même ligne repliable que l'ancienne vue)
     var nb = toNotifArray(item.notifBailleur), nl = toNotifArray(item.notifLocataire), ns = toNotifArray(item.notifSms), nr = toNotifArray(item.notifRappelSms);
