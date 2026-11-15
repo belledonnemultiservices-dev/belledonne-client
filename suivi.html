@@ -4010,20 +4010,57 @@ function libPassageSemaine(p) {
   return '<div class="ck-l ps-l"><b>' + (CERCLES[(p.num || 1) - 1] || '#' + p.num) + '</b> ' + j + '<span class="ps-h">' + h + '</span>'
     + (p.techs.length ? ' · ' + p.techs.map(function(t){ return t.split(' ')[0]; }).join(', ') : ' · <span style="color:#E74C3C;">sans technicien</span>') + '</div>';
 }
-// Première action utile sur la ligne : rapport à boucler, puis agenda, Kizeo, notification
-// (ordre de travail : on planifie dans l'agenda, on envoie le Kizeo, on notifie).
+// Étape 5 : 'ok' (reçu), 'retard', 'manque' (formulaire envoyé, passage fait, rien reçu),
+// 'horsKizeo' (passage fait sans formulaire Kizeo, ex. rapport déposé à la main), null (pas encore dû)
+function etapeRapportRecu(item, p) {
+  var rec = recPassage(item, p.num);
+  if (rec && rec.statut !== 'en-attente') return 'ok';
+  var r = etatRapport(item, p);
+  if (r === 'retard') return 'retard';
+  var d = (p.debut || '').substring(0, 10);
+  if (!d || d >= jourLocal(0)) return null;
+  return (p.kizeo || rec) ? 'manque' : 'horsKizeo';
+}
+// Étape 6 : 'ok' (envoyé), 'relire', 'envoyer', null (pas encore dû)
+function etapeRapportEnvoye(item, p) {
+  var rec = recPassage(item, p.num);
+  if (!rec) return null;
+  if (rec.statut === 'envoye') return 'ok';
+  if (rec.statut === 'a-relire') return 'relire';
+  if (rec.statut === 'a-traiter' || rec.statut === 'archive') return 'envoyer';
+  return null;
+}
+// Action principale : les six étapes dans l'ordre (agenda, Kizeo, client, locataire,
+// rapport reçu, rapport envoyé), passage par passage du plus ancien au plus récent,
+// jusqu'à la fin de la semaine affichée. Un passage déjà réalisé n'a plus que les
+// étapes de rapport.
 function actionSemaine(item, ps) {
   var id = item.id;
-  var ar = actionRapport(item, passagesNorm(item));
-  if (ar && ar.action === 'retard') return '<button class="btn-next" onclick="ouvrirRelanceSms(\'' + id + '\',' + ar.num + ')">Relancer sur WhatsApp</button>';
-  if (ar) return '<a class="btn-next" href="' + lienRapport(ar.recId, LIEN_ACTION_RAPPORT[ar.action]) + '">' + LIB_ACTION_RAPPORT[ar.action] + '</a>';
   if (item.statut === 'À valider') return '<button class="btn-next" onclick="validerIntervention(\'' + id + '\')">Valider</button>';
-  if (ps.some(function(p){ return etatAgenda(p) !== 'ok'; })) return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Mettre à l\'agenda</button>';
-  if (ps.some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) return '<button class="btn-next" onclick="openModal(\'' + id + '\')">Générer Kizeo</button>';
-  if (ps.some(function(p){ return !notifOk(notifPassage(item, p, 'notifBailleur')) || (item.emailClient && !notifOk(notifPassage(item, p, 'notifLocataire'))); })) return '<button class="btn-next" onclick="openNotifFromRow(\'' + id + '\')">Notifier</button>';
+  var finSem = (contexteLigne === 'prochaine' ? semaineAffichee(decalageSemaine + 1) : semaineAffichee()).vendredi;
+  var auj = jourLocal(0);
+  var candidats = passagesActifs(item).filter(function(p){ var d = (p.debut || '').substring(0, 10); return d && d <= finSem; })
+    .sort(function(x, y){ return (x.debut || '').localeCompare(y.debut || ''); });
+  var bouton = function(lib, onclick, titre){ return '<button class="btn-next" onclick="' + onclick + '" title="' + (titre || '') + '">' + lib + '</button>'; };
+  for (var k = 0; k < candidats.length; k++) {
+    var p = candidats[k], fait = p.debut.substring(0, 10) < auj, n = ' (passage ' + p.num + ')';
+    if (!fait) {
+      if (etatAgenda(p) !== 'ok') return bouton("Mettre à l'agenda", "openModal('" + id + "')", 'Étape 1' + n);
+      var kz = etatKizeo(item, p);
+      if (kz === 'manque' || kz === 'ecart') return bouton('Générer Kizeo', "openModal('" + id + "')", 'Étape 2' + n);
+      if (!notifOk(notifPassage(item, p, 'notifBailleur'))) return bouton('Notifier le client', "openNotifFromRow('" + id + "')", 'Étape 3' + n);
+      if (item.emailClient && !notifOk(notifPassage(item, p, 'notifLocataire'))) return bouton('Notifier le locataire', "openNotifFromRow('" + id + "')", 'Étape 4' + n);
+    } else {
+      var r5 = etapeRapportRecu(item, p);
+      if (r5 === 'retard' || r5 === 'manque') return bouton('Relancer sur WhatsApp', "ouvrirRelanceSms('" + id + "'," + p.num + ")", 'Étape 5' + n + ' : rapport attendu du technicien');
+      var r6 = etapeRapportEnvoye(item, p), rec = recPassage(item, p.num);
+      if (r6 === 'relire') return '<a class="btn-next" href="' + lienRapport(rec.id, 'relire') + '" title="Étape 6' + n + '">Relire le rapport</a>';
+      if (r6 === 'envoyer') return '<a class="btn-next" href="' + lienRapport(rec.id, 'envoyer') + '" title="Étape 6' + n + '">Envoyer le rapport</a>';
+    }
+  }
   return '<button class="btn-next neutre" onclick="openModal(\'' + id + '\')">Ouvrir</button>';
 }
-var TITRES_SEMAINE = '<th>Réf.</th><th>Client · Adresse</th><th>Passage de la semaine</th><th class="ck-th">Agenda</th><th class="ck-th">Kizeo</th><th class="ck-th">Client</th><th class="ck-th">Locataire</th><th>Statut</th><th style="text-align:right;">Action</th>';
+var TITRES_SEMAINE = '<th>Réf.</th><th>Client · Adresse</th><th>Passages</th><th class="ck-th">Agenda</th><th class="ck-th">Kizeo</th><th class="ck-th">Client</th><th class="ck-th">Locataire</th><th class="ck-th">Rapport<br>reçu</th><th class="ck-th">Rapport<br>envoyé</th><th>Statut</th><th style="text-align:right;">Action</th>';
 function ligneSemaine(item, nbCols) {
   // Tous les passages du dossier, avec la check-list de chacun. Ceux de la semaine
   // affichée sont en évidence, les autres en grisé, les annulés barrés.
@@ -4046,17 +4083,11 @@ function ligneSemaine(item, nbCols) {
     var e = etatAgenda(p);
     return e === 'ok' ? marque('ok', "Dans l'agenda de " + (p.techs.join(', ') || 'du technicien')) : e === 'partiel' ? marque('att', "Agenda incomplet : pas chez tous les techniciens du passage") : marque('ko', "Pas encore dans l'agenda du technicien");
   }) + '</td>';
-  // Kizeo : formulaire chez le technicien ; une fois le rapport revenu, état du rapport
+  // 2. Kizeo : formulaire envoyé au bon technicien
   h += '<td class="ck-td">' + colonne(function(p){
-    var rec = recPassage(item, p.num);
-    if (rec && rec.statut === 'envoye') return marque('ok', 'Rapport envoyé au client');
-    var r = etatRapport(item, p);
-    if (r === 'relire') return marque('att', 'Rapport reçu, à relire');
-    if (r === 'envoyer') return marque('att', 'Rapport prêt, pas encore envoyé au client');
-    if (r === 'retard') return marque('ko', 'Rapport du technicien en retard');
     var e = etatKizeo(item, p);
-    var dest = p.kizeoTech || (rec && rec.technicien) || '';
-    return e === 'ok' ? marque('ok', 'Formulaire envoyé à ' + (dest || 'le technicien') + (p.kizeoLe ? ' le ' + fmtDate(p.kizeoLe) : ''))
+    var rec = recPassage(item, p.num), dest = p.kizeoTech || (rec && rec.technicien) || '';
+    return e === 'ok' || e === 'recu' ? marque('ok', 'Formulaire envoyé à ' + (dest || 'le technicien') + (p.kizeoLe ? ' le ' + fmtDate(p.kizeoLe) : ''))
       : e === 'ecart' ? marque('att', 'Envoyé à ' + dest + ', mais le technicien du passage est ' + p.techs.join(', '))
       : marque('ko', 'Formulaire Kizeo pas encore envoyé');
   }) + '</td>';
@@ -4069,6 +4100,15 @@ function ligneSemaine(item, nbCols) {
       return r ? marque('ok', 'Notifié le ' + fmtDate(r.le) + (r.estime ? ' (estimation : notification envoyée avant cette date)' : '')) : marque('ko', champ === 'notifBailleur' ? 'Client pas encore notifié pour ce passage' : 'Locataire pas encore notifié pour ce passage');
     }) + '</td>';
   });
+  // 5. Rapport reçu du technicien  ·  6. Rapport envoyé au client
+  h += '<td class="ck-td">' + colonne(function(p){
+    var e = etapeRapportRecu(item, p);
+    return e === 'ok' ? marque('ok', 'Rapport reçu du technicien') : e === 'retard' ? marque('ko', 'Rapport du technicien en retard') : e === 'manque' ? marque('ko', 'Passage fait, aucun rapport reçu') : e === 'horsKizeo' ? marque('na', 'Pas de suivi Kizeo pour ce passage (rapport manuel ?)') : marque('na', 'Pas encore dû (passage à venir)');
+  }) + '</td>';
+  h += '<td class="ck-td">' + colonne(function(p){
+    var e = etapeRapportEnvoye(item, p);
+    return e === 'ok' ? marque('ok', 'Rapport envoyé au client') : e === 'relire' ? marque('att', 'Rapport à relire avant envoi') : e === 'envoyer' ? marque('ko', 'Rapport prêt, pas encore envoyé au client') : marque('na', 'Pas encore dû');
+  }) + '</td>';
   h += '<td>' + statutSelect(item.id, item.statut) + '</td>';
   h += '<td style="text-align:right;white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;">' + actionSemaine(item, ps) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
   h += '</tr>';
@@ -4181,7 +4221,7 @@ window.renderTableV2 = function(list) {
   if (!body || !head) return;
   var f = fileCourante();
   var extra = f.colonnes || [];
-  var nbCols = f.cle === 'semaine' ? 10 : 9 + extra.length;
+  var nbCols = f.cle === 'semaine' ? 12 : 9 + extra.length;
   // En-tête : colonnes communes, puis celles propres à l'onglet, avant Statut et Action.
   var titresCols = '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th><th>Techniciens</th><th>Passages</th><th>Notifs</th>'
     + extra.map(function(c){ return '<th>' + c.titre + '</th>'; }).join('')
