@@ -4576,6 +4576,8 @@ function ouvrirMenuSuivi(ev, id) {
   it.push('<button onclick="toggleNotifRow(\'' + id + '\')">Historique des notifications</button>');
   if (item.statut === 'Terminé' && !item.enFacturation) it.push('<button onclick="basculerEnFacturation(\'' + id + '\')">Basculer en facturation</button>');
   if (item.enFacturation) it.push('<a href="facturation.html">Voir en facturation</a>');
+  // Annulation propre (15/11) : motif, rendez-vous retirés des agendas, rapports Kizeo listés à supprimer
+  if (['Annulé', 'À valider'].indexOf(item.statut) === -1) it.push('<button class="danger" onclick="annulerCommandePlanif(\'' + id + '\')">Annuler la commande…</button>');
   it.push('<hr><button class="danger" onclick="deleteIntervention(\'' + id + '\')">Supprimer</button>');
   menuSuivi.innerHTML = it.join('');
   menuSuivi.dataset.pour = id;

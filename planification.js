@@ -443,10 +443,13 @@ function rendreDossier(item) {
       const maintenant = new Date().toISOString();
       const maj = { statut: "Annulé", motifAnnulation: motif, annuleLe: maintenant, updatedAt: maintenant };
       if (avecAgenda.length) {
-        const passages = passagesBruts(it).map(p => ({ ...p, calEvents: {}, calSync: "" }));
+        const passages = passagesBruts(it).map(p => ({ ...p, calEvents: {}, calSync: "", calEmpreinte: "", calEmpreintes: {} }));
         maj.passages = passages; maj.calEventIds = passages.map(() => ({}));
       }
       await window._updateSuivi(it.id, maj);
+      // Les rapports encore attendus quittent Gestion rapports (les rapports déjà revenus restent)
+      const attendus = ps.filter(p => p.kizeoPush && p.passageId).map(p => p.passageId);
+      if (attendus.length && window._supprimerAttentesRapport) await window._supprimerAttentesRapport(it.id, attendus);
       showToast("Commande annulée");
     } catch (e) {
       showToast("Erreur à l'annulation : " + e.message, true);
@@ -1270,6 +1273,8 @@ function manquesNotification(item) {
 }
 
 window.ouvrirPlanification = ouvrirPlanification;
+// Menu ⋯ du Suivi : annulation de la commande (étape Dossier, bouton déclenché d'office)
+window.annulerCommandePlanif = (id) => { ouvrirPlanification(id, 0); setTimeout(() => { const b = $("[data-a=annuler]"); if (b) b.click(); }, 50); };
 // Lus par l'onglet Planification du Suivi (colonne Avancement, bouton Reprendre)
 window.etatsEtapesPlanif = etatsEtapes;
 window.etapeConseilleePlanif = etapeConseillee;
