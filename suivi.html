@@ -3908,7 +3908,73 @@ function actionRapport(item, ps) {
   return null;
 }
 function lienRapport(recId, action) { return 'gestion-rapports.html?rapport=' + encodeURIComponent(recId) + '&action=' + action + '&from=suivi'; }
-var LIB_ACTION_RAPPORT = { relire: 'Relire le rapport', envoyer: 'Envoyer le rapport', retard: 'Relancer le technicien' };
+var LIB_ACTION_RAPPORT = { relire: 'Relire le rapport', envoyer: 'Envoyer le rapport', retard: 'Relancer par SMS' };
+
+// ── Relance d'un technicien par SMS (rapport Kizeo en retard) ──
+// Le SMS part via la fonction sendSMS existante (OVH), après relecture du texte.
+// La relance est notée sur la ligne du rapport (relancesSms) pour être visible ensuite.
+function techDuPassage(item, num) {
+  var rec = recPassage(item, num);
+  var p = passagesNorm(item).find(function(x){ return x.num === num; }) || { techs: [] };
+  var nom = (rec && rec.technicien) || p.kizeoTech || p.techs[0] || '';
+  var t = (window._techniciens || []).find(function(x){ return x.nomComplet === nom || x.nom === nom || (x.prenom && (x.prenom + ' ' + (x.nom || '')).trim() === nom); });
+  return { nom: nom, tel: t ? (t.tel || t.telephone || '') : '' };
+}
+function ouvrirRelanceSms(id, num) {
+  var item = (window.interventions || []).find(function(i){ return i.id === id; });
+  if (!item) return;
+  var p = passagesNorm(item).find(function(x){ return x.num === num; }) || {};
+  var tech = techDuPassage(item, num);
+  var ref = item.bc ? 'BC ' + item.bc : item.pl ? 'PL ' + item.pl : item.devis ? 'devis ' + item.devis : '';
+  var msg = 'Bonjour ' + (tech.nom.split(' ')[0] || '') + ', rappel : le rapport Kizeo du passage ' + num + ' (' + [item.client, ref].filter(Boolean).join(' ') + (item.adresse ? ', ' + item.adresse : '') + (p.debut ? ', du ' + jjmm(p.debut.substring(0, 10)) : '') + ") n'est pas encore envoyé. Merci de le compléter et de l'envoyer. Belledonne";
+  var m = document.getElementById('modalRelanceSms');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'modalRelanceSms';
+    m.className = 'modal-overlay';
+    // Petite fenêtre centrée (les fenêtres du Suivi sont des panneaux latéraux pleine hauteur)
+    m.style.cssText = 'right:0;background:rgba(13,27,42,.35);align-items:center;justify-content:center;pointer-events:auto;';
+    m.innerHTML = '<div class="modal" style="width:520px;height:auto;max-height:90vh;border-radius:var(--radius);"><div class="modal-header" style="cursor:default;"><div class="modal-title">Relancer le technicien par SMS</div><button class="modal-close" onclick="fermerRelanceSms()">&times;</button></div>'
+      + '<div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">'
+      + '<div><label style="font-size:12px;font-weight:600;color:var(--text-mid);">Destinataire</label><div id="rsTech" style="font-size:13px;margin:4px 0;"></div><input id="rsTel" class="search-input" style="width:100%;height:38px;" placeholder="Numéro du technicien"></div>'
+      + '<div><label style="font-size:12px;font-weight:600;color:var(--text-mid);">Message</label><textarea id="rsMsg" rows="5" style="width:100%;margin-top:4px;padding:10px;border:1px solid var(--border);border-radius:8px;font:13px \'DM Sans\',sans-serif;resize:vertical;" oninput="majCompteurRelance()"></textarea><div id="rsCpt" style="font-size:11px;color:var(--text-muted);text-align:right;"></div></div>'
+      + '</div><div class="modal-footer"><button class="btn-cancel" onclick="fermerRelanceSms()">Annuler</button><button class="btn-save" id="rsEnvoyer" onclick="envoyerRelanceSms()">Envoyer le SMS</button></div></div>';
+    document.body.appendChild(m);
+  }
+  m.dataset.id = id; m.dataset.num = num;
+  document.getElementById('rsTech').textContent = tech.nom || 'Technicien non renseigné';
+  document.getElementById('rsTel').value = tech.tel;
+  document.getElementById('rsMsg').value = msg;
+  var b = document.getElementById('rsEnvoyer'); b.disabled = false; b.textContent = 'Envoyer le SMS';
+  majCompteurRelance();
+  m.classList.add('open');
+}
+function fermerRelanceSms() { var m = document.getElementById('modalRelanceSms'); if (m) m.classList.remove('open'); }
+function majCompteurRelance() {
+  var l = document.getElementById('rsMsg').value.length;
+  document.getElementById('rsCpt').textContent = l + ' caractères · ' + (l <= 160 ? 1 : Math.ceil(l / 153)) + ' SMS';
+}
+async function envoyerRelanceSms() {
+  var m = document.getElementById('modalRelanceSms');
+  var tel = document.getElementById('rsTel').value.trim();
+  var msg = document.getElementById('rsMsg').value.trim();
+  if (!tel) { alert("Aucun numéro : renseigne le téléphone du technicien (page Techniciens) ou saisis-le ici."); return; }
+  if (!msg) { alert('Message vide.'); return; }
+  var b = document.getElementById('rsEnvoyer'); b.disabled = true; b.textContent = 'Envoi...';
+  try {
+    var resp = await fetch(window.SMS_URL || 'https://europe-west1-belledonne-client.cloudfunctions.net/sendSMS', { method: 'POST', headers: await window._authHeaders(), body: JSON.stringify({ to: tel, message: msg }) });
+    var data = await resp.json().catch(function(){ return {}; });
+    if (!resp.ok || !data.success) throw new Error(data.error || 'envoi refusé par OVH');
+    var item = (window.interventions || []).find(function(i){ return i.id === m.dataset.id; });
+    var rec = item ? recPassage(item, Number(m.dataset.num)) : null;
+    if (rec && window._noterRelanceTech) window._noterRelanceTech(rec.id, new Date().toISOString());
+    fermerRelanceSms();
+    showToast('SMS de relance envoyé au ' + tel);
+  } catch (e) {
+    b.disabled = false; b.textContent = 'Envoyer le SMS';
+    alert("Le SMS n'est pas parti : " + e.message);
+  }
+}
 var LIEN_ACTION_RAPPORT = { relire: 'relire', envoyer: 'envoyer', retard: 'renvoyer' };
 // État du formulaire Kizeo d'un passage : 'ok', 'recu', 'manque' ou 'ecart' (envoyé à un autre technicien).
 function etatKizeo(item, p) {
@@ -3931,7 +3997,7 @@ function kizeoHtml(item) {
     var r = etatRapport(item, p);
     if (r === 'relire') return '<span class="kz-ecart">' + n + ' Rapport à relire</span>';
     if (r === 'envoyer') return '<span class="kz-ecart">' + n + ' Rapport prêt à envoyer</span>';
-    if (r === 'retard') return '<span class="kz-manque">' + n + ' ⚠ Rapport en retard (' + (p.kizeoTech ? p.kizeoTech.split(' ')[0] : 'technicien') + ')</span>';
+    if (r === 'retard') { var rl = (recK && recK.relancesSms) || []; return '<span class="kz-manque">' + n + ' ⚠ Rapport en retard (' + (p.kizeoTech ? p.kizeoTech.split(' ')[0] : 'technicien') + ')' + (rl.length ? ' · relancé le ' + fmtDate(rl[rl.length - 1]) : '') + '</span>'; }
     if (e === 'recu') return '<span class="kz-ok">' + n + ' ✓ Rapport envoyé</span>';
     if (e === 'ok') return '<span class="kz-ok">' + n + ' ✓ Envoyé' + (p.kizeoTech ? ' à ' + p.kizeoTech.split(' ')[0] : '') + '</span>';
     if (e === 'ecart') return '<span class="kz-ecart" title="Le technicien du passage a changé après l\'envoi : renvoyer le formulaire au bon technicien.">' + n + ' ⚠ Envoyé à ' + p.kizeoTech.split(' ')[0] + ', technicien actuel : ' + p.techs.map(function(t){ return t.split(' ')[0]; }).join(', ') + '</span>';
@@ -3962,6 +4028,7 @@ function actionSuivante(item) {
   // Semaine et En cours : un rapport à relire, à envoyer ou en retard passe en premier.
   if (fileSuivi === 'semaine' || f === 'encours') {
     var ar = actionRapport(item, passagesNorm(item));
+    if (ar && ar.action === 'retard') return '<button class="btn-next" onclick="ouvrirRelanceSms(\'' + id + '\',' + ar.num + ')" title="Rapport du passage ' + ar.num + ' en retard : SMS au technicien">Relancer par SMS</button>';
     if (ar) return '<a class="btn-next" href="' + lienRapport(ar.recId, LIEN_ACTION_RAPPORT[ar.action]) + '" title="Ouvre Gestion rapports sur ce rapport (passage ' + ar.num + ')">' + LIB_ACTION_RAPPORT[ar.action] + '</a>';
   }
   // Dans la Semaine, un formulaire Kizeo manquant ou mal envoyé passe avant tout.
@@ -4081,7 +4148,10 @@ function ouvrirMenuSuivi(ev, id) {
   if (hasPsg) it.push('<button onclick="openNotifFromRow(\'' + id + '\')">Notifier bailleur / locataire</button><button onclick="openRappelSms(\'' + id + '\')">Rappel SMS</button>');
   passagesNorm(item).forEach(function(p) {
     var e = etatRapport(item, p);
-    if (e && e !== 'attente') it.push('<a href="' + lienRapport(recPassage(item, p.num).id, LIEN_ACTION_RAPPORT[e]) + '">' + LIB_ACTION_RAPPORT[e] + ' · passage ' + p.num + '</a>');
+    if (e === 'retard') {
+      it.push('<button onclick="ouvrirRelanceSms(\'' + id + '\',' + p.num + ')">Relancer par SMS · passage ' + p.num + '</button>');
+      it.push('<a href="' + lienRapport(recPassage(item, p.num).id, 'renvoyer') + '" title="Envoie un nouveau formulaire Kizeo au technicien ; l\'ancien reste sur son téléphone, à supprimer dans Kizeo">Renvoyer le formulaire · passage ' + p.num + '</a>');
+    } else if (e && e !== 'attente') it.push('<a href="' + lienRapport(recPassage(item, p.num).id, LIEN_ACTION_RAPPORT[e]) + '">' + LIB_ACTION_RAPPORT[e] + ' · passage ' + p.num + '</a>');
   });
   it.push('<button onclick="toggleNotifRow(\'' + id + '\')">Historique des notifications</button>');
   if (item.statut === 'Terminé' && !item.enFacturation) it.push('<button onclick="basculerEnFacturation(\'' + id + '\')">Basculer en facturation</button>');
@@ -5637,6 +5707,12 @@ onAuthStateChanged(auth, async (user) => {
     else if (window.renderTable) window.renderTable(interventions);
   });
 
+  // Trace d'une relance SMS envoyée au technicien pour un rapport en retard.
+  window._noterRelanceTech = async (recId, ts) => {
+    try { await updateDoc(doc(db, 'reception-rapports', recId), { relancesSms: arrayUnion(ts) }); }
+    catch (e) { console.warn('relance SMS non notée:', e.message); }
+  };
+
   // État des rapports par passage, pour la frise de la nouvelle vue.
   // Clé suiviId::numPassage ; on garde l'état le plus avancé.
   const RANG_RECEPTION = { 'en-attente': 0, 'a-relire': 1, 'a-traiter': 2, 'archive': 2, 'envoye': 3 };
@@ -5646,7 +5722,7 @@ onAuthStateChanged(auth, async (user) => {
       const r = d.data();
       if (!r.suiviId || r.numPassage == null) return;
       const k = r.suiviId + '::' + r.numPassage;
-      if (!m[k] || (RANG_RECEPTION[r.statut] ?? -1) > (RANG_RECEPTION[m[k].statut] ?? -1)) m[k] = { id: d.id, statut: r.statut, dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null };
+      if (!m[k] || (RANG_RECEPTION[r.statut] ?? -1) > (RANG_RECEPTION[m[k].statut] ?? -1)) m[k] = { id: d.id, statut: r.statut, dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, relancesSms: Array.isArray(r.relancesSms) ? r.relancesSms : [] };
     });
     window._receptionsParPassage = m;
     if (window.filterTable) window.filterTable();
