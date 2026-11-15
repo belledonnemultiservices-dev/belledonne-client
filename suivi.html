@@ -2570,6 +2570,19 @@ async function setStatutRapide(id, newStatut) {
   } catch(e) { alert('Erreur: ' + e.message); }
 }
 
+// Reprise d'un dossier en attente : retour en Planification, motif effacé
+// (il ne doit pas réapparaître si le dossier repasse en attente par un autre chemin)
+async function reprendreAttente(id) {
+  try {
+    const changes = { statut: 'À traiter', motifAttente: null, attenteDepuis: null };
+    await window._updateSuivi(id, changes);
+    const idx = interventions.findIndex(i => i.id === id);
+    if (idx !== -1) { Object.assign(interventions[idx], changes); window.interventions = interventions; }
+    filterTable();
+    showToast('Dossier repris : retour en Planification.');
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
 // ── RENDER ──
 // Normalize notif field to array (rétrocompat)
 function toNotifArray(val) {
@@ -3760,7 +3773,14 @@ var FILES_SUIVI = [
     tri: function(x, y){ return String(x.updatedAt || dateArrivee(x)).localeCompare(String(y.updatedAt || dateArrivee(y))); },
     question: "Qu'est-ce qui est bloqué, et qui doit relancer ?",
     colonnes: [
-      { titre: 'Dernière note', cell: function(i){ var t = String(i.notes || i.observations || '').trim(); return t ? '<span style="font-size:12px;color:var(--text-mid);display:inline-block;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + t.replace(/"/g, '&quot;') + '">' + t.replace(/</g, '&lt;') + '</span>' : '<span style="color:var(--text-muted)">—</span>'; } },
+      // Motif (décidé le 15/11) : le champ motifAttente ; pour les dossiers mis en attente avant,
+      // la dernière ligne des notes internes (l'ancien fonctionnement y ajoutait le motif à la fin)
+      { titre: 'Motif', cell: function(i){
+        var t, titre;
+        if (i.motifAttente) { t = String(i.motifAttente).trim(); titre = t + (i.attenteDepuis ? '\nEn attente depuis le ' + fmtDate(i.attenteDepuis) : ''); }
+        else { var tout = String(i.notes || i.observations || '').trim(); var lignes = tout.split('\n').map(function(l){ return l.trim(); }).filter(Boolean); t = lignes.length ? lignes[lignes.length - 1] : ''; titre = tout; }
+        return t ? '<span style="font-size:12px;color:var(--text-mid);display:inline-block;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + titre.replace(/"/g, '&quot;') + '">' + t.replace(/</g, '&lt;') + '</span>' : '<span style="color:var(--text-muted)">—</span>';
+      } },
       { titre: 'Sans activité', cell: function(i){ var n = joursDepuis(i.updatedAt || dateArrivee(i)); return '<span class="psg ' + (n !== null && n > DELAI_ATTENTE_JOURS ? 'psg-retard' : 'psg-passe') + '">' + (n === null ? '—' : n + ' j') + '</span>'; } },
     ],
     kpis: function(l){
@@ -3792,7 +3812,11 @@ var FILES_SUIVI = [
     } },
   { cle: 'annuleDef', label: 'Annulé', ligne2: true, test: function(i){ return fileDe(i) === 'annuleDef'; }, tri: parRecent,
     question: 'Combien de dossiers perdus, et pourquoi ?',
-    colonnes: [{ titre: 'Annulé', cell: function(i){ return '<span style="font-size:12px;">' + (i.updatedAt ? fmtDate(i.updatedAt) : '—') + '</span>'; } }],
+    colonnes: [
+      // Motif saisi à l'annulation depuis la planification (15/11) ; rien pour les annulations plus anciennes
+      { titre: 'Motif', cell: function(i){ var t = String(i.motifAnnulation || '').trim(); return t ? '<span style="font-size:12px;color:var(--text-mid);display:inline-block;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + t.replace(/"/g, '&quot;') + '">' + t.replace(/</g, '&lt;') + '</span>' : '<span style="color:var(--text-muted)">—</span>'; } },
+      { titre: 'Annulé', cell: function(i){ var d = i.annuleLe || i.updatedAt; return '<span style="font-size:12px;">' + (d ? fmtDate(d) : '—') + '</span>'; } },
+    ],
     kpis: function(l){
       return [
         { val: l.length, lib: 'dossier(s) annulé(s)' },
@@ -4112,7 +4136,7 @@ function actionSuivante(item) {
   if (f === 'afacturer') return bouton('Facturer', 'basculerEnFacturation');
   if (f === 'cloture') return '<a class="btn-next neutre" href="facturation.html">Voir la facturation</a>';
   // Reprendre un dossier en attente : retour en Planification
-  if (f === 'attente') return '<button class="btn-next" onclick="setStatutRapide(\'' + id + '\',\'À traiter\')" title="Le blocage est levé : le dossier revient en Planification">Reprendre</button>';
+  if (f === 'attente') return '<button class="btn-next" onclick="reprendreAttente(\'' + id + '\')" title="Le blocage est levé : le dossier revient en Planification">Reprendre</button>';
   if (f === 'annuleDef') return bouton('Ouvrir', 'openModal', true);
   if (f === 'planification') {
     // Commencé : on rouvre la fenêtre directement sur la première étape manquante

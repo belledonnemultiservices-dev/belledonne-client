@@ -317,9 +317,10 @@ function rendreDossier(item) {
       ${champ("Email client", inp("plEmail", item.emailClient, "", "email"), true)}
       <div class="pl-section">Notes</div>
       ${champ("Observations", `<textarea id="plObservations" placeholder="Détails, contexte, contraintes...">${esc(item.observations)}</textarea>`, true)}
-      ${champ("Notes internes", `<textarea id="plNotes" placeholder="Notes internes, suivi, rappels...">${esc(item.notes)}</textarea>`, true)}
+      ${String(item.notes || "").trim() ? champ("Anciennes notes <span style=\"text-transform:none;font-weight:400;\">· lecture seule</span>", `<div class="pl-lecture" style="white-space:pre-wrap;font-size:12.5px;color:#4A6078;background:#F7F9FB;border-radius:8px;padding:8px 10px;">${esc(item.notes)}</div>`, true) : ""}
     </div>
-    <div class="pl-actions"><button class="pl-btn" data-a="attente">Mettre en attente…</button><span class="pl-note">Si une information bloque la planification (locataire injoignable, accès…)</span></div>`;
+    <div class="pl-actions"><button class="pl-btn" data-a="attente">Mettre en attente…</button><span class="pl-note">Si une information bloque la planification (locataire injoignable, accès…)</span></div>
+    <div class="pl-actions" style="margin-top:6px;"><button class="pl-btn" data-a="annuler" style="color:#C0392B;border-color:#F5C6C0;background:#FDECEA;">Annuler la commande…</button><span class="pl-note">Le dossier part dans l'onglet Annulé</span></div>`;
   // Téléphones : un champ par numéro, comme la fiche
   $("[data-a=ajoutTel]").onclick = () => { $("#plTels").insertAdjacentHTML("beforeend", champTel("")); $("#plTels input:last-child").focus(); };
   // Liste des natures habituelle (config/naturesMission, avec « Ajouter une nature »)
@@ -360,18 +361,66 @@ function rendreDossier(item) {
     clearTimeout(minuterieDossier);
     minuterieDossier = setTimeout(() => { minuterieDossier = null; if (etat && etat.etape === 0 && $("#plClient")) enregistrerDossier(dossier() || item, true); }, 1200);
   };
+  // Décidé le 15/11 : motif obligatoire, rangé dans son propre champ (affiché dans l'onglet
+  // En attente), et non plus ajouté aux notes internes.
   $("[data-a=attente]").onclick = async () => {
-    const note = prompt("Pourquoi ce dossier est-il en attente ? (la note est ajoutée au dossier)");
-    if (note === null) return;
-    const ligne = new Date().toLocaleDateString("fr-FR") + " : " + note.trim();
-    await window._updateSuivi(item.id, { statut: "En attente", notes: [item.notes, ligne].filter(Boolean).join("\n"), updatedAt: new Date().toISOString() });
+    const motif = demanderMotif("Motif de la mise en attente (obligatoire) :\nex. locataire injoignable, code d'accès manquant…", "mettre le dossier en attente");
+    if (!motif) return;
+    viderDossier(); // la saisie en cours part avant
+    const maintenant = new Date().toISOString();
+    await window._updateSuivi(item.id, { statut: "En attente", motifAttente: motif, attenteDepuis: maintenant, updatedAt: maintenant });
     showToast("Dossier mis en attente");
+    fermer();
+  };
+  // Décidé le 15/11 : annulation de la commande depuis l'étape Dossier, motif obligatoire.
+  // Les rendez-vous agenda déjà posés sont retirés ; les formulaires Kizeo, eux, se suppriment à la main.
+  $("[data-a=annuler]").onclick = async () => {
+    const it = dossier() || item;
+    const ps = passagesBruts(it).filter(p => p.statut !== "annule");
+    const avecAgenda = ps.filter(p => Object.values(p.calEvents || {}).some(Boolean));
+    // Nom du rapport tel qu'il apparaît dans Kizeo, pour retrouver chaque formulaire à supprimer
+    const kizeo = ps.filter(p => p.kizeoPush).map(p => "• Passage " + p.num + (p.debut ? " du " + (window.fmtDate ? window.fmtDate(p.debut) : p.debut.substring(0, 10)) : "")
+      + " : « " + (p.kizeoPush.libelle || p.titre || titreDefaut(it)) + " »" + (p.kizeoPush.technicien ? " (chez " + p.kizeoPush.technicien + ")" : ""));
+    const avecKizeo = kizeo.length;
+    const motif = demanderMotif("Motif de l'annulation de la commande (obligatoire) :\nex. annulée par le bailleur, doublon, locataire parti…", "annuler la commande");
+    if (!motif) return;
+    if (!confirm("Annuler définitivement cette commande ?\n\nMotif : " + motif
+      + (avecAgenda.length ? "\n\n" + avecAgenda.length + " passage(s) dans l'agenda : les rendez-vous seront retirés." : "")
+      + (avecKizeo ? "\n\n" + avecKizeo + " formulaire(s) Kizeo déjà envoyé(s), à supprimer à la main dans Kizeo :\n" + kizeo.join("\n") : ""))) return;
+    viderDossier();
+    etat.occupe = true;
+    try {
+      for (const p of avecAgenda) for (const [nom, ev] of Object.entries(p.calEvents || {})) {
+        const t = techParNom(nom); if (!t || !t.email || !ev) continue;
+        try { await requeteAgenda({ technicienEmail: t.email, operation: "delete", calEventId: ev }); } catch (e) { /* rendez-vous déjà absent */ }
+      }
+      const maintenant = new Date().toISOString();
+      const maj = { statut: "Annulé", motifAnnulation: motif, annuleLe: maintenant, updatedAt: maintenant };
+      if (avecAgenda.length) {
+        const passages = passagesBruts(it).map(p => ({ ...p, calEvents: {}, calSync: "" }));
+        maj.passages = passages; maj.calEventIds = passages.map(() => ({}));
+      }
+      await window._updateSuivi(it.id, maj);
+      showToast("Commande annulée");
+    } catch (e) {
+      showToast("Erreur à l'annulation : " + e.message, true);
+      return;
+    } finally { if (etat) etat.occupe = false; }
     fermer();
   };
   navigation("Continuer →", () => { clearTimeout(minuterieDossier); minuterieDossier = null; return enregistrerDossier(dossier() || item); });
   $(".pl-pied .pl-espace").insertAdjacentHTML("afterend", `<span class="pl-note" id="plAuto" style="margin-right:8px;">Enregistrement automatique</span>`);
 }
 let minuterieDossier = null;
+// Motif obligatoire : redemande tant que la réponse est vide, null si l'utilisateur annule
+function demanderMotif(question, action) {
+  for (;;) {
+    const r = prompt(question);
+    if (r === null) return null;
+    if (r.trim()) return r.trim();
+    alert("Le motif est obligatoire pour " + action + ".");
+  }
+}
 // Saisie en attente d'enregistrement automatique : on l'enregistre tout de suite
 // (changement d'étape, fermeture). Les valeurs sont lues avant que le formulaire disparaisse.
 function viderDossier() {
@@ -394,7 +443,7 @@ async function enregistrerDossier(item, silencieux) {
     dateEmission: v("plDateEmission"), expediteur: v("plExpediteur"),
     pl: v("pl_pl"), bc: v("pl_bc"), devis: v("pl_devis"),
     adresse: v("plAdresse"), nomClient: v("plNom"), emailClient: v("plEmail"),
-    observations: v("plObservations"), notes: v("plNotes"),
+    observations: v("plObservations"), // notes internes : plus saisies ici, jamais écrasées
   };
   if (!saisie.client) {
     // Client vidé : jamais enregistré à vide ; en automatique on enregistre le reste
