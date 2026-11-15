@@ -2622,6 +2622,11 @@ async function creerDossierManuel() {
 // Reprise d'un dossier en attente : retour en Planification, motif effacé
 // (il ne doit pas réapparaître si le dossier repasse en attente par un autre chemin)
 async function reprendreAttente(id) {
+  // Confirmation (15/11) : un clic par erreur effaçait le motif et renvoyait le dossier en Planification
+  const it = (window.interventions || []).find(i => i.id === id) || {};
+  const ref = it.bc ? 'BC ' + it.bc : it.pl ? 'PL ' + it.pl : it.devis ? 'Devis ' + it.devis : (it.clientType === 'tache' ? 'cette tâche' : 'ce dossier');
+  const motif = it.motifAttente || String(it.notes || '').split('\n').map(l => l.trim()).filter(Boolean).pop() || '';
+  if (!confirm('Reprendre ' + ref + (it.client ? ' (' + it.client + ')' : '') + ' ?' + (motif ? '\n\nMotif d\'attente : ' + motif : '') + '\n\nLe blocage est levé : le dossier retourne en Planification.')) return;
   try {
     const changes = { statut: 'À traiter', motifAttente: null, attenteDepuis: null };
     await window._updateSuivi(id, changes);
