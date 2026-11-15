@@ -1601,6 +1601,7 @@ function getPassagesFromDOM() {
       manualRapport,
       calEvents: getPassageCalMap(n),
       notifs: (function(){ try { return JSON.parse(div.dataset.notifs || 'null'); } catch(e) { return null; } })(),
+      calSync: div.dataset.calSync || '',
     });
   });
   passages.sort((a, b) => (a.num || 0) - (b.num || 0));
@@ -1612,6 +1613,9 @@ async function _saveCalEventId(n, eventMap) {
   // passage quand la liste est triée ou qu'un passage est supprimé au milieu.
   const div = document.getElementById('passage_' + n);
   if (div) div.dataset.calEventId = JSON.stringify(eventMap);
+  // Empreinte de ce qui a été envoyé à l'agenda (date, heure, techniciens) : si le
+  // passage change ensuite, la vue Semaine signale l'agenda à mettre à jour.
+  if (div) div.dataset.calSync = Object.keys(eventMap || {}).length ? cleSyncAgenda(document.getElementById('fDateDebut' + n)?.value, document.getElementById('fDateFin' + n)?.value, getPassageTechsFromDOM(n)) : '';
   // Sauvegarde aussi les passages pour ne pas perdre ceux ajoutés sans "Mettre à jour"
   const passages = getPassagesFromDOM();
   await window._updateSuivi(editId, { calEventIds: passages.map(p => p.calEvents || {}), passages });
@@ -1769,6 +1773,7 @@ function addPassage(value = '', calEventId = '') {
   div.dataset.calEventId = JSON.stringify(calMap);
   div.dataset.kizeoPush = JSON.stringify(savedKizeoPush);
   div.dataset.notifs = JSON.stringify((value && typeof value === 'object' && value.notifs) || null);
+  div.dataset.calSync = (value && typeof value === 'object' && value.calSync) || '';
   div.dataset.statutPassage = savedStatut;
   div.dataset.manualRapport = JSON.stringify(savedManualRapport);
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
@@ -3451,7 +3456,7 @@ function passagesNorm(item) {
     if (typeof p === 'string') { var x = p.split('|'); return { num: i+1, debut: x[0]||'', fin: x[1]||'', techs: [], statut: '' }; }
     var cal = (p.calEvents && typeof p.calEvents === 'object') ? p.calEvents : ((item.calEventIds || [])[i] || {});
     if (typeof cal !== 'object' || cal === null) cal = cal ? { _: cal } : {};
-    return { num: p.num || (i+1), debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null };
+    return { num: p.num || (i+1), debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null, calSync: p.calSync || '' };
   }).sort(function(a, b){ return (a.num||0) - (b.num||0); });
 }
 function techsDesPassages(item) {
@@ -3962,26 +3967,29 @@ function actionSuivante(item) {
   if (fileSuivi === 'semaine' && passagesLigneSemaine(item).some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) {
     return bouton('Générer Kizeo', 'openModal', false, 'Ouvre la fiche pour envoyer le formulaire Kizeo au technicien');
   }
-  if (f === 'pannule') return bouton('Replanifier', 'openModal');
+  if (f === 'pannule') return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)">Replanifier</button>';
   if (f === 'termine') {
     return item.enFacturation ? '<a class="btn-next neutre" href="facturation.html">En facturation</a>' : bouton('Facturer', 'basculerEnFacturation');
   }
   if (f === 'annuleDef' || f === 'attente') return bouton('Ouvrir', 'openModal', true);
-  if (f === 'planifier') return bouton('Planifier', 'openModal');
+  if (f === 'planifier') return bouton('Planifier', 'ouvrirPlanification', false, 'Ouvre la fenêtre de planification (passages, agenda, Kizeo, notifications)');
   // En cours
   if (aCloturer(item)) return '<button class="btn-next" onclick="setStatutRapide(\'' + id + '\',\'Terminé\')" title="Le rapport du passage 1 est envoyé : passer le dossier en Terminé">Terminer</button>';
   var auj7 = jourLocal(0), fin7 = jourLocal(6);
-  if (passagesActifs(item).some(function(p){ var d = (p.debut || '').substring(0, 10); return d && d >= auj7 && d <= fin7 && etatAgenda(p) !== 'ok'; })) return bouton('Mettre à l\'agenda', 'openModal', false, 'Un passage des 7 prochains jours n\'est pas dans l\'agenda du technicien');
-  if (kizeoAGenerer7j(item)) return bouton('Générer Kizeo', 'openModal', false, 'Un passage des 7 prochains jours n\'a pas son formulaire Kizeo');
+  if (passagesActifs(item).some(function(p){ var d = (p.debut || '').substring(0, 10); return d && d >= auj7 && d <= fin7 && etatAgenda(p) !== 'ok'; })) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',2)" title="Un passage des 7 prochains jours n\'est pas à jour dans l\'agenda">Mettre à l\'agenda</button>';
+  if (kizeoAGenerer7j(item)) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',3)" title="Un passage des 7 prochains jours n\'a pas son formulaire Kizeo">Générer Kizeo</button>';
   if (!toNotifArray(item.notifBailleur).length && prochainPassage(item)) return bouton('Notifier', 'openNotifFromRow');
   return bouton('Ouvrir', 'openModal', true);
 }
 
 // ── Check-list d'un passage de la semaine ──
 // Agenda : un rendez-vous Google existe pour chaque technicien du passage.
+function cleSyncAgenda(debut, fin, techs) { return (debut || '') + '|' + (fin || '') + '|' + (techs || []).slice().sort().join(','); }
 function etatAgenda(p) {
   var cles = Object.keys(p.calEvents || {}).filter(function(k){ return p.calEvents[k]; });
   if (!cles.length) return 'manque';
+  // Passage modifié depuis la mise à l'agenda (date, heure ou technicien)
+  if (p.calSync && p.calSync !== cleSyncAgenda(p.debut, p.fin, p.techs)) return 'desync';
   if (cles.indexOf('_') !== -1 || !p.techs.length) return 'ok';
   var absents = p.techs.filter(function(t){ return cles.indexOf(t) === -1; });
   return absents.length === 0 ? 'ok' : absents.length < p.techs.length ? 'partiel' : 'manque';
@@ -4045,11 +4053,11 @@ function actionSemaine(item, ps) {
   for (var k = 0; k < candidats.length; k++) {
     var p = candidats[k], fait = p.debut.substring(0, 10) < auj, n = ' (passage ' + p.num + ')';
     if (!fait) {
-      if (etatAgenda(p) !== 'ok') return bouton("Mettre à l'agenda", "openModal('" + id + "')", 'Étape 1' + n);
+      if (etatAgenda(p) !== 'ok') return bouton("Mettre à l'agenda", "ouvrirPlanification('" + id + "',2)", 'Étape 1' + n);
       var kz = etatKizeo(item, p);
-      if (kz === 'manque' || kz === 'ecart') return bouton('Générer Kizeo', "openModal('" + id + "')", 'Étape 2' + n);
-      if (!notifOk(notifPassage(item, p, 'notifBailleur'))) return bouton('Notifier le client', "openNotifFromRow('" + id + "')", 'Étape 3' + n);
-      if (item.emailClient && !notifOk(notifPassage(item, p, 'notifLocataire'))) return bouton('Notifier le locataire', "openNotifFromRow('" + id + "')", 'Étape 4' + n);
+      if (kz === 'manque' || kz === 'ecart') return bouton('Générer Kizeo', "ouvrirPlanification('" + id + "',3)", 'Étape 2' + n);
+      if (!notifOk(notifPassage(item, p, 'notifBailleur'))) return bouton('Notifier le client', "ouvrirPlanification('" + id + "',4)", 'Étape 3' + n);
+      if (item.emailClient && !notifOk(notifPassage(item, p, 'notifLocataire'))) return bouton('Notifier le locataire', "ouvrirPlanification('" + id + "',4)", 'Étape 4' + n);
     } else {
       var r5 = etapeRapportRecu(item, p);
       if (r5 === 'retard' || r5 === 'manque') return bouton('Relancer sur WhatsApp', "ouvrirRelanceSms('" + id + "'," + p.num + ")", 'Étape 5' + n + ' : rapport attendu du technicien');
@@ -4081,7 +4089,7 @@ function ligneSemaine(item, nbCols) {
   // Agenda
   h += '<td class="ck-td">' + colonne(function(p){
     var e = etatAgenda(p);
-    return e === 'ok' ? marque('ok', "Dans l'agenda de " + (p.techs.join(', ') || 'du technicien')) : e === 'partiel' ? marque('att', "Agenda incomplet : pas chez tous les techniciens du passage") : marque('ko', "Pas encore dans l'agenda du technicien");
+    return e === 'ok' ? marque('ok', "Dans l'agenda de " + (p.techs.join(', ') || 'du technicien')) : e === 'partiel' ? marque('att', "Agenda incomplet : pas chez tous les techniciens du passage") : e === 'desync' ? marque('att', "Agenda à mettre à jour : date, heure ou technicien modifiés depuis") : marque('ko', "Pas encore dans l'agenda du technicien");
   }) + '</td>';
   // 2. Kizeo : formulaire envoyé au bon technicien
   h += '<td class="ck-td">' + colonne(function(p){
@@ -4315,6 +4323,7 @@ function ouvrirMenuSuivi(ev, id) {
   var hasPsg = passagesNorm(item).length > 0;
   var it = [];
   it.push('<button onclick="openModal(\'' + id + '\')">Ouvrir la fiche</button>');
+  if (['Annulé', 'À valider'].indexOf(item.statut) === -1) it.push('<button onclick="ouvrirPlanification(\'' + id + '\')">Planifier / compléter la planification</button>');
   if (item.statut === 'À valider') it.push('<button onclick="validerIntervention(\'' + id + '\')">Valider</button><button onclick="rejeterIntervention(\'' + id + '\')">Rejeter</button>');
   if (hasPsg) it.push('<button onclick="openNotifFromRow(\'' + id + '\')">Notifier client / locataire</button><button onclick="openRappelSms(\'' + id + '\')">Rappel SMS</button>');
   passagesNorm(item).forEach(function(p) {
@@ -5031,6 +5040,7 @@ function addPassageT(value = '', calEventId = '') {
   div.dataset.calEventId = JSON.stringify(calMap);
   div.dataset.kizeoPush = JSON.stringify(savedKizeoPush);
   div.dataset.notifs = JSON.stringify((value && typeof value === 'object' && value.notifs) || null);
+  div.dataset.calSync = (value && typeof value === 'object' && value.calSync) || '';
   div.dataset.statutPassage = savedStatut;
   div.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;';
   div.innerHTML = `
@@ -6440,6 +6450,7 @@ window.resetStatusColors = function() {
   </div>
 </div>
 
+<script type="module" src="planification.js"></script>
 <script type="module" src="suivi-badge.js"></script>
 </body>
 </html>
