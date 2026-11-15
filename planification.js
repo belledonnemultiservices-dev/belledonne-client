@@ -101,15 +101,16 @@ const CSS = `
 .pl-passage.jumeau{margin-left:28px;border-style:dashed;background:#FAFBFF;padding:8px 12px;}
 .pl-psg-jum{display:flex;gap:10px;align-items:flex-end;}
 .pl-psg-agenda{display:flex;flex-wrap:wrap;gap:6px;}
-.pl-apercu summary{font-size:12px;color:#4338CA;cursor:pointer;font-weight:600;}
-.pl-apercu pre{white-space:pre-wrap;font:12px 'DM Sans',sans-serif;color:#4A6078;background:#F7F9FB;border-radius:7px;padding:8px 10px;margin:4px 0 8px;}
+.pl-tbloc{border:1px solid rgba(67,56,202,.18);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:10px;background:#fff;}
+.pl-tbloc-tete{display:flex;align-items:center;gap:10px;font-size:13.5px;color:#312E81;}
+.pl-rap-etat,.pl-rap-act{display:flex;gap:6px;align-items:center;white-space:nowrap;}
 .pl-raps{border:1px solid #E0E7FF;background:#F8F9FF;border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
 .pl-raps-tete{display:flex;gap:10px;align-items:baseline;font-size:13px;}
-.pl-rap{display:grid;grid-template-columns:22px minmax(150px,1.2fr) minmax(110px,.8fr) minmax(160px,1.4fr) auto auto;gap:8px;align-items:center;}
+.pl-rap{display:grid;grid-template-columns:22px minmax(150px,1fr) minmax(170px,1.4fr) auto auto;gap:8px;align-items:center;}
 .pl-rap select,.pl-rap input{height:34px;border:1px solid rgba(13,27,42,.15);border-radius:7px;padding:0 8px;font:13px 'DM Sans',sans-serif;min-width:0;width:100%;box-sizing:border-box;background:#fff;}
 .pl-rap-n{font-weight:700;color:#4338CA;font-size:13px;}
 .pl-raps-pied{display:flex;gap:8px;align-items:center;}
-@media (max-width:900px){.pl-rap{grid-template-columns:22px 1fr 1fr;}}
+@media (max-width:900px){.pl-rap{grid-template-columns:22px 1fr;}}
 .pl-psg-pb{font-size:12px;font-weight:600;color:#C0392B;background:#FDECEA;border-radius:7px;padding:6px 10px;}
 @media (max-width:640px){.pl-psg-l1{grid-template-columns:1fr 1fr;}}
 `;
@@ -514,43 +515,54 @@ async function enregistrerDossier(item, silencieux) {
 // ── 2. Passages, agenda & Kizeo ────────────────────────────────────
 // Décidé le 15/11 :
 // - l'étape reprend la fiche classique passage par passage (n° modifiable, début et fin en
-//   date + heure, techniciens, adresse, titre agenda, description) et ses contrôles (fin après
-//   début, année plausible), plus un contrôle : jamais avant un passage de numéro inférieur ;
+//   date + heure, techniciens) et ses contrôles (fin après début, année plausible), plus un
+//   contrôle : jamais avant un passage de numéro inférieur ;
 // - Passages, Agenda et Kizeo ne font qu'une étape. Chaque modification est enregistrée toute
 //   seule et l'agenda Google suit (création, mise à jour, suppression des rendez-vous) ;
-// - un passage peut avoir plusieurs rapports Kizeo (ex. cafards + punaises de lit). Le 1er est
-//   porté par le passage ; chaque rapport de plus est un passage « jumeau » caché (même n°,
-//   `jumeau: true`) qui reprend date, créneau et techniciens du passage, sans rendez-vous à lui.
-//   Le serveur lui donne une référence Kizeo distincte, son rapport arrive à part ;
-// - la description du rendez-vous se termine toujours par le nom des rapports à remplir ;
-// - l'envoi à Kizeo se fait au clic (un formulaire parti ne se retire pas à distance).
+// - tout est organisé par technicien : chacun a son rendez-vous (titre, adresse, description à
+//   lui, `agendaTech[nom]`) et ses rapports Kizeo. La description de son rendez-vous se termine
+//   par le nom de SES rapports ; le nom de son 1er rapport reprend son titre agenda ;
+// - un passage peut avoir plusieurs rapports. Le 1er est porté par le passage ; chaque rapport de
+//   plus est un passage « jumeau » caché (même n°, `jumeau: true`) qui reprend date, créneau et
+//   techniciens, sans rendez-vous à lui. Le serveur lui donne une référence Kizeo distincte ;
+// - chaque rapport s'envoie au clic, ligne par ligne (un formulaire parti ne se retire pas à distance).
 const ANNEE_MIN = new Date().getFullYear() - 1, ANNEE_MAX = new Date().getFullYear() + 3;
 const BORNE_MIN = ANNEE_MIN + "-01-01T00:00", BORNE_MAX = ANNEE_MAX + "-12-31T23:59";
 const sansSuffixe = (s) => String(s || "").replace(/ \(\d+\)$/, ""); // « (2) » ajouté par le serveur à un renvoi
-function rapportDepuis(item, p, num) {
+const agendaVide = () => ({ titre: "", adresse: "", desc: "" });
+// Technicien d'un rapport : celui enregistré, sinon celui qui l'a reçu, sinon le 1er du passage
+function techDuRapport(p, techs) {
+  if (p.kzTech && techs.includes(p.kzTech)) return p.kzTech;
+  const id = p.kzDest || (p.kizeoPush ? p.kizeoPush.recipientUserId : "");
+  const t = id ? techs.find(n => { const x = techParNom(n); return x && String(x.kizeoUserId) === String(id); }) : null;
+  return t || techs[0] || "";
+}
+function rapportDepuis(item, p, num, techs, agenda) {
   const kp = p.kizeoPush || null;
   const lie = window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", num) : null;
-  return { pid: p.passageId || uuid(), ref: p, annule: p.statut === "annule",
+  const tech = techDuRapport(p, techs);
+  const titreTech = ((agenda[tech] || {}).titre || "").trim() || titreDefaut(item);
+  return { pid: p.passageId || uuid(), ref: p, annule: p.statut === "annule", tech,
     formId: String(p.kzForm ?? (kp ? kp.kizeoFormDocId : (lie ? lie.id : "")) ?? ""),
-    dest: String(p.kzDest ?? (kp ? kp.recipientUserId : "") ?? ""),
     // Nom saisi à la main ; pour un rapport parti avant le 15/11 (pas de kzNom), le nom déjà envoyé
     nom: p.kzNomSaisi ? (p.kzNom || "") : (kp && p.kzNom === undefined ? sansSuffixe(kp.libelle) : ""),
-    manuel: !!p.kzNomSaisi || (!!kp && p.kzNom === undefined && sansSuffixe(kp.libelle) !== (p.titre || titreDefaut(item))) };
+    manuel: !!p.kzNomSaisi || (!!kp && p.kzNom === undefined && sansSuffixe(kp.libelle) !== titreTech) };
 }
 function lignesDepuis(item) {
   const bruts = passagesBruts(item);
-  const L = bruts.filter(p => !p.jumeau).map(p => ({
-    ref: p, pid: p.passageId || uuid(), num: p.num, annule: p.statut === "annule",
-    debut: (p.debut || "").substring(0, 16), fin: (p.fin || "").substring(0, 16),
-    techs: (p.techs || []).slice(), adresse: p.adresse || "", titre: p.titre || "", desc: p.desc || "",
-    rapports: [],
-  }));
-  L.forEach(l => { const r = rapportDepuis(item, l.ref, l.num); r.pid = l.pid; l.rapports.push(r); });
+  const L = bruts.filter(p => !p.jumeau).map(p => {
+    const techs = (p.techs || []).slice();
+    // Rendez-vous par technicien ; un passage d'avant reprend son titre, son adresse et sa description pour chacun
+    const agenda = {};
+    techs.forEach(n => { const a = (p.agendaTech || {})[n]; agenda[n] = a ? { titre: a.titre || "", adresse: a.adresse || "", desc: a.desc || "" } : { titre: p.titre || "", adresse: p.adresse || "", desc: p.desc || "" }; });
+    return { ref: p, pid: p.passageId || uuid(), num: p.num, annule: p.statut === "annule",
+      debut: (p.debut || "").substring(0, 16), fin: (p.fin || "").substring(0, 16), techs, agenda, rapports: [] };
+  });
+  L.forEach(l => { const r = rapportDepuis(item, l.ref, l.num, l.techs, l.agenda); r.pid = l.pid; l.rapports.push(r); });
   // Rapports de plus (jumeaux) : rangés sous leur passage
   bruts.filter(p => p.jumeau).forEach(p => {
     const l = L.find(x => x.num === p.num && !x.annule) || L.find(x => x.num === p.num);
-    if (l) l.rapports.push(rapportDepuis(item, p, p.num));
-    else { const n = { ref: null, pid: uuid(), num: p.num, annule: false, debut: (p.debut || "").substring(0, 16), fin: (p.fin || "").substring(0, 16), techs: (p.techs || []).slice(), adresse: p.adresse || "", titre: "", desc: "", rapports: [] }; n.rapports.push(rapportDepuis(item, p, p.num)); n.rapports[0].pid = n.pid; L.push(n); }
+    if (l) l.rapports.push(rapportDepuis(item, p, p.num, l.techs, l.agenda));
   });
   if (!L.length) L.push(nouvelleLigne(item, 1));
   return L;
@@ -558,9 +570,14 @@ function lignesDepuis(item) {
 function nouvelleLigne(item, num, modele) {
   const pid = uuid();
   const lie = window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", num) : null;
-  return { ref: null, pid, num, annule: false, debut: modele ? modele.debut : "", fin: modele ? modele.fin : "", techs: modele ? modele.techs.slice() : [],
-    adresse: (modele && modele.adresse) || "", titre: "", desc: "",
-    rapports: [{ pid, ref: null, annule: false, formId: modele ? modele.rapports[0].formId : (lie ? String(lie.id) : ""), dest: "", nom: "", manuel: false }] };
+  const techs = modele ? modele.techs.slice() : [];
+  const agenda = {}; techs.forEach(n => { agenda[n] = modele && modele.agenda[n] ? { ...modele.agenda[n] } : agendaVide(); });
+  const rapports = modele
+    ? modele.rapports.filter(r => !r.annule).map((r, k) => ({ pid: k === 0 ? pid : uuid(), ref: null, annule: false, tech: r.tech, formId: r.formId, nom: "", manuel: false }))
+    : [{ pid, ref: null, annule: false, tech: techs[0] || "", formId: lie ? String(lie.id) : "", nom: "", manuel: false }];
+  if (!rapports.length) rapports.push({ pid, ref: null, annule: false, tech: techs[0] || "", formId: "", nom: "", manuel: false });
+  rapports[0].pid = pid;
+  return { ref: null, pid, num, annule: false, debut: modele ? modele.debut : "", fin: modele ? modele.fin : "", techs, agenda, rapports };
 }
 // Ajoute des minutes à une valeur datetime-local (AAAA-MM-JJTHH:MM), en heure locale
 function decaler(v, minutes) {
@@ -595,21 +612,19 @@ function problemesLigne(l, L) {
   if (avant.length) { const a = avant.sort((x, y) => y.debut.localeCompare(x.debut))[0]; pb.push(`daté avant le passage ${a.num} (${fmtDT(a.debut)})`); }
   return pb;
 }
-// ── Rapports Kizeo d'un passage ──
+// ── Rapports Kizeo ──
 const formParId = (id) => (window._kizeoForms || []).find(f => String(f.id) === String(id));
-const techsKizeo = (l) => l.techs.map(techParNom).filter(t => t && t.kizeoUserId);
-// Destinataire : celui choisi s'il est encore sur le passage, sinon le 1er technicien du passage ayant un compte Kizeo
-function destDe(l, r) { const tk = techsKizeo(l); return (tk.find(t => String(t.kizeoUserId) === String(r.dest)) || tk[0] || null); }
-// Nom du rapport dans l'application du technicien (décidé le 15/11) : le 1er reprend le titre
-// agenda tant qu'on ne l'a pas modifié à la main ; les suivants se nomment à la main.
-const titreAuto = (item, l) => l.titre.trim() || titreDefaut(item);
-function nomRapport(item, l, r, k) {
-  if (k === 0) return r.manuel && r.nom.trim() ? r.nom.trim() : titreAuto(item, l);
+// Destinataire Kizeo d'un rapport : son technicien, s'il a un compte Kizeo
+function destDe(l, r) { const t = r.tech ? techParNom(r.tech) : null; return t && t.kizeoUserId ? t : null; }
+const titreAuto = (item, l, nom) => (((l.agenda || {})[nom] || {}).titre || "").trim() || titreDefaut(item);
+// Le 1er rapport d'un technicien reprend son titre agenda tant qu'on ne l'a pas modifié ; les suivants se nomment à la main
+const premierDuTech = (l, r) => l.rapports.filter(x => !x.annule && x.tech === r.tech)[0] === r;
+function nomRapport(item, l, r) {
+  if (premierDuTech(l, r)) return r.manuel && r.nom.trim() ? r.nom.trim() : titreAuto(item, l, r.tech);
   return r.nom.trim();
 }
-const rapportsActifs = (l) => l.rapports.filter(r => !r.annule && r.formId);
 // État d'un rapport : envoyé, reçu, modifié depuis l'envoi (à renvoyer), à envoyer
-function etatRapportKz(item, l, r, k) {
+function etatRapportKz(item, l, r) {
   const n = norm(item, { passageId: r.pid, num: l.num });
   const p = (dossier() ? passagesBruts(dossier()) : []).find(x => x.passageId === r.pid);
   const e = n ? window.etatKizeo(item, n) : "manque";
@@ -617,29 +632,29 @@ function etatRapportKz(item, l, r, k) {
   if (e === "manque" || !p || !p.kizeoPush) return "manque";
   const t = destDe(l, r);
   const kp = p.kizeoPush;
-  if (String(kp.kizeoFormDocId) !== String(r.formId) || (t && String(kp.recipientUserId) !== String(t.kizeoUserId)) || sansSuffixe(kp.libelle) !== nomRapport(item, l, r, k)) return "modifie";
-  return e === "ecart" ? "modifie" : "ok";
+  if (String(kp.kizeoFormDocId) !== String(r.formId) || !t || String(kp.recipientUserId) !== String(t.kizeoUserId) || sansSuffixe(kp.libelle) !== nomRapport(item, l, r)) return "modifie";
+  return "ok";
 }
 const LIB_KZ = { ok: ["ok", "✓ envoyé"], recu: ["ok", "✓ rapport reçu"], modifie: ["att", "modifié : à renvoyer"], manque: ["ko", "✕ à envoyer"] };
-// Contenu du rendez-vous d'un passage principal (ce qui, s'il change, impose une mise à jour)
+// ── Agenda ──
 function descriptionAuto(item, adresse) {
   const tels = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
   return [item.bc || item.pl ? "N° BC : " + (item.bc || item.pl) : "", item.nature ? "Nature : " + item.nature : "", item.nomClient ? "Client : " + item.nomClient : "",
     tels.length ? "Téléphone(s) : " + tels.join(" / ") : "", adresse ? "Adresse : " + adresse : ""].filter(Boolean).join("\n");
 }
-// Rendez-vous d'un technicien sur un passage principal (décidé le 15/11) :
-// description saisie (sinon automatique) + observations du dossier, toujours + rapports Kizeo
-// destinés à CE technicien (deux techniciens, deux rapports différents : chacun voit le sien).
+// Rendez-vous d'un technicien sur un passage principal : son titre, son adresse, sa description
+// (sinon automatique) + observations du dossier, toujours + ses rapports Kizeo
 function contenuAgenda(item, p, ps, nom) {
-  const adresse = p.adresse || item.adresse || "";
-  let desc = p.desc || descriptionAuto(item, adresse);
+  const a = (p.agendaTech || {})[nom] || { titre: p.titre, adresse: p.adresse, desc: p.desc };
+  const adresse = (a.adresse || "").trim() || item.adresse || "";
+  let desc = (a.desc || "").trim() || descriptionAuto(item, adresse);
   const obs = String(item.observations || "").trim();
   if (obs && !desc.includes(obs)) desc += (desc ? "\n" : "") + "Observations : " + obs;
   const t = nom ? techParNom(nom) : null;
   const noms = [p].concat(ps.filter(j => j.jumeau && j.statut !== "annule" && j.num === p.num))
-    .filter(x => x.kzForm && x.kzNom && (!nom || (t && t.kizeoUserId && String(x.kzDest) === String(t.kizeoUserId)))).map(x => x.kzNom);
+    .filter(x => x.kzForm && x.kzNom && (x.kzTech ? x.kzTech === nom : (t && t.kizeoUserId && String(x.kzDest) === String(t.kizeoUserId)))).map(x => x.kzNom);
   if (noms.length) desc += "\n\n" + (noms.length > 1 ? "Rapports Kizeo à remplir :" : "Rapport Kizeo à remplir :") + "\n" + noms.map(n => "• " + n).join("\n");
-  return { titre: p.titre || titreDefaut(item), adresse, desc };
+  return { titre: (a.titre || "").trim() || titreDefaut(item), adresse, desc };
 }
 const empreinteAgenda = (item, p, ps, nom) => JSON.stringify([p.debut, p.fin, (p.techs || []).slice().sort(), contenuAgenda(item, p, ps, nom)]);
 // Rendez-vous d'un technicien à jour ? Empreinte par technicien (calEmpreintes) ; un passage
@@ -656,7 +671,7 @@ function etatAgendaTech(item, p, ps, nom) {
   if (!(p.calEvents || {})[nom]) return "manque";
   return agendaAJour(item, p, ps, nom) ? "ok" : "maj";
 }
-const LIB_AGENDA = { ok: ["ok", "✓ agenda"], maj: ["att", "agenda à mettre à jour"], manque: ["ko", "✕ pas dans l'agenda"], sans: ["att", "pas d'agenda"] };
+const LIB_AGENDA = { ok: ["ok", "✓ agenda à jour"], maj: ["att", "agenda à mettre à jour"], manque: ["ko", "✕ pas dans l'agenda"], sans: ["att", "pas d'agenda (page Techniciens)"] };
 
 let minuteriePassages = null, sauvegardeEnCours = null, aRefaire = false;
 function rendrePassages(item) {
@@ -666,33 +681,44 @@ function rendrePassages(item) {
   const forms = window._kizeoForms || [];
   const enBase = passagesBruts(dossier() || item);
   const dt = (f, v) => `<input type="datetime-local" data-f="${f}" value="${esc(v)}" min="${BORNE_MIN}" max="${BORNE_MAX}">`;
-  const blocRapports = (l) => {
-    const tk = techsKizeo(l);
+  // Ligne d'un rapport, dans le bloc de son technicien
+  const ligneRapport = (l, r, i) => {
+    const k = l.rapports.indexOf(r);
     const lie = window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", l.num) : null;
-    const lignes = l.rapports.map((r, k) => {
-      if (r.annule) return "";
-      const etatR = r.formId ? etatRapportKz(item, l, r, k) : null;
-      const t = destDe(l, r);
-      return `<div class="pl-rap" data-r="${k}">
-        <span class="pl-rap-n">${k + 1}.</span>
-        <select data-rf="formId"><option value="">— Aucun rapport Kizeo —</option>${forms.map(f => `<option value="${esc(f.id)}"${String(r.formId) === String(f.id) ? " selected" : ""}>${esc(f.nom || "Formulaire")}${lie && String(lie.id) === String(f.id) ? " (lié)" : ""}</option>`).join("")}</select>
-        ${tk.length ? `<select data-rf="dest">${tk.map(x => `<option value="${esc(x.kizeoUserId)}"${t && String(t.kizeoUserId) === String(x.kizeoUserId) ? " selected" : ""}>${esc(nomTech(x))}</option>`).join("")}</select>` : `<span class="pl-manque" style="font-size:12px;">aucun technicien du passage n'a de compte Kizeo</span>`}
-        <input data-rf="nom" value="${esc(k === 0 ? nomRapport(item, l, r, 0) : r.nom)}" placeholder="${k === 0 ? "" : "Nom du rapport (à saisir)"}" title="${k === 0 ? "Reprend le titre agenda tant que tu ne le modifies pas" : "Nom du rapport dans l'application du technicien"}"${r.formId && !nomRapport(item, l, r, k) ? ' style="border-color:#E74C3C;"' : ""}>
-        ${etatR ? etatHtml(...LIB_KZ[etatR]) : ""}
-        ${etatR === "modifie" ? `<button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler la modification</button>` : ""}
-        ${k > 0 ? `<button class="pl-btn petit" data-a="retirerRap" title="Retirer ce rapport">✕</button>` : ""}
-      </div>`;
-    }).join("");
-    const aEnvoyer = rapportsActifs(l).filter(r => { const k = l.rapports.indexOf(r); const e = etatRapportKz(item, l, r, k); return e === "manque" || e === "modifie"; }).length;
-    return `<div class="pl-raps"><div class="pl-raps-tete"><b>Rapports Kizeo</b><span class="pl-note">un formulaire par rapport, envoyé sur le téléphone du technicien</span></div>${lignes}
-      <div class="pl-raps-pied"><button class="pl-btn petit" data-a="ajoutRap">+ Ajouter un rapport</button><span class="pl-espace" style="flex:1"></span>
-        <button class="pl-btn indigo petit" data-a="envoyerKz"${aEnvoyer ? "" : " disabled"}>${aEnvoyer ? "Envoyer sur Kizeo (" + aEnvoyer + ")" : "Rapports à jour sur Kizeo"}</button></div></div>`;
+    const etatR = r.formId ? etatRapportKz(item, l, r) : null;
+    const premier = premierDuTech(l, r);
+    const nom = nomRapport(item, l, r);
+    const action = !r.formId || !destDe(l, r) ? "" : etatR === "manque" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Envoyer</button>` : etatR === "modifie" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Renvoyer</button><button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler</button>` : "";
+    return `<div class="pl-rap" data-r="${k}">
+      <span class="pl-rap-n">${i + 1}.</span>
+      <select data-rf="formId"><option value="">— Aucun rapport Kizeo —</option>${forms.map(f => `<option value="${esc(f.id)}"${String(r.formId) === String(f.id) ? " selected" : ""}>${esc(f.nom || "Formulaire")}${lie && String(lie.id) === String(f.id) ? " (lié)" : ""}</option>`).join("")}</select>
+      <input data-rf="nom" value="${esc(premier ? nom : r.nom)}" placeholder="${premier ? "" : "Nom du rapport (à saisir)"}" title="${premier ? "Reprend le titre agenda tant que tu ne le modifies pas" : "Nom du rapport dans l'application du technicien"}"${r.formId && !nom ? ' style="border-color:#E74C3C;"' : ""}>
+      <span class="pl-rap-etat">${etatR ? etatHtml(...LIB_KZ[etatR]) : ""}</span>
+      <span class="pl-rap-act">${action}${r.formId || k > 0 ? `<button class="pl-btn petit" data-a="retirerRap" title="Supprimer ce rapport">✕</button>` : ""}</span>
+    </div>`;
+  };
+  // Bloc d'un technicien : son rendez-vous et ses rapports
+  const blocTech = (l, nom, p) => {
+    const a = l.agenda[nom] || (l.agenda[nom] = agendaVide());
+    const t = techParNom(nom);
+    const etatA = p && p.statut !== "annule" && (p.techs || []).includes(nom) ? etatAgendaTech(item, p, enBase, nom) : null;
+    const raps = l.rapports.filter(r => !r.annule && r.tech === nom);
+    return `<div class="pl-tbloc" data-tech="${esc(nom)}">
+      <div class="pl-tbloc-tete"><b>${esc(nom)}</b>${etatA ? etatHtml(...LIB_AGENDA[etatA]) : ""}</div>
+      <div class="pl-grille">
+        <div class="pl-champ"><label>Titre agenda</label><input data-af="titre" value="${esc(a.titre)}" placeholder="${esc(titreDefaut(item))}"></div>
+        <div class="pl-champ"><label>Adresse</label><input data-af="adresse" value="${esc(a.adresse)}" placeholder="${esc(item.adresse || "Adresse...")}"></div>
+        <div class="pl-champ large"><label>Description <span style="text-transform:none;font-weight:400;">· les observations du dossier et le nom de ses rapports Kizeo sont ajoutés dans l'agenda</span></label><textarea data-af="desc" placeholder="Laisse vide pour la description automatique (BC, nature, contact, téléphones, adresse)">${esc(a.desc)}</textarea></div>
+      </div>
+      <div class="pl-raps"><div class="pl-raps-tete"><b>Rapports Kizeo</b>${t && t.kizeoUserId ? "" : '<span class="pl-manque" style="font-size:12px;">pas de compte Kizeo (page Techniciens) : envoi impossible</span>'}</div>
+        ${raps.map((r, i) => ligneRapport(l, r, i)).join("")}
+        <div class="pl-raps-pied"><button class="pl-btn petit" data-a="ajoutRap">+ Ajouter un rapport</button></div></div>
+    </div>`;
   };
   const carte = (l, k) => {
     const pb = problemesLigne(l, L);
     if (l.annule) return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}</span></div></div>`;
     const p = enBase.find(x => x.passageId === l.pid);
-    const agenda = p && p.statut !== "annule" && (p.techs || []).length ? (p.techs || []).map(nom => { const [c, t] = LIB_AGENDA[etatAgendaTech(item, p, enBase, nom)]; return etatHtml(c, esc(nom.split(" ")[0]) + " · " + t); }).join(" ") : "";
     return `<div class="pl-passage" data-k="${k}">
       <div class="pl-psg-l1">
         <div class="pl-psg-num"><label>Passage</label><div style="display:flex;align-items:center;gap:4px;"><input type="number" min="1" data-f="num" value="${esc(l.num)}"><span class="pl-cercle">${cercle(l.num)}</span></div></div>
@@ -702,37 +728,22 @@ function rendrePassages(item) {
       </div>
       <div class="pl-champ"><label>Technicien(s)</label><div class="pl-techs">${techs.map(t => `<span class="pl-tech${l.techs.includes(nomTech(t)) ? " on" : ""}" data-t="${esc(nomTech(t))}">${esc(nomTech(t))}</span>`).join("")}</div>
         ${l.techs.map(t => { const c = chargeTech(t, (l.debut || "").substring(0, 10), item.id); return c ? `<div class="pl-charge">${esc(t.split(" ")[0])} a déjà ${c} passage${c > 1 ? "s" : ""} ce jour-là</div>` : ""; }).join("")}</div>
-      <div class="pl-grille">
-        <div class="pl-champ"><label>Titre agenda</label><input data-f="titre" value="${esc(l.titre)}" placeholder="${esc(titreDefaut(item))}"></div>
-        <div class="pl-champ"><label>Adresse</label><input data-f="adresse" value="${esc(l.adresse)}" placeholder="${esc(item.adresse || "Adresse...")}"></div>
-        <div class="pl-champ large"><label>Description <span style="text-transform:none;font-weight:400;">· le nom des rapports Kizeo est ajouté à la fin dans l'agenda</span></label><textarea data-f="desc" placeholder="Laisse vide pour la description automatique (BC, nature, contact, téléphones, adresse, observations)">${esc(l.desc)}</textarea></div>
-      </div>
-      ${blocRapports(l)}
-      ${agenda ? `<div class="pl-psg-agenda">${agenda}</div>` : ""}
-      ${p && p.statut !== "annule" && (p.techs || []).length ? `<details class="pl-apercu"><summary>Voir la description envoyée dans l'agenda</summary>${(p.techs || []).map(nom => `<div><b>${esc(nom)}</b><pre>${esc(contenuAgenda(item, p, enBase, nom).desc)}</pre></div>`).join("")}</details>` : ""}
+      ${l.techs.map(nom => blocTech(l, nom, p)).join("")}
       ${pb.length ? `<div class="pl-psg-pb">⚠ ${pb.map(esc).join(" · ")}</div>` : ""}
     </div>`;
   };
   $(".pl-corps").innerHTML = `
-    <p class="pl-intro">Chaque modification est enregistrée toute seule et l'agenda de chaque technicien suit : rendez-vous créé, déplacé ou retiré. Les rapports Kizeo partent au clic sur « Envoyer sur Kizeo ».</p>
+    <p class="pl-intro">Chaque modification est enregistrée toute seule et l'agenda de chaque technicien suit : rendez-vous créé, déplacé ou retiré. Chaque rapport Kizeo s'envoie avec son bouton.</p>
     ${L.map(carte).join("")}
     <div class="pl-actions"><button class="pl-btn" data-a="ajout">+ Ajouter un passage</button>
       <button class="pl-btn" data-a="dupli">Dupliquer le dernier à +</button><input id="plEcart" type="number" min="1" value="15" style="width:60px;height:34px;border:1px solid rgba(13,27,42,.15);border-radius:7px;padding:0 8px;"> jours</div>`;
   const ligneDe = (el) => L[Number(el.closest(".pl-passage").dataset.k)];
+  const techDe = (el) => el.closest(".pl-tbloc").dataset.tech;
   const rapportDe = (el) => ligneDe(el).rapports[Number(el.closest(".pl-rap").dataset.r)];
   const change = (redessiner) => { if (redessiner) rendrePassages(item); planifierAutoPassages(); };
+  // Passage : n° et dates (redessin pour les contrôles)
   document.querySelectorAll(".pl-corps [data-f]").forEach(inp => {
     const f = inp.dataset.f;
-    // Texte : pas de redessin pendant la frappe ; n° et dates : redessin pour les contrôles
-    if (["titre", "adresse", "desc"].includes(f)) {
-      inp.oninput = () => {
-        const l = ligneDe(inp); l[f] = inp.value;
-        // Le nom du 1er rapport suit le titre agenda en direct (s'il n'a pas été modifié à la main)
-        if (f === "titre" && !l.rapports[0].manuel) { const c = inp.closest(".pl-passage").querySelector('.pl-rap[data-r="0"] [data-rf="nom"]'); if (c) c.value = titreAuto(item, l); }
-        change(false);
-      };
-      inp.onchange = () => rendrePassages(item); return;
-    }
     inp.onchange = () => {
       const l = ligneDe(inp);
       if (f === "num") l.num = parseInt(inp.value, 10) || 0;
@@ -745,74 +756,121 @@ function rendrePassages(item) {
       change(true);
     };
   });
+  // Rendez-vous d'un technicien : titre, adresse, description (pas de redessin pendant la frappe)
+  document.querySelectorAll(".pl-corps [data-af]").forEach(inp => {
+    const f = inp.dataset.af;
+    inp.oninput = () => {
+      const l = ligneDe(inp), nom = techDe(inp);
+      (l.agenda[nom] = l.agenda[nom] || agendaVide())[f] = inp.value;
+      // Le nom de son 1er rapport suit son titre agenda en direct (s'il n'a pas été modifié à la main)
+      if (f === "titre") {
+        const r = l.rapports.find(x => !x.annule && x.tech === nom);
+        if (r && !r.manuel) { const c = inp.closest(".pl-tbloc").querySelector('.pl-rap[data-r="' + l.rapports.indexOf(r) + '"] [data-rf="nom"]'); if (c) c.value = titreAuto(item, l, nom); }
+      }
+      change(false);
+    };
+    inp.onchange = () => rendrePassages(item);
+  });
   document.querySelectorAll(".pl-corps [data-rf]").forEach(inp => {
     const f = inp.dataset.rf;
     if (f === "nom") {
       inp.oninput = () => {
         const l = ligneDe(inp), r = rapportDe(inp);
         r.nom = inp.value;
-        // 1er rapport : redevient automatique (titre agenda) si on efface ou si on retape le titre
-        if (l.rapports.indexOf(r) === 0) r.manuel = !!inp.value.trim() && inp.value.trim() !== titreAuto(item, l);
+        // 1er rapport du technicien : redevient automatique (titre agenda) si on l'efface ou retape le titre
+        if (premierDuTech(l, r)) r.manuel = !!inp.value.trim() && inp.value.trim() !== titreAuto(item, l, r.tech);
         change(false);
       };
       inp.onchange = () => rendrePassages(item); return;
     }
     inp.onchange = () => { rapportDe(inp)[f] = inp.value; change(true); };
   });
-  document.querySelectorAll(".pl-corps .pl-tech").forEach(ch => ch.onclick = () => {
-    const l = ligneDe(ch); const t = ch.dataset.t;
-    l.techs = l.techs.includes(t) ? l.techs.filter(x => x !== t) : l.techs.concat(t);
-    change(true);
-  });
   // Liste « nom (chez technicien) » des rapports déjà partis sur Kizeo
   const partis = (rs) => rs.map(r => enBase.find(p => p.passageId === r.pid)).filter(p => p && p.kizeoPush)
     .map(p => "• « " + (p.kizeoPush.libelle || "") + " »" + (p.kizeoPush.technicien ? " (chez " + p.kizeoPush.technicien + ")" : ""));
+  document.querySelectorAll(".pl-corps .pl-tech").forEach(ch => ch.onclick = () => {
+    const l = ligneDe(ch); const t = ch.dataset.t;
+    if (!l.techs.includes(t)) {
+      l.techs.push(t); l.agenda[t] = l.agenda[t] || agendaVide();
+      // Le rapport du passage sans technicien valable revient au nouveau
+      if (!l.techs.includes(l.rapports[0].tech) || !l.rapports[0].tech) l.rapports[0].tech = t;
+      change(true); return;
+    }
+    // Décocher : son rendez-vous est retiré, ses rapports aussi (ceux déjà partis restent à supprimer dans Kizeo)
+    const siens = l.rapports.filter(r => !r.annule && r.tech === t);
+    const p = enBase.find(x => x.passageId === l.pid);
+    const kz = partis(siens);
+    const rdv = p && (p.calEvents || {})[t];
+    if ((kz.length || rdv) && !confirm("Retirer " + t + " du passage " + l.num + " ?" + (rdv ? "\n\nSon rendez-vous sera retiré de l'agenda." : "")
+      + (kz.length ? "\n\nRapport(s) Kizeo déjà envoyé(s), à supprimer à la main dans Kizeo :\n" + kz.join("\n") : ""))) return;
+    l.techs = l.techs.filter(x => x !== t);
+    delete l.agenda[t];
+    // Le rapport porté par le passage ne se supprime pas : il passe au 1er technicien restant, sans formulaire s'il était parti
+    l.rapports = l.rapports.filter((r, k) => k === 0 || r.tech !== t);
+    if (l.rapports[0].tech === t) { l.rapports[0].tech = l.techs[0] || ""; l.rapports[0].nom = ""; l.rapports[0].manuel = false; }
+    change(true);
+  });
   document.querySelectorAll(".pl-corps [data-a=suppr]").forEach(b => b.onclick = () => {
     const l = ligneDe(b);
     const p = enBase.find(x => x.passageId === l.pid);
     const rdv = p && Object.values(p.calEvents || {}).some(Boolean);
     const kz = partis(l.rapports);
-    if (p && !confirm("Supprimer le passage " + l.num + " ?" + (rdv ? "\n\nLe rendez-vous sera retiré de l'agenda." : "")
+    if (p && !confirm("Supprimer le passage " + l.num + " ?" + (rdv ? "\n\nLes rendez-vous seront retirés de l'agenda." : "")
       + (kz.length ? "\n\nRapport(s) Kizeo déjà envoyé(s), à supprimer à la main dans Kizeo :\n" + kz.join("\n") : ""))) return;
     L.splice(L.indexOf(l), 1);
     change(true);
   });
   document.querySelectorAll(".pl-corps [data-a=ajoutRap]").forEach(b => b.onclick = () => {
-    ligneDe(b).rapports.push({ pid: uuid(), ref: null, annule: false, formId: "", dest: "", nom: "" });
+    const l = ligneDe(b), nom = techDe(b);
+    // Le rapport porté par le passage, s'il est encore vide et sans technicien valable, sert en premier
+    const r0 = l.rapports[0];
+    if (!r0.formId && (!r0.tech || !l.techs.includes(r0.tech) || r0.tech === nom) && !(r0.ref && r0.ref.kizeoPush)) { r0.tech = nom; change(true); return; }
+    l.rapports.push({ pid: uuid(), ref: null, annule: false, tech: nom, formId: "", nom: "", manuel: false });
     change(true);
   });
+  // Suppression d'un rapport (15/11) : la ligne part, l'agenda est mis à jour (son nom disparaît
+  // de la description), la ligne « en attente technicien » de Gestion rapports est retirée.
+  // Le formulaire déjà sur le téléphone se supprime à la main dans Kizeo.
   document.querySelectorAll(".pl-corps [data-a=retirerRap]").forEach(b => b.onclick = () => {
     const l = ligneDe(b), r = rapportDe(b);
+    if (etatRapportKz(item, l, r) === "recu") { showToast("Ce rapport est déjà revenu du technicien : il se gère dans Gestion rapports.", true); return; }
     const kz = partis([r]);
-    if (kz.length && !confirm("Retirer ce rapport ?\n\nIl est déjà parti sur Kizeo, à supprimer à la main dans Kizeo :\n" + kz.join("\n"))) return;
-    l.rapports.splice(l.rapports.indexOf(r), 1);
+    const nom = nomRapport(item, l, r) || "sans nom";
+    if (!confirm("Supprimer le rapport « " + nom + " » ?" + (kz.length ? "\n\nIl est déjà parti sur Kizeo : supprime-le aussi à la main dans l'application Kizeo :\n" + kz.join("\n") : ""))) return;
+    if (l.rapports.indexOf(r) === 0) {
+      // Le rapport porté par le passage : le passage reste, sans rapport Kizeo
+      r.formId = ""; r.nom = ""; r.manuel = false; r.effacerEnvoi = true;
+    } else l.rapports.splice(l.rapports.indexOf(r), 1);
     change(true);
   });
-  // Modification abandonnée (15/11) : le rapport reprend ce qui est parti sur Kizeo
+  // Modification abandonnée : le rapport reprend ce qui est parti sur Kizeo
   document.querySelectorAll(".pl-corps [data-a=annulerModif]").forEach(b => b.onclick = () => {
-    const l = ligneDe(b), r = rapportDe(b), k = l.rapports.indexOf(r);
+    const l = ligneDe(b), r = rapportDe(b);
     const kp = (enBase.find(p => p.passageId === r.pid) || {}).kizeoPush;
     if (!kp) return;
     r.formId = String(kp.kizeoFormDocId || "");
-    r.dest = String(kp.recipientUserId || "");
+    const recu = l.techs.find(n => { const x = techParNom(n); return x && String(x.kizeoUserId) === String(kp.recipientUserId); });
+    if (recu) r.tech = recu;
     const nomEnvoye = sansSuffixe(kp.libelle);
-    if (k === 0) { r.manuel = nomEnvoye !== titreAuto(item, l); r.nom = r.manuel ? nomEnvoye : ""; }
+    if (premierDuTech(l, r)) { r.manuel = nomEnvoye !== titreAuto(item, l, r.tech); r.nom = r.manuel ? nomEnvoye : ""; }
     else r.nom = nomEnvoye;
     change(true);
-    // Toujours « à renvoyer » : le technicien qui l'a reçu n'est plus sur le passage
-    if (etatRapportKz(item, l, r, k) === "modifie") showToast("Rapport remis comme envoyé, mais " + (kp.technicien || "son destinataire") + " n'est plus sur ce passage : remets-le dans les techniciens ou renvoie le rapport.", true);
+    if (!recu) showToast("Rapport remis comme envoyé, mais " + (kp.technicien || "son destinataire") + " n'est plus sur ce passage : remets-le dans les techniciens ou renvoie le rapport.", true);
   });
-  document.querySelectorAll(".pl-corps [data-a=envoyerKz]").forEach(b => b.onclick = () => envoyerRapports(item, ligneDe(b), b));
+  document.querySelectorAll(".pl-corps [data-a=envoyerRap]").forEach(b => b.onclick = () => envoyerRapport(item, ligneDe(b), rapportDe(b), b));
   const prochainNum = () => Math.max(0, ...L.map(l => l.num || 0)) + 1;
-  $("[data-a=ajout]").onclick = () => { const der = L.filter(l => !l.annule).slice(-1)[0]; const n = nouvelleLigne(item, prochainNum()); if (der) n.techs = der.techs.slice(); L.push(n); rendrePassages(item); };
+  $("[data-a=ajout]").onclick = () => {
+    const der = L.filter(l => !l.annule).slice(-1)[0];
+    const n = nouvelleLigne(item, prochainNum());
+    if (der) { n.techs = der.techs.slice(); n.techs.forEach(t => { n.agenda[t] = agendaVide(); }); n.rapports[0].tech = n.techs[0] || ""; }
+    L.push(n); rendrePassages(item);
+  };
   $("[data-a=dupli]").onclick = () => {
     const der = L.filter(l => !l.annule && l.debut).slice(-1)[0];
     if (!der) { showToast("Saisis d'abord la date d'un passage.", true); return; }
     const jours = (Number($("#plEcart").value) || 15) * 1440;
     const n = nouvelleLigne(item, prochainNum(), der);
     n.debut = decaler(der.debut, jours); n.fin = der.fin ? decaler(der.fin, jours) : "";
-    // Les rapports du passage modèle sont repris (formulaires, destinataire), à envoyer
-    n.rapports = der.rapports.filter(r => !r.annule).map((r, k) => ({ pid: k === 0 ? n.pid : uuid(), ref: null, annule: false, formId: r.formId, dest: r.dest, nom: "" }));
     L.push(n);
     change(true);
   };
@@ -857,22 +915,31 @@ async function enregistrerPassages(item, silencieux) {
     const frais = passagesBruts(dossier() || item);
     const parPid = Object.fromEntries(frais.filter(p => p.passageId).map(p => [p.passageId, p]));
     const passages = [];
+    const effaces = []; // rapports supprimés dont le formulaire était parti
     L.forEach(l => {
+      // Rendez-vous de chaque technicien ; le 1er technicien alimente aussi titre/adresse/description
+      // du passage, lus par le reste de l'app (vue Semaine, ancienne fiche)
+      const agendaTech = {};
+      l.techs.forEach(n => { const a = l.agenda[n] || agendaVide(); agendaTech[n] = { titre: a.titre.trim(), adresse: a.adresse.trim(), desc: a.desc.trim() }; });
+      const a0 = agendaTech[l.techs[0]] || agendaVide();
       l.rapports.forEach((r, k) => {
         // Base : la version en base (envoi Kizeo, rendez-vous, notifications faits entre-temps)
         const base = parPid[r.pid] ? { ...parPid[r.pid] } : { passageId: r.pid, statut: "", kizeoPush: null, calEvents: {}, notifs: null, manualRapport: null };
         const jumeau = k > 0;
         if (!l.annule && !r.annule) {
           base.debut = l.debut; base.fin = l.fin || l.debut; base.techs = l.techs.slice();
-          base.adresse = l.adresse.trim() || item.adresse || "";
-          base.titre = jumeau ? "" : l.titre.trim();
-          base.desc = jumeau ? "" : l.desc.trim();
-          // Rapport Kizeo préparé (formulaire, destinataire, nom) : sert à l'envoi et à la description de l'agenda
+          base.adresse = a0.adresse || item.adresse || "";
+          base.titre = jumeau ? "" : a0.titre;
+          base.desc = jumeau ? "" : a0.desc;
+          base.agendaTech = jumeau ? {} : agendaTech;
+          // Rapport Kizeo préparé (formulaire, technicien, nom) : sert à l'envoi et à la description de l'agenda
           const t = destDe(l, r);
           base.kzForm = r.formId || "";
+          base.kzTech = r.tech || "";
           base.kzDest = t ? String(t.kizeoUserId) : "";
-          base.kzNom = r.formId ? nomRapport(item, l, r, k) : "";
-          base.kzNomSaisi = k === 0 ? !!(r.manuel && r.nom.trim()) : true;
+          base.kzNom = r.formId ? nomRapport(item, l, r) : "";
+          base.kzNomSaisi = premierDuTech(l, r) ? !!(r.manuel && r.nom.trim()) : true;
+          if (r.effacerEnvoi) { if (base.kizeoPush) effaces.push(r.pid); base.kizeoPush = null; }
           base.libelle = jumeau ? base.kzNom : "";
           if (jumeau) { base.calEvents = {}; base.calSync = ""; base.calEmpreinte = ""; base.calEmpreintes = {}; }
         }
@@ -891,7 +958,11 @@ async function enregistrerPassages(item, silencieux) {
       await window._updateSuivi(item.id, { passages, calEventIds: passages.map(p => p.calEvents || {}), assignes, assigne: assignes[0] || "", updatedAt: new Date().toISOString() });
       // Comme la fiche : l'échéance d'un rapport Kizeo en attente suit le passage déplacé
       if (window._syncEcheancesReception) await window._syncEcheancesReception(item.id, passages);
+      // Rapports supprimés (ligne, passage ou technicien retiré) : plus de ligne « en attente technicien »
+      const partisRetires = frais.filter(p => p.passageId && p.kizeoPush && !gardes.has(p.passageId)).map(p => p.passageId).concat(effaces);
+      if (partisRetires.length && window._supprimerAttentesRapport) await window._supprimerAttentesRapport(item.id, partisRetires);
     } finally { if (etat) etat.occupe = false; }
+    L.forEach(l => l.rapports.forEach(r => { delete r.effacerEnvoi; }));
     L.forEach(l => { l.ref = passages.find(p => p.passageId === l.pid) || l.ref; l.rapports.forEach(r => { r.ref = passages.find(p => p.passageId === r.pid) || r.ref; }); });
     if (erreurs.length) { indiquerAuto("⚠ Agenda : " + erreurs[0], true); if (!silencieux) alert("Passages enregistrés, mais l'agenda n'a pas pu être mis à jour pour :\n\n" + erreurs.join("\n")); }
     else indiquerAuto("Enregistré ✓ · agenda à jour");
@@ -912,37 +983,31 @@ function rechargerAgenda() {
   const dr = $("#plDroite"); const fr = dr && dr.classList.contains("ouvert") && dr.dataset.src === "agenda" ? $("iframe", dr) : null;
   if (fr) { const s = fr.src; fr.src = "about:blank"; setTimeout(() => { fr.src = s; }, 50); }
 }
-// Envoi au clic des rapports d'un passage (à envoyer, ou modifiés depuis l'envoi)
-async function envoyerRapports(item, l, bouton) {
+// Envoi au clic d'UN rapport (à envoyer, ou modifié depuis l'envoi)
+async function envoyerRapport(item, l, r, bouton) {
   clearTimeout(minuteriePassages); minuteriePassages = null;
-  if ((await enregistrerPassages(dossier() || item, false)) === false) return; // les rapports doivent exister en base
+  if ((await enregistrerPassages(dossier() || item, false)) === false) return; // le rapport doit exister en base
   const it = dossier() || item;
-  const aEnvoyer = rapportsActifs(l).map(r => ({ r, k: l.rapports.indexOf(r) })).map(x => ({ ...x, e: etatRapportKz(it, l, x.r, x.k) })).filter(x => x.e === "manque" || x.e === "modifie");
-  if (!aEnvoyer.length) { showToast("Les rapports de ce passage sont déjà à jour sur Kizeo."); return; }
-  const sansNom = aEnvoyer.find(x => !nomRapport(it, l, x.r, x.k));
-  if (sansNom) { showToast("Donne un nom au rapport " + (sansNom.k + 1) + " du passage " + l.num + " avant de l'envoyer.", true); return; }
-  const sansDest = aEnvoyer.find(x => !destDe(l, x.r));
-  if (sansDest) { showToast("Aucun technicien du passage " + l.num + " n'a de compte Kizeo (page Techniciens).", true); return; }
-  const bruts = passagesBruts(it);
-  const anciens = aEnvoyer.filter(x => x.e === "modifie").map(x => bruts.find(p => p.passageId === x.r.pid)).filter(p => p && p.kizeoPush)
-    .map(p => "• « " + p.kizeoPush.libelle + " »" + (p.kizeoPush.technicien ? " (chez " + p.kizeoPush.technicien + ")" : ""));
-  if (!confirm("Envoyer " + aEnvoyer.length + " rapport(s) sur Kizeo pour le passage " + l.num + " ?\n\n" + aEnvoyer.map(x => "• « " + nomRapport(it, l, x.r, x.k) + " » → " + nomTech(destDe(l, x.r))).join("\n")
-    + (anciens.length ? "\n\nAnciens formulaires restés sur le téléphone, à supprimer à la main dans Kizeo :\n" + anciens.join("\n") : ""))) return;
-  if (bouton) { bouton.disabled = true; bouton.textContent = "Envoi à Kizeo…"; }
+  const e = etatRapportKz(it, l, r);
+  if (e !== "manque" && e !== "modifie") { showToast("Ce rapport est déjà à jour sur Kizeo."); return; }
+  const nom = nomRapport(it, l, r);
+  if (!nom) { showToast("Donne un nom à ce rapport avant de l'envoyer.", true); return; }
+  const t = destDe(l, r);
+  if (!t) { showToast((r.tech || "Ce technicien") + " n'a pas de compte Kizeo (page Techniciens).", true); return; }
+  const ancien = e === "modifie" ? (passagesBruts(it).find(p => p.passageId === r.pid) || {}).kizeoPush : null;
+  if (!confirm((ancien ? "Renvoyer" : "Envoyer") + " le rapport « " + nom + " » à " + nomTech(t) + " sur Kizeo ?"
+    + (ancien ? "\n\nL'ancien formulaire reste sur le téléphone, à supprimer à la main dans Kizeo :\n• « " + ancien.libelle + " »" + (ancien.technicien ? " (chez " + ancien.technicien + ")" : "") : ""))) return;
+  if (bouton) { bouton.disabled = true; bouton.textContent = "Envoi…"; }
   etat.occupe = true;
-  let ok = 0; const erreurs = [];
-  for (const x of aEnvoyer) {
-    const body = { suiviId: it.id, numPassage: l.num, passageId: x.r.pid, kizeoFormDocId: x.r.formId, recipientUserId: String(destDe(l, x.r).kizeoUserId), libelle: nomRapport(it, l, x.r, x.k) };
-    try {
-      const r = await fetch(URL_KIZEO, { method: "POST", headers: await window._authHeaders(), body: JSON.stringify(body) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
-      ok++;
-    } catch (e) { erreurs.push("« " + body.libelle + " » : " + e.message); }
-  }
-  if (etat) etat.occupe = false;
-  showToast(ok ? `✅ ${ok} rapport(s) envoyé(s) sur Kizeo` : "Aucun rapport envoyé", !ok);
-  if (erreurs.length) alert("Certains rapports n'ont pas pu partir :\n\n" + erreurs.join("\n"));
+  try {
+    const body = { suiviId: it.id, numPassage: l.num, passageId: r.pid, kizeoFormDocId: r.formId, recipientUserId: String(t.kizeoUserId), libelle: nom };
+    const res = await fetch(URL_KIZEO, { method: "POST", headers: await window._authHeaders(), body: JSON.stringify(body) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || "HTTP " + res.status);
+    showToast("✅ Rapport « " + nom + " » envoyé à " + nomTech(t));
+  } catch (err) {
+    showToast("Le rapport n'a pas pu partir : " + err.message, true);
+  } finally { if (etat) etat.occupe = false; }
   await pause(800);
   if (etat && etat.etape === 1) rendrePassages(dossier() || item);
 }
@@ -955,8 +1020,8 @@ async function requeteAgenda(payload) {
 // Titre par défaut d'un rendez-vous ; ajoute un libellé s'il y en a un
 const titreDefaut = (item, p) => [item.nature || "Intervention", item.client, item.bc ? "BC " + item.bc : item.pl ? "PL " + item.pl : "", p && p.libelle ? p.libelle : ""].filter(Boolean).join(" — ");
 const nomPassage = (p) => (p.jumeau ? "↳ " : "") + cercle(p.num) + (p.libelle ? ' <span style="color:#0D1B2A;font-weight:600;">' + esc(p.libelle) + '</span>' : "");
-// Met les passages (modifiés en place : calEvents, calSync, calEmpreinte) en accord avec l'agenda.
-// Ne contacte Google que pour ce qui a changé. Retourne la liste des erreurs.
+// Met les passages (modifiés en place : calEvents, calSync, calEmpreintes) en accord avec l'agenda.
+// Un rendez-vous par technicien, avec son contenu. Ne contacte Google que pour ce qui a changé.
 async function synchroniserAgenda(item, passages, aRetirer) {
   const erreurs = [];
   const supprimer = async (nom, ev) => { const t = techParNom(nom); if (t && t.email && ev) { try { await requeteAgenda({ technicienEmail: t.email, operation: "delete", calEventId: ev }); } catch (e) { /* déjà absent */ } } };
