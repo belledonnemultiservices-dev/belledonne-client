@@ -349,6 +349,11 @@
   .ck-th,.ck-td{text-align:center!important;}
   .ck-td .ck-l{justify-content:center;}
   .ck-multi{gap:3px;}
+  .ck-fichier{position:relative;display:inline-flex;width:20px;height:22px;color:#E74C3C;text-decoration:none;}
+  .ck-fichier svg{width:20px;height:22px;}
+  .ck-fichier span{position:absolute;left:0;right:0;bottom:3px;text-align:center;font:800 6.5px 'DM Sans',sans-serif;color:#fff;letter-spacing:.2px;}
+  .ck-fichier.excel{color:#1E8449;}
+  .ck-fichier:hover{transform:scale(1.15);}
   .ps-auj{background:#FFF4D6;border-radius:5px;padding:0 5px;margin-left:-5px;}
   .ck{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
   .ck-ok{background:#E8F9F2;color:#1DA870;}
@@ -4390,6 +4395,14 @@ function notifPassage(item, p, champ) {
 }
 function notifOk(r) { return !!r && !r.change; }
 var MARQUES = { ok: '<span class="ck ck-ok">✓</span>', ko: '<span class="ck ck-ko">✕</span>', att: '<span class="ck ck-att">!</span>', na: '<span class="ck ck-na">–</span>' };
+// Icône PDF (ou Excel) d'un rapport reçu, lien direct vers le fichier
+function iconeRapport(rec, nom) {
+  var excel = rec.type === 'excel';
+  var titre = (nom + ' : reçu, ouvrir le ' + (excel ? 'fichier Excel' : 'PDF')).replace(/"/g, '&quot;');
+  return '<a class="ck-fichier' + (excel ? ' excel' : '') + '" href="' + String(rec.fileUrl).replace(/"/g, '&quot;') + '" target="_blank" rel="noopener" title="' + titre + '" onclick="event.stopPropagation()">'
+    + '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="currentColor"/><path d="M14 2v6h6" fill="rgba(255,255,255,.55)"/></svg>'
+    + '<span>' + (excel ? 'XLS' : 'PDF') + '</span></a>';
+}
 function marque(etat, titre) { return '<div class="ck-l" title="' + String(titre || '').replace(/"/g, '&quot;') + '">' + MARQUES[etat] + '</div>'; }
 var JOURS_COURTS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 function libPassageSemaine(p) {
@@ -4509,6 +4522,9 @@ function badgesRapports(item, p, quoi) {
     }
     if (quoi === 'recu') {
       var e = etapeRapportRecu(item, r);
+      // Rapport reçu (16/11) : icône du fichier, un clic l'ouvre dans un nouvel onglet
+      var recF = e === 'ok' ? recPassage(item, r) : null;
+      if (recF && recF.fileUrl) return iconeRapport(recF, nom);
       return e === 'ok' ? MARQUES.ok.replace('<span ', '<span title="' + (nom + ' : reçu').replace(/"/g, '&quot;') + '" ')
         : e === 'retard' || e === 'manque' ? MARQUES.ko.replace('<span ', '<span title="' + (nom + (e === 'retard' ? ' : en retard' : ' : passage fait, rien reçu')).replace(/"/g, '&quot;') + '" ')
         : MARQUES.na.replace('<span ', '<span title="' + (nom + (e === 'na' ? ' : pas de rapport prévu' : e === 'horsKizeo' ? ' : pas de suivi Kizeo (rapport manuel ?)' : ' : pas encore dû')).replace(/"/g, '&quot;') + '" ');
@@ -6391,7 +6407,7 @@ onAuthStateChanged(auth, async (user) => {
     snap.docs.forEach(d => {
       const r = d.data();
       if (!r.suiviId || r.numPassage == null) return;
-      const e = { id: d.id, statut: r.statut, passageId: r.passageId || null, dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, relances: [].concat(Array.isArray(r.relancesWhatsapp) ? r.relancesWhatsapp : [], Array.isArray(r.relancesSms) ? r.relancesSms : []).sort() };
+      const e = { id: d.id, statut: r.statut, passageId: r.passageId || null, dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, fileUrl: r.fileUrl || null, type: r.type || '', relances: [].concat(Array.isArray(r.relancesWhatsapp) ? r.relancesWhatsapp : [], Array.isArray(r.relancesSms) ? r.relancesSms : []).sort() };
       const k = r.suiviId + '::' + r.numPassage;
       if (plusAvance(m[k], e)) m[k] = e;
       if (e.passageId && plusAvance(parPid[e.passageId], e)) parPid[e.passageId] = e;
