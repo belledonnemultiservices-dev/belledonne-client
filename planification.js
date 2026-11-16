@@ -247,7 +247,9 @@ function etatsEtapes(item) {
   const kizeoOk = ns.filter(veutKizeo).every(p => { const e = window.etatKizeo(item, p); return e === "ok" || e === "recu"; });
   const clientOk = nsPr.length > 0 && nsPr.every(p => window.notifOk(window.notifPassage(item, p, "notifBailleur")));
   const locOk = !item.emailClient || (nsPr.length > 0 && nsPr.every(p => window.notifOk(window.notifPassage(item, p, "notifLocataire"))));
-  return [dossierOk, passagesOk && agendaOk && kizeoOk, estTache(item) || (clientOk && locOk)];
+  const rep = window.modeReport ? window.modeReport(item) : null;
+  const notifOkEtape = rep ? !rep.client && (!item.emailClient || !rep.loc) : clientOk && locOk;
+  return [dossierOk, passagesOk && agendaOk && kizeoOk, estTache(item) || notifOkEtape];
 }
 
 function monter() {
@@ -970,10 +972,12 @@ function rendrePassages(item) {
       // Passage annulé (16/11) : son constat, et « Replanifier ce passage » tant qu'il n'a pas de suite
       const an = (l.ref && l.ref.annulation) || null, suite = (l.ref && l.ref.suite) || null;
       const remp = L.find(x => x.remplace === l.pid && !x.annule);
+      if (remp && (l.modeSuite === "avance" || (suite && suite.type === "avance"))) return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr;align-items:center;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note pl-annule-txt">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}${constat} · passages suivants avancés, nouveau ${cercle(remp.num)} ajouté en fin</span></div></div>`;
       const constat = an ? ` · ${an.statut === "absent" ? "absent" : "annulation"}${an.motif ? " : " + esc(an.motif) : ""}` : "";
       const droite = remp ? `<span class="pl-note">remplacé par le nouveau ${cercle(remp.num)}${remp.debut ? " du " + fmtDT(remp.debut) : ""}</span>`
-        : suite ? `<span class="pl-note">${suite.type === "abandon" ? "non replanifié" + (suite.motif ? " : " + esc(suite.motif) : "") : "replanifié"}</span>`
-        : `<button class="pl-btn indigo petit" data-a="replanif" title="Crée un nouveau passage ${cercle(l.num)} avec le même technicien : choisis la nouvelle date">↻ Replanifier ce passage</button>`;
+        : suite ? `<span class="pl-note">${suite.type === "abandon" ? "non replanifié" + (suite.motif ? " : " + esc(suite.motif) : "") : suite.type === "avance" ? "passages suivants avancés" : "replanifié"}</span>`
+        : `<span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="pl-btn indigo petit" data-a="replanif" title="Crée un nouveau passage ${cercle(l.num)} avec le même technicien : choisis la nouvelle date">↻ Replanifier ce passage</button>`
+          + (L.some(x => !x.annule && x.num > l.num && !vierge(x)) ? `<button class="pl-btn petit" data-a="avancer" title="Les passages suivants remontent d'un cran (dates et techniciens gardés), un nouveau passage est ajouté en fin de série">⇡ Avancer les passages suivants</button>` : "") + `</span>`;
       return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr auto;align-items:center;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note pl-annule-txt">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}${constat}</span>${droite}</div></div>`;
     }
     const p = enBase.find(x => x.passageId === l.pid);
@@ -1085,6 +1089,39 @@ function rendrePassages(item) {
     rendrePassages(item);
     const champ = document.querySelector(`.pl-passage[data-k="${L.indexOf(n)}"] [data-f=debut]`);
     if (champ) champ.focus();
+  });
+  // Avancer les passages suivants (16/11) : chacun prend le numéro du précédent (date et techniciens
+  // gardés), son formulaire Kizeo et son titre suivent le nouveau numéro (à renvoyer), et un nouveau
+  // passage s'ajoute en fin de série, à dater, pour garder le nombre de passages prévu.
+  document.querySelectorAll(".pl-corps [data-a=avancer]").forEach(b => b.onclick = () => {
+    const l = ligneDe(b);
+    const suivants = L.filter(x => !x.annule && x.num > l.num && !vierge(x)).sort((a, c) => a.num - c.num);
+    if (!suivants.length) return;
+    const dernier = Math.max(...suivants.map(x => x.num));
+    if (!confirm(suivants.map(x => cercle(x.num) + " devient " + cercle(x.num - 1)).join(", ") + ", dates et techniciens inchangés.\n\n"
+      + "Un nouveau passage " + cercle(dernier) + " est ajouté en fin de série : choisis sa date.\n\n"
+      + "Les formulaires Kizeo déjà envoyés passent en « à renvoyer » (nouveau numéro) : clique Renvoyer sur chacun. L'ancien formulaire reste sur le téléphone du technicien, à supprimer dans Kizeo.")) return;
+    const renum = (t, a, c) => String(t || "").replace(new RegExp("(\\s)" + a + "(?=\\s|$)"), "$1" + c);
+    suivants.forEach(x => {
+      const ancien = x.num;
+      x.num = ancien - 1; x.modifie = true;
+      Object.values(x.agenda || {}).forEach(a => { a.titre = renum(a.titre, ancien, x.num); });
+      x.rapports.forEach(r => {
+        if (r.annule) return;
+        const lie = !estTache(item) && window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", x.num) : null;
+        if (lie) r.formId = String(lie.id);
+        if (r.manuel && r.nom) r.nom = renum(r.nom, ancien, x.num);
+      });
+    });
+    const der = suivants[suivants.length - 1];
+    const n = nouvelleLigne(item, dernier);
+    n.remplace = l.pid;
+    n.techs = der.techs.slice(); n.techs.forEach(t => { n.agenda[t] = agendaVide(); }); n.rapports[0].tech = n.techs[0] || "";
+    l.modeSuite = "avance";
+    L.push(n);
+    change(true);
+    const champ = document.querySelector(`.pl-passage[data-k="${L.indexOf(n)}"] [data-f=debut]`);
+    if (champ) { champ.scrollIntoView({ block: "center" }); champ.focus(); }
   });
   document.querySelectorAll(".pl-corps [data-a=suppr]").forEach(b => b.onclick = () => {
     const l = ligneDe(b);
@@ -1246,7 +1283,7 @@ async function enregistrerPassages(item, silencieux) {
         if (l.remplace && !jumeau) base.remplace = l.remplace;
         if (l.annule && !jumeau && !base.suite) {
           const remp = L.find(x => x.remplace === l.pid && !x.annule && !vierge(x) && x.debut);
-          if (remp) base.suite = { type: "replanifie", le: new Date().toISOString(), nouveau: remp.pid };
+          if (remp) base.suite = { type: l.modeSuite || "replanifie", le: new Date().toISOString(), nouveau: remp.pid };
         }
         // Rendez-vous de l'ancienne fiche (sans repère) sur un passage modifié : mise à jour forcée, en place
         if (l.modifie && !jumeau && !Object.keys(base.calEmpreintes || {}).length) base.calEmpreinte = "modifie";
@@ -1389,6 +1426,7 @@ function journalPassages(avant, apres) {
     const o = av[p.passageId];
     const n = "Passage " + p.num;
     if (!o) { if (p.debut) lignes.push(n + (p.remplace ? " replanifié" : " ajouté") + " : " + fmt(p.debut) + (p.techs && p.techs.length ? ", " + p.techs.join(", ") : "") + (p.remplace ? " (remplace le passage annulé)" : "")); return; }
+    if (o.num !== p.num) lignes.push("Passage " + o.num + " devient passage " + p.num + " (passages avancés après une annulation)");
     if ((o.debut || "") !== (p.debut || "")) lignes.push(n + " déplacé : " + fmt(o.debut) + " → " + fmt(p.debut));
     const ta = (o.techs || []).slice().sort().join(", "), tb = (p.techs || []).slice().sort().join(", ");
     if (ta !== tb) lignes.push(n + " : technicien " + (ta || "aucun") + " → " + (tb || "aucun"));
@@ -1412,6 +1450,9 @@ function etatNotif(item, champ) {
 }
 // Tous les passages en cours notifiés, à la bonne date (même règle que etatNotif)
 function notifFaite(item, champ) {
+  // Report en cours (16/11) : c'est l'annonce du report qui compte
+  const rep = window.modeReport ? window.modeReport(item) : null;
+  if (rep) return champ === "notifBailleur" ? !rep.client : !rep.loc;
   const ns = actifs(item).filter(p => !p.jumeau).map(p => norm(item, p)).filter(Boolean);
   return ns.length > 0 && ns.every(p => window.notifOk(window.notifPassage(item, p, champ)));
 }
@@ -1436,7 +1477,33 @@ function listeNotifManuelles(item, type) {
 }
 function rendreNotifications(item) {
   const lienManuel = (type, champ) => notifFaite(item, champ) || etat.formManuel === type ? "" : `<button class="pl-lien" data-a="manOuvrir" data-type="${type}" title="Notification faite par téléphone, SMS, email hors app… : la valider à la main">Prévenu autrement ?</button>`;
-  $(".pl-corps").innerHTML = `
+  // Report (16/11) : deux nouvelles lignes « Renotifier », les notifications d'avant gardées en mémoire
+  const rep = window.modeReport ? window.modeReport(item) : null;
+  const r0 = item.report && (item.report.etat === "replanifie" || item.report.etat === "clos") ? item.report : null;
+  const vueReport = rep || r0;
+  const fd = (t) => window.fmtDate ? window.fmtDate(t) : t;
+  if (vueReport) {
+    const ouvert = (rep && rep.ouvertLe) || (r0 && r0.ouvertLe) || "";
+    const avant = (champ) => (window.toNotifArray ? window.toNotifArray(item[champ]) : []).filter(t => !ouvert || String(t) < ouvert).sort().pop();
+    const nC = (rep && rep.notifClient) || (r0 && r0.notifClient), nL = (rep && rep.notifLoc) || (r0 && r0.notifLoc);
+    const etatR = (le) => le ? etatHtml("ok", "✓ report notifié le " + fd(le)) : etatHtml("ko", "✕ report à notifier");
+    const ancien = (champ) => { const t = avant(champ); return t ? `<span class="pl-note">notifié le ${esc(fd(t))}</span>` : `<span class="pl-note">—</span>`; };
+    $(".pl-corps").innerHTML = `
+    <p class="pl-intro">Passage annulé puis replanifié : le client et le locataire doivent être prévenus du report. Le message reprend les anciennes et les nouvelles dates (modèles « Replanification », page Contacts).</p>
+    <table class="pl-table"><tbody>
+      <tr><td style="width:160px;"><b>Renotifier le client</b><div class="pl-note">${esc(item.client || "")}</div></td><td>${etatR(nC)}${listeNotifManuelles(item, "bailleur")}</td>
+        <td style="text-align:right;white-space:nowrap;">${nC ? "" : lienManuel("bailleur", "notifBailleur")}<button class="pl-btn indigo" data-a="client">Renotifier le client</button></td></tr>
+      ${etat.formManuel === "bailleur" ? formNotifManuelle("bailleur") : ""}
+      <tr><td><b>Renotifier le locataire</b><div class="pl-note">${esc(item.nomClient || "")}</div></td>
+        <td>${item.emailClient ? etatR(nL) : etatHtml("na", "pas d'email locataire")}</td>
+        <td style="text-align:right;white-space:nowrap;">${item.emailClient ? (nL ? "" : lienManuel("locataire", "notifLocataire")) + '<button class="pl-btn indigo" data-a="loc">Renotifier le locataire</button>' : '<button class="pl-btn" data-a="ajoutEmail">Ajouter son email</button>'}</td></tr>
+      ${etat.formManuel === "locataire" && item.emailClient ? formNotifManuelle("locataire") : ""}
+      <tr><td colspan="3" style="padding-top:14px;"><span class="pl-note" style="text-transform:uppercase;letter-spacing:.05em;font-size:11px;">Notifications d'avant l'annulation</span></td></tr>
+      <tr style="opacity:.7;"><td><span class="pl-note">Client</span></td><td colspan="2">${ancien("notifBailleur")}</td></tr>
+      <tr style="opacity:.7;"><td><span class="pl-note">Locataire</span></td><td colspan="2">${item.emailClient ? ancien("notifLocataire") : '<span class="pl-note">—</span>'}</td></tr>
+    </tbody></table>
+    <p class="pl-note" style="margin-top:12px;">La fenêtre d'envoi s'ouvre à gauche, avec le message de report. Une fois l'email parti, ferme-la : la coche se met à jour ici. SMS au locataire : facultatif, onglet SMS de la fenêtre.</p>`;
+  } else $(".pl-corps").innerHTML = `
     <p class="pl-intro">Le message annonce tous les passages d'un coup. Il utilise tes modèles habituels (page Contacts), avec les contacts du client et les pièces jointes.</p>
     <table class="pl-table"><tbody>
       <tr><td style="width:160px;"><b>Client</b><div class="pl-note">${esc(item.client || "")}</div></td><td>${etatNotif(item, "notifBailleur")}${listeNotifManuelles(item, "bailleur")}</td>
@@ -1450,6 +1517,7 @@ function rendreNotifications(item) {
     <p class="pl-note" style="margin-top:12px;">La fenêtre d'envoi s'ouvre à gauche. Une fois l'email parti, ferme-la : la coche se met à jour ici.</p>`;
   const ouvrirNotif = (onglet) => {
     if (!window.openNotifFromItem) return;
+    window._nsForcerReport = !!vueReport; // « Renotifier » : toujours le message de report
     window._nsCurrentItemId = item.id;
     window._nsCurrentClient = item.client || "";
     window.openNotifFromItem(dossier() || item).then(() => { if (window.switchNotifTab) window.switchNotifTab(onglet); });
@@ -1564,6 +1632,8 @@ function manquesPlanification(item) {
 // Notifications manquantes (rappel, non bloquant)
 function manquesNotification(item) {
   if (estTache(item)) return []; // facultatives pour une tâche, pas de rappel
+  const rep = window.modeReport ? window.modeReport(item) : null;
+  if (rep) return [rep.client ? "le client n'est pas prévenu du report" : "", item.emailClient && rep.loc ? "le locataire n'est pas prévenu du report" : ""].filter(Boolean);
   const ns = actifs(item).filter(p => !p.jumeau).map(p => norm(item, p)).filter(Boolean);
   if (!ns.length) return [];
   const m = [];

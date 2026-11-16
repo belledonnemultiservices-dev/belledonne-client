@@ -2965,15 +2965,16 @@ var DEF_REPORT = {
   locataire: { subject: 'Report de votre rendez-vous', body: "Bonjour {{nom}},\n\n{{changement}}\n{{introNouvelles}}\n\n{{nouvellesDates}}\n\nAdresse : {{adresse}}\n\nMerci d'être présent(e) aux horaires indiqués. En cas d'empêchement, merci de nous contacter dès que possible.\n\nCordialement,\nBelledonne Multiservices\n📞 06 95 67 26 03" },
   sms: { body: 'Belledonne : votre RDV est reporte. Nouveau(x) creneau(x) : {{nouvellesDates}} - {{adresse}}. BC:{{bc}}. Empechement : 06 95 67 26 03.' },
 };
-window.modeReport = function(item) {
+// forcer : « Renotifier » demandé à la main, même si le report a déjà été annoncé
+window.modeReport = function(item, forcer) {
   var r = item.report;
-  if (fileDe(item) !== 'pannule' && !(r && r.etat === 'replanifie')) return null;
-  var base = r && (r.etat === 'standby' || r.etat === 'replanifie') ? r : window.reportInitial(item);
+  if (fileDe(item) !== 'pannule' && !(r && r.etat === 'replanifie') && !(forcer && r && r.etat === 'clos')) return null;
+  var base = r && (r.etat === 'standby' || r.etat === 'replanifie' || r.etat === 'clos') ? r : window.reportInitial(item);
   var anc = [];
   (base.anciennes || []).forEach(function(a){ if (a && a.debut && anc.indexOf(a.debut) === -1) anc.push(a.debut); });
   anc.sort();
   var c = constatAnnulation(item);
-  return { anciennes: anc, client: !base.notifClient, loc: !base.notifLoc, motif: c.motif || '' };
+  return { anciennes: anc, client: !!forcer || !base.notifClient, loc: !!forcer || !base.notifLoc, motif: c.motif || '', notifClient: base.notifClient || null, notifLoc: base.notifLoc || null, ouvertLe: base.ouvertLe || null };
 };
 function libCreneau(d) { if (!d) return ''; var j = d.substring(0, 10).split('-'); return 'le ' + j[2] + '/' + j[1] + '/' + j[0] + (d.length > 10 ? ' à ' + d.substring(11, 13) + 'h' + d.substring(14, 16) : ''); }
 function joindreFr(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' et ' + a[a.length - 1]; }
@@ -2994,7 +2995,8 @@ function remplirVars(t, v, sms) {
   return String(t || '').replace(/{{(\w+)}}/g, function(m, k){ if (sms && k === 'nouvellesDates') return v.nouvellesDatesSms; if (sms && k === 'adresse') return String(v.adresse).substring(0, 40); return v[k] !== undefined ? v[k] : m; });
 }
 function appliquerModeReport(item) {
-  var rep = window.modeReport ? window.modeReport(item) : null;
+  var rep = window.modeReport ? window.modeReport(item, window._nsForcerReport) : null;
+  window._nsForcerReport = false;
   window._nsReport = rep ? { itemId: item.id, client: rep.client, loc: rep.loc } : null;
   var info = document.getElementById('nsReportInfo');
   if (info) info.style.display = rep && (rep.client || rep.loc) ? '' : 'none';
@@ -6393,6 +6395,11 @@ window._syncEcheancesReception = async function(suiviId, passages) {
         || passages.find(p => String(p.num) === String(r.numPassage));
       if (!passage) continue;
       const updates = {};
+      // Passages avancés (16/11) : le rapport attendu suit le nouveau numéro de son passage
+      if (r.passageId && passage.passageId === r.passageId && passage.num != null && String(passage.num) !== String(r.numPassage)) {
+        updates.numPassage = Number(passage.num);
+        updates.passageLabel = Number(passage.num) === 1 ? '1er passage' : passage.num + 'ème passage';
+      }
       if (passage.fin && passage.fin !== r.dateFin) updates.dateFin = passage.fin;
       if (passage.debut && passage.debut !== r.dateDebut) updates.dateDebut = passage.debut;
       if (Object.keys(updates).length) await updateDoc(doc(db, 'reception-rapports', d.id), updates);
@@ -6668,7 +6675,7 @@ onAuthStateChanged(auth, async (user) => {
     const snap = await getDoc(doc(db, 'suivi', suiviId));
     if (!snap.exists()) return;
     const d = snap.data();
-    const rep = d.report && (d.report.etat === 'standby' || d.report.etat === 'replanifie') ? { ...d.report } : (window.fileDe({ ...d, id: suiviId }) === 'pannule' ? window.reportInitial(d) : null);
+    const rep = d.report && ['standby', 'replanifie', 'clos'].includes(d.report.etat) ? { ...d.report } : (window.fileDe({ ...d, id: suiviId }) === 'pannule' ? window.reportInitial(d) : null);
     if (!rep) return;
     rep[type === 'loc' ? 'notifLoc' : 'notifClient'] = ts;
     if (rep.etat === 'replanifie' && rep.notifClient && (rep.notifLoc || !d.emailClient)) { rep.etat = 'clos'; rep.closLe = ts; }

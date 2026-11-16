@@ -493,7 +493,27 @@ async function annulerPassageSuivi(r, infos) {
   const par = (auth.currentUser && auth.currentUser.email) || "";
   const annulation = { le: now, statut: infos.statut === "absent" ? "absent" : "annulation", motif: infos.motif || "", provenance: infos.provenance, par };
   const cibles = passages.filter(p => p && typeof p === "object" && memePassage(p, r));
-  const updated = passages.map(p => p && typeof p === "object" && memePassage(p, r) ? { ...p, statut: "annule", annulation, ...(infos.effacerKizeo ? { kizeoPush: null } : {}) } : p);
+  // Rendez-vous du passage annulé retirés tout de suite de l'agenda des techniciens (16/11)
+  const retires = new Set();
+  const rdv = cibles.flatMap(p => Object.entries(p.calEvents || {}).filter(([nom, ev]) => nom !== "_" && ev));
+  if (rdv.length) {
+    try {
+      const techs = (await getDocs(collection(db, "techniciens"))).docs.map(x => x.data());
+      const idt = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      for (const [nom, ev] of rdv) {
+        const t = techs.find(x => x.nomComplet === nom || x.nom === nom || ((x.prenom || "") + " " + (x.nom || "")).trim() === nom);
+        if (!t || !t.email) continue;
+        try {
+          const resp = await fetch("https://europe-west1-belledonne-client.cloudfunctions.net/addToCalendar", { method: "POST",
+            headers: { "Content-Type": "application/json", ...(idt ? { Authorization: "Bearer " + idt } : {}) },
+            body: JSON.stringify({ technicienEmail: t.email, operation: "delete", calEventId: ev }) });
+          if (resp.ok) retires.add(ev);
+        } catch(e) { /* laissé : la planification le retirera au prochain enregistrement */ }
+      }
+    } catch(e) { console.warn("agenda non mis à jour :", e.message); }
+  }
+  const sansRetires = (cal) => Object.fromEntries(Object.entries(cal || {}).filter(([, ev]) => !retires.has(ev)));
+  const updated = passages.map(p => p && typeof p === "object" && memePassage(p, r) ? { ...p, statut: "annule", annulation, calEvents: sansRetires(p.calEvents), ...(infos.effacerKizeo ? { kizeoPush: null } : {}) } : p);
   const ouvert = d.report && d.report.etat === "standby" ? d.report : {
     etat: "standby", ouvertLe: now, anciennes: [],
     // Passages connus à l'ouverture : seuls eux comptent comme « anciennes dates » s'ils bougent
@@ -502,7 +522,7 @@ async function annulerPassageSuivi(r, infos) {
   const anciennes = (ouvert.anciennes || []).slice();
   cibles.filter(p => !p.jumeau).forEach(p => { if (!anciennes.some(a => a.pid && a.pid === p.passageId)) anciennes.push({ pid: p.passageId || null, num: p.num || null, debut: p.debut || "" }); });
   const texte = "Passage " + r.numPassage + " annulé (" + (annulation.statut === "absent" ? "absent" : "annulation") + (annulation.motif ? " : " + annulation.motif : "") + ") · "
-    + (infos.provenance === "technicien" ? "signalé par le technicien" : "depuis l'app") + " · dossier en attente de replanification";
+    + (infos.provenance === "technicien" ? "signalé par le technicien" : "depuis l'app") + (retires.size ? " · rendez-vous retiré de l'agenda" : "") + " · dossier en attente de replanification";
   await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated, report: { ...ouvert, anciennes }, journal: arrayUnion({ at: now, par, texte }) });
   if (String(r.numPassage) === "1") await majStatutApresPassage1(r.suiviId);
 }
