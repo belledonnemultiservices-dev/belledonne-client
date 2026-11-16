@@ -48,6 +48,12 @@ const CSS = `
 .pl-corps{padding:20px 24px;overflow-y:auto;flex:1;}
 .pl-pied{padding:14px 24px;border-top:1px solid rgba(13,27,42,.09);display:flex;gap:10px;align-items:center;}
 .pl-pied .pl-espace{flex:1;}
+.pl-lien{background:none;border:0;color:#4338CA;font:600 12.5px 'DM Sans',sans-serif;text-decoration:underline;cursor:pointer;margin-right:12px;padding:0;}
+.pl-manuel td{background:#F5F7FF;}
+.pl-manuel-form{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;}
+.pl-manuel-form label{display:flex;align-items:center;gap:6px;}
+.pl-manuel-ligne{margin-top:4px;}
+.pl-manuel-ligne .pl-lien{margin:0 0 0 8px;font-size:12px;}
 .pl-btn{font:600 13px 'DM Sans',sans-serif;border:1px solid rgba(13,27,42,.12);background:#fff;color:#0D1B2A;border-radius:8px;padding:9px 16px;cursor:pointer;}
 .pl-btn:disabled{opacity:.5;cursor:default;}
 .pl-btn.prim{background:#1DA870;border-color:#1DA870;color:#fff;}
@@ -327,7 +333,7 @@ function rendreEtapes() {
     <div class="pl-etapes">${nomsEtapes(item).map((nom, k) => `<div class="pl-etape${k === etat.etape ? " active" : ""}${k < DERNIERE && faits[k] ? " faite" : ""}" data-etape="${k}"><span class="pl-num">${k < DERNIERE && faits[k] ? "✓" : k + 1}</span>${nom}</div>`).join("")}</div>`;
   $(".pl-tete [data-a=fermer]").onclick = fermer;
   const bd = $(".pl-tete [data-a=droite]"); if (bd) bd.onclick = () => { delete etat.droiteFermee[etat.etape]; rendreEtapes(); rendreDroite(dossier() || item); };
-  document.querySelectorAll(".pl-etape").forEach(el => el.onclick = () => { etat.etape = Number(el.dataset.etape); etat.lignes = null; rendre(); });
+  document.querySelectorAll(".pl-etape").forEach(el => el.onclick = () => { etat.etape = Number(el.dataset.etape); etat.lignes = null; etat.formManuel = null; rendre(); });
 }
 
 function rendre() {
@@ -1303,19 +1309,50 @@ function etatNotif(item, champ) {
   const ns = actifs(item).filter(p => !p.jumeau).map(p => norm(item, p)).filter(Boolean);
   if (!ns.length) return etatHtml("na", "aucun passage");
   const rs = ns.map(p => window.notifPassage(item, p, champ));
-  if (rs.every(r => window.notifOk(r))) { const der = rs.map(r => r.le).sort().pop(); return etatHtml("ok", "✓ notifié" + (der && window.fmtDate ? " le " + window.fmtDate(der) : "")); }
+  if (rs.every(r => window.notifOk(r))) {
+    const der = rs.slice().sort((a, b) => String(a.le).localeCompare(String(b.le))).pop();
+    const man = der && der.manuel ? " · " + ((window.LIB_MOYEN_NOTIF || {})[der.manuel.moyen] || "autrement") : "";
+    return etatHtml("ok", "✓ notifié" + (der && window.fmtDate ? " le " + window.fmtDate(der.le) : "") + man, der && der.manuel ? "Validé à la main" + (der.manuel.par ? " par " + String(der.manuel.par).split("@")[0] : "") + (der.manuel.note ? " · " + der.manuel.note : "") : "");
+  }
   if (rs.some(r => r && r.change)) return etatHtml("att", "date modifiée, à re-notifier");
   return etatHtml("ko", "✕ pas encore notifié");
 }
+// Tous les passages en cours notifiés, à la bonne date (même règle que etatNotif)
+function notifFaite(item, champ) {
+  const ns = actifs(item).filter(p => !p.jumeau).map(p => norm(item, p)).filter(Boolean);
+  return ns.length > 0 && ns.every(p => window.notifOk(window.notifPassage(item, p, champ)));
+}
+const MOYENS_NOTIF = [["tel", "Téléphone"], ["sms", "SMS"], ["email", "Email hors app"], ["oral", "De vive voix"], ["autre", "Autre"]];
+// Formulaire « Prévenu autrement ? » (16/11) : date, moyen, note ; couvre tous les passages en cours
+function formNotifManuelle(type) {
+  const auj = new Date(), iso = auj.getFullYear() + "-" + String(auj.getMonth() + 1).padStart(2, "0") + "-" + String(auj.getDate()).padStart(2, "0");
+  return `<tr class="pl-manuel"><td colspan="3"><div class="pl-manuel-form">
+    <b>${type === "locataire" ? "Locataire" : "Client"} prévenu autrement</b>
+    <label>Le <input type="date" data-m="date" value="${iso}" max="${iso}"></label>
+    <label>Par <select data-m="moyen">${MOYENS_NOTIF.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+    <input type="text" data-m="note" placeholder="Note (facultatif)" style="flex:1;min-width:140px;">
+    <button class="pl-btn" data-a="manAnnuler">Annuler</button>
+    <button class="pl-btn prim" data-a="manValider">Valider</button>
+  </div><div class="pl-note" style="margin-top:6px;">Couvre tous les passages en cours. Aucun email n'est envoyé.</div></td></tr>`;
+}
+// Validations manuelles déjà faites, avec « Retirer » en cas d'erreur
+function listeNotifManuelles(item, type) {
+  const ms = (Array.isArray(item.notifsManuelles) ? item.notifsManuelles : []).filter(m => m.type === type);
+  return ms.map(m => `<div class="pl-note pl-manuel-ligne">Validé à la main : prévenu ${esc((window.LIB_MOYEN_NOTIF || {})[m.moyen] || "autrement")} le ${window.fmtDate ? esc(window.fmtDate(m.le)) : esc(m.le)}${m.par ? " · par " + esc(String(m.par).split("@")[0]) : ""}${m.note ? " · " + esc(m.note) : ""}
+    <button class="pl-lien" data-a="manRetirer" data-type="${type}" data-le="${esc(m.le)}">Retirer</button></div>`).join("");
+}
 function rendreNotifications(item) {
+  const lienManuel = (type, champ) => notifFaite(item, champ) || etat.formManuel === type ? "" : `<button class="pl-lien" data-a="manOuvrir" data-type="${type}" title="Notification faite par téléphone, SMS, email hors app… : la valider à la main">Prévenu autrement ?</button>`;
   $(".pl-corps").innerHTML = `
     <p class="pl-intro">Le message annonce tous les passages d'un coup. Il utilise tes modèles habituels (page Contacts), avec les contacts du client et les pièces jointes.</p>
     <table class="pl-table"><tbody>
-      <tr><td style="width:160px;"><b>Client</b><div class="pl-note">${esc(item.client || "")}</div></td><td>${etatNotif(item, "notifBailleur")}</td>
-        <td style="text-align:right;"><button class="pl-btn indigo" data-a="client">Notifier le client</button></td></tr>
+      <tr><td style="width:160px;"><b>Client</b><div class="pl-note">${esc(item.client || "")}</div></td><td>${etatNotif(item, "notifBailleur")}${listeNotifManuelles(item, "bailleur")}</td>
+        <td style="text-align:right;white-space:nowrap;">${lienManuel("bailleur", "notifBailleur")}<button class="pl-btn indigo" data-a="client">Notifier le client</button></td></tr>
+      ${etat.formManuel === "bailleur" ? formNotifManuelle("bailleur") : ""}
       <tr><td><b>Locataire</b><div class="pl-note">${esc(item.nomClient || "")}</div></td>
-        <td>${item.emailClient ? etatNotif(item, "notifLocataire") : etatHtml("na", "pas d'email locataire")}</td>
-        <td style="text-align:right;">${item.emailClient ? '<button class="pl-btn indigo" data-a="loc">Notifier le locataire</button>' : '<button class="pl-btn" data-a="ajoutEmail">Ajouter son email</button>'}</td></tr>
+        <td>${item.emailClient ? etatNotif(item, "notifLocataire") + listeNotifManuelles(item, "locataire") : etatHtml("na", "pas d'email locataire")}</td>
+        <td style="text-align:right;white-space:nowrap;">${item.emailClient ? lienManuel("locataire", "notifLocataire") + '<button class="pl-btn indigo" data-a="loc">Notifier le locataire</button>' : '<button class="pl-btn" data-a="ajoutEmail">Ajouter son email</button>'}</td></tr>
+      ${etat.formManuel === "locataire" && item.emailClient ? formNotifManuelle("locataire") : ""}
     </tbody></table>
     <p class="pl-note" style="margin-top:12px;">La fenêtre d'envoi s'ouvre à gauche. Une fois l'email parti, ferme-la : la coche se met à jour ici.</p>`;
   const ouvrirNotif = (onglet) => {
@@ -1327,6 +1364,30 @@ function rendreNotifications(item) {
   const bc = $("[data-a=client]"); if (bc) bc.onclick = () => ouvrirNotif("bailleur");
   const bl = $("[data-a=loc]"); if (bl) bl.onclick = () => ouvrirNotif("locataire");
   const be = $("[data-a=ajoutEmail]"); if (be) be.onclick = () => { etat.etape = 0; rendre(); };
+  // Prévenu autrement (16/11)
+  document.querySelectorAll("[data-a=manOuvrir]").forEach(b => b.onclick = () => { etat.formManuel = b.dataset.type; rendre(); });
+  const ma = $("[data-a=manAnnuler]"); if (ma) ma.onclick = () => { etat.formManuel = null; rendre(); };
+  const mv = $("[data-a=manValider]"); if (mv) mv.onclick = async () => {
+    const type = etat.formManuel, val = k => ($(`.pl-manuel [data-m=${k}]`) || {}).value || "";
+    const jour = val("date"), auj = new Date();
+    const max = auj.getFullYear() + "-" + String(auj.getMonth() + 1).padStart(2, "0") + "-" + String(auj.getDate()).padStart(2, "0");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(jour) || jour > max) { alert("Choisis une date valide, pas dans le futur."); return; }
+    // Aujourd'hui : l'heure actuelle ; un autre jour : midi
+    const ts = jour === max ? auj.toISOString() : new Date(jour + "T12:00:00").toISOString();
+    mv.disabled = true; mv.textContent = "Enregistrement…";
+    try {
+      await window._validerNotifManuelle(item.id, type, ts, val("moyen"), val("note").trim());
+      etat.formManuel = null;
+      window.showToast && window.showToast((type === "locataire" ? "Locataire" : "Client") + " : notification validée");
+      rendre();
+    } catch (e) { alert("Enregistrement impossible : " + e.message); mv.disabled = false; mv.textContent = "Valider"; }
+  };
+  document.querySelectorAll("[data-a=manRetirer]").forEach(b => b.onclick = async () => {
+    if (!confirm("Retirer cette validation manuelle ? La notification redeviendra à faire.")) return;
+    b.disabled = true;
+    try { await window._retirerNotifManuelle(item.id, b.dataset.type, b.dataset.le); rendre(); }
+    catch (e) { alert("Retrait impossible : " + e.message); b.disabled = false; }
+  });
   navigation("Continuer →");
 }
 

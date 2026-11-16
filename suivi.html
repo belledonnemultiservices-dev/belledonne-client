@@ -4387,13 +4387,19 @@ function etatAgenda(p) {
 function notifPassage(item, p, champ) {
   var type = champ === 'notifBailleur' ? 'bailleur' : 'locataire';
   var n = p.notifs && p.notifs[type];
-  if (n && n.le) return { le: n.le, change: !!(n.debut && p.debut && n.debut.substring(0, 16) !== p.debut.substring(0, 16)), annonce: n.debut };
+  if (n && n.le) return { le: n.le, change: !!(n.debut && p.debut && n.debut.substring(0, 16) !== p.debut.substring(0, 16)), annonce: n.debut, manuel: n.manuel || null };
   var d = (p.debut || '').substring(0, 10);
   if (!d) return null;
   var envois = toNotifArray(item[champ]).filter(function(ts){ return String(ts).substring(0, 10) <= d; }).sort();
   return envois.length ? { le: envois[envois.length - 1], estime: true } : null;
 }
 function notifOk(r) { return !!r && !r.change; }
+// « par téléphone, validé à la main par Sana » (notification faite hors de l'app, 16/11)
+function libManuel(r) {
+  if (!r || !r.manuel) return '';
+  var m = r.manuel;
+  return ' ' + ((window.LIB_MOYEN_NOTIF || {})[m.moyen] || 'autrement') + ', validé à la main' + (m.par ? ' par ' + String(m.par).split('@')[0] : '') + (m.note ? ' (' + m.note + ')' : '');
+}
 var MARQUES = { ok: '<span class="ck ck-ok">✓</span>', ko: '<span class="ck ck-ko">✕</span>', att: '<span class="ck ck-att">!</span>', na: '<span class="ck ck-na">–</span>' };
 // Icône PDF (ou Excel) d'un rapport reçu, lien direct vers le fichier
 function iconeRapport(rec, nom) {
@@ -4497,14 +4503,14 @@ function notifCellule(item, p, champ) {
   var r = notifPassage(item, p, champ);
   if (item.clientType === 'tache' && !r) return marque('na', 'Notification facultative pour une tâche');
   if (r && r.change) return marque('att', 'Notifié le ' + fmtDate(r.le) + ' pour le ' + fmtDate(r.annonce) + ' : date modifiée depuis, à re-notifier');
-  return r ? marque('ok', 'Notifié le ' + fmtDate(r.le) + (r.estime ? ' (estimation : notification envoyée avant cette date)' : '')) : marque('ko', champ === 'notifBailleur' ? 'Client pas encore notifié pour ce passage' : 'Locataire pas encore notifié pour ce passage');
+  return r ? marque('ok', 'Notifié le ' + fmtDate(r.le) + libManuel(r) + (r.estime ? ' (estimation : notification envoyée avant cette date)' : '')) : marque('ko', champ === 'notifBailleur' ? 'Client pas encore notifié pour ce passage' : 'Locataire pas encore notifié pour ce passage');
 }
 function prevenusPassage(item, p) {
   var c = notifPassage(item, p, 'notifBailleur');
   var l = item.emailClient ? notifPassage(item, p, 'notifLocataire') : null;
   if (item.clientType === 'tache') return c ? marque('ok', 'Client notifié le ' + fmtDate(c.le)) : marque('na', 'Notification facultative pour une tâche');
-  var det = [c ? (c.change ? 'Client : date modifiée depuis la notification' : 'Client notifié le ' + fmtDate(c.le)) : 'Client pas encore prévenu',
-    !item.emailClient ? "Locataire : pas d'email dans la fiche" : l ? (l.change ? 'Locataire : date modifiée depuis la notification' : 'Locataire notifié le ' + fmtDate(l.le)) : 'Locataire pas encore prévenu'].join('\n');
+  var det = [c ? (c.change ? 'Client : date modifiée depuis la notification' : 'Client notifié le ' + fmtDate(c.le) + libManuel(c)) : 'Client pas encore prévenu',
+    !item.emailClient ? "Locataire : pas d'email dans la fiche" : l ? (l.change ? 'Locataire : date modifiée depuis la notification' : 'Locataire notifié le ' + fmtDate(l.le) + libManuel(l)) : 'Locataire pas encore prévenu'].join('\n');
   var okC = notifOk(c), okL = !item.emailClient || notifOk(l);
   if (okC && okL) return marque('ok', det);
   if ((c && c.change) || (l && l.change)) return marque('att', det);
@@ -6389,6 +6395,51 @@ onAuthStateChanged(auth, async (user) => {
         if (p && p.notifs) div.dataset.notifs = JSON.stringify(p.notifs);
       });
     } catch (e) { console.warn('trace notification par passage non enregistrée:', e.message); }
+  };
+
+  // Notification faite autrement (téléphone, SMS, email hors app...) validée à la main (16/11).
+  // Même trace qu'un envoi depuis l'app (heure dans notifBailleur/notifLocataire, et sur chaque
+  // passage en cours avec la date annoncée), plus la mention « manuel » : moyen, note, qui, quand.
+  const LIB_MOYEN_NOTIF = { tel: 'par téléphone', sms: 'par SMS', email: 'par email hors app', oral: 'de vive voix', autre: 'autrement' };
+  window.LIB_MOYEN_NOTIF = LIB_MOYEN_NOTIF;
+  const champNotif = type => type === 'locataire' ? 'notifLocataire' : 'notifBailleur';
+  const majFicheOuverte = passages => document.querySelectorAll('[id^="passage_"], [id^="passageT_"]').forEach(div => {
+    const p = passages.find(x => x && x.passageId && x.passageId === div.dataset.passageId);
+    div.dataset.notifs = JSON.stringify((p && p.notifs) || {});
+  });
+  window._validerNotifManuelle = async (suiviId, type, ts, moyen, note) => {
+    const u = auth.currentUser || {};
+    const manuel = { moyen, note: note || '', par: u.displayName || u.email || '', at: new Date().toISOString() };
+    const snap = await getDoc(doc(db, 'suivi', suiviId));
+    if (!snap.exists()) throw new Error('dossier introuvable');
+    const d = snap.data();
+    const passages = (d.passages || []).map(p => (p && typeof p === 'object' && p.statut !== 'annule')
+      ? { ...p, notifs: { ...(p.notifs || {}), [type]: { le: ts, debut: p.debut || '', manuel } } } : p);
+    const champ = champNotif(type);
+    const liste = toNotifArray(d[champ]).concat([ts]);
+    const manuelles = (Array.isArray(d.notifsManuelles) ? d.notifsManuelles : []).concat([{ type, le: ts, ...manuel }]);
+    await updateDoc(doc(db, 'suivi', suiviId), { [champ]: liste, passages, notifsManuelles: manuelles });
+    const it = (window.interventions || []).find(i => i.id === suiviId);
+    if (it) { it[champ] = liste; it.passages = passages; it.notifsManuelles = manuelles; }
+    majFicheOuverte(passages);
+  };
+  // Retrait d'une validation manuelle faite par erreur. Un envoi réel depuis l'app ne se retire pas.
+  window._retirerNotifManuelle = async (suiviId, type, ts) => {
+    const snap = await getDoc(doc(db, 'suivi', suiviId));
+    if (!snap.exists()) throw new Error('dossier introuvable');
+    const d = snap.data();
+    const passages = (d.passages || []).map(p => {
+      if (!p || typeof p !== 'object' || !p.notifs || !p.notifs[type] || p.notifs[type].le !== ts || !p.notifs[type].manuel) return p;
+      const notifs = { ...p.notifs }; delete notifs[type];
+      return { ...p, notifs };
+    });
+    const champ = champNotif(type);
+    const liste = toNotifArray(d[champ]).filter(x => x !== ts);
+    const manuelles = (Array.isArray(d.notifsManuelles) ? d.notifsManuelles : []).filter(m => !(m.type === type && m.le === ts));
+    await updateDoc(doc(db, 'suivi', suiviId), { [champ]: liste, passages, notifsManuelles: manuelles });
+    const it = (window.interventions || []).find(i => i.id === suiviId);
+    if (it) { it[champ] = liste; it.passages = passages; it.notifsManuelles = manuelles; }
+    majFicheOuverte(passages);
   };
 
   // Trace d'une relance WhatsApp ouverte pour un rapport en retard.
