@@ -358,6 +358,12 @@
   .sem-espace td{height:12px;padding:0!important;border:none!important;background:transparent!important;}
   .bs-option{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid);margin-left:auto;cursor:pointer;}
   .file-chip.discret{border-style:dashed;font-weight:500;}
+  /* Séparation Pilotage quotidien / parcours, et recherche transversale (16/11) */
+  .files-sep{width:1px;height:28px;background:var(--border);margin:0 6px;}
+  .file-chip.trouve:not(.active),.file-semaine.trouve:not(.active){border-color:var(--green);box-shadow:0 0 0 2px rgba(46,204,143,.2);}
+  .file-chip.trouve:not(.active) .cpt{background:var(--green-pale);color:var(--green-dark);}
+  .file-chip.sans-resultat:not(.active),.file-semaine.sans-resultat:not(.active){opacity:.45;}
+  .trouve-ailleurs{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;}
   .ligne-groupe td{background:var(--bg)!important;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mid);padding:8px 14px!important;}
   .kz{display:flex;flex-direction:column;gap:3px;}
   .kz span{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:10px;white-space:nowrap;}
@@ -2642,7 +2648,7 @@ async function reprendreAttente(id) {
   const it = (window.interventions || []).find(i => i.id === id) || {};
   const ref = it.bc ? 'BC ' + it.bc : it.pl ? 'PL ' + it.pl : it.devis ? 'Devis ' + it.devis : (it.clientType === 'tache' ? 'cette tâche' : 'ce dossier');
   const motif = it.motifAttente || String(it.notes || '').split('\n').map(l => l.trim()).filter(Boolean).pop() || '';
-  if (!confirm('Reprendre ' + ref + (it.client ? ' (' + it.client + ')' : '') + ' ?' + (motif ? '\n\nMotif d\'attente : ' + motif : '') + '\n\nLe blocage est levé : le dossier reprend son parcours (Pilotage s\'il était planifié, sinon Planification).')) return;
+  if (!confirm('Reprendre ' + ref + (it.client ? ' (' + it.client + ')' : '') + ' ?' + (motif ? '\n\nMotif d\'attente : ' + motif : '') + '\n\nLe blocage est levé : le dossier reprend son parcours (En cours s\'il était planifié, sinon Planification).')) return;
   try {
     // Planification déjà validée (passages, agenda, Kizeo) : retour direct en Pilotage, sinon en Planification
     const pret = typeof window.etatsEtapesPlanif === 'function' && (window.etatsEtapesPlanif(it) || [])[1];
@@ -2651,7 +2657,7 @@ async function reprendreAttente(id) {
     const idx = interventions.findIndex(i => i.id === id);
     if (idx !== -1) { Object.assign(interventions[idx], changes); window.interventions = interventions; }
     filterTable();
-    showToast(pret ? 'Dossier repris : retour en Pilotage quotidien.' : 'Dossier repris : retour en Planification.');
+    showToast(pret ? 'Dossier repris : retour En cours.' : 'Dossier repris : retour en Planification.');
   } catch(e) { alert('Erreur : ' + e.message); }
 }
 
@@ -3533,8 +3539,11 @@ function filterTable() {
   var dateA = (document.getElementById('filterDateA')?.value)||'';
   // Nouvelle vue (onglet En contrat) : technicien et dates portent aussi sur les passages.
   var v2 = activeTab === 'contrat';
-  // Validation : pas de recherche ni de filtres (barre masquée), un filtre resté actif ailleurs ne doit rien cacher
-  if (v2 && fileSuivi === 'validation') q = statut = clientFilter = annee = assigneFilter = natureFilter = dateDe = dateA = '';
+  // Ancien filtre Statut retiré du parcours (16/11) : l'étape est donnée par l'onglet
+  if (v2) statut = '';
+  // Validation : pas de filtres, un filtre resté actif ailleurs ne doit rien cacher. La recherche
+  // est gardée (recherche transversale, 16/11) : la barre ne réapparaît que si elle est remplie.
+  if (v2 && fileSuivi === 'validation') clientFilter = annee = assigneFilter = natureFilter = dateDe = dateA = '';
   // Planification : la recherche seule, les autres filtres (masqués) ne s'appliquent pas
   if (v2 && fileSuivi === 'planification') statut = clientFilter = annee = assigneFilter = natureFilter = dateDe = dateA = '';
   // Pilotage (15/11) : recherche et technicien seulement
@@ -3828,7 +3837,35 @@ function fileDe(item) {
 // Le pilotage montre les bons de l'étape Pilotage, et les passages restants des bons
 // À facturer (le bon est rangé dans À facturer, mais ses passages doivent rester visibles).
 function dansPilotage(i) { var e = fileDe(i); return e === 'pilotage' || e === 'afacturer'; }
-var LIB_ETAPE = { validation: 'Validation', planification: 'Planification', pilotage: 'Pilotage quotidien', afacturer: 'À facturer', cloture: 'Clôturé', attente: 'En attente', pannule: 'Passage annulé', annuleDef: 'Annulé' };
+// Onglet En cours (16/11). Un passage est en retard quand sa date est passée sans qu'il soit
+// exécuté (rapport envoyé, ou reçu pour une tâche). Rang : 0 en retard, 1 sans passage à venir
+// (dossier qui dort, invisible dans le Pilotage quotidien), 2 prochain passage daté.
+function passagesEnRetard(item) {
+  var auj = jourLocal(0);
+  return passagesActifs(item).filter(function(p){ var d = (p.debut || '').substring(0, 10); return !p.jumeau && d && d < auj && !passageExecute(item, p); })
+    .sort(function(a, b){ return a.debut.localeCompare(b.debut); });
+}
+function rangEnCours(item) { return passagesEnRetard(item).length ? 0 : prochainPassage(item) ? 2 : 1; }
+function prochainPassageHtml(item) {
+  var ret = passagesEnRetard(item);
+  if (ret.length) {
+    var p = ret[0], n = joursDepuis(p.debut);
+    return '<span class="psg psg-retard" style="text-decoration:none;" title="' + ret.length + ' passage(s) passé(s) sans rapport envoyé au client">⚠ ' + (CERCLES[p.num - 1] || '#' + p.num) + ' du ' + jjmm(p.debut.substring(0, 10)) + (n ? ' · ' + n + ' j' : '') + '</span>';
+  }
+  var d = prochainPassage(item);
+  if (!d) return '<span class="psg psg-annule" style="text-decoration:none;" title="Aucun passage daté à venir : dossier à terminer ou à replanifier">aucun à venir</span>';
+  var p2 = passagesActifs(item).find(function(x){ return !x.jumeau && (x.debut || '').substring(0, 10) === d; });
+  var j = Math.round((new Date(d + 'T12:00:00') - new Date(jourLocal(0) + 'T12:00:00')) / 86400e3);
+  return '<span class="psg ' + (j === 0 ? 'psg-auj' : 'psg-prevu') + '" style="text-decoration:none;">' + (p2 ? (CERCLES[p2.num - 1] || '#' + p2.num) + ' ' : '') + jjmm(d) + ' · ' + (j === 0 ? "aujourd'hui" : j === 1 ? 'demain' : 'dans ' + j + ' j') + '</span>';
+}
+function avancementEnCoursHtml(item) {
+  var ps = passagesActifs(item).filter(function(p){ return p.debut && !p.jumeau; });
+  var faits = ps.filter(function(p){ return passageExecute(item, p); }).length;
+  var h = '<span style="font-size:12px;white-space:nowrap;">' + faits + ' / ' + ps.length + ' exécuté' + (faits > 1 ? 's' : '') + '</span>';
+  if (item.clientType !== 'tache' && item.enFacturation) h += ' <span class="psg psg-ok" style="text-decoration:none;" title="Facture émise : le dossier reste ici tant qu\'il reste des passages à exécuter">Facturé</span>';
+  return h;
+}
+var LIB_ETAPE = { validation: 'Validation', planification: 'Planification', pilotage: 'En cours', afacturer: 'À facturer', cloture: 'Clôturé', attente: 'En attente', pannule: 'Passage annulé', annuleDef: 'Annulé' };
 var CLS_ETAPE = { validation: 'psg-passe', planification: 'psg-prevu', pilotage: 'psg-auj', afacturer: 'psg-annule', cloture: 'psg-ok', attente: 'psg-passe', pannule: 'psg-annule', annuleDef: 'psg-retard' };
 function etiquetteEtape(item) { var e = fileDe(item); return '<span class="psg ' + CLS_ETAPE[e] + '" style="text-decoration:none;">' + LIB_ETAPE[e] + '</span>'; }
 
@@ -3906,13 +3943,38 @@ var FILES_SUIVI = [
         { val: vieux.length ? vieux.reduce(function(a, b){ return Math.max(a, b); }) + ' j' : '—', lib: 'plus ancien (j ouvrés)' },
       ];
     } },
-  { cle: 'encours', label: 'En cours', ligne2: true, test: function(){ return true; }, tri: parRecent,
-    question: "Tous les bons : cherche un n° de BC, un client, une adresse pour savoir où il en est.",
-    colonnes: [{ titre: 'Étape', cell: etiquetteEtape }],
+  // En cours (16/11) : étape du parcours entre Planification et À facturer. Tous les dossiers
+  // planifiés, quelle que soit la semaine de leurs passages (le Pilotage quotidien n'en montre
+  // que trois), y compris les dossiers facturés dont il reste des passages à exécuter.
+  { cle: 'encours', label: 'En cours', test: function(i){ return fileDe(i) === 'pilotage'; },
+    tri: function(x, y){
+      var rx = rangEnCours(x), ry = rangEnCours(y);
+      if (rx !== ry) return rx - ry;
+      if (rx === 0) return (passagesEnRetard(x)[0].debut || '').localeCompare(passagesEnRetard(y)[0].debut || '');
+      if (rx === 2) return prochainPassage(x).localeCompare(prochainPassage(y));
+      return entreePlanif(x).localeCompare(entreePlanif(y));
+    },
+    question: 'Tous les dossiers planifiés, quelle que soit la semaine de leurs passages.',
+    sansNotifs: true,
+    colonnes: [
+      { titre: 'Prochain passage', cell: prochainPassageHtml },
+      { titre: 'Avancement', cell: avancementEnCoursHtml },
+    ],
     kpis: function(l){
-      var c = {}; l.forEach(function(i){ var e = fileDe(i); c[e] = (c[e] || 0) + 1; });
-      return ['validation', 'planification', 'pilotage', 'afacturer', 'cloture', 'attente', 'pannule', 'annuleDef']
-        .map(function(e){ return { val: c[e] || 0, lib: LIB_ETAPE[e].toLowerCase(), cle: 'e-' + e, filtre: c[e] ? function(i){ return fileDe(i) === e; } : null }; });
+      var s = semaineAffichee(0);
+      var retard = function(i){ return rangEnCours(i) === 0; };
+      var dort = function(i){ return rangEnCours(i) === 1; };
+      var semaine = function(i){ var d = prochainPassage(i); return !!d && d <= s.vendredi; };
+      var plusTard = function(i){ var d = prochainPassage(i); return !!d && d > s.vendredi; };
+      var facture = function(i){ return i.clientType !== 'tache' && !!i.enFacturation; };
+      return [
+        { val: l.length, lib: 'dossier(s) en cours' },
+        { val: l.filter(retard).length, lib: 'passage passé non bouclé', alerte: true, cle: 'ret', filtre: retard },
+        { val: l.filter(dort).length, lib: 'sans passage à venir', alerte: true, cle: 'dort', filtre: dort },
+        { val: l.filter(semaine).length, lib: 'prochain passage cette semaine', cle: 'sem', filtre: semaine },
+        { val: l.filter(plusTard).length, lib: 'prochain passage plus tard', cle: 'tard', filtre: plusTard },
+        { val: l.filter(facture).length, lib: 'déjà facturé(s), passages restants', cle: 'fac', filtre: facture },
+      ];
     } },
   { cle: 'attente', label: 'En attente', ligne2: true, test: function(i){ return fileDe(i) === 'attente'; },
     tri: function(x, y){ return String(x.updatedAt || dateArrivee(x)).localeCompare(String(y.updatedAt || dateArrivee(y))); },
@@ -3989,6 +4051,7 @@ var FILES_SUIVI = [
     kpis: function(l){ return [{ val: l.length, lib: 'dossier(s) clôturé(s)' }, { val: l.filter(clotureHistorique).length, lib: 'dont clôturés d\'office (rapports non suivis)', cle: 'histo', filtre: clotureHistorique }, { texte: parClient(l), lib: 'par client' }]; } },
 ];
 
+function rechercheSaisie() { return ((document.getElementById('searchInput') || {}).value || '').trim(); }
 function fileCourante() { return FILES_SUIVI.find(function(x){ return x.cle === fileSuivi; }) || FILES_SUIVI[0]; }
 function libelleFile(f) { return typeof f.label === 'function' ? f.label() : f.label; }
 
@@ -3997,21 +4060,25 @@ function renderFilesBar(base) {
   if (!bar) return;
   if (!FILES_SUIVI.some(function(f){ return f.cle === fileSuivi; })) fileSuivi = 'semaine'; // ancienne file mémorisée
   var trouve = function(cle){ return FILES_SUIVI.find(function(f){ return f.cle === cle; }); };
+  // Recherche transversale (16/11) : la recherche porte sur tous les onglets ; chaque puce
+  // compte ses résultats, celles qui en ont ressortent, les autres s'estompent.
+  var cherche = rechercheSaisie();
   var puce = function(f) {
     var liste = base.filter(f.test), n = liste.length;
-    var alerte = f.kpis && f.cle !== 'annuleDef' && f.cle !== 'encours' && f.cle !== 'cloture' && f.kpis(liste).some(function(k){ return k.alerte && Number(k.val) > 0; });
+    var alerte = !cherche && f.kpis && f.cle !== 'annuleDef' && f.cle !== 'cloture' && f.kpis(liste).some(function(k){ return k.alerte && Number(k.val) > 0; });
+    var etatRech = cherche ? (n ? ' trouve' : ' sans-resultat') : '';
     if (f.cle === 'semaine') {
-      return '<button class="file-semaine' + (fileSuivi === 'semaine' ? ' active' : '') + '" onclick="choisirFileSuivi(\'semaine\')">'
+      return '<button class="file-semaine' + (fileSuivi === 'semaine' ? ' active' : '') + etatRech + '" onclick="choisirFileSuivi(\'semaine\')" title="Passages de la semaine précédente, en cours et suivante">'
         + '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>'
         + libelleFile(f) + ' <span class="cpt">' + n + '</span></button>';
     }
-    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (alerte ? ' alerte' : '') + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + libelleFile(f) + ' <span class="cpt">' + n + '</span></button>';
+    return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (alerte ? ' alerte' : '') + etatRech + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + libelleFile(f) + ' <span class="cpt">' + n + '</span></button>';
   };
-  // Rangée 1 : le parcours d'un bon, dans l'ordre
-  var parcours = ['validation', 'planification', 'semaine', 'afacturer', 'cloture'].map(trouve);
-  var html = '<div class="files-ligne">' + parcours.map(puce).join('<span class="files-fleche">→</span>') + '</div>';
-  // Rangée 2 : recherche globale et situations hors parcours
-  html += '<div class="files-ligne files-ligne2">' + ['encours', 'attente', 'pannule', 'annuleDef'].map(trouve).map(puce).join('') + '</div>';
+  // Rangée 1 : le Pilotage quotidien (outil du jour, à part), puis le parcours d'un bon dans l'ordre
+  var parcours = ['validation', 'planification', 'encours', 'afacturer', 'cloture'].map(trouve);
+  var html = '<div class="files-ligne">' + puce(trouve('semaine')) + '<span class="files-sep"></span>' + parcours.map(puce).join('<span class="files-fleche">→</span>') + '</div>';
+  // Rangée 2 : situations hors parcours
+  html += '<div class="files-ligne files-ligne2">' + ['attente', 'pannule', 'annuleDef'].map(trouve).map(puce).join('') + '</div>';
   bar.innerHTML = html;
   renderBandeau(base.filter(fileCourante().test));
 }
@@ -4074,7 +4141,7 @@ function majAffichageVue() {
   var btnAj = document.getElementById('btnAjouter');
   if (btnAj) btnAj.style.display = contrat ? 'none' : '';
   var barre = document.querySelector('.filters-bar');
-  if (barre) barre.style.display = contrat && fileSuivi === 'validation' ? 'none' : '';
+  if (barre) barre.style.display = contrat && fileSuivi === 'validation' && !rechercheSaisie() ? 'none' : '';
   // Filtres secondaires repliés dans l'onglet En contrat
   var replier = contrat && !plusFiltres;
   ['filterNature', 'filterAnnee', 'filtreDates'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = replier ? 'none' : (id === 'filtreDates' ? 'flex' : ''); });
@@ -4087,8 +4154,13 @@ function majAffichageVue() {
     var fa = document.getElementById('filterAssigne'); if (fa) fa.style.display = '';
   } else if (contrat && fileSuivi === 'planification') {
     ['filterClient', 'filterStatut', 'filterAssigne', 'filterNature', 'filterAnnee', 'filtreDates', 'btnPlusFiltres'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  } else if (contrat && fileSuivi === 'validation') {
+    // Recherche seule (la barre n'est visible que si une recherche est en cours)
+    ['filterClient', 'filterStatut', 'filterAssigne', 'filterNature', 'filterAnnee', 'filtreDates', 'btnPlusFiltres'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = 'none'; });
   } else {
-    ['filterStatut', 'filterAssigne'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = ''; });
+    // Statut retiré du parcours En contrat (16/11), gardé pour Particuliers, Entreprises, Tâches
+    var fs = document.getElementById('filterStatut'); if (fs) fs.style.display = contrat ? 'none' : '';
+    var fa2 = document.getElementById('filterAssigne'); if (fa2) fa2.style.display = '';
     var fc = document.getElementById('filterClient'); if (fc) fc.style.display = contrat ? '' : 'none';
   }
 }
@@ -4610,11 +4682,12 @@ window.renderTableV2 = function(list) {
   var extra = f.colonnes || [];
   // Onglet réduit (Validation) : ni techniciens, ni passages, ni notifications, ni statut
   var reduit = !!f.reduit;
+  var notifs = !reduit && !f.sansNotifs; // En cours (16/11) : pas de colonne Notifs
   // Colonne Statut retirée de tous les onglets du parcours (15/11) : les changements passent par les actions
-  var nbCols = f.cle === 'semaine' ? 11 : (reduit ? 5 : 8) + extra.length;
+  var nbCols = f.cle === 'semaine' ? 11 : (reduit ? 5 : notifs ? 8 : 7) + extra.length;
   // En-tête : colonnes communes, puis celles propres à l'onglet, avant Statut et Action.
   var titresCols = '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th>'
-    + (reduit ? '' : '<th>Techniciens</th><th>Passages</th><th>Notifs</th>')
+    + (reduit ? '' : '<th>Techniciens</th><th>Passages</th>' + (notifs ? '<th>Notifs</th>' : ''))
     + extra.map(function(c){ return '<th>' + c.titre + '</th>'; }).join('')
     + '<th>Action</th>';
   if (f.cle === 'semaine') {
@@ -4628,7 +4701,14 @@ window.renderTableV2 = function(list) {
   }
   var vide = '';
   if (!list.length) {
-    vide = '<tr><td colspan="' + nbCols + '"><div class="empty-state"><p>' + (sousFiltre ? 'Aucun dossier pour cet indicateur.' : 'Rien dans « ' + libelleFile(f) + ' » pour le moment.') + '</p></div></td></tr>';
+    // Recherche transversale (16/11) : rien ici, on indique les onglets qui ont un résultat
+    var ailleurs = rechercheSaisie() && !sousFiltre ? FILES_SUIVI.filter(function(x){ return x.cle !== f.cle; }).map(function(x){ return { f: x, n: (window._baseSuivi || []).filter(x.test).length }; }).filter(function(x){ return x.n > 0; }) : [];
+    var msgVide = sousFiltre ? 'Aucun dossier pour cet indicateur.'
+      : rechercheSaisie() ? 'Aucun résultat dans « ' + libelleFile(f) + ' »' + (ailleurs.length ? ', mais trouvé dans :' : ' ni dans les autres onglets.')
+      : 'Rien dans « ' + libelleFile(f) + ' » pour le moment.';
+    vide = '<tr><td colspan="' + nbCols + '"><div class="empty-state"><p>' + msgVide + '</p>'
+      + (ailleurs.length ? '<div class="trouve-ailleurs">' + ailleurs.map(function(x){ return '<button class="file-chip trouve" onclick="choisirFileSuivi(\'' + x.f.cle + '\')">' + libelleFile(x.f) + ' <span class="cpt">' + x.n + '</span></button>'; }).join('') + '</div>' : '')
+      + '</div></td></tr>';
     // La Semaine garde son bloc "Semaine prochaine" même vide
     if (f.cle !== 'semaine' || sousFiltre) { body.innerHTML = vide; return; }
   }
@@ -4646,7 +4726,7 @@ window.renderTableV2 = function(list) {
     if (!reduit) {
       h += '<td>' + (techs.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + techs.map(function(a){ return assigneBadge(a); }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
       h += '<td>' + friseHtml(item) + '</td>';
-      h += '<td>' + notifsHtml(item) + '</td>';
+      if (notifs) h += '<td>' + notifsHtml(item) + '</td>';
     }
     extra.forEach(function(c){ h += '<td>' + c.cell(item) + '</td>'; });
     h += '<td style="white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-start;align-items:center;">' + actionSuivante(item) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';

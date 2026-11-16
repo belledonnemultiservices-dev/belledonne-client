@@ -1351,9 +1351,9 @@ function rendreRecap(item) {
   const manque = manquesPlanification(item);
   const manqueNotif = manquesNotification(item);
   $(".pl-corps").innerHTML = `
-    <p class="pl-intro">${toutOk ? "Tout est prêt : les passages sont planifiés, dans l'agenda, sur Kizeo, et le client et le locataire sont prévenus." : manque.length ? "Le dossier ne peut pas encore passer en Pilotage : l'étape Passages, agenda & Kizeo n'est pas terminée." : "Les passages sont prêts. Il reste à prévenir le client ou le locataire (tu peux le faire maintenant ou plus tard)."}</p>
+    <p class="pl-intro">${toutOk ? "Tout est prêt : les passages sont planifiés, dans l'agenda, sur Kizeo, et le client et le locataire sont prévenus." : manque.length ? "Le dossier ne peut pas encore passer En cours : l'étape Passages, agenda & Kizeo n'est pas terminée." : "Les passages sont prêts. Il reste à prévenir le client ou le locataire (tu peux le faire maintenant ou plus tard)."}</p>
     <table class="pl-table pl-recap"><thead><tr><th>Passage</th><th>Agenda</th><th>Kizeo</th><th>Client</th><th>Locataire</th></tr></thead><tbody>${lignes.join("") || '<tr><td colspan="5">Aucun passage</td></tr>'}</tbody></table>
-    ${manque.length ? `<div class="pl-psg-pb" style="margin-top:12px;">À terminer avant de passer en Pilotage :<br>${manque.map(x => "• " + esc(x)).join("<br>")}</div>` : ""}
+    ${manque.length ? `<div class="pl-psg-pb" style="margin-top:12px;">À terminer avant de passer En cours :<br>${manque.map(x => "• " + esc(x)).join("<br>")}</div>` : ""}
     ${!manque.length && manqueNotif.length ? `<div class="pl-psg-pb" style="margin-top:12px;background:#FFF4E5;color:#B45309;">Rappel :<br>${manqueNotif.map(x => "• " + esc(x)).join("<br>")}</div>` : ""}
     <p class="pl-note" style="margin-top:12px;">Les rapports (reçu, envoyé au client) se suivront après l'intervention, dans le Pilotage quotidien.</p>`;
   pied(`<button class="pl-btn" data-a="prec">← Précédent</button><span class="pl-espace"></span>${manque.length ? `<button class="pl-btn" data-a="aller">Reprendre l'étape Passages →</button>` : ""}<button class="pl-btn prim" data-a="fin">Terminer</button>`);
@@ -1366,12 +1366,12 @@ function rendreRecap(item) {
     const m1 = manquesPlanification(it);
     if (m1.length) { alert("Le dossier reste en Planification tant que l'étape Passages, agenda & Kizeo n'est pas terminée :\n\n" + m1.map(x => "• " + x).join("\n")); return; }
     const m2 = manquesNotification(it);
-    if (m2.length && !confirm("Rappel :\n\n" + m2.map(x => "• " + x).join("\n") + "\n\nPasser quand même le dossier en Pilotage ? Tu pourras notifier depuis le Pilotage quotidien.")) return;
+    if (m2.length && !confirm("Rappel :\n\n" + m2.map(x => "• " + x).join("\n") + "\n\nPasser quand même le dossier En cours ? Tu pourras notifier depuis l'onglet En cours ou le Pilotage quotidien.")) return;
     // Planification faite : le dossier passe de « À traiter » à « En cours »
     // (de même pour un dossier replanifié après un passage annulé)
     if (["À traiter", "Passage annulé", "Nouveau", "", undefined, null].includes(it.statut)) {
       await window._updateSuivi(it.id, { statut: "En cours", updatedAt: new Date().toISOString() });
-      showToast("Dossier planifié · passé en Pilotage quotidien");
+      showToast("Dossier planifié · passé En cours");
     }
     fermer();
   };
