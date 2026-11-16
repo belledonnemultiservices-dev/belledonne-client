@@ -424,7 +424,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, updateDoc, deleteDoc, onSnapshot, getDocs, query, where, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, updateDoc, deleteDoc, onSnapshot, getDocs, query, where, addDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { PDFDocument, StandardFonts, rgb } from "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.esm.js";
 
@@ -462,6 +462,49 @@ async function majStatutApresPassage1(suiviId) {
   const ok = actifs1.length === 1 ? envoyes.some(r => !r.passageId || !actifs1[0].passageId || r.passageId === actifs1[0].passageId)
     : actifs1.every(p => envoyes.some(r => r.passageId && r.passageId === p.passageId));
   if (ok) await updateDoc(doc(db, "suivi", suiviId), { statut: "Terminé" });
+}
+// Rapport ordinaire envoyé (16/11) : le premier passage encore actif fait passer le dossier
+// en « Terminé ». C'est le n° 1 d'habitude (règle ci-dessus, inchangée) ; après un passage 1
+// annulé et non replanifié, ou replanifié sous un autre numéro, c'est le plus petit restant.
+async function majStatutApresEnvoi(suiviId, numPassage) {
+  const sSnap = await getDoc(doc(db, "suivi", suiviId));
+  if (!sSnap.exists()) return;
+  const d = sSnap.data();
+  if (["Terminé", "Annulé", "En attente"].includes(d.statut)) return;
+  const actifs = (Array.isArray(d.passages) ? d.passages : []).filter(p => p && typeof p === "object" && p.statut !== "annule");
+  if (!actifs.length) return;
+  const min = Math.min(...actifs.map(p => Number(p.num) || 0));
+  if (Number(numPassage) !== min) return;
+  if (min === 1) return majStatutApresPassage1(suiviId);
+  const groupe = actifs.filter(p => Number(p.num) === min);
+  const recs = (await getDocs(query(collection(db, "reception-rapports"), where("suiviId", "==", suiviId), where("numPassage", "==", min)))).docs.map(x => x.data());
+  const envoyes = recs.filter(r => r.statut === "envoye" && r.typeRapport !== "absence-annulation");
+  if (groupe.every(p => envoyes.some(r => !p.passageId || !r.passageId || r.passageId === p.passageId))) await updateDoc(doc(db, "suivi", suiviId), { statut: "Terminé" });
+}
+// Passage annulé (16/11) : passage barré avec son constat (statut, motif, provenance), dossier
+// en stand-by jusqu'à la replanification ou la décision de ne pas replanifier (report.etat),
+// étape notée dans l'historique du dossier. Vaut pour tout passage, pas seulement le n° 1.
+async function annulerPassageSuivi(r, infos) {
+  const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
+  if (!sSnap.exists()) return;
+  const d = sSnap.data();
+  const passages = Array.isArray(d.passages) ? d.passages : [];
+  const now = new Date().toISOString();
+  const par = (auth.currentUser && auth.currentUser.email) || "";
+  const annulation = { le: now, statut: infos.statut === "absent" ? "absent" : "annulation", motif: infos.motif || "", provenance: infos.provenance, par };
+  const cibles = passages.filter(p => p && typeof p === "object" && memePassage(p, r));
+  const updated = passages.map(p => p && typeof p === "object" && memePassage(p, r) ? { ...p, statut: "annule", annulation, ...(infos.effacerKizeo ? { kizeoPush: null } : {}) } : p);
+  const ouvert = d.report && d.report.etat === "standby" ? d.report : {
+    etat: "standby", ouvertLe: now, anciennes: [],
+    // Passages connus à l'ouverture : seuls eux comptent comme « anciennes dates » s'ils bougent
+    connus: passages.filter(p => p && typeof p === "object" && p.passageId && p.statut !== "annule" && !p.jumeau).map(p => p.passageId),
+  };
+  const anciennes = (ouvert.anciennes || []).slice();
+  cibles.filter(p => !p.jumeau).forEach(p => { if (!anciennes.some(a => a.pid && a.pid === p.passageId)) anciennes.push({ pid: p.passageId || null, num: p.num || null, debut: p.debut || "" }); });
+  const texte = "Passage " + r.numPassage + " annulé (" + (annulation.statut === "absent" ? "absent" : "annulation") + (annulation.motif ? " : " + annulation.motif : "") + ") · "
+    + (infos.provenance === "technicien" ? "signalé par le technicien" : "depuis l'app") + " · dossier en attente de replanification";
+  await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated, report: { ...ouvert, anciennes }, journal: arrayUnion({ at: now, par, texte }) });
+  if (String(r.numPassage) === "1") await majStatutApresPassage1(r.suiviId);
 }
 const storage = getStorage(app);
 
@@ -1484,33 +1527,26 @@ window.doEnvoyer = async function(mode) {
           });
         }
       }
+      // Constat final (statut et motif éventuellement corrigés dans la fenêtre) gardé sur le rapport (16/11)
+      const constat = isAbsAnnul ? { ...(r.absence || {}), source: (r.absence && r.absence.source) || "app", statut: document.getElementById("envoiStatut").value === "absent" ? "absent" : "annulation", motif: document.getElementById("envoiMotif").value.trim() } : null;
       await updateDoc(doc(db, "reception-rapports", r.id), {
         statut: "envoye", updatedAt: now, ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}), ajouteEspaceClient: wantsEspace,
+        ...(constat ? { absence: constat } : {}),
       });
       // Rapport normal du passage n°1 envoyé : l'intervention passe en "Terminé"
       // (anciennement fait par le bouton Archiver, supprimé). Les rapports des
       // passages suivants se rangent sur leur passage sans changer le statut.
       // Un renvoi depuis "Envoyés" ne retouche pas un statut modifié depuis.
       // Avec des jumeaux n° 1, « Terminé » attend que chacun ait son rapport envoyé.
-      if (!isAbsAnnul && r.statut !== "envoye" && r.suiviId && String(r.numPassage) === "1") {
-        try { await majStatutApresPassage1(r.suiviId); }
+      if (!isAbsAnnul && r.statut !== "envoye" && r.suiviId && r.numPassage != null) {
+        try { await majStatutApresEnvoi(r.suiviId, r.numPassage); }
         catch(e) { console.warn("Mise à jour statut Suivi échouée:", e.message); }
       }
-      // Un rapport d'absence/annulation constaté par le technicien signifie que le
-      // passage n'a pas eu lieu normalement : on le marque annulé dans le Suivi.
-      if (isAbsAnnul && r.suiviId && r.numPassage) {
-        try {
-          const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
-          if (sSnap.exists()) {
-            const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
-            // Seul le passage concerné est annulé (par passageId : un jumeau n'emporte pas l'autre)
-            const updated = passages.map(p => memePassage(p, r) ? { ...p, statut: "annule" } : p);
-            await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
-            // Passage n°1 : « Passage annulé » si plus aucun n° 1 actif, « Terminé » si les jumeaux restants sont envoyés.
-            // Statut ordinaire, modifiable ensuite à la main.
-            if (String(r.numPassage) === "1") await majStatutApresPassage1(r.suiviId);
-          }
-        } catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
+      // Rapport d'absence/annulation : le passage n'a pas eu lieu, il est annulé dans le Suivi et le
+      // dossier part en stand-by (Passage annulé). Un renvoi depuis « Envoyés » ne rouvre rien.
+      if (isAbsAnnul && r.statut !== "envoye" && r.suiviId && r.numPassage) {
+        try { await annulerPassageSuivi(r, { statut: constat.statut, motif: constat.motif, provenance: r.absence && r.absence.source === "kizeo" ? "technicien" : "app" }); }
+        catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
       }
       showToast((wantsEmail ? sent + " email(s) envoyé(s)" : "Ajouté à l'espace client") + (wantsEspace && wantsEmail ? ", ajouté à l'espace client." : "."));
       closeEnvoi();
@@ -1814,21 +1850,14 @@ window.confirmerAnnulerPassage = async function(mode) {
 
     await updateDoc(doc(db, "reception-rapports", r.id), {
       statut: "envoye", typeRapport: "absence-annulation", fileUrl, type: "pdf", bc: reference,
+      absence: { source: "app", statut: statut === "absent" ? "absent" : "annulation", motif },
       ajouteEspaceClient: wantsEspace, updatedAt: now,
       ...(wantsEmail ? { notifiedAt: now, notifiedTo: recipients } : {}),
     });
 
     if (r.suiviId && r.numPassage) {
-      try {
-        const sSnap = await getDoc(doc(db, "suivi", r.suiviId));
-        if (sSnap.exists()) {
-          const passages = Array.isArray(sSnap.data().passages) ? sSnap.data().passages : [];
-          const updated = passages.map(p => memePassage(p, r) ? { ...p, statut: "annule", kizeoPush: null } : p);
-          await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated });
-          // Même règle que pour un constat envoyé
-          if (String(r.numPassage) === "1") await majStatutApresPassage1(r.suiviId);
-        }
-      } catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
+      try { await annulerPassageSuivi(r, { statut, motif, provenance: "app", effacerKizeo: true }); }
+      catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
     }
 
     showToast("Passage annulé" + (wantsEmail ? " — email envoyé" : "") + (wantsEspace ? ", ajouté à l'espace client." : "."));

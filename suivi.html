@@ -312,6 +312,11 @@
   .bs-nav button:hover{border-color:#4338CA;}
   .bs-nav .bs-nav-retour{font-size:12px;}
   .sem-entete{cursor:pointer;}
+  /* Alerte stand-by (16/11) : passage prévu d'un dossier en Passage annulé */
+  .sem-alerte td{padding:0!important;background:transparent!important;border-bottom:none!important;}
+  .sem-alerte-in{background:#FFF4E5;border:1px solid #F5C98A;color:#8A5A00;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.7;}
+  .sem-alerte-in a{display:inline-block;margin:0 4px;padding:1px 9px;border-radius:12px;background:#fff;border:1px solid #F5C98A;color:#8A5A00;font-weight:600;cursor:pointer;text-decoration:none;}
+  .sem-alerte-in a.rouge{border-color:#E74C3C;color:#C0392B;}
   .sem-entete td{padding:0!important;background:transparent!important;border-bottom:none!important;}
   .sem-hd{display:flex;align-items:center;gap:12px;padding:11px 16px;border-left:4px solid;border-radius:8px;}
   .sem-hd:hover{filter:brightness(0.98);}
@@ -2917,8 +2922,9 @@ window.openNotifFromRow = function(id) {
 
 window.openNotifFromItem = async function(item) {
   const client = item.client;
-  // Un jumeau est la même visite que son passage principal : une seule date annoncée
-  const passages = (item.passages || []).filter(p => p && !(typeof p === 'object' && p.jumeau));
+  // Un jumeau est la même visite que son passage principal : une seule date annoncée.
+  // Un passage annulé n'est plus annoncé (16/11).
+  const passages = (item.passages || []).filter(p => p && !(typeof p === 'object' && (p.jumeau || p.statut === 'annule')));
   const passagesStr = passages.map((p, i) => {
     const debut = typeof p === 'object' ? (p.debut || '') : (p.includes('|') ? p.split('|')[0] : p);
     return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
@@ -2945,10 +2951,68 @@ window.openNotifFromItem = async function(item) {
   populateLocataireTab(nomLoc, emailLoc, passagesStr, adresse, bc, pl, nature);
   const phonesLoc = Array.isArray(item.coordonnees) ? item.coordonnees : (item.coordonnees ? [item.coordonnees] : []);
   populateSmsPanel(phonesLoc, passagesStr, adresse, bc, nature);
+  appliquerModeReport(item);
 
   switchNotifTab('bailleur');
   document.getElementById('modalNotifSuivi').classList.add('open');
 };
+
+// ── REPORT DE RENDEZ-VOUS (16/11) ──
+// Dossier en stand-by ou tout juste replanifié : client et locataire reçoivent un message de
+// report (anciennes dates → nouvelles dates) tant que chacun n'a pas été prévenu du report.
+var DEF_REPORT = {
+  client: { subject: 'Report de rendez-vous — BC N°{{bc}}', body: "Bonjour,\n\nConcernant l'intervention {{nature}} ({{reference}}) au {{adresse}} :\n\n{{changement}}\n{{introNouvelles}}\n\n{{nouvellesDates}}\n\nCordialement,\nBelledonne Multiservices\n📞 06 95 67 26 03" },
+  locataire: { subject: 'Report de votre rendez-vous', body: "Bonjour {{nom}},\n\n{{changement}}\n{{introNouvelles}}\n\n{{nouvellesDates}}\n\nAdresse : {{adresse}}\n\nMerci d'être présent(e) aux horaires indiqués. En cas d'empêchement, merci de nous contacter dès que possible.\n\nCordialement,\nBelledonne Multiservices\n📞 06 95 67 26 03" },
+  sms: { body: 'Belledonne : votre RDV est reporte. Nouveau(x) creneau(x) : {{nouvellesDates}} - {{adresse}}. BC:{{bc}}. Empechement : 06 95 67 26 03.' },
+};
+window.modeReport = function(item) {
+  var r = item.report;
+  if (fileDe(item) !== 'pannule' && !(r && r.etat === 'replanifie')) return null;
+  var base = r && (r.etat === 'standby' || r.etat === 'replanifie') ? r : window.reportInitial(item);
+  var anc = [];
+  (base.anciennes || []).forEach(function(a){ if (a && a.debut && anc.indexOf(a.debut) === -1) anc.push(a.debut); });
+  anc.sort();
+  var c = constatAnnulation(item);
+  return { anciennes: anc, client: !base.notifClient, loc: !base.notifLoc, motif: c.motif || '' };
+};
+function libCreneau(d) { if (!d) return ''; var j = d.substring(0, 10).split('-'); return 'le ' + j[2] + '/' + j[1] + '/' + j[0] + (d.length > 10 ? ' à ' + d.substring(11, 13) + 'h' + d.substring(14, 16) : ''); }
+function joindreFr(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' et ' + a[a.length - 1]; }
+function varsReport(item, rep) {
+  var anc = rep.anciennes.map(libCreneau);
+  var nouv = passagesActifs(item).filter(function(p){ return !p.jumeau && p.debut && p.debut.substring(0, 10) >= jourLocal(0); }).sort(function(a, b){ return a.debut.localeCompare(b.debut); });
+  var reference = [item.bc ? 'BC N°' + item.bc : '', item.pl ? 'PL N°' + item.pl : '', item.devis ? 'Devis N°' + item.devis : ''].filter(Boolean).join(' / ') || '—';
+  return {
+    changement: anc.length > 1 ? 'Les rendez-vous initialement prévus ' + joindreFr(anc) + ' sont reportés.' : anc.length ? 'Le rendez-vous initialement prévu ' + anc[0] + ' est reporté.' : 'Le rendez-vous est reporté.',
+    introNouvelles: nouv.length > 1 ? 'Voici les nouveaux créneaux :' : 'Voici le nouveau créneau :',
+    anciennesDates: joindreFr(anc),
+    nouvellesDates: nouv.map(function(p, k){ return (k === 0 ? '1er' : (k + 1) + 'e') + ' passage : ' + libCreneau(p.debut); }).join('\n'),
+    nouvellesDatesSms: nouv.map(function(p){ return p.debut.substring(8, 10) + '/' + p.debut.substring(5, 7) + (p.debut.length > 10 ? ' ' + p.debut.substring(11, 13) + 'h' + p.debut.substring(14, 16) : ''); }).join(' | '),
+    bc: item.bc || '', pl: item.pl || '', reference: reference, adresse: item.adresse || '', nature: item.nature || '', nom: item.nomClient || 'Madame, Monsieur', motif: rep.motif || '',
+  };
+}
+function remplirVars(t, v, sms) {
+  return String(t || '').replace(/{{(\w+)}}/g, function(m, k){ if (sms && k === 'nouvellesDates') return v.nouvellesDatesSms; if (sms && k === 'adresse') return String(v.adresse).substring(0, 40); return v[k] !== undefined ? v[k] : m; });
+}
+function appliquerModeReport(item) {
+  var rep = window.modeReport ? window.modeReport(item) : null;
+  window._nsReport = rep ? { itemId: item.id, client: rep.client, loc: rep.loc } : null;
+  var info = document.getElementById('nsReportInfo');
+  if (info) info.style.display = rep && (rep.client || rep.loc) ? '' : 'none';
+  if (!rep) return;
+  var v = varsReport(item, rep);
+  if (rep.client) {
+    var tc = window._reportClientTemplate || DEF_REPORT.client;
+    document.getElementById('nsSubject').value = remplirVars(tc.subject || DEF_REPORT.client.subject, v);
+    document.getElementById('nsBody').value = remplirVars(tc.body || DEF_REPORT.client.body, v);
+  }
+  if (rep.loc) {
+    var tl = window._reportLocataireTemplate || DEF_REPORT.locataire;
+    document.getElementById('nsSubjectLoc').value = remplirVars(tl.subject || DEF_REPORT.locataire.subject, v);
+    document.getElementById('nsBodyLoc').value = remplirVars(tl.body || DEF_REPORT.locataire.body, v);
+    var sm = document.getElementById('nsSmsBody');
+    if (sm) { sm.value = remplirVars((window._reportSmsTemplate || DEF_REPORT.sms).body || DEF_REPORT.sms.body, v, true); updateSmsCount(); }
+  }
+}
 
 // ── DESTINATAIRES BAILLEUR (cases à cocher, multi, + nouveau contact) ──
 // ── Expéditeur du dossier ↔ contacts du client (15/11) ──
@@ -3309,6 +3373,10 @@ window.sendNotifSuivi = async function() {
       }
       if (window._updateSuiviNotifArray) window._updateSuiviNotifArray(itemId, field, ts);
       if (window._noterNotifPassages) window._noterNotifPassages(itemId, isLoc ? 'locataire' : 'bailleur', ts);
+      // Report (16/11) : la fiche garde la trace de qui a été prévenu du report, et quand
+      if (window._nsReport && window._nsReport.itemId === itemId && window._noterReport && (isLoc ? window._nsReport.loc : window._nsReport.client)) {
+        window._noterReport(itemId, isLoc ? 'loc' : 'client', ts, recipients.slice(0, sent)).catch(function(e){ console.warn('report :', e.message); });
+      }
       updateNotifRow(itemId);
     }
   } else {
@@ -3636,7 +3704,7 @@ function passagesNorm(item) {
     if (typeof p === 'string') { var x = p.split('|'); return { num: i+1, debut: x[0]||'', fin: x[1]||'', techs: [], statut: '' }; }
     var cal = (p.calEvents && typeof p.calEvents === 'object') ? p.calEvents : ((item.calEventIds || [])[i] || {});
     if (typeof cal !== 'object' || cal === null) cal = cal ? { _: cal } : {};
-    return { num: p.num || (i+1), passageId: p.passageId || null, kzForm: p.kzForm, kzNom: p.kzNom || (p.kizeoPush ? String(p.kizeoPush.libelle || '').replace(/ \(\d+\)$/, '') : ''), jumeau: !!p.jumeau, libelle: p.libelle || '', adresse: p.adresse || '', titre: p.titre || '', debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null, calSync: p.calSync || '' };
+    return { num: p.num || (i+1), passageId: p.passageId || null, kzForm: p.kzForm, kzNom: p.kzNom || (p.kizeoPush ? String(p.kizeoPush.libelle || '').replace(/ \(\d+\)$/, '') : ''), jumeau: !!p.jumeau, libelle: p.libelle || '', adresse: p.adresse || '', titre: p.titre || '', debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null, calSync: p.calSync || '', annulation: p.annulation || null, suite: p.suite || null, remplace: p.remplace || null };
   }).sort(function(a, b){ return (a.num||0) - (b.num||0) || (a.jumeau ? 1 : 0) - (b.jumeau ? 1 : 0); });
   // Jumeau (15/11) : même visite que son passage principal, autre type d'intervention. Il en
   // reprend date, créneau, techniciens, rendez-vous agenda et notifications ; seuls son
@@ -3710,6 +3778,8 @@ function recPassage(item, x) {
   if (pid && window._receptionsParPid && window._receptionsParPid[pid]) return window._receptionsParPid[pid];
   var r = window._receptionsParPassage[item.id + '::' + num];
   if (r && pid && r.passageId && r.passageId !== pid) return undefined;
+  // Passage de remplacement (même n° que le passage annulé) : le rapport d'annulation envoyé n'est pas le sien
+  if (r && x && typeof x === 'object' && x.statut !== 'annule' && r.typeRapport === 'absence-annulation' && r.statut === 'envoye' && (!pid || r.passageId !== pid)) return undefined;
   return r;
 }
 function moisCourant(iso) { var d = jourLocal(0); return !!iso && iso.substring(0, 7) === d.substring(0, 7); }
@@ -3843,8 +3913,12 @@ function clotureHistorique(item) {
   return dates.length === 0 || dates[dates.length - 1] < jourLocal(-30);
 }
 var STATUT_VERS_FILE = { 'À valider': 'validation', 'En attente': 'attente', 'Passage annulé': 'pannule', 'Annulé': 'annuleDef' };
+// Stand-by (16/11) : un passage annulé (n° 1 ou suivant) attend sa replanification ou la décision
+// de ne pas replanifier. Le dossier quitte le pilotage le temps de cette décision.
+function enStandby(item) { return item.statut === 'Passage annulé' || !!(item.report && item.report.etat === 'standby' && ['À valider', 'En attente', 'Annulé'].indexOf(item.statut) === -1); }
 function fileDe(item) {
   if (STATUT_VERS_FILE[item.statut]) return STATUT_VERS_FILE[item.statut];
+  if (enStandby(item)) return 'pannule';
   // Tâche : pas de facturation ; clôturée quand tous ses passages sont faits
   if (item.clientType === 'tache') {
     if (item.statut === 'Terminé') return 'cloture';
@@ -4001,19 +4075,42 @@ var FILES_SUIVI = [
         { texte: parClient(l), lib: 'par client' },
       ];
     } },
+  // Stand-by (16/11) : passage annulé (n° 1 ou suivant) en attente de replanification
   { cle: 'pannule', label: 'Passage annulé', ligne2: true, test: function(i){ return fileDe(i) === 'pannule'; },
-    tri: function(x, y){ return String(x.updatedAt || '').localeCompare(String(y.updatedAt || '')); },
+    tri: function(x, y){
+      var ax = alerteProchain(x), ay = alerteProchain(y);
+      var kx = ax ? ax.jours : 99999, ky = ay ? ay.jours : 99999;
+      return kx !== ky ? kx - ky : String(constatAnnulation(x).le).localeCompare(String(constatAnnulation(y).le));
+    },
     question: "Qu'est-ce qu'il faut replanifier ?",
     colonnes: [
-      { titre: 'Motif', cell: function(i){ var r = recPassage(i, 1); var a = r && r.absence; return a ? '<span style="font-size:12px;"><b>' + (a.statut === 'absent' ? 'Absent' : 'Annulation') + '</b>' + (a.motif ? ' · ' + String(a.motif).replace(/</g, '&lt;') : '') + '</span>' : '<span style="color:var(--text-muted)">—</span>'; } },
-      { titre: 'Annulé', cell: function(i){ var r = recPassage(i, 1); return '<span style="font-size:12px;">' + libJours(joursDepuis((r && r.notifiedAt) || i.updatedAt)) + '</span>'; } },
+      { titre: 'Annulation', cell: function(i){
+        var c = constatAnnulation(i), t = function(v){ return String(v).replace(/</g, '&lt;'); };
+        var num = c.p ? (CERCLES[(c.p.num || 1) - 1] || '#' + c.p.num) + ' ' : '';
+        var quoi = c.statut === 'absent' ? 'Absent' : c.statut ? 'Annulation' : 'Annulé';
+        var prov = c.provenance === 'technicien' ? 'technicien' : c.provenance === 'app' ? "depuis l'app" : '';
+        return '<div style="font-size:12px;max-width:260px;"><b>' + num + quoi + '</b>' + (c.p && c.p.debut ? ' du ' + jjmm(c.p.debut.substring(0, 10)) : '')
+          + '<div style="color:var(--text-mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + t(c.motif).replace(/"/g, '&quot;') + '">' + (c.motif ? t(c.motif) : c.rec && c.rec.fileUrl ? '<span style="color:var(--text-muted)">motif dans le PDF</span>' : '<span style="color:var(--text-muted)">pas de motif</span>') + '</div>'
+          + (prov ? '<div style="color:var(--text-muted);font-size:11px;">' + prov + '</div>' : '') + '</div>';
+      } },
+      { titre: 'Rapport', cell: function(i){ var c = constatAnnulation(i); return c.rec && c.rec.fileUrl ? iconeRapport(c.rec, "Rapport d'annulation") : '<span style="color:var(--text-muted)">—</span>'; } },
+      { titre: 'Prochain passage', cell: function(i){
+        var a = alerteProchain(i);
+        if (!a) return '<span style="font-size:12px;color:var(--text-muted)">aucun</span>';
+        var col = { depasse: '#C0392B', rouge: '#E74C3C', orange: '#B9770E', gris: 'var(--text-mid)' }[a.niveau];
+        return '<span style="font-size:12px;white-space:nowrap;font-weight:' + (a.niveau === 'gris' ? 500 : 700) + ';color:' + col + ';" title="Toujours dans l\'agenda du technicien et dans Kizeo : à replanifier ou à supprimer">'
+          + (CERCLES[(a.p.num || 1) - 1] || '#' + a.p.num) + ' ' + jjmm(a.p.debut.substring(0, 10)) + ' · ' + (a.jours < 0 ? 'dépassé' : a.jours === 0 ? "aujourd'hui" : 'dans ' + a.jours + ' j') + '</span>';
+      } },
+      { titre: 'Annulé', cell: function(i){ return '<span style="font-size:12px;">' + libJours(joursDepuis(constatAnnulation(i).le)) + '</span>'; } },
     ],
     kpis: function(l){
-      var abs = l.filter(function(i){ var r = recPassage(i, 1); return r && r.absence && r.absence.statut === 'absent'; }).length;
-      var aRepl = function(i){ var r = recPassage(i, 1); var n = joursDepuis((r && r.notifiedAt) || i.updatedAt); return !aNouveauPassage(i) && n !== null && n > DELAI_REPLANIF_JOURS; };
+      var abs = l.filter(function(i){ return constatAnnulation(i).statut === 'absent'; }).length;
+      var proche = function(i){ var a = alerteProchain(i); return !!a && a.niveau !== 'gris'; };
+      var aRepl = function(i){ var n = joursDepuis(constatAnnulation(i).le); return !aNouveauPassage(i) && n !== null && n > DELAI_REPLANIF_JOURS; };
       return [
         { val: l.length, lib: 'à replanifier' },
         { val: abs + ' / ' + (l.length - abs), lib: 'absents / annulations' },
+        { val: l.filter(proche).length, lib: 'passage prévu sous 7 j', alerte: true, cle: 'proche', filtre: proche },
         { val: l.filter(aRepl).length, lib: 'sans nouveau passage depuis +' + DELAI_REPLANIF_JOURS + ' j', alerte: true, cle: 'repl', filtre: aRepl },
         { texte: parClient(l), lib: 'par client' },
       ];
@@ -4031,7 +4128,8 @@ var FILES_SUIVI = [
         { texte: parClient(l), lib: 'par client' },
       ];
     } },
-  { cle: 'afacturer', label: 'À facturer', test: function(i){ return fileDe(i) === 'afacturer'; }, tri: parRecent,
+  // Stand-by d'un passage suivant (16/11) : la facture du passage 1 reste à faire, le dossier reste visible ici
+  { cle: 'afacturer', label: 'À facturer', test: function(i){ return fileDe(i) === 'afacturer' || (fileDe(i) === 'pannule' && i.statut === 'Terminé' && !i.enFacturation && i.clientType !== 'tache'); }, tri: parRecent,
     question: 'Passage 1 fait et rapport envoyé : qu\'est-ce qui reste à facturer ?',
     colonnes: [
       { titre: 'Rapport passage 1', cell: function(i){ var s = rapportP1(i); return s === 'envoye' ? '<span class="psg psg-ok">✓ Envoyé</span>' : s && s !== 'en-attente' ? '<span class="psg psg-recu">Reçu, non envoyé</span>' : '<span class="psg psg-retard">✕ Non envoyé</span>'; } },
@@ -4169,6 +4267,51 @@ function basculerPlusFiltres() { plusFiltres = !plusFiltres; majAffichageVue(); 
 
 var CERCLES = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
 function jjmm(d) { return d ? d.substring(8,10) + '/' + d.substring(5,7) : ''; }
+// ── Stand-by d'un passage annulé (16/11) ──
+// Passage annulé encore sans suite (ni replanifié, ni abandonné), le plus récent
+function annuleOuvert(item) {
+  var ps = passagesNorm(item).filter(function(p){ return p.statut === 'annule' && !p.jumeau && !p.suite; });
+  ps.sort(function(a, b){ return String((b.annulation && b.annulation.le) || b.debut || '').localeCompare(String((a.annulation && a.annulation.le) || a.debut || '')); });
+  return ps[0] || null;
+}
+// Constat de l'annulation : passage, rapport, statut, motif, provenance, date
+function constatAnnulation(item) {
+  var p = annuleOuvert(item), rec = p ? recPassage(item, p) : null;
+  var a = (p && p.annulation) || (rec && rec.absence) || null;
+  // Un rapport d'annulation sans constat ne peut venir que de « Annuler le passage » (app)
+  var prov = p && p.annulation ? p.annulation.provenance : rec && rec.absence ? (rec.absence.source === 'kizeo' ? 'technicien' : 'app') : rec && rec.statut === 'envoye' ? 'app' : '';
+  return { p: p, rec: rec, statut: a ? a.statut : '', motif: a ? (a.motif || '') : '', provenance: prov, le: (p && p.annulation && p.annulation.le) || (rec && rec.notifiedAt) || item.updatedAt || '' };
+}
+// Prochain passage encore prévu (pas exécuté) et délai : orange à 7 j, rouge à 3 j
+function alerteProchain(item) {
+  var p = passagesActifs(item).filter(function(x){ return !x.jumeau && x.debut && !passageExecute(item, x); }).sort(function(a, b){ return a.debut.localeCompare(b.debut); })[0];
+  if (!p) return null;
+  var n = Math.round((new Date(p.debut.substring(0, 10) + 'T12:00:00') - new Date(jourLocal(0) + 'T12:00:00')) / 86400e3);
+  return { p: p, jours: n, niveau: n < 0 ? 'depasse' : n <= 3 ? 'rouge' : n <= 7 ? 'orange' : 'gris' };
+}
+// Report initial d'un dossier en stand-by sans suivi de report (annulations d'avant le 16/11)
+window.reportInitial = function(d) {
+  var ps = Array.isArray(d.passages) ? d.passages : [];
+  return { etat: 'standby', ouvertLe: new Date().toISOString(),
+    anciennes: ps.filter(function(p){ return p && typeof p === 'object' && p.statut === 'annule' && !p.jumeau && !p.suite; }).map(function(p){ return { pid: p.passageId || null, num: p.num || null, debut: p.debut || '' }; }),
+    connus: ps.filter(function(p){ return p && typeof p === 'object' && p.passageId && p.statut !== 'annule' && !p.jumeau; }).map(function(p){ return p.passageId; }) };
+};
+// Ne pas replanifier : motif obligatoire ; sans aucun passage restant, un passage 1 abandonné annule le dossier
+function abandonnerReplanif(id) {
+  var item = (window.interventions || []).find(function(i){ return i.id === id; });
+  if (!item) return;
+  var restants = passagesActifs(item).filter(function(p){ return !p.jumeau && p.debut; });
+  var annuleDossier = item.statut === 'Passage annulé' && !restants.length;
+  var motif = '';
+  while (!motif) {
+    var r = prompt((annuleDossier ? "Aucun autre passage n'est prévu : le dossier partira dans Annulé.\n\n" : '') + 'Pourquoi ce passage ne sera pas replanifié ? (obligatoire)\nex. le client renonce, locataire parti, traitement plus nécessaire…');
+    if (r === null) return;
+    motif = r.trim();
+  }
+  window._abandonnerReplanif(id, motif).then(function(st){
+    showToast(st === 'Annulé' ? 'Dossier annulé' : 'Passage non replanifié · le dossier reprend sa place');
+  }).catch(function(e){ alert('Enregistrement impossible : ' + e.message); });
+}
 
 // Une pastille par passage : prévu, aujourd'hui, passé, rapport reçu, envoyé, en retard, annulé.
 function friseHtml(item) {
@@ -4363,7 +4506,8 @@ function actionSuivante(item) {
   if (fileSuivi === 'semaine' && passagesLigneSemaine(item).some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) {
     return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)" title="Ouvre la planification pour envoyer le formulaire Kizeo au technicien">Générer Kizeo</button>';
   }
-  if (f === 'pannule') return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)">Replanifier</button>';
+  if (f === 'pannule') return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)" title="Nouveau passage à la place du passage annulé, puis notification du report">Replanifier</button>'
+    + '<button class="btn-next neutre" onclick="abandonnerReplanif(\'' + id + '\')" title="Le passage annulé ne sera pas refait (motif obligatoire)">Ne pas replanifier</button>';
   if (f === 'afacturer') return bouton('Facturer', 'basculerEnFacturation');
   if (f === 'cloture') return '<a class="btn-next neutre" href="facturation.html">Voir la facturation</a>';
   // Reprendre un dossier en attente : retour en Planification
@@ -4642,6 +4786,16 @@ function sectionsSemaine(list, ligne, nbCols) {
   var kzManque = function(item, ps){ return ps.filter(function(p){ return prepPassage(item, p).etat === 'att'; }).length; };
   var cptTxt = function(n){ return String(n); };
 
+  // 0. Alerte (16/11) : dossier en stand-by dont un passage tombe d'ici la fin de la semaine suivante
+  if (decalageSemaine === 0) {
+    var sb = (window._baseSuivi || []).filter(function(i){ return fileDe(i) === 'pannule'; })
+      .map(function(i){ return { i: i, a: alerteProchain(i) }; })
+      .filter(function(x){ return x.a && x.a.p.debut.substring(0, 10) <= sn.vendredi; })
+      .sort(function(x, y){ return x.a.jours - y.a.jours; });
+    if (sb.length) html += '<tr class="sem-alerte"><td colspan="' + nbCols + '"><div class="sem-alerte-in">⚠ <b>' + compte(sb.length, 'dossier en stand-by', 'dossiers en stand-by') + '</b> (passage annulé) avec un passage encore prévu d\'ici le ' + jjmm(sn.vendredi) + ' : à replanifier ou à supprimer.'
+      + sb.map(function(x){ return '<a class="' + (x.a.niveau === 'gris' || x.a.niveau === 'orange' ? '' : 'rouge') + '" onclick="event.stopPropagation();ouvrirPlanification(\'' + x.i.id + '\',1)" title="' + String(x.i.client || '').replace(/"/g, '&quot;') + '">' + (x.i.bc ? 'BC ' + x.i.bc : (x.i.client || 'dossier')) + ' · ' + (CERCLES[(x.a.p.num || 1) - 1] || '#' + x.a.p.num) + ' ' + jjmm(x.a.p.debut.substring(0, 10)) + '</a>'; }).join('')
+      + '</div></td></tr>' + espace;
+  }
   // 1. Semaine précédente : rapports encore à boucler
   if (decalageSemaine === 0) {
     var resteBrut = list.filter(estReste);
@@ -6440,6 +6594,10 @@ onAuthStateChanged(auth, async (user) => {
     if (tplDoc && tplDoc.data().suiviSms) {
       window._suiviSmsTemplate = tplDoc.data().suiviSms;
     }
+    // Report de rendez-vous (16/11)
+    if (tplDoc && tplDoc.data().reportClient) window._reportClientTemplate = tplDoc.data().reportClient;
+    if (tplDoc && tplDoc.data().reportLocataire) window._reportLocataireTemplate = tplDoc.data().reportLocataire;
+    if (tplDoc && tplDoc.data().reportSms) window._reportSmsTemplate = tplDoc.data().reportSms;
     if (tplDoc && tplDoc.data().rappelSms) {
       window._rappelSmsTemplate = tplDoc.data().rappelSms;
     }
@@ -6499,6 +6657,61 @@ onAuthStateChanged(auth, async (user) => {
     const it = (window.interventions || []).find(i => i.id === suiviId);
     if (it) { it[champ] = liste; it.passages = passages; it.notifsManuelles = manuelles; }
     majFicheOuverte(passages);
+    if (it && window.modeReport && window.modeReport(it)) await window._noterReport(suiviId, type === 'locataire' ? 'loc' : 'client', ts, [LIB_MOYEN_NOTIF[moyen] || 'autrement']).catch(e => console.warn('report :', e.message));
+  };
+  // ── Stand-by et replanification (16/11) ──
+  const parCourant = () => (auth.currentUser && auth.currentUser.email) || '';
+  const majLocale = (suiviId, maj) => { const it = (window.interventions || []).find(i => i.id === suiviId); if (it) Object.keys(maj).forEach(k => { if (k !== 'journal') it[k] = maj[k]; }); };
+  const fmtCreneau = d => d ? d.substring(8, 10) + '/' + d.substring(5, 7) + (d.length > 10 ? ' ' + d.substring(11, 16) : '') : '';
+  // Client ou locataire prévenu du report ; le report se clôt quand les deux le sont (locataire sans email : non concerné)
+  window._noterReport = async (suiviId, type, ts, dest) => {
+    const snap = await getDoc(doc(db, 'suivi', suiviId));
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const rep = d.report && (d.report.etat === 'standby' || d.report.etat === 'replanifie') ? { ...d.report } : (window.fileDe({ ...d, id: suiviId }) === 'pannule' ? window.reportInitial(d) : null);
+    if (!rep) return;
+    rep[type === 'loc' ? 'notifLoc' : 'notifClient'] = ts;
+    if (rep.etat === 'replanifie' && rep.notifClient && (rep.notifLoc || !d.emailClient)) { rep.etat = 'clos'; rep.closLe = ts; }
+    const texte = 'Report notifié ' + (type === 'loc' ? 'au locataire' : 'au client') + (dest && dest.length ? ' (' + dest.join(', ') + ')' : '');
+    await updateDoc(doc(db, 'suivi', suiviId), { report: rep, journal: arrayUnion({ at: ts, par: parCourant(), texte }) });
+    majLocale(suiviId, { report: rep });
+  };
+  // Fin de la planification d'un dossier en stand-by : passages annulés « replanifiés », report à notifier
+  window._terminerReplanif = async (suiviId) => {
+    const snap = await getDoc(doc(db, 'suivi', suiviId));
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const now = new Date().toISOString(), par = parCourant();
+    const rep0 = d.report && d.report.etat === 'standby' ? { ...d.report } : window.reportInitial(d);
+    const passages = (d.passages || []).map(p => p && typeof p === 'object' && p.statut === 'annule' && !p.jumeau && !p.suite ? { ...p, suite: { type: 'replanifie', le: now, par } } : p);
+    const auj = jourLocal(0);
+    const nouv = passages.filter(p => p && typeof p === 'object' && p.statut !== 'annule' && !p.jumeau && p.debut && p.debut.substring(0, 10) >= auj).sort((a, b) => a.debut.localeCompare(b.debut));
+    const report = { ...rep0, etat: 'replanifie', replanifieLe: now };
+    if (report.notifClient && (report.notifLoc || !d.emailClient)) { report.etat = 'clos'; report.closLe = now; }
+    const texte = 'Replanification terminée · ' + (nouv.length ? 'à venir : ' + nouv.map(p => 'passage ' + p.num + ' le ' + fmtCreneau(p.debut)).join(', ') : 'aucun passage à venir') + ' · dossier repris';
+    await updateDoc(doc(db, 'suivi', suiviId), { passages, report, updatedAt: now, journal: arrayUnion({ at: now, par, texte }) });
+    majLocale(suiviId, { passages, report });
+  };
+  // Ne pas replanifier : le passage annulé est clos avec son motif, le dossier reprend sa place
+  window._abandonnerReplanif = async (suiviId, motif) => {
+    const snap = await getDoc(doc(db, 'suivi', suiviId));
+    if (!snap.exists()) throw new Error('dossier introuvable');
+    const d = snap.data();
+    const now = new Date().toISOString(), par = parCourant();
+    const ouverts = (d.passages || []).filter(p => p && typeof p === 'object' && p.statut === 'annule' && !p.jumeau && !p.suite);
+    const passages = (d.passages || []).map(p => p && typeof p === 'object' && p.statut === 'annule' && !p.jumeau && !p.suite ? { ...p, suite: { type: 'abandon', le: now, par, motif } } : p);
+    const restants = passages.filter(p => p && typeof p === 'object' && p.statut !== 'annule' && p.debut);
+    const maj = { passages, updatedAt: now, report: { ...(d.report || window.reportInitial(d)), etat: 'abandon', abandonLe: now, motif } };
+    let texte = (ouverts.length ? 'Passage ' + ouverts.map(p => p.num).join(', ') : 'Passage annulé') + ' non replanifié : ' + motif;
+    if (d.statut === 'Passage annulé') {
+      if (restants.length) maj.statut = 'En cours';
+      else { maj.statut = 'Annulé'; maj.motifAnnulation = motif; maj.annuleLe = now; texte += ' · aucun passage restant, dossier annulé'; }
+    }
+    maj.journal = arrayUnion({ at: now, par, texte });
+    await updateDoc(doc(db, 'suivi', suiviId), maj);
+    majLocale(suiviId, maj);
+    if (window.filterTable) window.filterTable();
+    return maj.statut || d.statut;
   };
   // Retrait d'une validation manuelle faite par erreur. Un envoi réel depuis l'app ne se retire pas.
   window._retirerNotifManuelle = async (suiviId, type, ts) => {
@@ -6597,7 +6810,7 @@ onAuthStateChanged(auth, async (user) => {
     snap.docs.forEach(d => {
       const r = d.data();
       if (!r.suiviId || r.numPassage == null) return;
-      const e = { id: d.id, statut: r.statut, passageId: r.passageId || null, origine: r.origine || '', dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, fileUrl: r.fileUrl || null, type: r.type || '', relances: [].concat(Array.isArray(r.relancesWhatsapp) ? r.relancesWhatsapp : [], Array.isArray(r.relancesSms) ? r.relancesSms : []).sort() };
+      const e = { id: d.id, statut: r.statut, passageId: r.passageId || null, origine: r.origine || '', dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, fileUrl: r.fileUrl || null, type: r.type || '', typeRapport: r.typeRapport || '', relances: [].concat(Array.isArray(r.relancesWhatsapp) ? r.relancesWhatsapp : [], Array.isArray(r.relancesSms) ? r.relancesSms : []).sort() };
       const k = r.suiviId + '::' + r.numPassage;
       if (plusAvance(m[k], e)) m[k] = e;
       if (e.passageId && plusAvance(parPid[e.passageId], e)) parPid[e.passageId] = e;
@@ -6918,6 +7131,7 @@ window.resetStatusColors = function() {
       <button class="modal-close" onclick="closeNotifSuivi()">✕</button>
     </div>
     <div class="modal-body" style="padding:22px 28px;">
+      <div id="nsReportInfo" style="display:none;background:#FFF4E5;border:1px solid #F5C98A;color:#8A5A00;border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:14px;">↻ <b>Report de rendez-vous</b> : les messages annoncent les anciennes et les nouvelles dates (modèles « Replanification », page Contacts). Le SMS au locataire est facultatif.</div>
 
       <!-- TABS -->
       <div style="display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;">

@@ -110,7 +110,8 @@ const CSS = `
 .pl-doc .pl-btn{white-space:nowrap;}
 .pl-doc-nom{font-size:11.5px;color:#1DA870;margin-top:3px;}
 .pl-passage{border:1px solid rgba(13,27,42,.12);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px;}
-.pl-passage.annule{opacity:.5;}
+.pl-passage.annule{background:#F7F8FA;}
+.pl-passage.annule .pl-cercle,.pl-passage.annule .pl-annule-txt{opacity:.6;}
 .pl-psg-l1{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:10px;align-items:end;}
 .pl-psg-num label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#8FA4B8;margin-bottom:5px;}
 .pl-psg-num input{width:56px;height:38px;border:1px solid rgba(13,27,42,.15);border-radius:8px;text-align:center;font:700 15px 'DM Sans',sans-serif;}
@@ -785,7 +786,7 @@ function lignesDepuis(item) {
     // Rendez-vous par technicien ; un passage d'avant reprend son titre, son adresse et sa description pour chacun
     const agenda = {};
     techs.forEach(n => { const a = (p.agendaTech || {})[n]; agenda[n] = a ? { titre: a.titre || "", adresse: a.adresse || "", desc: a.desc || "" } : { titre: p.titre || "", adresse: p.adresse || "", desc: p.desc || "" }; });
-    return { ref: p, pid: p.passageId || uuid(), num: p.num, annule: p.statut === "annule",
+    return { ref: p, pid: p.passageId || uuid(), num: p.num, annule: p.statut === "annule", remplace: p.remplace || null,
       debut: (p.debut || "").substring(0, 16), fin: (p.fin || "").substring(0, 16), techs, agenda, rapports: [] };
   });
   L.forEach(l => { const r = rapportDepuis(item, l.ref, l.num, l.techs, l.agenda); r.pid = l.pid; l.rapports.push(r); });
@@ -965,7 +966,16 @@ function rendrePassages(item) {
   };
   const carte = (l, k) => {
     const pb = problemesLigne(l, L);
-    if (l.annule) return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}</span></div></div>`;
+    if (l.annule) {
+      // Passage annulé (16/11) : son constat, et « Replanifier ce passage » tant qu'il n'a pas de suite
+      const an = (l.ref && l.ref.annulation) || null, suite = (l.ref && l.ref.suite) || null;
+      const remp = L.find(x => x.remplace === l.pid && !x.annule);
+      const constat = an ? ` · ${an.statut === "absent" ? "absent" : "annulation"}${an.motif ? " : " + esc(an.motif) : ""}` : "";
+      const droite = remp ? `<span class="pl-note">remplacé par le nouveau ${cercle(remp.num)}${remp.debut ? " du " + fmtDT(remp.debut) : ""}</span>`
+        : suite ? `<span class="pl-note">${suite.type === "abandon" ? "non replanifié" + (suite.motif ? " : " + esc(suite.motif) : "") : "replanifié"}</span>`
+        : `<button class="pl-btn indigo petit" data-a="replanif" title="Crée un nouveau passage ${cercle(l.num)} avec le même technicien : choisis la nouvelle date">↻ Replanifier ce passage</button>`;
+      return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr auto;align-items:center;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note pl-annule-txt">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}${constat}</span>${droite}</div></div>`;
+    }
     const p = enBase.find(x => x.passageId === l.pid);
     return `<div class="pl-passage teinte-${k % 4}" data-k="${k}">
       <div class="pl-psg-l1">
@@ -1064,6 +1074,17 @@ function rendrePassages(item) {
     l.rapports = l.rapports.filter((r, k) => k === 0 || r.tech !== t);
     if (l.rapports[0].tech === t) { l.rapports[0].tech = l.techs[0] || ""; l.rapports[0].nom = ""; l.rapports[0].manuel = false; }
     change(true);
+  });
+  // Replanifier un passage annulé (16/11) : nouveau passage de même numéro, même technicien, date à choisir
+  document.querySelectorAll(".pl-corps [data-a=replanif]").forEach(b => b.onclick = () => {
+    const l = ligneDe(b);
+    const n = nouvelleLigne(item, l.num);
+    n.remplace = l.pid;
+    n.techs = l.techs.slice(); n.techs.forEach(t => { n.agenda[t] = agendaVide(); }); n.rapports[0].tech = n.techs[0] || "";
+    L.splice(L.indexOf(l) + 1, 0, n);
+    rendrePassages(item);
+    const champ = document.querySelector(`.pl-passage[data-k="${L.indexOf(n)}"] [data-f=debut]`);
+    if (champ) champ.focus();
   });
   document.querySelectorAll(".pl-corps [data-a=suppr]").forEach(b => b.onclick = () => {
     const l = ligneDe(b);
@@ -1221,6 +1242,12 @@ async function enregistrerPassages(item, silencieux) {
           if (jumeau) { base.calEvents = {}; base.calSync = ""; base.calEmpreinte = ""; base.calEmpreintes = {}; }
         }
         base.num = l.num; base.jumeau = jumeau; base.passageId = r.pid;
+        // Replanification (16/11) : le nouveau passage sait lequel il remplace, l'annulé sait qu'il est replanifié
+        if (l.remplace && !jumeau) base.remplace = l.remplace;
+        if (l.annule && !jumeau && !base.suite) {
+          const remp = L.find(x => x.remplace === l.pid && !x.annule && !vierge(x) && x.debut);
+          if (remp) base.suite = { type: "replanifie", le: new Date().toISOString(), nouveau: remp.pid };
+        }
         // Rendez-vous de l'ancienne fiche (sans repère) sur un passage modifié : mise à jour forcée, en place
         if (l.modifie && !jumeau && !Object.keys(base.calEmpreintes || {}).length) base.calEmpreinte = "modifie";
         passages.push(base);
@@ -1237,6 +1264,19 @@ async function enregistrerPassages(item, silencieux) {
       await window._updateSuivi(item.id, { passages, calEventIds: passages.map(p => p.calEvents || {}), assignes, assigne: assignes[0] || "", updatedAt: new Date().toISOString() });
       // Historique interne (16/11) : dates et techniciens modifiés, passages ajoutés ou retirés
       if (window._ajouterJournal) window._ajouterJournal(item.id, journalPassages(frais, passages)).catch(e => console.warn("journal :", e.message));
+      // Stand-by (16/11) : un passage d'avant l'annulation déplacé ou supprimé devient une « ancienne date » du report
+      const d0 = dossier() || item;
+      if (window.fileDe && window.fileDe(d0) === "pannule" && window.reportInitial) {
+        const rep = d0.report && d0.report.etat === "standby" ? { ...d0.report } : window.reportInitial({ ...d0, passages: frais });
+        const anc = (rep.anciennes || []).slice(), connus = rep.connus || [];
+        const ap = Object.fromEntries(passages.filter(p => !p.jumeau && p.passageId).map(p => [p.passageId, p]));
+        frais.filter(o => o && !o.jumeau && o.passageId && o.statut !== "annule" && o.debut && connus.includes(o.passageId)).forEach(o => {
+          const n = ap[o.passageId];
+          if ((!n || n.statut === "annule" || (n.debut || "") !== (o.debut || "")) && !anc.some(a => a.pid === o.passageId)) anc.push({ pid: o.passageId, num: o.num || null, debut: o.debut });
+        });
+        rep.anciennes = anc;
+        if (JSON.stringify(rep) !== JSON.stringify(d0.report || null)) await window._updateSuivi(item.id, { report: rep });
+      }
       // Comme la fiche : l'échéance d'un rapport Kizeo en attente suit le passage déplacé
       if (window._syncEcheancesReception) await window._syncEcheancesReception(item.id, passages);
       // Rapports supprimés (ligne, passage ou technicien retiré) : plus de ligne « en attente technicien »
@@ -1348,7 +1388,7 @@ function journalPassages(avant, apres) {
   Object.values(ap).forEach(p => {
     const o = av[p.passageId];
     const n = "Passage " + p.num;
-    if (!o) { if (p.debut) lignes.push(n + " ajouté : " + fmt(p.debut) + (p.techs && p.techs.length ? ", " + p.techs.join(", ") : "")); return; }
+    if (!o) { if (p.debut) lignes.push(n + (p.remplace ? " replanifié" : " ajouté") + " : " + fmt(p.debut) + (p.techs && p.techs.length ? ", " + p.techs.join(", ") : "") + (p.remplace ? " (remplace le passage annulé)" : "")); return; }
     if ((o.debut || "") !== (p.debut || "")) lignes.push(n + " déplacé : " + fmt(o.debut) + " → " + fmt(p.debut));
     const ta = (o.techs || []).slice().sort().join(", "), tb = (p.techs || []).slice().sort().join(", ");
     if (ta !== tb) lignes.push(n + " : technicien " + (ta || "aucun") + " → " + (tb || "aucun"));
@@ -1481,11 +1521,20 @@ function rendreRecap(item) {
     if (m1.length) { alert("Le dossier reste en Planification tant que l'étape Passages, agenda & Kizeo n'est pas terminée :\n\n" + m1.map(x => "• " + x).join("\n")); return; }
     const m2 = manquesNotification(it);
     if (m2.length && !confirm("Rappel :\n\n" + m2.map(x => "• " + x).join("\n") + "\n\nPasser quand même le dossier En cours ? Tu pourras notifier depuis l'onglet En cours ou le Pilotage quotidien.")) return;
+    // Stand-by (16/11) : il faut au moins un passage à venir, sinon c'est « Ne pas replanifier »
+    const enStandby = window.fileDe && window.fileDe(it) === "pannule";
+    if (enStandby) {
+      const auj = new Date(), j = auj.getFullYear() + "-" + String(auj.getMonth() + 1).padStart(2, "0") + "-" + String(auj.getDate()).padStart(2, "0");
+      if (!actifs(it).some(p => !p.jumeau && (p.debut || "").substring(0, 10) >= j)) { alert("Aucun passage à venir : ajoute le nouveau passage (bouton « Replanifier ce passage »), ou utilise « Ne pas replanifier » dans l'onglet Passage annulé."); return; }
+    }
     // Planification faite : le dossier passe de « À traiter » à « En cours »
     // (de même pour un dossier replanifié après un passage annulé)
     if (["À traiter", "Passage annulé", "Nouveau", "", undefined, null].includes(it.statut)) {
       await window._updateSuivi(it.id, { statut: "En cours", updatedAt: new Date().toISOString() });
-      showToast("Dossier planifié · passé En cours");
+      showToast(enStandby ? "Dossier replanifié · repris En cours" : "Dossier planifié · passé En cours");
+    } else if (enStandby) showToast("Dossier replanifié · il reprend sa place");
+    if (enStandby && window._terminerReplanif) {
+      try { await window._terminerReplanif(it.id); } catch (e) { alert("Replanification enregistrée, mais l'historique n'a pas pu être mis à jour : " + e.message); }
     }
     fermer();
   };
