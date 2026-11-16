@@ -281,6 +281,7 @@
   .files-bar{align-items:center;flex-direction:column;align-items:stretch;gap:8px;}
   .files-ligne{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .files-ligne2 .file-chip{height:32px;font-size:12.5px;}
+  .files-archives .file-chip:not(.active){opacity:.75;}
   .files-fleche{color:var(--text-muted);font-size:15px;}
   .file-semaine{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 16px;border:2px solid #C7D2FE;border-radius:var(--radius-sm);background:#EEF2FF;font:700 13px 'DM Sans',sans-serif;color:#4338CA;cursor:pointer;}
   .file-semaine svg{width:16px;height:16px;}
@@ -4175,11 +4176,13 @@ function renderFilesBar(base) {
     }
     return '<button class="file-chip' + (f.cle === fileSuivi ? ' active' : '') + (alerte ? ' alerte' : '') + etatRech + '" onclick="choisirFileSuivi(\'' + f.cle + '\')">' + libelleFile(f) + ' <span class="cpt">' + n + '</span></button>';
   };
-  // Rangée 1 : le Pilotage quotidien (outil du jour, à part), puis le parcours d'un bon dans l'ordre
-  var parcours = ['validation', 'planification', 'encours', 'afacturer', 'cloture'].map(trouve);
-  var html = '<div class="files-ligne">' + puce(trouve('semaine')) + '<span class="files-sep"></span>' + parcours.map(puce).join('<span class="files-fleche">→</span>') + '</div>';
-  // Rangée 2 : situations hors parcours
-  html += '<div class="files-ligne files-ligne2">' + ['attente', 'pannule', 'annuleDef'].map(trouve).map(puce).join('') + '</div>';
+  // Trois rangées (16/11) :
+  // 1. le parcours d'un bon, dans l'ordre (ce qui avance)
+  // 2. le travail du jour et ce qui est bloqué : Pilotage quotidien, puis En attente et Passage annulé
+  // 3. les dossiers terminés : Clôturé et Annulé (archives)
+  var html = '<div class="files-ligne">' + ['validation', 'planification', 'encours', 'afacturer'].map(trouve).map(puce).join('<span class="files-fleche">→</span>') + '</div>';
+  html += '<div class="files-ligne">' + puce(trouve('semaine')) + '<span class="files-sep"></span>' + ['attente', 'pannule'].map(trouve).map(puce).join('') + '</div>';
+  html += '<div class="files-ligne files-ligne2 files-archives">' + ['cloture', 'annuleDef'].map(trouve).map(puce).join('') + '</div>';
   bar.innerHTML = html;
   renderBandeau(base.filter(fileCourante().test));
 }
