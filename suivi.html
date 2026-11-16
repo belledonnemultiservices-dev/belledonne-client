@@ -3846,25 +3846,6 @@ function passagesEnRetard(item) {
     .sort(function(a, b){ return a.debut.localeCompare(b.debut); });
 }
 function rangEnCours(item) { return passagesEnRetard(item).length ? 0 : prochainPassage(item) ? 2 : 1; }
-function prochainPassageHtml(item) {
-  var ret = passagesEnRetard(item);
-  if (ret.length) {
-    var p = ret[0], n = joursDepuis(p.debut);
-    return '<span class="psg psg-retard" style="text-decoration:none;" title="' + ret.length + ' passage(s) passé(s) sans rapport envoyé au client">⚠ ' + (CERCLES[p.num - 1] || '#' + p.num) + ' du ' + jjmm(p.debut.substring(0, 10)) + (n ? ' · ' + n + ' j' : '') + '</span>';
-  }
-  var d = prochainPassage(item);
-  if (!d) return '<span class="psg psg-annule" style="text-decoration:none;" title="Aucun passage daté à venir : dossier à terminer ou à replanifier">aucun à venir</span>';
-  var p2 = passagesActifs(item).find(function(x){ return !x.jumeau && (x.debut || '').substring(0, 10) === d; });
-  var j = Math.round((new Date(d + 'T12:00:00') - new Date(jourLocal(0) + 'T12:00:00')) / 86400e3);
-  return '<span class="psg ' + (j === 0 ? 'psg-auj' : 'psg-prevu') + '" style="text-decoration:none;">' + (p2 ? (CERCLES[p2.num - 1] || '#' + p2.num) + ' ' : '') + jjmm(d) + ' · ' + (j === 0 ? "aujourd'hui" : j === 1 ? 'demain' : 'dans ' + j + ' j') + '</span>';
-}
-function avancementEnCoursHtml(item) {
-  var ps = passagesActifs(item).filter(function(p){ return p.debut && !p.jumeau; });
-  var faits = ps.filter(function(p){ return passageExecute(item, p); }).length;
-  var h = '<span style="font-size:12px;white-space:nowrap;">' + faits + ' / ' + ps.length + ' exécuté' + (faits > 1 ? 's' : '') + '</span>';
-  if (item.clientType !== 'tache' && item.enFacturation) h += ' <span class="psg psg-ok" style="text-decoration:none;" title="Facture émise : le dossier reste ici tant qu\'il reste des passages à exécuter">Facturé</span>';
-  return h;
-}
 var LIB_ETAPE = { validation: 'Validation', planification: 'Planification', pilotage: 'En cours', afacturer: 'À facturer', cloture: 'Clôturé', attente: 'En attente', pannule: 'Passage annulé', annuleDef: 'Annulé' };
 var CLS_ETAPE = { validation: 'psg-passe', planification: 'psg-prevu', pilotage: 'psg-auj', afacturer: 'psg-annule', cloture: 'psg-ok', attente: 'psg-passe', pannule: 'psg-annule', annuleDef: 'psg-retard' };
 function etiquetteEtape(item) { var e = fileDe(item); return '<span class="psg ' + CLS_ETAPE[e] + '" style="text-decoration:none;">' + LIB_ETAPE[e] + '</span>'; }
@@ -3955,11 +3936,7 @@ var FILES_SUIVI = [
       return entreePlanif(x).localeCompare(entreePlanif(y));
     },
     question: 'Tous les dossiers planifiés, quelle que soit la semaine de leurs passages.',
-    sansNotifs: true,
-    colonnes: [
-      { titre: 'Prochain passage', cell: prochainPassageHtml },
-      { titre: 'Avancement', cell: avancementEnCoursHtml },
-    ],
+    // Affiché comme le Pilotage quotidien (renderTableV2) : passages restants en évidence, exécutés grisés
     kpis: function(l){
       var s = semaineAffichee(0);
       var retard = function(i){ return rangEnCours(i) === 0; };
@@ -4215,6 +4192,8 @@ function passagesReste(item) {
 function estReste(item) { return passagesSemaine(item).length === 0 && passagesReste(item).length > 0 && item.statut !== 'Annulé'; }
 // Passages montrés sur la ligne de la Semaine : ceux de la semaine, ou ceux du reste.
 function passagesLigneSemaine(item) {
+  // En cours (16/11) : tous les passages restant à exécuter (en retard ou à venir), quelle que soit la semaine
+  if (contexteLigne === 'encours') return passagesActifs(item).filter(function(p){ return !p.jumeau && p.debut && !passageExecute(item, p); });
   if (contexteLigne === 'prochaine') return passagesSemaine(item, semaineAffichee(decalageSemaine + 1));
   return estReste(item) ? passagesReste(item) : passagesSemaine(item);
 }
@@ -4448,7 +4427,7 @@ function etapeRapportEnvoye(item, p) {
 function actionSemaine(item, ps) {
   var id = item.id;
   if (item.statut === 'À valider') return '<button class="btn-next" onclick="validerIntervention(\'' + id + '\')">Valider</button>';
-  var finSem = (contexteLigne === 'prochaine' ? semaineAffichee(decalageSemaine + 1) : semaineAffichee()).vendredi;
+  var finSem = contexteLigne === 'encours' ? '9999-12-31' : (contexteLigne === 'prochaine' ? semaineAffichee(decalageSemaine + 1) : semaineAffichee()).vendredi;
   var auj = jourLocal(0);
   var candidats = passagesActifs(item).filter(function(p){ var d = (p.debut || '').substring(0, 10); return !p.jumeau && d && d <= finSem; })
     .sort(function(x, y){ return (x.debut || '').localeCompare(y.debut || ''); });
@@ -4555,7 +4534,7 @@ function ligneSemaine(item, nbCols) {
   h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2 ligne-sem' + (item.clientType === 'tache' ? ' ligne-tache' : '') + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
   h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
   h += '<td>' + refHtml(item) + '</td>';
-  h += '<td><div class="cn-client">' + (item.client || '—') + (item.nature && item.clientType !== 'tache' ? ' <span class="cn-nature">· ' + item.nature + '</span>' : '') + (fileDe(item) !== 'pilotage' ? ' ' + etiquetteEtape(item) : '') + '</div><div class="cn-nature">' + (item.adresse || '—') + (item.nomClient ? ' · ' + item.nomClient : '') + '</div></td>';
+  h += '<td><div class="cn-client">' + (item.client || '—') + (item.nature && item.clientType !== 'tache' ? ' <span class="cn-nature">· ' + item.nature + '</span>' : '') + (fileDe(item) !== 'pilotage' ? ' ' + etiquetteEtape(item) : '') + (item.clientType !== 'tache' && item.enFacturation && fileDe(item) === 'pilotage' ? ' <span class="psg psg-ok" style="text-decoration:none;" title="Facture émise : le dossier reste En cours tant qu\'il reste des passages à exécuter">Facturé</span>' : '') + '</div><div class="cn-nature">' + (item.adresse || '—') + (item.nomClient ? ' · ' + item.nomClient : '') + '</div></td>';
   var classe = function(p){ return p.statut === 'annule' ? 'ps-annule' : dansSemaine[cleP(p)] ? 'ps-in' : 'ps-out'; };
   var colonne = function(rendu){ return tous.map(function(p){ return '<div class="ps-row ' + classe(p) + '">' + (p.statut === 'annule' ? (rendu === libPassageSemaine ? rendu(p) : marque('na', 'Passage annulé')) : rendu(p)) + '</div>'; }).join(''); };
   h += '<td>' + (tous.length ? colonne(libPassageSemaine) : '<span class="cn-nature">aucun passage</span>') + '</td>';
@@ -4682,12 +4661,12 @@ window.renderTableV2 = function(list) {
   var extra = f.colonnes || [];
   // Onglet réduit (Validation) : ni techniciens, ni passages, ni notifications, ni statut
   var reduit = !!f.reduit;
-  var notifs = !reduit && !f.sansNotifs; // En cours (16/11) : pas de colonne Notifs
   // Colonne Statut retirée de tous les onglets du parcours (15/11) : les changements passent par les actions
-  var nbCols = f.cle === 'semaine' ? 11 : (reduit ? 5 : notifs ? 8 : 7) + extra.length;
+  var commeSemaine = f.cle === 'semaine' || f.cle === 'encours'; // En cours (16/11) : mêmes indicateurs que le Pilotage
+  var nbCols = commeSemaine ? 11 : (reduit ? 5 : 8) + extra.length;
   // En-tête : colonnes communes, puis celles propres à l'onglet, avant Statut et Action.
   var titresCols = '<th>Réf.</th><th>Client · Nature</th><th style="min-width:180px;">Adresse</th>'
-    + (reduit ? '' : '<th>Techniciens</th><th>Passages</th>' + (notifs ? '<th>Notifs</th>' : ''))
+    + (reduit ? '' : '<th>Techniciens</th><th>Passages</th><th>Notifs</th>')
     + extra.map(function(c){ return '<th>' + c.titre + '</th>'; }).join('')
     + '<th>Action</th>';
   if (f.cle === 'semaine') {
@@ -4697,7 +4676,7 @@ window.renderTableV2 = function(list) {
       return '<tr class="sem-thead"><th style="width:32px;"><input type="checkbox" onchange="toggleSelectSection(this,\'' + cle + '\')" style="cursor:pointer;"></th>' + TITRES_SEMAINE + '</tr>';
     };
   } else {
-    head.innerHTML = '<tr><th style="width:32px;"><input type="checkbox" id="checkAllV2" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>' + titresCols + '</tr>';
+    head.innerHTML = '<tr><th style="width:32px;"><input type="checkbox" id="checkAllV2" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>' + (f.cle === 'encours' ? TITRES_SEMAINE : titresCols) + '</tr>';
   }
   var vide = '';
   if (!list.length) {
@@ -4726,7 +4705,7 @@ window.renderTableV2 = function(list) {
     if (!reduit) {
       h += '<td>' + (techs.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + techs.map(function(a){ return assigneBadge(a); }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';
       h += '<td>' + friseHtml(item) + '</td>';
-      if (notifs) h += '<td>' + notifsHtml(item) + '</td>';
+      h += '<td>' + notifsHtml(item) + '</td>';
     }
     extra.forEach(function(c){ h += '<td>' + c.cell(item) + '</td>'; });
     h += '<td style="white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-start;align-items:center;">' + actionSuivante(item) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
@@ -4749,6 +4728,9 @@ window.renderTableV2 = function(list) {
     html = sectionsSemaine(list, function(i){ return ligneSemaine(i, nbCols); }, nbCols);
   } else if (!list.length) {
     html = vide;
+  } else if (f.cle === 'encours') {
+    contexteLigne = 'encours';
+    try { list.forEach(function(i){ html += ligneSemaine(i, nbCols); }); } finally { contexteLigne = ''; }
   } else if (f.groupable && grouperCommune) {
     var groupes = {};
     list.forEach(function(i){ var c = communeDe(i); (groupes[c] = groupes[c] || []).push(i); });
