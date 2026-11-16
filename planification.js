@@ -48,6 +48,8 @@ const CSS = `
 .pl-corps{padding:20px 24px;overflow-y:auto;flex:1;}
 .pl-pied{padding:14px 24px;border-top:1px solid rgba(13,27,42,.09);display:flex;gap:10px;align-items:center;}
 .pl-pied .pl-espace{flex:1;}
+.pl-rap-pdf{font-size:12px;font-weight:600;color:#C0392B;text-decoration:none;white-space:nowrap;}
+.pl-rap-pdf:hover{text-decoration:underline;}
 .pl-lien{background:none;border:0;color:#4338CA;font:600 12.5px 'DM Sans',sans-serif;text-decoration:underline;cursor:pointer;margin-right:12px;padding:0;}
 .pl-manuel td{background:#F5F7FF;}
 .pl-manuel-form{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;}
@@ -924,13 +926,20 @@ function rendrePassages(item) {
     const etatR = r.formId ? etatRapportKz(item, l, r) : null;
     const premier = premierDuTech(l, r);
     const nom = nomRapport(item, l, r);
-    const action = !r.formId || !destDe(l, r) ? "" : etatR === "manque" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Envoyer</button>` : etatR === "modifie" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Renvoyer</button><button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler</button>` : "";
+    // Rapport manuel (16/11) : rapport déjà reçu (Kizeo ou PDF déposé) → lien vers le fichier ;
+    // sinon, passage enregistré → bouton pour déposer le PDF à la main
+    const pBase = r.pid ? enBase.find(x => x.passageId === r.pid) : null;
+    const rec = pBase && window.recPassage ? window.recPassage(item, { num: l.num, passageId: r.pid }) : null;
+    const recu = !!rec && rec.statut !== "en-attente";
+    const lienRecu = recu && rec.fileUrl ? `<a class="pl-rap-pdf" href="${esc(rec.fileUrl)}" target="_blank" rel="noopener" title="Ouvrir le rapport">📄 ${rec.origine === "manuel" ? "Rapport manuel" : "Rapport reçu"}</a>` : "";
+    const btnManuel = pBase && !recu ? `<button class="pl-btn petit" data-a="manuelRap" title="Déposer le rapport en PDF à la main${rec ? " (remplace le rapport Kizeo attendu)" : ""}">📎 PDF</button>` : "";
+    const action = !r.formId || !destDe(l, r) || recu ? "" : etatR === "manque" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Envoyer</button>` : etatR === "modifie" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Renvoyer</button><button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler</button>` : "";
     return `<div class="pl-rap" data-r="${k}">
       <span class="pl-rap-n">${i + 1}.</span>
       <select data-rf="formId"><option value="">— Aucun rapport Kizeo —</option>${forms.map(f => `<option value="${esc(f.id)}"${String(r.formId) === String(f.id) ? " selected" : ""}>${esc(f.nom || "Formulaire")}${lie && String(lie.id) === String(f.id) ? " (lié)" : ""}</option>`).join("")}</select>
       <input data-rf="nom" value="${esc(premier ? nom : r.nom)}" placeholder="${premier ? "" : "Nom du rapport (à saisir)"}" title="${premier ? "Reprend le titre agenda tant que tu ne le modifies pas" : "Nom du rapport dans l'application du technicien"}"${r.formId && !nom ? ' style="border-color:#E74C3C;"' : ""}>
-      <span class="pl-rap-etat">${etatR ? etatHtml(...LIB_KZ[etatR]) : ""}</span>
-      <span class="pl-rap-act">${action}${r.formId || k > 0 ? `<button class="pl-btn petit" data-a="retirerRap" title="Supprimer ce rapport">✕</button>` : ""}</span>
+      <span class="pl-rap-etat">${lienRecu || (etatR ? etatHtml(...LIB_KZ[etatR]) : "")}</span>
+      <span class="pl-rap-act">${action}${btnManuel}${r.formId || k > 0 ? `<button class="pl-btn petit" data-a="retirerRap" title="Supprimer ce rapport">✕</button>` : ""}</span>
     </div>`;
   };
   // Bloc d'un technicien : son rendez-vous et ses rapports
@@ -1074,6 +1083,26 @@ function rendrePassages(item) {
   // Suppression d'un rapport (15/11) : la ligne part, l'agenda est mis à jour (son nom disparaît
   // de la description), la ligne « en attente technicien » de Gestion rapports est retirée.
   // Le formulaire déjà sur le téléphone se supprime à la main dans Kizeo.
+  // Rapport manuel (16/11) : dépôt d'un PDF sur le passage du rapport
+  document.querySelectorAll(".pl-corps [data-a=manuelRap]").forEach(b => b.onclick = () => {
+    const l = ligneDe(b), r = rapportDe(b);
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "application/pdf,.pdf";
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      if (f.type !== "application/pdf" && !/\.pdf$/i.test(f.name)) { alert("Le rapport doit être un fichier PDF."); return; }
+      const remplace = window.recPassage && window.recPassage(item, { num: l.num, passageId: r.pid });
+      if (!confirm("Déposer « " + f.name + " » comme rapport du passage " + l.num + " ?\n\n" + (remplace ? "Il remplace le rapport Kizeo attendu du technicien.\n" : "") + "Il arrive dans Gestion rapports, prêt à envoyer au client.")) return;
+      b.disabled = true; b.textContent = "Envoi…";
+      try {
+        await window._ajouterRapportManuel(item.id, r.pid, l.num, f);
+        window.showToast && window.showToast("Rapport déposé · prêt à envoyer depuis Gestion rapports");
+        rendrePassages(dossier() || item);
+      } catch (e) { alert("Dépôt impossible : " + e.message); b.disabled = false; b.textContent = "📎 PDF"; }
+    };
+    inp.click();
+  });
   document.querySelectorAll(".pl-corps [data-a=retirerRap]").forEach(b => b.onclick = () => {
     const l = ligneDe(b), r = rapportDe(b);
     if (etatRapportKz(item, l, r) === "recu") { showToast("Ce rapport est déjà revenu du technicien : il se gère dans Gestion rapports.", true); return; }

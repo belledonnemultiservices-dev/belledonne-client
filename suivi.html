@@ -6442,6 +6442,54 @@ onAuthStateChanged(auth, async (user) => {
     majFicheOuverte(passages);
   };
 
+  // Rapport manuel (16/11) : PDF déposé à la main sur un passage, depuis la fenêtre de planification.
+  // Il entre dans le circuit ordinaire (reception-rapports, statut « prêt à envoyer ») : Gestion
+  // rapports, colonnes Rapport reçu / envoyé du Pilotage, passage exécuté une fois envoyé.
+  // S'il existe un rapport Kizeo attendu (en attente) pour ce passage, le PDF le remplace ; ses
+  // identifiants Kizeo sont mis de côté pour qu'une soumission tardive du technicien crée une
+  // ligne distincte au lieu d'écraser le rapport manuel.
+  window._ajouterRapportManuel = async (suiviId, passageId, num, file) => {
+    const sSnap = await getDoc(doc(db, 'suivi', suiviId));
+    if (!sSnap.exists()) throw new Error('dossier introuvable');
+    const s = sSnap.data();
+    const p = (s.passages || []).find(x => x && typeof x === 'object' && (passageId ? x.passageId === passageId : Number(x.num) === Number(num)));
+    if (!p) throw new Error('passage introuvable : enregistre d\'abord le passage');
+    const rs = (await getDocs(query(collection(db, 'reception-rapports'), where('suiviId', '==', suiviId)))).docs
+      .filter(d => { const r = d.data(); return passageId ? r.passageId === passageId : (!r.passageId && Number(r.numPassage) === Number(num)); });
+    if (rs.some(d => d.data().statut !== 'en-attente')) throw new Error('un rapport est déjà reçu pour ce passage (Gestion rapports permet de remplacer son fichier)');
+    const nomFichier = Date.now() + '_manuel_' + String(file.name || 'rapport.pdf').replace(/[^\w.\-]+/g, '_');
+    const storageRef = ref(storage, 'reception/' + (s.client || '_inconnu') + '/' + nomFichier);
+    await uploadBytesResumable(storageRef, file, { contentType: 'application/pdf' });
+    const fileUrl = await getDownloadURL(storageRef);
+    const now = new Date().toISOString(), u = auth.currentUser || {};
+    const reference = s.bc || s.pl || s.devis || '';
+    const commun = {
+      fileUrl, type: 'pdf', statut: 'a-traiter', typeRapport: 'intervention', origine: 'manuel',
+      fichierManuel: file.name || '', ajoutePar: u.displayName || u.email || '', arriveeAt: now, updatedAt: now,
+    };
+    let recId;
+    const attendu = rs.find(d => d.data().statut === 'en-attente');
+    if (attendu) {
+      const a = attendu.data();
+      await updateDoc(attendu.ref, { ...commun, kizeoDataId: null, refInterne: null,
+        kizeoDataIdRemplace: a.kizeoDataId || null, refInterneRemplace: a.refInterne || null });
+      recId = attendu.id;
+    } else {
+      const n = Number(p.num) || Number(num) || 1;
+      const ref2 = await addDoc(collection(db, 'reception-rapports'), { ...commun,
+        suiviId, passageId: passageId || null, numPassage: n, client: s.client || '', bc: reference, reference,
+        passageLabel: n === 1 ? '1er passage' : n + 'ème passage', libelle: p.kzNom || p.libelle || '',
+        technicien: (p.techs || []).join(', '), dateFin: p.fin || null, createdAt: now });
+      recId = ref2.id;
+    }
+    // Affichage immédiat, sans attendre l'écoute temps réel
+    const e = { id: recId, statut: 'a-traiter', passageId: passageId || null, fileUrl, type: 'pdf', origine: 'manuel', relances: [] };
+    if (passageId) { window._receptionsParPid = window._receptionsParPid || {}; window._receptionsParPid[passageId] = e; }
+    window._receptionsParPassage[suiviId + '::' + (Number(p.num) || num)] = e;
+    if (window.filterTable) window.filterTable();
+    return recId;
+  };
+
   // Trace d'une relance WhatsApp ouverte pour un rapport en retard.
   window._noterRelanceTech = async (recId, ts) => {
     try { await updateDoc(doc(db, 'reception-rapports', recId), { relancesWhatsapp: arrayUnion(ts) }); }
@@ -6458,7 +6506,7 @@ onAuthStateChanged(auth, async (user) => {
     snap.docs.forEach(d => {
       const r = d.data();
       if (!r.suiviId || r.numPassage == null) return;
-      const e = { id: d.id, statut: r.statut, passageId: r.passageId || null, dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, fileUrl: r.fileUrl || null, type: r.type || '', relances: [].concat(Array.isArray(r.relancesWhatsapp) ? r.relancesWhatsapp : [], Array.isArray(r.relancesSms) ? r.relancesSms : []).sort() };
+      const e = { id: d.id, statut: r.statut, passageId: r.passageId || null, origine: r.origine || '', dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, fileUrl: r.fileUrl || null, type: r.type || '', relances: [].concat(Array.isArray(r.relancesWhatsapp) ? r.relancesWhatsapp : [], Array.isArray(r.relancesSms) ? r.relancesSms : []).sort() };
       const k = r.suiviId + '::' + r.numPassage;
       if (plusAvance(m[k], e)) m[k] = e;
       if (e.passageId && plusAvance(parPid[e.passageId], e)) parPid[e.passageId] = e;
