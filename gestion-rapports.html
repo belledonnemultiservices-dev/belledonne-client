@@ -1278,6 +1278,19 @@ function appliquerVars(text, vars) {
 }
 
 // ── ENVOYER AU CLIENT ──
+// Contact correspondant à l'expéditeur du dossier : identifiant enregistré, sinon email, sinon même nom
+// (même règle que window._contactExpediteur dans suivi.html)
+const normNom = s => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean).sort().join(" ");
+function contactExpediteur(item, contacts) {
+  if (!item || !contacts || !contacts.length) return null;
+  if (item.expediteurContactId) { const c = contacts.find(x => x.id === item.expediteurContactId); if (c) return c; }
+  const brut = String(item.expediteur || "");
+  const email = String(item.expediteurEmail || (brut.match(/[^\s<>]+@[^\s<>]+/) || [])[0] || "").toLowerCase();
+  if (email) { const c = contacts.find(x => String(x.email || "").toLowerCase() === email); if (c) return c; }
+  const n = normNom(brut.replace(/[^\s<>]+@[^\s<>]+/, ""));
+  if (!n) return null;
+  return contacts.find(x => normNom((x.prenom || "") + " " + (x.nom || "")) === n) || null;
+}
 let _envoiId = null;
 let _envoiTpl = null, _envoiIsAbsAnnul = false, _envoiRef = null, _envoiTexteGenere = { subject: "", body: "" };
 
@@ -1348,14 +1361,22 @@ window.openEnvoi = async function(id) {
   }
   try {
     const snapC = await getDocs(query(collection(db, "contacts"), where("client", "==", r.client)));
-    const contacts = snapC.docs.map(d => ({ id: d.id, ...d.data() }));
+    let contacts = snapC.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Expéditeur du dossier coché d'office et placé en tête (16/11), même règle que la notification client
+    let exp = null;
+    if (r.suiviId) {
+      try { const sS = await getDoc(doc(db, "suivi", r.suiviId)); if (sS.exists()) exp = contactExpediteur(sS.data(), contacts); }
+      catch(e) { console.warn("expéditeur non retrouvé:", e.message); }
+    }
+    if (_envoiId !== id) return; // une autre fenêtre a été ouverte entre-temps
+    if (exp) contacts = [exp, ...contacts.filter(c => c.id !== exp.id)];
     if (!contacts.length) {
       document.getElementById("envoiContacts").innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:12px;">Aucun contact pour ce client. <a href="contacts.html" style="color:var(--green-dark);">Ajouter</a></div>';
     } else {
       document.getElementById("envoiContacts").innerHTML = contacts.map(c => `
         <label class="mn-contact-item">
-          <input type="checkbox" value="${c.email}">
-          <div><div class="mn-contact-name">${c.prenom||""} ${c.nom||""}</div><div class="mn-contact-email">${c.email||"-"}</div></div>
+          <input type="checkbox" value="${c.email}" ${exp && c.id === exp.id ? "checked" : ""}>
+          <div><div class="mn-contact-name">${c.prenom||""} ${c.nom||""}${exp && c.id === exp.id ? ' <span style="font-size:11px;font-weight:500;color:var(--green-dark);">· expéditeur du BC</span>' : ""}</div><div class="mn-contact-email">${c.email||"-"}</div></div>
         </label>`).join("");
     }
   } catch(e) { document.getElementById("envoiContacts").innerHTML = '<div style="color:red;padding:12px;">Erreur : ' + e.message + '</div>'; }
