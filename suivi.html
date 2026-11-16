@@ -322,6 +322,9 @@
   .sem-cpt{min-width:24px;height:22px;padding:0 7px;border-radius:11px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;color:#fff;}
   .sem-resume{font-size:12.5px;color:var(--text-mid);flex:1;}
   .sem-resume.ok{color:#1DA870;font-weight:600;}
+  .sem-boucles{color:#1DA870;font-weight:600;}
+  .sem-lien{margin-left:8px;color:var(--text-mid);text-decoration:underline;cursor:pointer;font-weight:500;}
+  tr.ligne-bouclee td{opacity:.5;}
   .sem-action{font-size:12px;font-weight:600;color:var(--text-mid);}
   .sem-passee .sem-hd{background:#FEF5F4;border-color:#E74C3C;}
   .sem-passee .sem-pastille,.sem-passee .sem-cpt{background:#E74C3C;}
@@ -3670,6 +3673,11 @@ var contexteLigne = ''; // 'prochaine' pendant le rendu du bloc Semaine prochain
 // Un dossier peut apparaître dans la semaine et dans le bloc Semaine prochaine :
 // ses lignes du bloc prennent un suffixe d'identifiant pour rester distinctes.
 function sfxLigne() { return contexteLigne === 'prochaine' ? '-prochaine' : ''; }
+// Semaine en cours (16/11) : une ligne dont tous les passages de la semaine sont bouclés
+// (rapport envoyé, reçu pour une tâche) sort de la semaine ; « Afficher les bouclés » la remontre en grisé.
+var bouclesVisibles = (function(){ try { return localStorage.getItem('suivi.bouclesVisibles') === '1'; } catch(e) { return false; } })();
+function basculerBoucles() { bouclesVisibles = !bouclesVisibles; try { localStorage.setItem('suivi.bouclesVisibles', bouclesVisibles ? '1' : '0'); } catch(e) {} filterTable(); }
+function boucleSemaine(item) { var ps = passagesSemaine(item); return ps.length > 0 && ps.every(function(p){ return passageExecute(item, p); }); }
 function basculerReste() { resteOuvert = !resteOuvert; try { localStorage.setItem('suivi.resteOuvert', resteOuvert ? '1' : '0'); } catch(e) {} filterTable(); }
 function semaineAffichee(decalage) {
   var d = new Date(); var j = d.getDay(); // 0 = dimanche, 6 = samedi
@@ -3942,7 +3950,8 @@ var FILES_SUIVI = [
   // En cours (16/11) : étape du parcours entre Planification et À facturer. Tous les dossiers
   // planifiés, quelle que soit la semaine de leurs passages (le Pilotage quotidien n'en montre
   // que trois), y compris les dossiers facturés dont il reste des passages à exécuter.
-  { cle: 'encours', label: 'En cours', test: function(i){ return fileDe(i) === 'pilotage'; },
+  // Option B (16/11) : un dossier À facturer qui a encore des passages à exécuter y figure aussi (étiquette « À facturer »).
+  { cle: 'encours', label: 'En cours', test: function(i){ var e = fileDe(i); return e === 'pilotage' || (e === 'afacturer' && passagesActifs(i).some(function(p){ return !p.jumeau && p.debut && !passageExecute(i, p); })); },
     tri: function(x, y){
       var rx = rangEnCours(x), ry = rangEnCours(y);
       if (rx !== ry) return rx - ry;
@@ -4654,20 +4663,29 @@ function sectionsSemaine(list, ligne, nbCols) {
 
   // 2. Semaine pilotée
   var couranteBrut = list.filter(function(i){ return !estReste(i); });
-  var courante = couranteBrut;
+  // Bouclés : hors de la semaine, sauf « Afficher les bouclés » ou recherche en cours
+  var boucles = couranteBrut.filter(boucleSemaine);
+  var courante = couranteBrut.filter(function(i){ return !boucleSemaine(i); });
+  var voirBoucles = boucles.length > 0 && (bouclesVisibles || window._rechercheActive);
   var nbP = 0, kzC = 0;
   courante.forEach(function(i){ var ps = passagesSemaine(i); nbP += ps.length; kzC += kzManque(i, ps); });
   var npC = courante.filter(function(i){ return i.clientType !== 'tache' && passagesSemaine(i).some(function(p){ return !notifOk(notifPassage(i, p, 'notifBailleur')); }); }).length;
-  var resumeC = courante.length ? [compte(nbP, 'passage', 'passages'), kzC ? compte(kzC, 'agenda ou Kizeo à reprendre', 'agenda ou Kizeo à reprendre') : '✓ agenda et Kizeo à jour', npC ? compte(npC, 'non prévenu', 'non prévenus') : ''].filter(Boolean).join(' · ') : (window._rechercheActive ? 'aucun résultat' : 'aucun passage');
+  var resumeC = courante.length ? [compte(nbP, 'passage', 'passages'), kzC ? compte(kzC, 'agenda ou Kizeo à reprendre', 'agenda ou Kizeo à reprendre') : '✓ agenda et Kizeo à jour', npC ? compte(npC, 'non prévenu', 'non prévenus') : ''].filter(Boolean).join(' · ') : (window._rechercheActive ? 'aucun résultat' : boucles.length ? '✓ tout est bouclé' : 'aucun passage');
+  if (boucles.length) resumeC += ' · <span class="sem-boucles">' + compte(boucles.length, 'bouclé', 'bouclés') + '</span>'
+    + (window._rechercheActive ? '' : '<a class="sem-lien" onclick="event.stopPropagation();basculerBoucles()">' + (bouclesVisibles ? 'Masquer les bouclés' : 'Afficher les bouclés') + '</a>');
   var titreC = decalageSemaine === 0 ? 'Semaine en cours' : 'Semaine affichée';
   var ouvC = courantOuvert || (window._rechercheActive && courante.length > 0);
   html += enteteSection('courante', titreC, sa, cptTxt(courante.length), resumeC, ouvC, 'basculerCourant', nbCols, false);
   if (ouvC) {
-    if (courante.length) {
+    if (courante.length || voirBoucles) {
       html += window._enteteSection('courante');
       sectionRendu = 'courante';
-      try { courante.forEach(function(i){ html += ligne(i); }); } finally { sectionRendu = ''; }
+      try {
+        courante.forEach(function(i){ html += ligne(i); });
+        if (voirBoucles) boucles.forEach(function(i){ html += ligne(i).replace('class="ligne-v2', 'class="ligne-v2 ligne-bouclee'); });
+      } finally { sectionRendu = ''; }
     }
+    else if (boucles.length) html += '<tr><td colspan="' + nbCols + '"><div class="empty-state" style="padding:24px;"><p>✓ Tout est bouclé sur cette semaine.</p></div></td></tr>';
     else html += '<tr><td colspan="' + nbCols + '"><div class="empty-state" style="padding:24px;"><p>' + (sousFiltre ? 'Aucun dossier pour cet indicateur.' : window._rechercheActive ? 'Aucun résultat dans cette semaine.' : 'Aucun passage prévu sur cette semaine.') + '</p></div></td></tr>';
   }
 
