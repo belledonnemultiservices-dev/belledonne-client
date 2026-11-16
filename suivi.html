@@ -6447,6 +6447,13 @@ onAuthStateChanged(auth, async (user) => {
     majFicheOuverte(passages);
   };
 
+  // Historique interne des modifications (16/11) : une entrée par changement, avec l'auteur
+  window._ajouterJournal = async (suiviId, lignes) => {
+    if (!lignes || !lignes.length) return;
+    const u = auth.currentUser || {}, at = new Date().toISOString();
+    await updateDoc(doc(db, 'suivi', suiviId), { journal: arrayUnion(...lignes.map(texte => ({ at, par: u.displayName || u.email || '', texte }))) });
+  };
+
   // Fiche dossier (16/11, consultation) : rapports et facture(s) du dossier, en lecture seule
   window._chargerFicheDossier = async (suiviId) => {
     const lire = async (col) => (await getDocs(query(collection(db, col), where('suiviId', '==', suiviId)))).docs.map(d => ({ id: d.id, ...d.data() }));

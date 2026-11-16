@@ -152,10 +152,14 @@
     (donnees && donnees.factures || []).forEach(function (f) {
       if (f.dateFacture) ajout(f.dateFacture, 'Facture ' + esc(f.numFacture || '') + ' émise');
     });
+    // Modifications de passages (dates, techniciens, ajouts, suppressions), enregistrées depuis le 16/11
+    (Array.isArray(it.journal) ? it.journal : []).forEach(function (j) {
+      if (j && j.at) ajout(j.at, esc(j.texte || '') + (j.par ? ' <span class="fd-vide">(' + esc(String(j.par).split('@')[0]) + ')</span>' : ''));
+    });
     ev.sort(function (a, b) { return a.q.localeCompare(b.q); });
     var li = ev.map(function (e) { return '<li><span>' + dh(e.q) + '</span><span>' + e.t + '</span></li>'; }).join('');
     return '<div class="fd-section"><h3>Historique</h3>' + (li ? '<ul class="fd-histo">' + li + '</ul>' : '<p class="fd-vide">Rien d\'enregistré.</p>')
-      + '<p class="fd-vide" style="font-size:11.5px;margin-top:8px;">Les modifications de dates ou de techniciens ne sont pas historisées.</p></div>';
+      + '<p class="fd-vide" style="font-size:11.5px;margin-top:8px;">Les modifications de dates ou de techniciens sont historisées depuis le 16/11/2026.</p></div>';
   }
 
   function rendre(it, donnees) {

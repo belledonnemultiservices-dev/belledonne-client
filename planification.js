@@ -1235,6 +1235,8 @@ async function enregistrerPassages(item, silencieux) {
     if (etat) etat.occupe = true;
     try {
       await window._updateSuivi(item.id, { passages, calEventIds: passages.map(p => p.calEvents || {}), assignes, assigne: assignes[0] || "", updatedAt: new Date().toISOString() });
+      // Historique interne (16/11) : dates et techniciens modifiés, passages ajoutés ou retirés
+      if (window._ajouterJournal) window._ajouterJournal(item.id, journalPassages(frais, passages)).catch(e => console.warn("journal :", e.message));
       // Comme la fiche : l'échéance d'un rapport Kizeo en attente suit le passage déplacé
       if (window._syncEcheancesReception) await window._syncEcheancesReception(item.id, passages);
       // Rapports supprimés (ligne, passage ou technicien retiré) : plus de ligne « en attente technicien »
@@ -1334,6 +1336,25 @@ async function synchroniserAgenda(item, passages, aRetirer) {
     p.calEvents = cal;
   }
   return erreurs;
+}
+
+// Différences entre les passages en base et ceux enregistrés (passages principaux seulement)
+function journalPassages(avant, apres) {
+  const fmt = (d) => d ? d.substring(8, 10) + "/" + d.substring(5, 7) + "/" + d.substring(0, 4) + (d.length > 10 ? " " + d.substring(11, 16) : "") : "sans date";
+  const prin = (l) => l.filter(p => p && !p.jumeau && p.passageId);
+  const av = Object.fromEntries(prin(avant).map(p => [p.passageId, p]));
+  const ap = Object.fromEntries(prin(apres).map(p => [p.passageId, p]));
+  const lignes = [];
+  Object.values(ap).forEach(p => {
+    const o = av[p.passageId];
+    const n = "Passage " + p.num;
+    if (!o) { if (p.debut) lignes.push(n + " ajouté : " + fmt(p.debut) + (p.techs && p.techs.length ? ", " + p.techs.join(", ") : "")); return; }
+    if ((o.debut || "") !== (p.debut || "")) lignes.push(n + " déplacé : " + fmt(o.debut) + " → " + fmt(p.debut));
+    const ta = (o.techs || []).slice().sort().join(", "), tb = (p.techs || []).slice().sort().join(", ");
+    if (ta !== tb) lignes.push(n + " : technicien " + (ta || "aucun") + " → " + (tb || "aucun"));
+  });
+  Object.values(av).forEach(o => { if (!ap[o.passageId]) lignes.push("Passage " + o.num + " supprimé (" + fmt(o.debut) + ")"); });
+  return lignes;
 }
 
 // ── 3. Notifications ───────────────────────────────────────────────
