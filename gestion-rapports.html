@@ -183,6 +183,10 @@
   #menuActions .danger{color:var(--red);}
   #menuActions hr{border:none;border-top:1px solid var(--border);margin:4px 0;}
   .groupe-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-mid);cursor:pointer;margin-left:auto;}
+  /* Mode intégré au Suivi (16/11) : seules les fenêtres s'affichent, la page reste invisible */
+  body.embed{background:transparent;}
+  body.embed .sidebar,body.embed .main,body.embed .toast{display:none !important;}
+  .pdf-relu{width:100%;height:65vh;border:1px solid var(--border);border-radius:var(--radius-sm);}
 </style>
 </head>
 <body>
@@ -394,6 +398,22 @@
   </div>
 </div>
 
+<!-- MODAL VALIDATION D'UN RAPPORT SANS DONNÉES (PDF seul) -->
+<div class="modal-overlay" id="modalValiderPdf">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="vpTitre">Relire le rapport</div>
+      <button class="btn-close" onclick="closeValiderPdf()">&times;</button>
+    </div>
+    <div class="modal-body"><iframe class="pdf-relu" id="vpPdf" title="Rapport"></iframe></div>
+    <div class="modal-footer">
+      <span id="vpEtat" style="margin-right:auto;font-size:12px;color:var(--text-muted);"></span>
+      <button class="btn-cancel" onclick="closeValiderPdf()">Annuler</button>
+      <button class="btn-save" id="vpBtn" onclick="validerPdf()">Valider le rapport</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
   <span id="toastMsg"></span>
@@ -445,6 +465,14 @@ async function majStatutApresPassage1(suiviId) {
 }
 const storage = getStorage(app);
 
+// ── Mode intégré (16/11) : ouvert dans une fenêtre du Suivi (loupe / enveloppe) ──
+// gestion-rapports.html?rapport=<id>&action=relire|envoyer&embed=1
+// Seule la fenêtre demandée s'affiche ; à sa fermeture, le Suivi retire la fenêtre.
+const EMBED = new URLSearchParams(window.location.search).get("embed") === "1" && window.parent !== window;
+if (EMBED) document.body.classList.add("embed");
+function versSuivi(msg) { if (EMBED) window.parent.postMessage(msg, window.location.origin); }
+function finEmbed() { versSuivi({ type: "gr-fini" }); }
+
 let allDocs = [];
 let unsub = null;
 
@@ -484,9 +512,16 @@ function traiterLienDirect() {
   const ligne = document.getElementById("rrow-" + id);
   if (ligne) { if (ligne.scrollIntoView) ligne.scrollIntoView({ block: "center" }); ligne.style.transition = "background 1.5s"; ligne.style.background = "#E8F9F2"; setTimeout(() => { ligne.style.background = ""; }, 2500); }
   const action = params.get("action");
+  let ouvert = true;
   if (action === "relire" && r.donnees) openRelecture(id);
+  else if (action === "relire" && r.statut === "a-relire" && r.fileUrl) openValiderPdf(id);
   else if (action === "envoyer" && (r.statut === "a-traiter" || r.statut === "archive")) openEnvoi(id);
   else if (action === "renvoyer" && r.statut === "en-attente") renvoyer(id);
+  else ouvert = false;
+  if (EMBED) {
+    if (ouvert) versSuivi({ type: "gr-pret" });
+    else { alert(r.statut === "envoye" ? "Ce rapport a déjà été envoyé au client." : r.statut === "a-traiter" || r.statut === "archive" ? "Ce rapport est déjà validé : il reste à l'envoyer au client." : "Ce rapport n'a ni données ni fichier à relire."); finEmbed(); }
+  }
   // Nettoie l'adresse pour qu'un rechargement ne relance pas l'action
   history.replaceState(null, "", "gestion-rapports.html" + (params.get("from") === "suivi" ? "?from=suivi" : ""));
 }
@@ -654,7 +689,7 @@ function actionPrincipale(r) {
   if (r.statut === "a-relire") {
     return r.donnees
       ? `<button class="btn-a btn-primaire" onclick="openRelecture('${r.id}')">Relire et valider</button>`
-      : (r.fileUrl ? `<a class="btn-a btn-primaire" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : "");
+      : (r.fileUrl ? `<button class="btn-a btn-primaire" onclick="openValiderPdf('${r.id}')">Relire et valider</button>` : "");
   }
   if (r.statut === "a-traiter" || r.statut === "archive") return `<button class="btn-a btn-primaire" onclick="openEnvoi('${r.id}')" ${!r.client ? `disabled title="Rattachez d'abord un client"` : ""}>Envoyer au client</button>`;
   if (r.statut === "envoye") return r.fileUrl ? `<a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : "";
@@ -824,6 +859,7 @@ document.getElementById("searchInput").addEventListener("input", render);
 renderEntete();
 
 function showToast(msg) {
+  if (EMBED) { versSuivi({ type: "gr-toast", msg }); return; }
   const t = document.getElementById("toast");
   document.getElementById("toastMsg").textContent = msg;
   t.classList.add("show");
@@ -1088,6 +1124,40 @@ window.openRelecture = async function(id) {
 window.closeRelecture = function() {
   document.getElementById("modalRelecture").classList.remove("open");
   _rlId = null; _rlDonnees = null; _rlChoix = null;
+  finEmbed();
+};
+
+// ── Rapport « à relire » sans données (PDF seul) : on le lit, puis on le valide tel quel ──
+let _vpId = null;
+window.openValiderPdf = function(id) {
+  const r = allDocs.find(x => x.id === id);
+  if (!r || !r.fileUrl) return;
+  _vpId = id;
+  document.getElementById("vpTitre").textContent = "Relire le rapport" + (r.numPassage ? " · passage " + r.numPassage : "");
+  document.getElementById("vpEtat").textContent = (r.client || "") + (r.bc ? " · " + r.bc : "");
+  document.getElementById("vpPdf").src = r.fileUrl;
+  document.getElementById("modalValiderPdf").classList.add("open");
+};
+window.closeValiderPdf = function() {
+  document.getElementById("modalValiderPdf").classList.remove("open");
+  document.getElementById("vpPdf").src = "about:blank";
+  _vpId = null;
+  finEmbed();
+};
+window.validerPdf = async function() {
+  if (!_vpId) return;
+  const btn = document.getElementById("vpBtn");
+  btn.disabled = true; btn.textContent = "Validation...";
+  try {
+    const now = new Date().toISOString();
+    await updateDoc(doc(db, "reception-rapports", _vpId), { statut: "a-traiter", relueAt: now, updatedAt: now });
+    showToast("Rapport validé : il est prêt à être envoyé au client.");
+    closeValiderPdf();
+  } catch (e) {
+    alert("Validation impossible : " + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "Valider le rapport";
+  }
 };
 
 window.enregistrerRelecture = async function() {
@@ -1132,6 +1202,7 @@ window.validerRelecture = async function() {
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+    showToast("Rapport validé : il est prêt à être envoyé au client.");
     closeRelecture();
     // Le PDF s'ouvre dans la foulée : on valide rarement sans vouloir vérifier.
     window.open(data.fileUrl, "_blank");
@@ -1307,6 +1378,7 @@ window.ajouterEmailManuel = function() {
 window.closeEnvoi = function() {
   document.getElementById("modalEnvoi").classList.remove("open");
   _envoiId = null;
+  finEmbed();
 };
 
 window.doEnvoyer = async function(mode) {

@@ -354,6 +354,16 @@
   .ck-fichier span{position:absolute;left:0;right:0;bottom:3px;text-align:center;font:800 6.5px 'DM Sans',sans-serif;color:#fff;letter-spacing:.2px;}
   .ck-fichier.excel{color:#1E8449;}
   .ck-fichier:hover{transform:scale(1.15);}
+  /* Loupe (rapport à relire) et enveloppe (rapport validé, à envoyer) : 16/11 */
+  .ck-act{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;text-decoration:none;cursor:pointer;}
+  .ck-act svg{width:13px;height:13px;}
+  .ck-act.loupe{background:rgba(124,58,237,0.13);color:#6D28D9;}
+  .ck-act.envoi{background:rgba(245,166,35,0.18);color:#B9770E;}
+  .ck-act:hover{transform:scale(1.15);}
+  #grVoile{position:fixed;inset:0;z-index:999;background:rgba(13,27,42,0.5);display:flex;align-items:center;justify-content:center;}
+  #grVoile .gr-charge{background:#fff;border-radius:12px;padding:16px 20px;font-size:13px;display:flex;align-items:center;gap:14px;box-shadow:0 24px 60px rgba(13,27,42,0.2);}
+  #grVoile button{border:0;background:none;font-size:20px;cursor:pointer;color:var(--text-muted);}
+  #grCadre{position:fixed;inset:0;z-index:1000;width:100%;height:100%;border:0;background:transparent;visibility:hidden;}
   .ps-auj{background:#FFF4D6;border-radius:5px;padding:0 5px;margin-left:-5px;}
   .ck{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
   .ck-ok{background:#E8F9F2;color:#1DA870;}
@@ -4409,6 +4419,12 @@ function iconeRapport(rec, nom) {
     + '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="currentColor"/><path d="M14 2v6h6" fill="rgba(255,255,255,.55)"/></svg>'
     + '<span>' + (excel ? 'XLS' : 'PDF') + '</span></a>';
 }
+var SVG_LOUPE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>';
+var SVG_ENVOI = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>';
+// Raccourci vers la relecture ou l'envoi d'un rapport, ouvert en fenêtre dans le Suivi
+function boutonRapport(recId, action, titre) {
+  return '<a class="ck-act ' + (action === 'relire' ? 'loupe' : 'envoi') + '" href="' + lienRapport(recId, action) + '" title="' + String(titre).replace(/"/g, '&quot;') + '">' + (action === 'relire' ? SVG_LOUPE : SVG_ENVOI) + '</a>';
+}
 function marque(etat, titre) { return '<div class="ck-l" title="' + String(titre || '').replace(/"/g, '&quot;') + '">' + MARQUES[etat] + '</div>'; }
 var JOURS_COURTS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 function libPassageSemaine(p) {
@@ -4530,6 +4546,8 @@ function badgesRapports(item, p, quoi) {
       var e = etapeRapportRecu(item, r);
       // Rapport reçu (16/11) : icône du fichier, un clic l'ouvre dans un nouvel onglet
       var recF = e === 'ok' ? recPassage(item, r) : null;
+      // À relire (16/11) : loupe, un clic ouvre la relecture ; une fois validé, l'icône du PDF
+      if (recF && recF.statut === 'a-relire') return boutonRapport(recF.id, 'relire', nom + ' : reçu, à relire et valider');
       if (recF && recF.fileUrl) return iconeRapport(recF, nom);
       return e === 'ok' ? MARQUES.ok.replace('<span ', '<span title="' + (nom + ' : reçu').replace(/"/g, '&quot;') + '" ')
         : e === 'retard' || e === 'manque' ? MARQUES.ko.replace('<span ', '<span title="' + (nom + (e === 'retard' ? ' : en retard' : ' : passage fait, rien reçu')).replace(/"/g, '&quot;') + '" ')
@@ -4537,8 +4555,8 @@ function badgesRapports(item, p, quoi) {
     }
     var e6 = etapeRapportEnvoye(item, r);
     return e6 === 'ok' ? MARQUES.ok.replace('<span ', '<span title="' + (nom + ' : envoyé au client').replace(/"/g, '&quot;') + '" ')
-      : e6 === 'relire' ? MARQUES.att.replace('<span ', '<span title="' + (nom + ' : à relire').replace(/"/g, '&quot;') + '" ')
-      : e6 === 'envoyer' ? MARQUES.ko.replace('<span ', '<span title="' + (nom + ' : prêt, pas encore envoyé').replace(/"/g, '&quot;') + '" ')
+      : e6 === 'relire' ? MARQUES.na.replace('<span ', '<span title="' + (nom + ' : à relire d\'abord (loupe)').replace(/"/g, '&quot;') + '" ')
+      : e6 === 'envoyer' ? boutonRapport(recPassage(item, r).id, 'envoyer', nom + ' : validé, à envoyer au client')
       : MARQUES.na.replace('<span ', '<span title="' + (nom + ' : pas encore dû').replace(/"/g, '&quot;') + '" ');
   }).join('');
   return '<div class="ck-l ck-multi">' + html + '</div>';
@@ -4830,6 +4848,42 @@ function ouvrirMenuSuivi(ev, id) {
 
 
 // ── TOAST ──
+// ── Relecture / envoi d'un rapport en fenêtre (16/11) ──
+// Charge Gestion rapports en mode intégré : mêmes fenêtres, même code, sans quitter le Suivi.
+// Tous les liens « relire » et « envoyer » vers Gestion rapports passent par ici.
+function fermerRapportSuivi() {
+  ['grCadre', 'grVoile'].forEach(function(id){ var el = document.getElementById(id); if (el) el.remove(); });
+}
+function ouvrirRapportSuivi(recId, action) {
+  fermerRapportSuivi();
+  var voile = document.createElement('div');
+  voile.id = 'grVoile';
+  voile.innerHTML = '<div class="gr-charge">Ouverture du rapport…<button type="button" title="Fermer">&times;</button></div>';
+  voile.querySelector('button').onclick = fermerRapportSuivi;
+  document.body.appendChild(voile);
+  var f = document.createElement('iframe');
+  f.id = 'grCadre';
+  f.src = lienRapport(recId, action) + '&embed=1';
+  document.body.appendChild(f);
+}
+window.addEventListener('message', function(ev) {
+  if (ev.origin !== window.location.origin || !ev.data || !document.getElementById('grCadre')) return;
+  if (ev.data.type === 'gr-pret') { document.getElementById('grCadre').style.visibility = 'visible'; var v = document.getElementById('grVoile'); if (v) v.style.background = 'transparent'; }
+  else if (ev.data.type === 'gr-fini') fermerRapportSuivi();
+  else if (ev.data.type === 'gr-toast') showToast(ev.data.msg);
+});
+document.addEventListener('click', function(ev) {
+  var a = ev.target.closest && ev.target.closest('a[href^="gestion-rapports.html?rapport="]');
+  if (!a || ev.metaKey || ev.ctrlKey || ev.shiftKey) return;
+  var u = new URLSearchParams(a.getAttribute('href').split('?')[1]);
+  var action = u.get('action');
+  if (action !== 'relire' && action !== 'envoyer') return;
+  ev.preventDefault(); ev.stopPropagation();
+  if (typeof fermerMenuSuivi === 'function') fermerMenuSuivi();
+  ouvrirRapportSuivi(u.get('rapport'), action);
+}, true);
+document.addEventListener('keydown', function(ev) { if (ev.key === 'Escape' && document.getElementById('grVoile') && document.getElementById('grCadre').style.visibility !== 'visible') fermerRapportSuivi(); });
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toastMsg').textContent = msg;
