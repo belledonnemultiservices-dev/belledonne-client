@@ -932,7 +932,10 @@ function rendrePassages(item) {
     const rec = pBase && window.recPassage ? window.recPassage(item, { num: l.num, passageId: r.pid }) : null;
     const recu = !!rec && rec.statut !== "en-attente";
     const lienRecu = recu && rec.fileUrl ? `<a class="pl-rap-pdf" href="${esc(rec.fileUrl)}" target="_blank" rel="noopener" title="Ouvrir le rapport">📄 ${rec.origine === "manuel" ? "Rapport manuel" : "Rapport reçu"}</a>` : "";
-    const btnManuel = pBase && !recu ? `<button class="pl-btn petit" data-a="manuelRap" title="Déposer le rapport en PDF à la main${rec ? " (remplace le rapport Kizeo attendu)" : ""}">📎 PDF</button>` : "";
+    // Toujours visible (16/11) : grisé tant que le passage n'est pas enregistré, pour ne pas disparaître sans explication
+    const btnManuel = recu ? "" : pBase
+      ? `<button class="pl-btn petit" data-a="manuelRap" title="Déposer le rapport en PDF à la main${rec ? " (remplace le rapport Kizeo attendu)" : ""}">📎 PDF</button>`
+      : `<button class="pl-btn petit" disabled style="opacity:.45;cursor:not-allowed;" title="Enregistre d'abord le passage (date et technicien) pour déposer un rapport">📎 PDF</button>`;
     const action = !r.formId || !destDe(l, r) || recu ? "" : etatR === "manque" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Envoyer</button>` : etatR === "modifie" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Renvoyer</button><button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler</button>` : "";
     return `<div class="pl-rap" data-r="${k}">
       <span class="pl-rap-n">${i + 1}.</span>
