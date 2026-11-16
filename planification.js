@@ -972,13 +972,16 @@ function rendrePassages(item) {
       // Passage annulé (16/11) : son constat, et « Replanifier ce passage » tant qu'il n'a pas de suite
       const an = (l.ref && l.ref.annulation) || null, suite = (l.ref && l.ref.suite) || null;
       const remp = L.find(x => x.remplace === l.pid && !x.annule);
-      if (remp && (l.modeSuite === "avance" || (suite && suite.type === "avance"))) return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr;align-items:center;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note pl-annule-txt">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}${constat} · passages suivants avancés, nouveau ${cercle(remp.num)} ajouté en fin</span></div></div>`;
+      if (remp && (l.modeSuite === "avance" || (suite && suite.type === "avance"))) return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr;align-items:center;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note pl-annule-txt">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}${constat} · passages suivants avancés, nouveau ${cercle(remp.num)} ajouté en fin</span></div>${rappelKz}</div>`;
       const constat = an ? ` · ${an.statut === "absent" ? "absent" : "annulation"}${an.motif ? " : " + esc(an.motif) : ""}` : "";
+      // Formulaire Kizeo laissé sur le téléphone par une annulation depuis l'app : rappel jusqu'à « Supprimé dans Kizeo »
+      const kzA = l.ref && l.ref.kizeoAnnule && !l.ref.kizeoAnnule.supprimeLe ? l.ref.kizeoAnnule : null;
+      const rappelKz = kzA ? `<div class="pl-psg-pb" style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">⚠ Formulaire Kizeo à supprimer à la main : « ${esc(kzA.libelle)} »${kzA.technicien ? " (chez " + esc(kzA.technicien) + ")" : ""}<button class="pl-btn petit" data-a="kzSupprime">✓ Supprimé dans Kizeo</button></div>` : "";
       const droite = remp ? `<span class="pl-note">remplacé par le nouveau ${cercle(remp.num)}${remp.debut ? " du " + fmtDT(remp.debut) : ""}</span>`
         : suite ? `<span class="pl-note">${suite.type === "abandon" ? "non replanifié" + (suite.motif ? " : " + esc(suite.motif) : "") : suite.type === "avance" ? "passages suivants avancés" : "replanifié"}</span>`
         : `<span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="pl-btn indigo petit" data-a="replanif" title="Crée un nouveau passage ${cercle(l.num)} avec le même technicien : choisis la nouvelle date">↻ Replanifier ce passage</button>`
           + (L.some(x => !x.annule && x.num > l.num && !vierge(x)) ? `<button class="pl-btn petit" data-a="avancer" title="Les passages suivants remontent d'un cran (dates et techniciens gardés), un nouveau passage est ajouté en fin de série">⇡ Avancer les passages suivants</button>` : "") + `</span>`;
-      return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr auto;align-items:center;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note pl-annule-txt">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}${constat}</span>${droite}</div></div>`;
+      return `<div class="pl-passage annule" data-k="${k}"><div class="pl-psg-l1" style="grid-template-columns:auto 1fr auto;align-items:center;"><span class="pl-cercle">${cercle(l.num)}</span><span class="pl-note pl-annule-txt">passage annulé${l.debut ? " · prévu le " + fmtDT(l.debut) : ""}${constat}</span>${droite}</div>${rappelKz}</div>`;
     }
     const p = enBase.find(x => x.passageId === l.pid);
     return `<div class="pl-passage teinte-${k % 4}" data-k="${k}">
@@ -1093,6 +1096,20 @@ function rendrePassages(item) {
   // Avancer les passages suivants (16/11) : chacun prend le numéro du précédent (date et techniciens
   // gardés), son formulaire Kizeo et son titre suivent le nouveau numéro (à renvoyer), et un nouveau
   // passage s'ajoute en fin de série, à dater, pour garder le nombre de passages prévu.
+  // Formulaire du passage annulé supprimé dans Kizeo : le rappel disparaît, noté dans l'historique
+  document.querySelectorAll(".pl-corps [data-a=kzSupprime]").forEach(b => b.onclick = async () => {
+    const l = ligneDe(b);
+    const d = dossier() || item;
+    const now = new Date().toISOString();
+    const passages = passagesBruts(d).map(p => p && p.passageId === l.pid && p.kizeoAnnule ? { ...p, kizeoAnnule: { ...p.kizeoAnnule, supprimeLe: now } } : p);
+    b.disabled = true;
+    try {
+      await window._updateSuivi(d.id, { passages });
+      if (l.ref && l.ref.kizeoAnnule) l.ref.kizeoAnnule = { ...l.ref.kizeoAnnule, supprimeLe: now };
+      if (window._ajouterJournal) window._ajouterJournal(d.id, ["Formulaire Kizeo du passage annulé supprimé dans Kizeo"]).catch(() => {});
+      rendrePassages(dossier() || item);
+    } catch (e) { alert("Enregistrement impossible : " + e.message); b.disabled = false; }
+  });
   document.querySelectorAll(".pl-corps [data-a=avancer]").forEach(b => b.onclick = () => {
     const l = ligneDe(b);
     const suivants = L.filter(x => !x.annule && x.num > l.num && !vierge(x)).sort((a, c) => a.num - c.num);
@@ -1100,7 +1117,9 @@ function rendrePassages(item) {
     const dernier = Math.max(...suivants.map(x => x.num));
     // Libellés exacts des formulaires partis, pour les retrouver et les supprimer dans Kizeo
     const kzAnciens = partis(suivants.flatMap(x => x.rapports.filter(r => !r.annule)));
-    const kzAnnule = partis(l.rapports);
+    // Seul un formulaire resté sur le téléphone (annulation depuis l'app) est à supprimer ; un constat rempli par le technicien est déjà parti
+    const kzAnnule = l.rapports.map(r => enBase.find(p => p.passageId === r.pid)).filter(p => p && p.kizeoAnnule && !p.kizeoAnnule.supprimeLe)
+      .map(p => "• « " + (p.kizeoAnnule.libelle || "") + " »" + (p.kizeoAnnule.technicien ? " (chez " + p.kizeoAnnule.technicien + ")" : ""));
     if (!confirm(suivants.map(x => cercle(x.num) + " devient " + cercle(x.num - 1)).join(", ") + ", dates et techniciens inchangés.\n\n"
       + "Un nouveau passage " + cercle(dernier) + " est ajouté en fin de série : choisis sa date.\n\n"
       + (kzAnciens.length

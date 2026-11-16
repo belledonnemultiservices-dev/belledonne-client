@@ -513,7 +513,7 @@ async function annulerPassageSuivi(r, infos) {
     } catch(e) { console.warn("agenda non mis à jour :", e.message); }
   }
   const sansRetires = (cal) => Object.fromEntries(Object.entries(cal || {}).filter(([, ev]) => !retires.has(ev)));
-  const updated = passages.map(p => p && typeof p === "object" && memePassage(p, r) ? { ...p, statut: "annule", annulation, calEvents: sansRetires(p.calEvents), ...(infos.effacerKizeo ? { kizeoPush: null } : {}) } : p);
+  const updated = passages.map(p => p && typeof p === "object" && memePassage(p, r) ? { ...p, statut: "annule", annulation, calEvents: sansRetires(p.calEvents), ...(infos.effacerKizeo ? { kizeoPush: null, ...(p.kizeoPush ? { kizeoAnnule: { libelle: p.kizeoPush.libelle || "", technicien: p.kizeoPush.technicien || "", le: now } } : {}) } : {}) } : p);
   const ouvert = d.report && d.report.etat === "standby" ? d.report : {
     etat: "standby", ouvertLe: now, anciennes: [],
     // Passages connus à l'ouverture : seuls eux comptent comme « anciennes dates » s'ils bougent
@@ -523,7 +523,11 @@ async function annulerPassageSuivi(r, infos) {
   cibles.filter(p => !p.jumeau).forEach(p => { if (!anciennes.some(a => a.pid && a.pid === p.passageId)) anciennes.push({ pid: p.passageId || null, num: p.num || null, debut: p.debut || "" }); });
   const texte = "Passage " + r.numPassage + " annulé (" + (annulation.statut === "absent" ? "absent" : "annulation") + (annulation.motif ? " : " + annulation.motif : "") + ") · "
     + (infos.provenance === "technicien" ? "signalé par le technicien" : "depuis l'app") + (retires.size ? " · rendez-vous retiré de l'agenda" : "") + " · dossier en attente de replanification";
-  await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated, report: { ...ouvert, anciennes }, journal: arrayUnion({ at: now, par, texte }) });
+  // Formulaire Kizeo resté sur le téléphone (annulation depuis l'app) : libellé gardé pour le supprimer dans Kizeo
+  const aSupprimer = infos.effacerKizeo ? cibles.filter(p => p.kizeoPush).map(p => "« " + (p.kizeoPush.libelle || "") + " »" + (p.kizeoPush.technicien ? " (chez " + p.kizeoPush.technicien + ")" : "")) : [];
+  const texteKz = aSupprimer.length ? " · formulaire Kizeo à supprimer : " + aSupprimer.join(", ") : "";
+  await updateDoc(doc(db, "suivi", r.suiviId), { passages: updated, report: { ...ouvert, anciennes }, journal: arrayUnion({ at: now, par, texte: texte + texteKz }) });
+  return aSupprimer;
   if (String(r.numPassage) === "1") await majStatutApresPassage1(r.suiviId);
 }
 const storage = getStorage(app);
@@ -1876,7 +1880,10 @@ window.confirmerAnnulerPassage = async function(mode) {
     });
 
     if (r.suiviId && r.numPassage) {
-      try { await annulerPassageSuivi(r, { statut, motif, provenance: "app", effacerKizeo: true }); }
+      try {
+        const kz = await annulerPassageSuivi(r, { statut, motif, provenance: "app", effacerKizeo: true });
+        if (kz && kz.length) alert("Passage annulé.\n\nLe formulaire Kizeo reste sur le téléphone du technicien. À supprimer à la main dans Kizeo :\n" + kz.map(x => "• " + x).join("\n"));
+      }
       catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
     }
 
