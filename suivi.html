@@ -4342,14 +4342,14 @@ function actionSuivante(item) {
   }
   // Dans la Semaine, un formulaire Kizeo manquant ou mal envoyé passe avant tout.
   if (fileSuivi === 'semaine' && passagesLigneSemaine(item).some(function(p){ var e = etatKizeo(item, p); return e === 'manque' || e === 'ecart'; })) {
-    return bouton('Générer Kizeo', 'openModal', false, 'Ouvre la fiche pour envoyer le formulaire Kizeo au technicien');
+    return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)" title="Ouvre la planification pour envoyer le formulaire Kizeo au technicien">Générer Kizeo</button>';
   }
   if (f === 'pannule') return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)">Replanifier</button>';
   if (f === 'afacturer') return bouton('Facturer', 'basculerEnFacturation');
   if (f === 'cloture') return '<a class="btn-next neutre" href="facturation.html">Voir la facturation</a>';
   // Reprendre un dossier en attente : retour en Planification
   if (f === 'attente') return '<button class="btn-next" onclick="reprendreAttente(\'' + id + '\')" title="Le blocage est levé : le dossier revient en Planification">Reprendre</button>';
-  if (f === 'annuleDef') return bouton('Ouvrir', 'openModal', true);
+  if (f === 'annuleDef') return bouton('Ouvrir', 'ouvrirFicheDossier', true);
   if (f === 'planification') {
     // Commencé : on rouvre la fenêtre directement sur la première étape manquante
     if (planifCommencee(item) && typeof window.etapeConseilleePlanif === 'function') {
@@ -4365,7 +4365,7 @@ function actionSuivante(item) {
   if (passagesActifs(item).some(function(p){ var d = (p.debut || '').substring(0, 10); return d && d >= auj7 && d <= fin7 && etatAgenda(p) !== 'ok'; })) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)" title="Un passage des 7 prochains jours n\'est pas à jour dans l\'agenda">Mettre à l\'agenda</button>';
   if (kizeoAGenerer7j(item)) return '<button class="btn-next" onclick="ouvrirPlanification(\'' + id + '\',1)" title="Un passage des 7 prochains jours n\'a pas son formulaire Kizeo">Générer Kizeo</button>';
   if (item.clientType !== 'tache' && !toNotifArray(item.notifBailleur).length && prochainPassage(item)) return bouton('Notifier', 'openNotifFromRow');
-  return bouton('Ouvrir', 'openModal', true);
+  return bouton('Ouvrir', 'ouvrirFicheDossier', true);
 }
 
 // ── Check-list d'un passage de la semaine ──
@@ -4774,6 +4774,8 @@ function ouvrirLigneSuivi(ev, id) {
   var item = (window.interventions || []).find(function(i){ return i.id === id; });
   var f = item ? fileDe(item) : '';
   if (!item || f === 'validation' || activeTab !== 'contrat' || typeof window.ouvrirPlanification !== 'function') { openModal(id); return; }
+  // Clôturé ou annulé (16/11) : rien à planifier, on consulte la fiche dossier
+  if ((f === 'cloture' || f === 'annuleDef') && typeof window.ouvrirFicheDossier === 'function') { window.ouvrirFicheDossier(id); return; }
   window.ouvrirPlanification(id, f === 'planification' ? 0 : 1);
 }
 
@@ -4795,7 +4797,10 @@ function ouvrirMenuSuivi(ev, id) {
   if (!item) return;
   var hasPsg = passagesNorm(item).length > 0;
   var it = [];
-  it.push('<button onclick="openModal(\'' + id + '\')">Ouvrir la fiche</button>');
+  // Fiche dossier en consultation (16/11) ; Validation garde sa fiche de relecture
+  it.push(item.statut === 'À valider' || typeof window.ouvrirFicheDossier !== 'function'
+    ? '<button onclick="openModal(\'' + id + '\')">Ouvrir la fiche</button>'
+    : '<button onclick="ouvrirFicheDossier(\'' + id + '\')">Fiche dossier</button>');
   if (['Annulé', 'À valider'].indexOf(item.statut) === -1) it.push('<button onclick="ouvrirPlanification(\'' + id + '\')">Planifier / compléter la planification</button>');
   if (item.statut === 'À valider') it.push('<button onclick="validerIntervention(\'' + id + '\')">Valider</button><button onclick="rejeterIntervention(\'' + id + '\')">Rejeter</button>');
   if (hasPsg) it.push('<button onclick="openNotifFromRow(\'' + id + '\')">Notifier client / locataire</button><button onclick="openRappelSms(\'' + id + '\')">Rappel SMS</button>');
@@ -6442,6 +6447,13 @@ onAuthStateChanged(auth, async (user) => {
     majFicheOuverte(passages);
   };
 
+  // Fiche dossier (16/11, consultation) : rapports et facture(s) du dossier, en lecture seule
+  window._chargerFicheDossier = async (suiviId) => {
+    const lire = async (col) => (await getDocs(query(collection(db, col), where('suiviId', '==', suiviId)))).docs.map(d => ({ id: d.id, ...d.data() }));
+    const [rapports, factures] = await Promise.all([lire('reception-rapports'), lire('facturation')]);
+    return { rapports, factures };
+  };
+
   // Rapport manuel (16/11) : PDF déposé à la main sur un passage, depuis la fenêtre de planification.
   // Il entre dans le circuit ordinaire (reception-rapports, statut « prêt à envoyer ») : Gestion
   // rapports, colonnes Rapport reçu / envoyé du Pilotage, passage exécuté une fois envoyé.
@@ -7034,6 +7046,7 @@ window.resetStatusColors = function() {
 </div>
 
 <script type="module" src="planification.js"></script>
+<script src="fiche-dossier.js"></script>
 <script type="module" src="suivi-badge.js"></script>
 </body>
 </html>
