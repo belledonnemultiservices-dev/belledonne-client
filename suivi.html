@@ -6388,7 +6388,19 @@ onAuthStateChanged(auth, async (user) => {
         const p = passages.find(x => x && x.passageId && x.passageId === pid);
         if (p && p.notifs) div.dataset.notifs = JSON.stringify(p.notifs);
       });
-    } catch (e) { console.warn('trace notification par passage non enregistrée:', e.message); }
+    } catch (e) {
+      console.warn('trace notification par passage non enregistrée:', e.message);
+      if (!window._alerteNotifFaite) { window._alerteNotifFaite = true; setTimeout(() => { window._alerteNotifFaite = false; }, 3000); alert('L\'email est bien parti, mais l\'app n\'a pas pu enregistrer la notification sur le dossier (' + e.message + ').\n\nOuvre la fenêtre de planification, étape Notifications, et utilise « Déjà prévenu ? » pour l\'enregistrer.'); }
+    }
+  };
+  // Notification faite hors de l'app ou non enregistrée (16/11) : on la marque à la main,
+  // avec la date réelle de l'envoi. Même trace qu'un envoi depuis l'app, plus une mention « manuelle ».
+  window._marquerNotifManuelle = async (suiviId, type, ts) => {
+    const field = type === 'locataire' ? 'notifLocataire' : 'notifBailleur';
+    await updateDoc(doc(db, 'suivi', suiviId), { [field]: arrayUnion(ts), notifsManuelles: arrayUnion(type + '|' + ts + '|' + new Date().toISOString()) });
+    const it = (window.interventions || []).find(i => i.id === suiviId);
+    if (it) it[field] = toNotifArray(it[field]).concat([ts]);
+    await window._noterNotifPassages(suiviId, type, ts);
   };
 
   // Trace d'une relance WhatsApp ouverte pour un rapport en retard.
@@ -6424,7 +6436,11 @@ window._updateSuiviNotifArray = async function(id, field, ts) {
     const update = {};
     update[field] = arrayUnion(ts);
     await updateDoc(doc(db, 'suivi', id), update);
-  } catch(e) { console.warn('notif update:', e); }
+  } catch(e) {
+    // 16/11 : un échec silencieux laissait le dossier « non notifié » alors que l'email était parti
+    console.warn('notif update:', e);
+    alert('L\'email est bien parti, mais l\'app n\'a pas pu enregistrer la notification sur le dossier (' + e.message + ').\n\nOuvre la fenêtre de planification, étape Notifications, et utilise « Déjà prévenu ? » pour l\'enregistrer.');
+  }
 };
 
 // ── PROTOCOLES POUR PJ LOCATAIRE ──

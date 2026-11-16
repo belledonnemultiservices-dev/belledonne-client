@@ -48,6 +48,7 @@ const CSS = `
 .pl-corps{padding:20px 24px;overflow-y:auto;flex:1;}
 .pl-pied{padding:14px 24px;border-top:1px solid rgba(13,27,42,.09);display:flex;gap:10px;align-items:center;}
 .pl-pied .pl-espace{flex:1;}
+.pl-lien{background:none;border:0;color:#4338CA;font:600 12.5px 'DM Sans',sans-serif;text-decoration:underline;cursor:pointer;margin-right:12px;padding:0;}
 .pl-btn{font:600 13px 'DM Sans',sans-serif;border:1px solid rgba(13,27,42,.12);background:#fff;color:#0D1B2A;border-radius:8px;padding:9px 16px;cursor:pointer;}
 .pl-btn:disabled{opacity:.5;cursor:default;}
 .pl-btn.prim{background:#1DA870;border-color:#1DA870;color:#fff;}
@@ -1307,15 +1308,20 @@ function etatNotif(item, champ) {
   if (rs.some(r => r && r.change)) return etatHtml("att", "date modifiée, à re-notifier");
   return etatHtml("ko", "✕ pas encore notifié");
 }
+// Tous les passages actifs notifiés, à la bonne date (même règle que etatNotif)
+function notifFaite(item, champ) {
+  const ns = actifs(item).filter(p => !p.jumeau).map(p => norm(item, p)).filter(Boolean);
+  return ns.length > 0 && ns.every(p => window.notifOk(window.notifPassage(item, p, champ)));
+}
 function rendreNotifications(item) {
   $(".pl-corps").innerHTML = `
     <p class="pl-intro">Le message annonce tous les passages d'un coup. Il utilise tes modèles habituels (page Contacts), avec les contacts du client et les pièces jointes.</p>
     <table class="pl-table"><tbody>
       <tr><td style="width:160px;"><b>Client</b><div class="pl-note">${esc(item.client || "")}</div></td><td>${etatNotif(item, "notifBailleur")}</td>
-        <td style="text-align:right;"><button class="pl-btn indigo" data-a="client">Notifier le client</button></td></tr>
+        <td style="text-align:right;white-space:nowrap;">${notifFaite(item, "notifBailleur") ? "" : '<button class="pl-lien" data-a="marqClient" title="Le client a été prévenu hors de l\'app, ou l\'envoi n\'a pas été enregistré">Déjà prévenu ?</button>'}<button class="pl-btn indigo" data-a="client">Notifier le client</button></td></tr>
       <tr><td><b>Locataire</b><div class="pl-note">${esc(item.nomClient || "")}</div></td>
         <td>${item.emailClient ? etatNotif(item, "notifLocataire") : etatHtml("na", "pas d'email locataire")}</td>
-        <td style="text-align:right;">${item.emailClient ? '<button class="pl-btn indigo" data-a="loc">Notifier le locataire</button>' : '<button class="pl-btn" data-a="ajoutEmail">Ajouter son email</button>'}</td></tr>
+        <td style="text-align:right;white-space:nowrap;">${item.emailClient ? (notifFaite(item, "notifLocataire") ? "" : '<button class="pl-lien" data-a="marqLoc" title="Le locataire a été prévenu hors de l\'app, ou l\'envoi n\'a pas été enregistré">Déjà prévenu ?</button>') + '<button class="pl-btn indigo" data-a="loc">Notifier le locataire</button>' : '<button class="pl-btn" data-a="ajoutEmail">Ajouter son email</button>'}</td></tr>
     </tbody></table>
     <p class="pl-note" style="margin-top:12px;">La fenêtre d'envoi s'ouvre à gauche. Une fois l'email parti, ferme-la : la coche se met à jour ici.</p>`;
   const ouvrirNotif = (onglet) => {
@@ -1327,6 +1333,24 @@ function rendreNotifications(item) {
   const bc = $("[data-a=client]"); if (bc) bc.onclick = () => ouvrirNotif("bailleur");
   const bl = $("[data-a=loc]"); if (bl) bl.onclick = () => ouvrirNotif("locataire");
   const be = $("[data-a=ajoutEmail]"); if (be) be.onclick = () => { etat.etape = 0; rendre(); };
+  // Déjà prévenu (16/11) : enregistre une notification faite hors de l'app, à sa date réelle
+  const marquer = async (type) => {
+    const qui = type === "locataire" ? "le locataire" : "le client";
+    const auj = new Date(), jj = String(auj.getDate()).padStart(2, "0") + "/" + String(auj.getMonth() + 1).padStart(2, "0") + "/" + auj.getFullYear();
+    const saisie = prompt("Date à laquelle " + qui + " a été prévenu (JJ/MM/AAAA) :", jj);
+    if (saisie === null) return;
+    const m = saisie.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const d = m ? new Date(+m[3], +m[2] - 1, +m[1], 12, 0, 0) : null;
+    if (!d || isNaN(d) || d.getDate() !== +m[1] || d > new Date(auj.getFullYear(), auj.getMonth(), auj.getDate(), 23, 59)) { alert("Date invalide (format JJ/MM/AAAA, pas dans le futur)."); return; }
+    if (!confirm("Enregistrer que " + qui + " a été prévenu le " + saisie.trim() + " pour les passages actuels ?\n\nAucun email n'est envoyé.")) return;
+    try {
+      await window._marquerNotifManuelle(item.id, type, d.toISOString());
+      window.showToast && window.showToast("Notification " + (type === "locataire" ? "locataire" : "client") + " enregistrée");
+      rendre();
+    } catch (e) { alert("Enregistrement impossible : " + e.message); }
+  };
+  const mc = $("[data-a=marqClient]"); if (mc) mc.onclick = () => marquer("bailleur");
+  const ml = $("[data-a=marqLoc]"); if (ml) ml.onclick = () => marquer("locataire");
   navigation("Continuer →");
 }
 
