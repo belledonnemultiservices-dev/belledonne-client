@@ -282,53 +282,37 @@
   .files-ligne{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .files-ligne2 .file-chip{height:32px;font-size:12.5px;}
   .files-archives .file-chip:not(.active){opacity:.75;}
-  /* Navigation du Suivi (16/11) : frise du parcours, blocs Aujourd'hui / À débloquer, archives */
-  .ns{display:flex;flex-direction:column;gap:14px;}
-  .ns-titre{font:700 10.5px 'DM Sans',sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--text-muted);margin:0 0 8px 2px;}
-  .ns-frise{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 8px 12px;}
-  .ns-etape{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;cursor:pointer;font-family:'DM Sans',sans-serif;padding:2px 4px 4px;border-radius:10px;min-width:0;}
-  .ns-etape:not(:first-child)::before{content:'';position:absolute;top:17px;right:calc(50% + 21px);width:calc(100% - 42px);height:2px;background:#DCE3EA;}
-  .ns-etape:hover{background:var(--bg);}
-  .ns-rond{width:34px;height:34px;border-radius:50%;border:2px solid #CBD5E1;background:#fff;color:var(--text-mid);font:700 13px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;transition:all .15s;}
-  .ns-lib{font:600 13px 'DM Sans',sans-serif;color:var(--text);white-space:nowrap;}
-  .ns-cpt{font:700 11px 'DM Sans',sans-serif;padding:1px 9px;border-radius:10px;background:var(--bg);color:var(--text-mid);}
-  .ns-etape:hover .ns-rond{border-color:var(--green);}
-  .ns-etape.active .ns-rond{background:var(--navy);border-color:var(--navy);color:#fff;box-shadow:0 0 0 4px rgba(13,27,42,.08);}
-  .ns-etape.active .ns-lib{color:var(--navy);font-weight:700;}
-  .ns-etape.active .ns-cpt{background:var(--navy);color:#fff;}
-  .ns-etape.alerte .ns-cpt{background:#FDECEA;color:#E74C3C;}
-  .ns-etape.active.alerte .ns-cpt{background:#E74C3C;color:#fff;}
-  .ns-rangee{display:flex;gap:16px;flex-wrap:wrap;}
-  .ns-rangee>.ns-bloc{flex:1 1 260px;}
-  .ns-rangee>.ns-bloc.ns-large{flex:2 1 420px;}
-  .ns-cartes{display:flex;gap:10px;flex-wrap:wrap;}
-  .ns-carte{flex:1 1 190px;display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;text-align:left;font-family:'DM Sans',sans-serif;transition:all .15s;}
-  .ns-carte:hover{border-color:var(--green);}
-  .ns-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .ns-ico svg{width:18px;height:18px;}
-  .ns-txt{flex:1;min-width:0;}
-  .ns-txt b{display:block;font-size:13.5px;color:var(--text);}
-  .ns-txt small{display:block;font-size:11.5px;color:var(--text-muted);margin-top:1px;}
-  .ns-n{font:800 21px 'Syne',sans-serif;color:var(--text);}
-  .ns-carte.active{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);background:#F8FAFC;}
-  .ns-carte.alerte .ns-n{color:#E74C3C;}
-  .ns-pilotage .ns-ico{background:#EEF2FF;color:#4338CA;}
-  .ns-pilotage{border-color:#C7D2FE;background:#F5F7FF;}
-  .ns-pilotage .ns-n{color:#4338CA;}
-  .ns-pilotage.active{background:#4338CA;border-color:#4338CA;box-shadow:none;}
-  .ns-pilotage.active b,.ns-pilotage.active small,.ns-pilotage.active .ns-n{color:#fff;}
-  .ns-pilotage.active .ns-ico{background:rgba(255,255,255,.18);color:#fff;}
-  .ns-attente .ns-ico{background:#FEF3C7;color:#B45309;}
-  .ns-pannule .ns-ico{background:#FDECEA;color:#E74C3C;}
-  .ns-archives{display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--text-muted);flex-wrap:wrap;}
-  .ns-archives button{border:0;background:none;font:500 12.5px 'DM Sans',sans-serif;color:var(--text-mid);cursor:pointer;padding:4px 9px;border-radius:6px;}
-  .ns-archives button b{font-weight:700;color:var(--text);margin-left:3px;}
-  .ns-archives button:hover{background:var(--surface);}
-  .ns-archives button.active{background:var(--navy);color:#fff;}
-  .ns-archives button.active b{color:#fff;}
-  .ns .trouve:not(.active){outline:2px solid rgba(46,204,143,.45);outline-offset:1px;}
+  /* Navigation du Suivi (16/11) : trois rangées compactes, titre à gauche */
+  .ns{display:flex;flex-direction:column;gap:8px;}
+  .ns-rang{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .ns-titre{width:150px;flex-shrink:0;font:700 10.5px 'DM Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);}
+  .ns-items{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0;}
+  .ns-lien{width:22px;height:2px;background:#D5DDE6;flex-shrink:0;}
+  .ns-chip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 6px;border:1px solid var(--border);border-radius:17px;background:var(--surface);font:600 13px 'DM Sans',sans-serif;color:var(--text);cursor:pointer;white-space:nowrap;transition:border-color .15s,background .15s;}
+  .ns-chip:hover{border-color:var(--green);}
+  .ns-num,.ns-ic{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:700 11px 'DM Sans',sans-serif;flex-shrink:0;}
+  .ns-num{background:var(--bg);color:var(--text-mid);border:1px solid #CBD5E1;}
+  .ns-ic svg{width:13px;height:13px;}
+  .ns-cpt{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bg);color:var(--text-mid);font:700 11px 'DM Sans',sans-serif;display:inline-flex;align-items:center;justify-content:center;}
+  .ns-chip.active{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .ns-chip.active .ns-num{background:#fff;color:var(--navy);border-color:#fff;}
+  .ns-chip.active .ns-cpt{background:rgba(255,255,255,.18);color:#fff;}
+  .ns-chip.alerte .ns-cpt{background:#FDECEA;color:#E74C3C;}
+  .ns-chip.active.alerte .ns-cpt{background:#E74C3C;color:#fff;}
+  .ns-sep{width:1px;height:22px;background:var(--border);margin:0 6px;}
+  .ns-semaine{border-color:#C7D2FE;background:#EEF2FF;color:#4338CA;}
+  .ns-semaine .ns-ic{background:#fff;color:#4338CA;}
+  .ns-semaine .ns-cpt{background:#fff;color:#4338CA;}
+  .ns-semaine.active{background:#4338CA;border-color:#4338CA;}
+  .ns-semaine.active .ns-ic{background:rgba(255,255,255,.2);color:#fff;}
+  .ns-attente .ns-ic{background:#FEF3C7;color:#B45309;}
+  .ns-pannule .ns-ic{background:#FDECEA;color:#E74C3C;}
+  .ns-cloture .ns-ic{background:#E8F9F2;color:#1DA870;}
+  .ns-annuleDef .ns-ic{background:#F1F5F9;color:#64748B;}
+  .ns-archive{background:#F8FAFC;color:var(--text-mid);font-weight:500;}
+  .ns .trouve:not(.active){border-color:var(--green);box-shadow:0 0 0 2px rgba(46,204,143,.2);}
   .ns .sans-resultat:not(.active){opacity:.45;}
-  @media (max-width:760px){ .ns-lib{font-size:11px;white-space:normal;text-align:center;} .ns-etape:not(:first-child)::before{right:calc(50% + 19px);width:calc(100% - 38px);} }
+  @media (max-width:760px){ .ns-titre{width:100%;} .ns-lien{width:10px;} }
   .files-fleche{color:var(--text-muted);font-size:15px;}
   .file-semaine{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 16px;border:2px solid #C7D2FE;border-radius:var(--radius-sm);background:#EEF2FF;font:700 13px 'DM Sans',sans-serif;color:#4338CA;cursor:pointer;}
   .file-semaine svg{width:16px;height:16px;}
@@ -4220,29 +4204,24 @@ function renderFilesBar(base) {
     return { n: n, cls: (f.cle === fileSuivi ? ' active' : '') + (alerte ? ' alerte' : '') + (cherche ? (n ? ' trouve' : ' sans-resultat') : '') };
   };
   var clic = function(cle){ return ' onclick="choisirFileSuivi(\'' + cle + '\')"'; };
-  var etape = function(cle, k) {
-    var f = trouve(cle), e = etatDe(f);
-    return '<button class="ns-etape' + e.cls + '"' + clic(cle) + ' title="' + String(f.question || '').replace(/"/g, '&quot;') + '"><span class="ns-rond">' + (k + 1) + '</span><span class="ns-lib">' + libelleFile(f) + '</span><span class="ns-cpt">' + e.n + '</span></button>';
-  };
   var ICO = {
     semaine: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>',
     attente: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
     pannule: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>',
+    cloture: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+    annuleDef: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>',
   };
-  var s0 = semaineAffichee(0);
-  var SOUS = { semaine: 'Semaine du ' + jjmm(s0.lundi) + ' au ' + jjmm(s0.vendredi), attente: 'Blocage à lever', pannule: 'À replanifier' };
-  var carte = function(cle) {
+  var chip = function(cle, devant, extra) {
     var f = trouve(cle), e = etatDe(f);
-    return '<button class="ns-carte ns-' + cle + e.cls + '"' + clic(cle) + '><span class="ns-ico">' + ICO[cle] + '</span><span class="ns-txt"><b>' + libelleFile(f) + '</b><small>' + SOUS[cle] + '</small></span><span class="ns-n">' + e.n + '</span></button>';
+    return '<button class="ns-chip ns-' + cle + (extra || '') + e.cls + '"' + clic(cle) + ' title="' + String(f.question || '').replace(/"/g, '&quot;') + '">' + devant + libelleFile(f) + ' <span class="ns-cpt">' + e.n + '</span></button>';
   };
-  var archive = function(cle, signe) { var f = trouve(cle), e = etatDe(f); return '<button class="' + e.cls.trim() + '"' + clic(cle) + '>' + signe + ' ' + libelleFile(f) + '<b>' + e.n + '</b></button>'; };
+  var etape = function(cle, k) { return chip(cle, '<span class="ns-num">' + (k + 1) + '</span>'); };
+  var icone = function(cle, extra) { return chip(cle, '<span class="ns-ic">' + ICO[cle] + '</span>', extra); };
+  var rang = function(titre, contenu) { return '<div class="ns-rang"><div class="ns-titre">' + titre + '</div><div class="ns-items">' + contenu + '</div></div>'; };
   var html = '<div class="ns">'
-    + '<div class="ns-bloc"><div class="ns-titre">Parcours d\'un bon</div><div class="ns-frise">' + ['validation', 'planification', 'encours', 'afacturer'].map(etape).join('') + '</div></div>'
-    + '<div class="ns-rangee">'
-    +   '<div class="ns-bloc"><div class="ns-titre">Aujourd\'hui</div><div class="ns-cartes">' + carte('semaine') + '</div></div>'
-    +   '<div class="ns-bloc ns-large"><div class="ns-titre">À débloquer</div><div class="ns-cartes">' + carte('attente') + carte('pannule') + '</div></div>'
-    + '</div>'
-    + '<div class="ns-archives"><span>Archives :</span>' + archive('cloture', '✓') + '<span>·</span>' + archive('annuleDef', '✕') + '</div>'
+    + rang('Parcours d\'un bon', ['validation', 'planification', 'encours', 'afacturer'].map(etape).join('<span class="ns-lien"></span>'))
+    + rang('Suivi et blocages', icone('semaine') + '<span class="ns-sep"></span>' + icone('attente') + icone('pannule'))
+    + rang('Archives', icone('cloture', ' ns-archive') + icone('annuleDef', ' ns-archive'))
     + '</div>';
   bar.innerHTML = html;
   renderBandeau(base.filter(fileCourante().test));
