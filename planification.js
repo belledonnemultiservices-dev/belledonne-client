@@ -1098,9 +1098,15 @@ function rendrePassages(item) {
     const suivants = L.filter(x => !x.annule && x.num > l.num && !vierge(x)).sort((a, c) => a.num - c.num);
     if (!suivants.length) return;
     const dernier = Math.max(...suivants.map(x => x.num));
+    // Libellés exacts des formulaires partis, pour les retrouver et les supprimer dans Kizeo
+    const kzAnciens = partis(suivants.flatMap(x => x.rapports.filter(r => !r.annule)));
+    const kzAnnule = partis(l.rapports);
     if (!confirm(suivants.map(x => cercle(x.num) + " devient " + cercle(x.num - 1)).join(", ") + ", dates et techniciens inchangés.\n\n"
       + "Un nouveau passage " + cercle(dernier) + " est ajouté en fin de série : choisis sa date.\n\n"
-      + "Les formulaires Kizeo déjà envoyés passent en « à renvoyer » (nouveau numéro) : clique Renvoyer sur chacun. L'ancien formulaire reste sur le téléphone du technicien, à supprimer dans Kizeo.")) return;
+      + (kzAnciens.length
+        ? "Les formulaires Kizeo déjà envoyés passent en « à renvoyer » (nouveau numéro) : clique Renvoyer sur chacun.\n\nAnciens formulaires à supprimer ensuite à la main dans Kizeo :\n" + kzAnciens.join("\n")
+        : "Aucun formulaire Kizeo n'était encore parti pour ces passages.")
+      + (kzAnnule.length ? "\n\nFormulaire du passage annulé, à supprimer aussi dans Kizeo :\n" + kzAnnule.join("\n") : ""))) return;
     const renum = (t, a, c) => String(t || "").replace(new RegExp("(\\s)" + a + "(?=\\s|$)"), "$1" + c);
     suivants.forEach(x => {
       const ancien = x.num;
