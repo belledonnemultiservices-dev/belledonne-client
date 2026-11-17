@@ -1432,6 +1432,7 @@ function refreshCalendarFrame(debut) {
 // ── MODAL ──
 window.openModal = function openModal(id = null) {
   editId = id;
+  (function(){ var box = document.getElementById('fPrecisions'); if (box) box.innerHTML = ''; })();
   document.getElementById('modalTitle').textContent = id ? 'Mise à jour de l\'intervention' : 'Nouvelle intervention';
   document.getElementById('btnSave').textContent = id ? 'Mettre à jour' : 'Enregistrer';
   resetForm();
@@ -1460,6 +1461,11 @@ window.openModal = function openModal(id = null) {
     document.getElementById('fEmailClient').value = item.emailClient || '';
     document.getElementById('fAdresse').value = item.adresse || '';
     document.getElementById('fObservations').value = item.observations || '';
+    // Précisions reçues par email (17/11), affichées au-dessus des observations
+    (function(){ var obs = document.getElementById('fObservations'), box = document.getElementById('fPrecisions');
+      if (!box && obs) { box = document.createElement('div'); box.id = 'fPrecisions'; obs.parentNode.parentNode.insertBefore(box, obs.parentNode); }
+      if (box) box.innerHTML = window.htmlPrecisions ? window.htmlPrecisions(item) : '';
+      if (window.lirePrecisions) window.lirePrecisions(item); })();
     const calEventIds = item.calEventIds || [];
     (item.passages || [item.date1, item.date2, item.date3].filter(Boolean)).forEach((d, i) => addPassage(d, (d && typeof d === 'object' && d.calEvents) || calEventIds[i] || ''));
     // Restaure les rapports manuels déposés mais pas encore notifiés (persistés dans passages[].manualRapport)
@@ -3801,6 +3807,8 @@ var sousFiltre = '';            // indicateur du bandeau cliqué (ne garder que 
 var grouperCommune = (function(){ try { return localStorage.getItem('suivi.grouperCommune') === '1'; } catch(e) { return false; } })();
 
 // Arrivée dans l'app = création de la ligne (import email dans les 15 min, ou saisie).
+// Badge « Précision » : un mail de précision a été rattaché au dossier et pas encore lu (17/11)
+function badgePrecision(item) { return item && item.precisionNonLue ? ' <span class="psg psg-annule" style="text-decoration:none;" title="Précision reçue par email après le bon : ouvrir le dossier pour la lire">✉ Précision</span>' : ''; }
 function dateArrivee(item) { return item.createdAt || item.dateEmission || ''; }
 function joursDepuis(iso) { if (!iso) return null; var t = new Date(iso).getTime(); return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400e3); }
 function libJours(n) { return n === null ? '—' : n === 0 ? "aujourd'hui" : n === 1 ? 'hier' : 'il y a ' + n + ' j'; }
@@ -4779,7 +4787,7 @@ function ligneSemaine(item, nbCols) {
   h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2 ligne-sem' + (item.clientType === 'tache' ? ' ligne-tache' : '') + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
   h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
   h += '<td>' + refHtml(item) + '</td>';
-  h += '<td><div class="cn-client">' + (item.client || '—') + (item.nature && item.clientType !== 'tache' ? ' <span class="cn-nature">· ' + item.nature + '</span>' : '') + (fileDe(item) !== 'pilotage' ? ' ' + etiquetteEtape(item) : '') + (item.clientType !== 'tache' && item.enFacturation && fileDe(item) === 'pilotage' ? ' <span class="psg psg-ok" style="text-decoration:none;" title="Facture émise : le dossier reste En cours tant qu\'il reste des passages à exécuter">Facturé</span>' : '') + '</div><div class="cn-nature">' + (item.adresse || '—') + (item.nomClient ? ' · ' + item.nomClient : '') + '</div></td>';
+  h += '<td><div class="cn-client">' + (item.client || '—') + badgePrecision(item) + (item.nature && item.clientType !== 'tache' ? ' <span class="cn-nature">· ' + item.nature + '</span>' : '') + (fileDe(item) !== 'pilotage' ? ' ' + etiquetteEtape(item) : '') + (item.clientType !== 'tache' && item.enFacturation && fileDe(item) === 'pilotage' ? ' <span class="psg psg-ok" style="text-decoration:none;" title="Facture émise : le dossier reste En cours tant qu\'il reste des passages à exécuter">Facturé</span>' : '') + '</div><div class="cn-nature">' + (item.adresse || '—') + (item.nomClient ? ' · ' + item.nomClient : '') + '</div></td>';
   var classe = function(p){ return p.statut === 'annule' ? 'ps-annule' : dansSemaine[cleP(p)] ? 'ps-in' : 'ps-out'; };
   var colonne = function(rendu){ return tous.map(function(p){ return '<div class="ps-row ' + classe(p) + '">' + (p.statut === 'annule' ? (rendu === libPassageSemaine ? rendu(p) : marque('na', 'Passage annulé')) : rendu(p)) + '</div>'; }).join(''); };
   h += '<td>' + (tous.length ? colonne(libPassageSemaine) : '<span class="cn-nature">aucun passage</span>') + '</td>';
@@ -4964,7 +4972,7 @@ window.renderTableV2 = function(list) {
     h += '<tr id="row-' + item.id + sfxLigne() + '" class="ligne-v2' + (item.clientType === 'tache' ? ' ligne-tache' : '') + (sectionRendu ? ' sec-' + sectionRendu : '') + '" onclick="ouvrirLigneSuivi(event,\'' + item.id + '\')">';
     h += '<td style="width:32px;text-align:center;"><input type="checkbox" class="row-check" data-id="' + item.id + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleRowSelect(this)" style="cursor:pointer;"></td>';
     h += '<td>' + refHtml(item) + '</td>';
-    h += '<td><div class="cn-client">' + (item.client || '—') + '</div><div class="cn-nature">' + (item.nature || '') + (item.dateEmission ? ' · BC du ' + fmtDate(item.dateEmission) : '') + '</div></td>';
+    h += '<td><div class="cn-client">' + (item.client || '—') + badgePrecision(item) + '</div><div class="cn-nature">' + (item.nature || '') + (item.dateEmission ? ' · BC du ' + fmtDate(item.dateEmission) : '') + '</div></td>';
     h += '<td style="font-size:13px;">' + (item.adresse || '—') + (item.nomClient ? '<div class="cn-nature">' + item.nomClient + '</div>' : '') + '</td>';
     if (!reduit) {
       h += '<td>' + (techs.length ? '<div style="display:flex;flex-wrap:wrap;gap:3px;">' + techs.map(function(a){ return assigneBadge(a); }).join('') + '</div>' : '<span style="color:var(--text-muted)">—</span>') + '</td>';

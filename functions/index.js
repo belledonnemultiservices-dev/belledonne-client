@@ -836,6 +836,79 @@ async function parseDocWithClaude(anthropic, docBuffer, filename, systemPrompt) 
   return toolUse.input.data || {};
 }
 
+// ── Précisions envoyées après un BC (17/11) ─────────────────────────────
+// Un mail sans PDF dont l'objet porte le n° d'un BC / PL déjà dans le Suivi (typiquement
+// « RE: Grenoble Habitat : Bon de commande N° 26110430 ») est rattaché à ce dossier :
+// texte sans l'historique cité, pièces jointes (photos), ligne de journal, badge « précision ».
+const PRECISION_ATTENTE_JOURS = 2; // BC pas encore importé : on réessaie pendant 2 jours
+
+function texteSansHistorique(texte) {
+  const lignes = String(texte || "").replace(/\r/g, "").split("\n");
+  const coupe = lignes.findIndex(l => /^\s*(De\s*:|From\s*:|Envoyé\s*:|-{3,}\s*(Message|Original)|_{8,}|Le .{4,120}a écrit\s*:|On .{4,120}wrote\s*:)/i.test(l));
+  const garde = (coupe >= 0 ? lignes.slice(0, coupe) : lignes).filter(l => !/^\s*>/.test(l));
+  return garde.join("\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
+}
+
+function numerosDuSujet(subject, source) {
+  const nums = new Set();
+  if (source.subjectNumberRegex) {
+    try { const m = subject.match(new RegExp(source.subjectNumberRegex)); if (m && m[1]) nums.add(m[1]); } catch (e) { /* regex invalide */ }
+  }
+  (subject.match(/\d{5,}/g) || []).forEach(n => nums.add(n));
+  const cands = new Set();
+  nums.forEach(n => { cands.add(n); const sansZeros = n.replace(/^0+/, ""); if (sansZeros.length >= 5) cands.add(sansZeros); });
+  return [...cands].slice(0, 10);
+}
+
+async function rattacherPrecision(db, parsed, source, sourceId) {
+  const subject = parsed.subject || "";
+  const cands = numerosDuSujet(subject, source);
+  if (!cands.length) return null;
+  const docs = [];
+  const s1 = await db.collection("suivi").where("bc", "in", cands).get();
+  s1.forEach(d => docs.push(d));
+  const s2 = await db.collection("suivi").where("pl", "in", cands.map(n => "PL/" + n)).get();
+  s2.forEach(d => { if (!docs.some(x => x.id === d.id)) docs.push(d); });
+  const memeClient = (c) => source.clientFirestore ? c === source.clientFirestore : String(c || "").toUpperCase().includes(String(source.clientLabel || "").toUpperCase());
+  const cible = docs.find(d => memeClient(d.data().client) && d.data().statut !== "Annulé") || null;
+  const recu = parsed.date ? new Date(parsed.date) : new Date();
+  if (!cible) {
+    const ageJours = (Date.now() - recu.getTime()) / 86400e3;
+    if (ageJours < PRECISION_ATTENTE_JOURS) { console.log(`Précision "${subject}" : BC pas encore dans le Suivi, nouvel essai au prochain passage`); return { attendre: true }; }
+    return null;
+  }
+  const messageId = parsed.messageId || (subject + "|" + recu.toISOString());
+  const deja = (cible.data().precisions || []).some(p => p.messageId === messageId);
+  if (deja) { console.log(`Précision déjà rattachée au dossier ${cible.id}`); return { ok: true, precision: true }; }
+
+  // Pièces jointes : photos et documents, hors petites images de signature
+  const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+  const pieces = [];
+  for (const a of (parsed.attachments || [])) {
+    const estImage = /^image\//.test(a.contentType || "");
+    if (estImage && (a.size || (a.content && a.content.length) || 0) < 15000) continue;
+    const nom = (a.filename || "piece").replace(/[^\w.\-()]/g, "_");
+    const chemin = `suivi/precisions/${cible.id}/${Date.now()}_${nom}`;
+    const jeton = crypto.randomUUID();
+    try {
+      await bucket.file(chemin).save(a.content, { contentType: a.contentType || "application/octet-stream", metadata: { metadata: { firebaseStorageDownloadTokens: jeton } } });
+      pieces.push({ nom: a.filename || nom, type: a.contentType || "", url: `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(chemin)}?alt=media&token=${jeton}` });
+    } catch (e) { console.warn(`Précision : pièce ${nom} non enregistrée :`, e.message); }
+  }
+  const de = (parsed.from && parsed.from.value && parsed.from.value[0]) || {};
+  const nomDe = de.name || de.address || "";
+  const texte = texteSansHistorique(parsed.text || "");
+  const maintenant = new Date().toISOString();
+  const { FieldValue } = require("firebase-admin/firestore");
+  await cible.ref.update({
+    precisions: FieldValue.arrayUnion({ at: recu.toISOString(), recuLe: maintenant, de: nomDe, email: de.address || "", objet: subject, texte, pieces, messageId }),
+    precisionNonLue: true,
+    journal: FieldValue.arrayUnion({ at: maintenant, par: "Import email", texte: `Précision reçue par email de ${nomDe}` + (pieces.length ? ` (${pieces.length} pièce(s) jointe(s))` : "") }),
+  });
+  console.log(`✅ Précision "${subject}" rattachée au dossier ${cible.id} (${pieces.length} pièce(s))`);
+  return { ok: true, precision: true };
+}
+
 // Traite un email déjà téléchargé et parsé (via IMAP + mailparser).
 // Retourne { ok:true, finalBc } si un document a été importé, { skipped:true } sinon.
 async function processParsedEmail(anthropic, db, parsed, source, sourceId) {
@@ -865,6 +938,10 @@ async function processParsedEmail(anthropic, db, parsed, source, sourceId) {
   const attach = pdfAtt || docAtt;
 
   if (!attach) {
+    try {
+      const r = await rattacherPrecision(db, parsed, source, sourceId);
+      if (r) return r;
+    } catch (e) { console.error(`Précision "${subject}" : rattachement échoué :`, e.message); return { attendre: true }; }
     console.log(`Email "${subject}": aucune pièce jointe PDF/DOC — ignoré (probablement hors-sujet)`);
     return { skipped: true };
   }
@@ -964,7 +1041,7 @@ async function processSource(client, anthropic, db, source, sourceRef) {
             catch(e) { console.warn(`Archive copy échouée (uid ${uid}):`, e.message); }
           }
           await client.messageMove(uid, source.gmailLabelTraite, { uid: true });
-          processed++;
+          if (!result.precision) processed++; // une précision rattachée n'est pas un BC importé
         } else if (result && result.skipped) {
           // Mail sans pièce jointe : on lui pose le libellé "import-ignoré" (il reste dans la
           // boîte de réception) pour qu'il ne soit plus réexaminé. Sinon, au-delà de 20 mails

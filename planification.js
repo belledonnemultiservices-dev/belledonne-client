@@ -190,6 +190,8 @@ export function ouvrirPlanification(id, etape) {
   etat = { id, etape: etape ?? 0, lignes: null, occupe: false, droiteFermee: {}, docVu: null, fichiers: {} };
   $("#plOverlay").classList.add("ouvert");
   rendre();
+  // Précisions email (17/11) : lues seulement si on ouvre sur l'étape Dossier, où elles s'affichent
+  if (etat.etape === 0 && window.lirePrecisions) window.lirePrecisions(item);
   // La fiche se met à jour en temps réel (envois Kizeo, notifications…) : on redessine
   clearInterval(surveillance);
   let empreinte = JSON.stringify(item);
@@ -406,6 +408,7 @@ function rendreDossier(item) {
         `<div id="plTels" style="display:flex;flex-direction:column;gap:6px;">${(tels.length ? tels : [""]).map(champTel).join("")}</div>`)}
       ${champ("Email client", inp("plEmail", item.emailClient, "", "email"), true)}
       <div class="pl-section">Notes</div>
+      ${window.htmlPrecisions && window.htmlPrecisions(item) ? `<div class="pl-champ large">${window.htmlPrecisions(item)}</div>` : ""}
       ${champ("Observations", `<textarea id="plObservations" placeholder="Détails, contexte, contraintes...">${esc(item.observations)}</textarea>`, true)}
       ${String(item.notes || "").trim() ? champ("Anciennes notes <span style=\"text-transform:none;font-weight:400;\">· lecture seule</span>", `<div class="pl-lecture" style="white-space:pre-wrap;font-size:12.5px;color:#4A6078;background:#F7F9FB;border-radius:8px;padding:8px 10px;">${esc(item.notes)}</div>`, true) : ""}
     </div>
@@ -495,6 +498,7 @@ function rendreTache(item) {
         `<div id="plTels" style="display:flex;flex-direction:column;gap:6px;">${(tels.length ? tels : [""]).map(champTel).join("")}</div>`)}
       ${champ("Email", inp("plEmail", item.emailClient, "", "email"), true)}
       <div class="pl-section">Notes</div>
+      ${window.htmlPrecisions && window.htmlPrecisions(item) ? `<div class="pl-champ large">${window.htmlPrecisions(item)}</div>` : ""}
       ${champ("Observations", `<textarea id="plObservations" placeholder="Détails, contexte, contraintes...">${esc(item.observations)}</textarea>`, true)}
       ${String(item.notes || "").trim() ? champ("Anciennes notes <span style=\"text-transform:none;font-weight:400;\">· lecture seule</span>", `<div class="pl-lecture" style="white-space:pre-wrap;font-size:12.5px;color:#4A6078;background:#F7F9FB;border-radius:8px;padding:8px 10px;">${esc(item.notes)}</div>`, true) : ""}
     </div>

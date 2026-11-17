@@ -63,6 +63,36 @@
     return el;
   }
 
+  // Précisions reçues par email après le BC (17/11), rattachées par l'import automatique.
+  // Rendu partagé : fiche dossier, étape Dossier de la planification, fenêtre de validation.
+  window.htmlPrecisions = function (it) {
+    var l = Array.isArray(it && it.precisions) ? it.precisions.slice() : [];
+    if (!l.length) return '';
+    l.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
+    var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var d = function (iso) { var x = new Date(iso); return isNaN(x) ? '' : x.toLocaleDateString('fr-FR') + ' ' + x.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); };
+    return '<div style="border:1px solid #F0C36D;background:#FFF8E6;border-radius:10px;padding:10px 12px;margin:0 0 12px;display:flex;flex-direction:column;gap:10px;">'
+      + '<div style="font-weight:700;font-size:13px;color:#8A5A00;">✉ Précision' + (l.length > 1 ? 's' : '') + ' reçue' + (l.length > 1 ? 's' : '') + ' par email après le bon (' + l.length + ')</div>'
+      + l.map(function (p) {
+        var pieces = (p.pieces || []).map(function (x) {
+          return /^image\//.test(x.type || '')
+            ? '<a href="' + e(x.url) + '" target="_blank" rel="noopener" title="' + e(x.nom) + '"><img src="' + e(x.url) + '" alt="' + e(x.nom) + '" style="width:88px;height:66px;object-fit:cover;border-radius:6px;border:1px solid #E5D3A8;"></a>'
+            : '<a href="' + e(x.url) + '" target="_blank" rel="noopener" style="font-size:12px;">📎 ' + e(x.nom) + '</a>';
+        }).join(' ');
+        return '<div style="border-top:1px solid #F0DDB0;padding-top:8px;">'
+          + '<div style="font-size:12px;color:#6B5A33;"><b>' + e(p.de || p.email || 'Expéditeur inconnu') + '</b> · ' + d(p.at) + '</div>'
+          + (p.texte ? '<div style="white-space:pre-wrap;font-size:13px;margin-top:4px;color:#2B2B2B;">' + e(p.texte) + '</div>' : '<div style="font-size:12px;color:#8A7A55;margin-top:4px;">(pas de texte)</div>')
+          + (pieces ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;">' + pieces + '</div>' : '')
+          + '</div>';
+      }).join('') + '</div>';
+  };
+  // Ouvrir le dossier vaut lecture : le badge « Précision » de la ligne disparaît (sans toucher à updatedAt)
+  window.lirePrecisions = function (it) {
+    if (!it || !it.precisionNonLue || typeof window._updateSuivi !== 'function') return;
+    it.precisionNonLue = false;
+    window._updateSuivi(it.id, { precisionNonLue: false }).catch(function (e) { console.warn('précision lue :', e.message); });
+  };
+
   function sectionDossier(it) {
     var tels = Array.isArray(it.coordonnees) ? it.coordonnees : it.coordonnees ? [it.coordonnees] : [];
     var docs = [['bc', 'BC'], ['pl', 'PL'], ['devis', 'Devis']].filter(function (d) { return it[d[0]] || it[d[0] + 'Url']; })
@@ -169,7 +199,7 @@
     var facture = it.clientType !== 'tache' && it.enFacturation && etape !== 'cloture' ? ' <span class="psg psg-ok" style="text-decoration:none;">Facturé</span>' : '';
     el.querySelector('.fd-tete').innerHTML = '<div style="flex:1;"><h2>' + esc(ref) + ' ' + etiquetteEtape(it) + facture + '</h2><small>' + esc([it.client, it.nature, it.adresse].filter(Boolean).join(' · ')) + '</small></div>'
       + '<button class="btn-ellipsis" onclick="fermerFicheDossier()" title="Fermer" style="font-size:18px;">×</button>';
-    el.querySelector('.fd-corps').innerHTML = sectionPassages(it) + sectionRapports(donnees && donnees.rapports) + sectionFacturation(it, donnees && donnees.factures) + sectionDossier(it) + sectionHistorique(it, donnees);
+    el.querySelector('.fd-corps').innerHTML = (window.htmlPrecisions(it) ? '<div class="fd-section">' + window.htmlPrecisions(it) + '</div>' : '') + sectionPassages(it) + sectionRapports(donnees && donnees.rapports) + sectionFacturation(it, donnees && donnees.factures) + sectionDossier(it) + sectionHistorique(it, donnees);
     var modif = etape === 'validation' ? '' : '<button class="btn-primary" onclick="fermerFicheDossier();ouvrirPlanification(\'' + it.id + '\',' + (etape === 'planification' ? 0 : 1) + ')">Modifier</button>';
     el.querySelector('.fd-pied').innerHTML = modif
       + (it.clientType !== 'tache' && passagesNorm(it).length ? '<button class="btn-next neutre" onclick="openNotifFromRow(\'' + it.id + '\')">Notifier client / locataire</button>' : '')
@@ -184,6 +214,7 @@
     el.classList.add('ouvert');
     el.dataset.id = id;
     rendre(it, null);
+    window.lirePrecisions(it);
     if (typeof window._chargerFicheDossier === 'function') {
       window._chargerFicheDossier(id).then(function (d) {
         if (el.dataset.id !== id || !el.classList.contains('ouvert')) return;
