@@ -407,7 +407,7 @@ function renderChips(boxId, valeurs, selected) {
     const on = selected.includes(v);
     return '<label class="chip' + (on ? ' on' : '') + '">' +
       '<input type="checkbox" value="' + escAttr(v) + '"' + (on ? ' checked' : '') +
-      ' onchange="this.parentNode.classList.toggle(\'on\', this.checked)">' + v + '</label>';
+      ' onchange="this.parentNode.classList.toggle(\'on\', this.checked)">' + (v === '*' ? '<b>Tous les clients</b>' : v) + '</label>';
   }).join("");
 }
 
@@ -444,7 +444,7 @@ function resumeLiaison(f) {
     return partiel ? '<span class="ko">Incomplète</span>' : "—";
   }
   const p = f.passageLie === "1" ? " · 1er passage" : (f.passageLie === "suivant" ? " · passage suivant" : "");
-  return escAttr((f.naturesMission || []).join(", ") + " → " + (f.clientsLies || []).join(", ") + p);
+  return escAttr((f.naturesMission || []).join(", ") + " → " + (f.clientsLies || []).map(c => c === "*" ? "Tous les clients" : c).join(", ") + p);
 }
 
 function populateExports(savedValue) {
@@ -616,7 +616,7 @@ window.openModal = async function(docId) {
     document.getElementById("fReconstruirePdf").checked = f.reconstruirePdf === true;
     document.getElementById("fRelecture").checked = f.relectureObligatoire === true;
     renderChips("fNaturesMission", naturesMission, f.naturesMission || []);
-    renderChips("fClientsLies", clientsComptes, f.clientsLies || []);
+    renderChips("fClientsLies", ["*"].concat(clientsComptes), f.clientsLies || []);
     current = f.mapping || {};
   } else {
     document.getElementById("fNom").value = "";
@@ -627,7 +627,7 @@ window.openModal = async function(docId) {
     document.getElementById("fReconstruirePdf").checked = false;
     document.getElementById("fRelecture").checked = false;
     renderChips("fNaturesMission", naturesMission, []);
-    renderChips("fClientsLies", clientsComptes, []);
+    renderChips("fClientsLies", ["*"].concat(clientsComptes), []);
   }
   populateMapSelects(current);
   populateExports(savedExport);

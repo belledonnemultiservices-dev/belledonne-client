@@ -7011,13 +7011,16 @@ window._findKizeoFormLie = function(nature, client, num) {
   const cands = forms.filter(f => {
     const nats = f.naturesMission || [], cls = f.clientsLies || [];
     if (!nats.length || !cls.length) return false;
-    if (!nats.includes(nature) || !cls.includes(client)) return false;
+    // « * » = tous les clients (rapport libre, 17/11) : couvre aussi particuliers et nouveaux clients
+    if (!nats.includes(nature) || !(cls.includes(client) || cls.includes('*'))) return false;
     const p = f.passageLie || '';
     if (!p) return true;
     return p === '1' ? num === 1 : num >= 2;
   });
   if (!cands.length) return null;
-  cands.sort((a, b) => ((b.passageLie ? 1 : 0) - (a.passageLie ? 1 : 0)));
+  // Priorité : un formulaire nommant le client avant « tous les clients », puis un passage lié avant un formulaire sans passage
+  const nomme = f => (f.clientsLies || []).includes(client) ? 1 : 0;
+  cands.sort((a, b) => (nomme(b) - nomme(a)) || ((b.passageLie ? 1 : 0) - (a.passageLie ? 1 : 0)));
   return cands[0];
 };
 
