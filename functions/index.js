@@ -860,6 +860,35 @@ function numerosDuSujet(subject, source) {
   return [...cands].slice(0, 10);
 }
 
+// Version HTML d'une précision : texte lisible + tableaux conservés ligne par ligne (17/11).
+// Les mails Outlook de Grenoble Habitat contiennent des tableaux (logements, locataires,
+// téléphones) que la version texte aplatit en une case par ligne, illisible.
+function decoderEntites(t) {
+  return String(t || "").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n))
+    .replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCharCode(parseInt(n, 16)));
+}
+const sansBalises = (h) => decoderEntites(String(h || "").replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h\d)>/gi, "\n").replace(/<[^>]+>/g, "")).replace(/[ \t]+/g, " ");
+function precisionDepuisHtml(html) {
+  let h = String(html || "");
+  const coupe = h.search(/<div[^>]*id="?(divRplyFwdMsg|appendonsend)|<div[^>]*class="?gmail_quote|<blockquote|<b>\s*(De|From)\s*:|>\s*(De|From)\s*:\s*<\/b>|-----\s*(Message|Original)/i);
+  if (coupe > 0) h = h.slice(0, coupe);
+  const tableaux = [];
+  h = h.replace(/<table[\s\S]*?<\/table>/gi, (t) => {
+    let lignes = (t.match(/<tr[\s\S]*?<\/tr>/gi) || []).map(tr => (tr.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || []).map(c => sansBalises(c).replace(/\s+/g, " ").trim()));
+    lignes = lignes.filter(l => l.some(c => c));
+    if (!lignes.length) return "\n";
+    const nbCol = Math.max(...lignes.map(l => l.length));
+    const utiles = [...Array(nbCol).keys()].filter(i => lignes.some(l => l[i]));
+    lignes = lignes.map(l => utiles.map(i => l[i] || ""));
+    if (lignes.length === 1 && lignes[0].length === 1) return "\n" + lignes[0][0] + "\n"; // tableau de mise en page
+    tableaux.push({ lignes: lignes.slice(0, 300).map(c => ({ c })) });
+    return "\n[tableau " + tableaux.length + "]\n";
+  });
+  const texte = sansBalises(h).split("\n").map(l => l.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
+  return { texte, tableaux };
+}
+
 async function rattacherPrecision(db, parsed, source, sourceId) {
   const subject = parsed.subject || "";
   const cands = numerosDuSujet(subject, source);
@@ -897,11 +926,13 @@ async function rattacherPrecision(db, parsed, source, sourceId) {
   }
   const de = (parsed.from && parsed.from.value && parsed.from.value[0]) || {};
   const nomDe = de.name || de.address || "";
-  const texte = texteSansHistorique(parsed.text || "");
+  const depuisHtml = parsed.html ? precisionDepuisHtml(parsed.html) : null;
+  const texte = depuisHtml && (depuisHtml.texte || depuisHtml.tableaux.length) ? depuisHtml.texte : texteSansHistorique(parsed.text || "");
+  const tableaux = depuisHtml ? depuisHtml.tableaux : [];
   const maintenant = new Date().toISOString();
   const { FieldValue } = require("firebase-admin/firestore");
   await cible.ref.update({
-    precisions: FieldValue.arrayUnion({ at: recu.toISOString(), recuLe: maintenant, de: nomDe, email: de.address || "", objet: subject, texte, pieces, messageId }),
+    precisions: FieldValue.arrayUnion({ at: recu.toISOString(), recuLe: maintenant, de: nomDe, email: de.address || "", objet: subject, texte, tableaux, pieces, messageId }),
     precisionNonLue: true,
     journal: FieldValue.arrayUnion({ at: maintenant, par: "Import email", texte: `Précision reçue par email de ${nomDe}` + (pieces.length ? ` (${pieces.length} pièce(s) jointe(s))` : "") }),
   });

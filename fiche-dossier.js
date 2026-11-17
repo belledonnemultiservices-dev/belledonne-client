@@ -81,7 +81,12 @@
         }).join(' ');
         return '<div style="border-top:1px solid #F0DDB0;padding-top:8px;">'
           + '<div style="font-size:12px;color:#6B5A33;"><b>' + e(p.de || p.email || 'Expéditeur inconnu') + '</b> · ' + d(p.at) + '</div>'
-          + (p.texte ? '<div style="white-space:pre-wrap;font-size:13px;margin-top:4px;color:#2B2B2B;">' + e(p.texte) + '</div>' : '<div style="font-size:12px;color:#8A7A55;margin-top:4px;">(pas de texte)</div>')
+          + (p.texte ? '<div style="white-space:pre-wrap;font-size:13px;margin-top:4px;color:#2B2B2B;">' + e(p.texte) + '</div>' : (p.tableaux && p.tableaux.length ? '' : '<div style="font-size:12px;color:#8A7A55;margin-top:4px;">(pas de texte)</div>'))
+          + (p.tableaux || []).map(function (t) {
+            return '<div style="overflow-x:auto;margin-top:6px;"><table style="border-collapse:collapse;font-size:12px;background:#fff;">'
+              + (t.lignes || []).map(function (l, i) { return '<tr>' + (l.c || []).map(function (c) { return '<td style="border:1px solid #E5D3A8;padding:3px 6px;white-space:nowrap;' + (i === 0 ? 'font-weight:600;background:#FBF1D6;' : '') + '">' + e(c) + '</td>'; }).join('') + '</tr>'; }).join('')
+              + '</table></div>';
+          }).join('')
           + (pieces ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;">' + pieces + '</div>' : '')
           + '</div>';
       }).join('') + '</div>';
