@@ -21,9 +21,7 @@ const ETAPES_COURTES = ["Dossier", "Passages", "Notifications", "Récapitulatif"
 const estTache = (item) => !!item && item.clientType === "tache";
 const TYPES_TACHE = { devis: "Devis", inspection: "Inspection / diagnostic", affiches: "Pose d'affiches", cles: "Récupération de clés", autre: "Autre" };
 const libTypeTache = (item) => item.typeIntervention === "autre" ? (item.typeInterventionAutre || "Autre") : (TYPES_TACHE[item.typeIntervention] || item.nature || "Tâche");
-const nomsEtapes = (item) => estTache(item) ? ["Tâche", "Passages, agenda & Kizeo", "Notifications (facultatif)", "Récapitulatif"] : estMontee(item) ? ["Dossier", "Passages, agenda & Kizeo", "Notifications & affichage", "Récapitulatif"] : ETAPES;
-// Nature « Désinsectisation Montées » (17/11) : affiches de hall et avis individuels à l'étape Notifications
-const estMontee = (item) => /^d[ée]sinsectisation\s+mont[ée]es?$/i.test(String((item && item.nature) || "").trim());
+const nomsEtapes = (item) => estTache(item) ? ["Tâche", "Passages, agenda & Kizeo", "Notifications (facultatif)", "Récapitulatif"] : ETAPES;
 // Rapport Kizeo exigé ? Bon : sauf « Aucun rapport » choisi ; tâche : seulement si un formulaire est choisi ou parti
 const rapportExige = (item, b) => !b ? !estTache(item) : estTache(item) ? (!!b.kzForm || !!b.kizeoPush) : (b.kzForm === undefined || !!b.kzForm || !!b.kizeoPush);
 const DERNIERE = ETAPES.length - 1;
@@ -1554,7 +1552,6 @@ function rendreNotifications(item) {
       ${etat.formManuel === "locataire" && item.emailClient ? formNotifManuelle("locataire") : ""}
     </tbody></table>
     <p class="pl-note" style="margin-top:12px;">La fenêtre d'envoi s'ouvre à gauche. Une fois l'email parti, ferme-la : la coche se met à jour ici.</p>`;
-  if (estMontee(item)) { $(".pl-corps").insertAdjacentHTML("beforeend", blocAffichage(item)); brancherAffichage(item); }
   const ouvrirNotif = (onglet) => {
     if (!window.openNotifFromItem) return;
     window._nsForcerReport = !!vueReport; // « Renotifier » : toujours le message de report
@@ -1590,111 +1587,6 @@ function rendreNotifications(item) {
     catch (e) { alert("Retrait impossible : " + e.message); b.disabled = false; }
   });
   navigation("Continuer →");
-}
-
-// ── Affichage d'une montée (17/11) ─────────────────────────────────
-// Affiche de hall pour tous les clients, avis individuels en option (choisis ici,
-// pas par client). Modèles Belledonne, sans logo de bailleur, imprimés depuis le navigateur.
-const JOURS_FR = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
-const MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-const hFr = (t) => { const [h, m] = String(t || "").split(":"); return h ? Number(h) + "h" + (m || "00") : ""; };
-function creneauFr(p) {
-  if (!p || !p.debut) return "";
-  const j = new Date(p.debut.substring(0, 10) + "T12:00:00");
-  const jour = JOURS_FR[j.getDay()] + " " + j.getDate() + " " + MOIS_FR[j.getMonth()] + " " + j.getFullYear();
-  const hd = hFr(p.debut.substring(11, 16)), hf = p.fin ? hFr(p.fin.substring(11, 16)) : "";
-  return jour + (hd ? (hf ? ", de " + hd + " à " + hf : ", à partir de " + hd) : "");
-}
-function passagesMontee(item) {
-  const ps = actifs(item).filter(p => !p.jumeau && p.debut).sort((a, b) => String(a.debut).localeCompare(String(b.debut)));
-  return { p1: ps[0] || null, p2: ps[1] || null };
-}
-function blocAffichage(item) {
-  const a = item.affichage || {};
-  const mode = a.mode === "affiche+avis" ? "affiche+avis" : "affiche";
-  const { p1, p2 } = passagesMontee(item);
-  const manque = !p1 ? "Planifie d'abord les deux passages (étape Passages)." : !p2 ? "Le 2nd passage n'est pas encore planifié : l'affiche doit porter les deux dates." : "";
-  const auj = new Date(); const ajd = auj.getFullYear() + "-" + String(auj.getMonth() + 1).padStart(2, "0") + "-" + String(auj.getDate()).padStart(2, "0");
-  return `<div class="pl-section" style="margin-top:22px;">Affichage de la montée</div>
-    <p class="pl-intro">Affiche de hall pour tous les clients ; avis individuels dans les boîtes aux lettres si le client le demande. Dates et heures reprises des passages planifiés.</p>
-    <div style="display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px;">
-      <label style="display:flex;gap:6px;align-items:center;cursor:pointer;"><input type="radio" name="plAffMode" value="affiche"${mode === "affiche" ? " checked" : ""}> Affiche seule</label>
-      <label style="display:flex;gap:6px;align-items:center;cursor:pointer;"><input type="radio" name="plAffMode" value="affiche+avis"${mode === "affiche+avis" ? " checked" : ""}> Affiche + avis individuels</label>
-    </div>
-    <table class="pl-table"><tbody>
-      <tr><td style="width:160px;"><b>1er passage</b></td><td>${p1 ? esc(creneauFr(p1)) : '<span class="pl-note">non planifié</span>'}</td></tr>
-      <tr><td><b>2nd passage</b><div class="pl-note">pour les absents</div></td><td>${p2 ? esc(creneauFr(p2)) : '<span class="pl-note">non planifié</span>'}</td></tr>
-    </tbody></table>
-    ${manque ? `<p class="pl-note" style="color:#B4541A;margin-top:8px;">${esc(manque)}</p>` : ""}
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-      <button class="pl-btn indigo" data-a="affImprimer"${p1 && p2 ? "" : " disabled"}>Imprimer l'affiche de hall</button>
-      ${mode === "affiche+avis" ? `<button class="pl-btn indigo" data-a="avisImprimer"${p1 && p2 ? "" : " disabled"}>Imprimer l'avis individuel</button>` : ""}
-    </div>
-    <p class="pl-note" style="margin-top:6px;">L'impression s'ouvre dans un nouvel onglet : choisis « Enregistrer en PDF » ou ton imprimante${mode === "affiche+avis" ? ", et le nombre de copies (un avis par logement)" : ""}.</p>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;">
-      ${a.poseesLe ? etatHtml("ok", "✓ affiches posées le " + esc(window.fmtDate ? window.fmtDate(a.poseesLe) : a.poseesLe)) + ` <button class="pl-lien" data-a="affRetirer">modifier</button>`
-        : `<span class="pl-note">Affiches posées le</span><input type="date" id="plAffDate" value="${ajd}" max="${ajd}" style="padding:4px 6px;"><button class="pl-btn" data-a="affPosees">Valider</button>`}
-    </div>`;
-}
-function brancherAffichage(item) {
-  const enregistrer = async (maj, journal) => {
-    const it = dossier() || item;
-    const data = { affichage: { ...(it.affichage || {}), ...maj } };
-    await window._updateSuivi(it.id, data);
-    Object.assign(it, data);
-    if (journal && window._ajouterJournal) await window._ajouterJournal(it.id, [journal]);
-    rendre();
-  };
-  document.querySelectorAll("input[name=plAffMode]").forEach(r => r.onchange = () => enregistrer({ mode: r.value }));
-  const bi = $("[data-a=affImprimer]"); if (bi) bi.onclick = () => imprimerMontee(dossier() || item, "affiche");
-  const ba = $("[data-a=avisImprimer]"); if (ba) ba.onclick = () => imprimerMontee(dossier() || item, "avis");
-  const bp = $("[data-a=affPosees]"); if (bp) bp.onclick = async () => {
-    const j = ($("#plAffDate") || {}).value || "";
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(j)) { alert("Choisis une date valide."); return; }
-    bp.disabled = true;
-    try { await enregistrer({ poseesLe: j }, "Affiches posées dans la montée le " + j.split("-").reverse().join("/")); }
-    catch (e) { alert("Enregistrement impossible : " + e.message); bp.disabled = false; }
-  };
-  const br = $("[data-a=affRetirer]"); if (br) br.onclick = () => enregistrer({ poseesLe: "" });
-}
-function imprimerMontee(item, type) {
-  const { p1, p2 } = passagesMontee(item);
-  if (!p1 || !p2) { alert("Les deux passages doivent être planifiés."); return; }
-  const e = esc, origine = location.origin;
-  const css = `@page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;font-family:Helvetica,Arial,sans-serif;color:#0D1B2A;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .page{display:flex;flex-direction:column;gap:14px;min-height:268mm}
-    .tete{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1DA870;padding-bottom:10px}
-    .tete img{height:46px}.tete .act{font-size:11px;color:#6B7C8F;text-align:right;letter-spacing:.04em;text-transform:uppercase}
-    h1{font-size:30px;line-height:1.15;margin:6px 0 0}h1 small{display:block;font-size:15px;color:#6B7C8F;font-weight:400;margin-top:6px}
-    .lieu{background:#F4F7F9;border-radius:10px;padding:12px 16px;font-size:15px;line-height:1.6}.lieu b{display:inline-block;min-width:105px;color:#6B7C8F;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
-    .pass{border:2px solid #1DA870;border-radius:12px;padding:14px 18px}.pass.second{border-color:#0D1B2A}
-    .pass .t{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:#1DA870}.pass.second .t{color:#0D1B2A}
-    .pass .d{font-size:22px;font-weight:700;margin-top:4px}.pass .n{font-size:13px;color:#4A5B6C;margin-top:4px}
-    .bloc h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#1DA870;margin:0 0 6px}
-    table{width:100%;border-collapse:collapse;font-size:13px}td{border-top:1px solid #D9E1E8;padding:6px 8px;vertical-align:top}td:first-child{width:34%;color:#6B7C8F;font-weight:600}
-    .rien{background:#E9F7F0;border-radius:10px;padding:12px 16px;font-size:13.5px;line-height:1.5}.rien b{font-size:15px}
-    .consigne{border-left:4px solid #B4541A;background:#FBEFE4;padding:10px 14px;font-size:13.5px;border-radius:0 8px 8px 0}
-    .pied{margin-top:auto;border-top:1px solid #D9E1E8;padding-top:10px;display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#4A5B6C}
-    .pied .q{font-size:15px;color:#0D1B2A;font-weight:700}.logement{border:1.5px dashed #6B7C8F;border-radius:8px;padding:10px 14px;font-size:15px}`;
-  const tete = `<div class="tete"><img src="${origine}/logo-belledonne.png" alt="Belledonne Multiservices"><div class="act">Désinsectisation · Dératisation · Désinfection</div></div>`;
-  const lieu = `<div class="lieu"><div><b>Résidence</b> ${e(item.nomClient || "")}</div><div><b>Adresse</b> ${e(item.adresse || "")}</div></div>`;
-  const pass = `<div class="pass"><div class="t">1er passage</div><div class="d">${e(creneauFr(p1))}</div><div class="n">Merci de permettre l'accès à votre logement sur ce créneau.</div></div>
-    <div class="pass second"><div class="t">2nd passage · pour les absents du 1er passage</div><div class="d">${e(creneauFr(p2))}</div></div>`;
-  const traitement = `<div class="bloc"><h2>Ce qui est traité, et comment</h2><table>
-    <tr><td>Nature du traitement</td><td>Application d'un gel insecticide rémanent</td></tr>
-    <tr><td>Nuisibles visés</td><td>Blattes, cafards</td></tr>
-    <tr><td>Durée de l'intervention</td><td>Environ 10 minutes par logement</td></tr>
-    <tr><td>Pièces traitées</td><td>Cuisine, salle de bains, WC, gaines techniques, ventilations, canalisations, plinthes et placards</td></tr></table></div>
-    <div class="rien"><b>Vous n'avez rien à préparer.</b><br>Pas besoin de quitter votre logement, ni de le ventiler, ni d'attendre pour y revenir. Il n'est pas nécessaire de vider les placards ni de déplacer les meubles. Le technicien se présente en tenue de l'entreprise, muni de sa carte professionnelle.</div>
-    <div class="consigne"><b>Une seule consigne après notre passage :</b> ne nettoyez pas et n'essuyez pas les points de gel déposés.</div>`;
-  const pied = `<div class="pied"><div><div class="q">Une question, un empêchement ?</div>06 95 67 26 03 · belledonne.multiservices@gmail.com</div><div style="text-align:right">BELLEDONNE MULTISERVICES<br>SIREN 891 508 376</div></div>`;
-  const corps = type === "avis"
-    ? `<div class="page">${tete}<h1>Avis de passage<small>Traitement de votre logement contre les blattes et les insectes rampants</small></h1>${lieu}<div class="logement">Logement n° ______________ &nbsp;&nbsp; Étage ________</div>${pass}${traitement}${pied}</div>`
-    : `<div class="page">${tete}<h1>Campagne de désinsectisation des logements<small>Ces dates concernent tous les logements de la montée.</small></h1>${lieu}${pass}${traitement}${pied}</div>`;
-  const w = window.open("", "_blank");
-  if (!w) { alert("Le navigateur a bloqué le nouvel onglet : autorise les fenêtres pour ce site."); return; }
-  w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${type === "avis" ? "Avis de passage" : "Affiche"} · ${e(item.adresse || "")}</title><style>${css}</style></head><body>${corps}<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>`);
-  w.document.close();
 }
 
 // ── Récapitulatif ──────────────────────────────────────────────────
