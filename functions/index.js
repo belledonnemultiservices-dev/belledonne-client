@@ -927,15 +927,19 @@ async function processParsedEmail(anthropic, db, parsed, source, sourceId) {
   return { ok: true, finalBc: numRef };
 }
 
+const LABEL_IGNORE = "import-ignoré";
+
 async function processSource(client, anthropic, db, source, sourceRef) {
   // S'assurer que les dossiers/labels de destination existent
   await ensureMailbox(client, source.gmailLabelTraite);
   if (source.gmailDossierArchive) await ensureMailbox(client, source.gmailDossierArchive);
+  await ensureMailbox(client, LABEL_IGNORE);
 
   // Même logique de recherche qu'avant, via la recherche Gmail brute (X-GM-RAW) sur la boîte de réception
   const fromFilter = (source.senderEmails || []).map(e => `from:${e}`).join(" OR ");
   let q = `(${fromFilter})`;
   if (source.gmailLabelTraite) q += ` -label:"${source.gmailLabelTraite}"`;
+  q += ` -label:"${LABEL_IGNORE}"`;
   if (source.subjectContains) q += ` subject:"${source.subjectContains}"`;
   if (source.startDate) q += ` after:${source.startDate.replace(/-/g, "/")}`;
 
@@ -961,6 +965,12 @@ async function processSource(client, anthropic, db, source, sourceRef) {
           }
           await client.messageMove(uid, source.gmailLabelTraite, { uid: true });
           processed++;
+        } else if (result && result.skipped) {
+          // Mail sans pièce jointe : on lui pose le libellé "import-ignoré" (il reste dans la
+          // boîte de réception) pour qu'il ne soit plus réexaminé. Sinon, au-delà de 20 mails
+          // ignorés, l'agent n'atteint plus jamais les nouveaux mails (limite de 20 par passage).
+          try { await client.messageCopy(uid, LABEL_IGNORE, { uid: true }); }
+          catch(e) { console.warn(`Libellé ${LABEL_IGNORE} échoué (uid ${uid}):`, e.message); }
         }
       } catch(e) {
         console.error(`Source ${sourceRef.id} - uid ${uid}:`, e.message);
