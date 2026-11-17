@@ -842,13 +842,6 @@ async function parseDocWithClaude(anthropic, docBuffer, filename, systemPrompt) 
 // texte sans l'historique cité, pièces jointes (photos), ligne de journal, badge « précision ».
 const PRECISION_ATTENTE_JOURS = 2; // BC pas encore importé : on réessaie pendant 2 jours
 
-function texteSansHistorique(texte) {
-  const lignes = String(texte || "").replace(/\r/g, "").split("\n");
-  const coupe = lignes.findIndex(l => /^\s*(De\s*:|From\s*:|Envoyé\s*:|-{3,}\s*(Message|Original)|_{8,}|Le .{4,120}a écrit\s*:|On .{4,120}wrote\s*:)/i.test(l));
-  const garde = (coupe >= 0 ? lignes.slice(0, coupe) : lignes).filter(l => !/^\s*>/.test(l));
-  return garde.join("\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
-}
-
 function numerosDuSujet(subject, source) {
   const nums = new Set();
   if (source.subjectNumberRegex) {
@@ -858,35 +851,6 @@ function numerosDuSujet(subject, source) {
   const cands = new Set();
   nums.forEach(n => { cands.add(n); const sansZeros = n.replace(/^0+/, ""); if (sansZeros.length >= 5) cands.add(sansZeros); });
   return [...cands].slice(0, 10);
-}
-
-// Version HTML d'une précision : texte lisible + tableaux conservés ligne par ligne (17/11).
-// Les mails Outlook de Grenoble Habitat contiennent des tableaux (logements, locataires,
-// téléphones) que la version texte aplatit en une case par ligne, illisible.
-function decoderEntites(t) {
-  return String(t || "").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n))
-    .replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCharCode(parseInt(n, 16)));
-}
-const sansBalises = (h) => decoderEntites(String(h || "").replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li|h\d)>/gi, "\n").replace(/<[^>]+>/g, "")).replace(/[ \t]+/g, " ");
-function precisionDepuisHtml(html) {
-  let h = String(html || "");
-  const coupe = h.search(/<div[^>]*id="?(divRplyFwdMsg|appendonsend)|<div[^>]*class="?gmail_quote|<blockquote|<b>\s*(De|From)\s*:|>\s*(De|From)\s*:\s*<\/b>|-----\s*(Message|Original)/i);
-  if (coupe > 0) h = h.slice(0, coupe);
-  const tableaux = [];
-  h = h.replace(/<table[\s\S]*?<\/table>/gi, (t) => {
-    let lignes = (t.match(/<tr[\s\S]*?<\/tr>/gi) || []).map(tr => (tr.match(/<t[dh][\s\S]*?<\/t[dh]>/gi) || []).map(c => sansBalises(c).replace(/\s+/g, " ").trim()));
-    lignes = lignes.filter(l => l.some(c => c));
-    if (!lignes.length) return "\n";
-    const nbCol = Math.max(...lignes.map(l => l.length));
-    const utiles = [...Array(nbCol).keys()].filter(i => lignes.some(l => l[i]));
-    lignes = lignes.map(l => utiles.map(i => l[i] || ""));
-    if (lignes.length === 1 && lignes[0].length === 1) return "\n" + lignes[0][0] + "\n"; // tableau de mise en page
-    tableaux.push({ lignes: lignes.slice(0, 300).map(c => ({ c })) });
-    return "\n[tableau " + tableaux.length + "]\n";
-  });
-  const texte = sansBalises(h).split("\n").map(l => l.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
-  return { texte, tableaux };
 }
 
 async function rattacherPrecision(db, parsed, source, sourceId) {
@@ -910,33 +874,21 @@ async function rattacherPrecision(db, parsed, source, sourceId) {
   const deja = (cible.data().precisions || []).some(p => p.messageId === messageId);
   if (deja) { console.log(`Précision déjà rattachée au dossier ${cible.id}`); return { ok: true, precision: true }; }
 
-  // Pièces jointes : photos et documents, hors petites images de signature
-  const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
-  const pieces = [];
-  for (const a of (parsed.attachments || [])) {
-    const estImage = /^image\//.test(a.contentType || "");
-    if (estImage && (a.size || (a.content && a.content.length) || 0) < 15000) continue;
-    const nom = (a.filename || "piece").replace(/[^\w.\-()]/g, "_");
-    const chemin = `suivi/precisions/${cible.id}/${Date.now()}_${nom}`;
-    const jeton = crypto.randomUUID();
-    try {
-      await bucket.file(chemin).save(a.content, { contentType: a.contentType || "application/octet-stream", metadata: { metadata: { firebaseStorageDownloadTokens: jeton } } });
-      pieces.push({ nom: a.filename || nom, type: a.contentType || "", url: `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(chemin)}?alt=media&token=${jeton}` });
-    } catch (e) { console.warn(`Précision : pièce ${nom} non enregistrée :`, e.message); }
-  }
+  // Décidé le 17/11 : on ne recopie ni le texte ni les pièces jointes. Le dossier garde un pointeur
+  // vers le mail (lien direct Gmail par son identifiant + mots-clés de recherche de secours).
   const de = (parsed.from && parsed.from.value && parsed.from.value[0]) || {};
   const nomDe = de.name || de.address || "";
-  const depuisHtml = parsed.html ? precisionDepuisHtml(parsed.html) : null;
-  const texte = depuisHtml && (depuisHtml.texte || depuisHtml.tableaux.length) ? depuisHtml.texte : texteSansHistorique(parsed.text || "");
-  const tableaux = depuisHtml ? depuisHtml.tableaux : [];
+  const domaine = String(de.address || "").split("@")[1] || "";
+  const sujetNu = subject.replace(/^\s*((RE|TR|FW|FWD)\s*:\s*)+/i, "").trim();
+  const recherche = (domaine ? "from:" + domaine + " " : "") + '"' + sujetNu.replace(/"/g, "") + '"';
   const maintenant = new Date().toISOString();
   const { FieldValue } = require("firebase-admin/firestore");
   await cible.ref.update({
-    precisions: FieldValue.arrayUnion({ at: recu.toISOString(), recuLe: maintenant, de: nomDe, email: de.address || "", objet: subject, texte, tableaux, pieces, messageId }),
+    precisions: FieldValue.arrayUnion({ at: recu.toISOString(), recuLe: maintenant, de: nomDe, email: de.address || "", objet: subject, messageId, recherche }),
     precisionNonLue: true,
-    journal: FieldValue.arrayUnion({ at: maintenant, par: "Import email", texte: `Précision reçue par email de ${nomDe}` + (pieces.length ? ` (${pieces.length} pièce(s) jointe(s))` : "") }),
+    journal: FieldValue.arrayUnion({ at: maintenant, par: "Import email", texte: `Précision reçue par email de ${nomDe} (à lire dans Gmail)` }),
   });
-  console.log(`✅ Précision "${subject}" rattachée au dossier ${cible.id} (${pieces.length} pièce(s))`);
+  console.log(`✅ Précision "${subject}" rattachée au dossier ${cible.id}`);
   return { ok: true, precision: true };
 }
 
@@ -987,6 +939,20 @@ async function processParsedEmail(anthropic, db, parsed, source, sourceId) {
     extractedData = await parsePdfWithClaude(anthropic, fileBase64, filename, source.claudeSystemPrompt || "");
   } else {
     extractedData = await parseDocWithClaude(anthropic, fileBuffer, filename, source.claudeSystemPrompt || "");
+  }
+
+  // Anti-doublon (17/11) : un BC / PL déjà dans le Suivi pour ce client n'est pas recréé
+  // (mail remis dans la boîte de réception, renvoi du bailleur…). Le mail est classé comme traité.
+  {
+    const numAnti = source.pdfType === "PL" ? (extractedData.pl || docNumber || "") : (extractedData.bc || docNumber || "");
+    if (numAnti) {
+      const champAnti = source.pdfType === "PL" ? "pl" : "bc";
+      const nums = [...new Set([String(numAnti), String(numAnti).replace(/^0+/, "")])].filter(Boolean);
+      const ex = await db.collection("suivi").where(champAnti, "in", nums).get();
+      const clientAttendu = source.clientFirestore || extractedData.client || "";
+      const doublon = ex.docs.find(d => !clientAttendu || d.data().client === clientAttendu);
+      if (doublon) { console.log(`Email: ${champAnti.toUpperCase()} ${numAnti} déjà dans le Suivi (${doublon.id}), pas de doublon créé`); return { ok: true, doublon: true }; }
+    }
   }
 
   console.log(`Email: upload Storage...`);
@@ -1072,7 +1038,7 @@ async function processSource(client, anthropic, db, source, sourceRef) {
             catch(e) { console.warn(`Archive copy échouée (uid ${uid}):`, e.message); }
           }
           await client.messageMove(uid, source.gmailLabelTraite, { uid: true });
-          if (!result.precision) processed++; // une précision rattachée n'est pas un BC importé
+          if (!result.precision && !result.doublon) processed++; // une précision rattachée n'est pas un BC importé
         } else if (result && result.skipped) {
           // Mail sans pièce jointe : on lui pose le libellé "import-ignoré" (il reste dans la
           // boîte de réception) pour qu'il ne soit plus réexaminé. Sinon, au-delà de 20 mails

@@ -70,25 +70,21 @@
     if (!l.length) return '';
     l.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
     var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-    var d = function (iso) { var x = new Date(iso); return isNaN(x) ? '' : x.toLocaleDateString('fr-FR') + ' ' + x.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); };
-    return '<div style="border:1px solid #F0C36D;background:#FFF8E6;border-radius:10px;padding:10px 12px;margin:0 0 12px;display:flex;flex-direction:column;gap:10px;">'
-      + '<div style="font-weight:700;font-size:13px;color:#8A5A00;">✉ Précision' + (l.length > 1 ? 's' : '') + ' reçue' + (l.length > 1 ? 's' : '') + ' par email après le bon (' + l.length + ')</div>'
+    var d = function (iso) { var x = new Date(iso); return isNaN(x) ? '' : x.toLocaleDateString('fr-FR') + ' à ' + x.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h'); };
+    var btn = 'font:600 12px inherit;border:1px solid #E5C77A;background:#fff;color:#6B4A00;border-radius:6px;padding:3px 9px;cursor:pointer;text-decoration:none;display:inline-block;';
+    return '<div style="border:1px solid #F0C36D;background:#FFF8E6;border-radius:10px;padding:10px 12px;margin:0 0 12px;display:flex;flex-direction:column;gap:8px;">'
+      + '<div style="font-weight:700;font-size:13px;color:#8A5A00;">✉ Précision' + (l.length > 1 ? 's' : '') + ' reçue' + (l.length > 1 ? 's' : '') + ' par email · à lire dans Gmail</div>'
       + l.map(function (p) {
-        var pieces = (p.pieces || []).map(function (x) {
-          return /^image\//.test(x.type || '')
-            ? '<a href="' + e(x.url) + '" target="_blank" rel="noopener" title="' + e(x.nom) + '"><img src="' + e(x.url) + '" alt="' + e(x.nom) + '" style="width:88px;height:66px;object-fit:cover;border-radius:6px;border:1px solid #E5D3A8;"></a>'
-            : '<a href="' + e(x.url) + '" target="_blank" rel="noopener" style="font-size:12px;">📎 ' + e(x.nom) + '</a>';
-        }).join(' ');
-        return '<div style="border-top:1px solid #F0DDB0;padding-top:8px;">'
-          + '<div style="font-size:12px;color:#6B5A33;"><b>' + e(p.de || p.email || 'Expéditeur inconnu') + '</b> · ' + d(p.at) + '</div>'
-          + (p.texte ? '<div style="white-space:pre-wrap;font-size:13px;margin-top:4px;color:#2B2B2B;">' + e(p.texte) + '</div>' : (p.tableaux && p.tableaux.length ? '' : '<div style="font-size:12px;color:#8A7A55;margin-top:4px;">(pas de texte)</div>'))
-          + (p.tableaux || []).map(function (t) {
-            return '<div style="overflow-x:auto;margin-top:6px;"><table style="border-collapse:collapse;font-size:12px;background:#fff;">'
-              + (t.lignes || []).map(function (l, i) { return '<tr>' + (l.c || []).map(function (c) { return '<td style="border:1px solid #E5D3A8;padding:3px 6px;white-space:nowrap;' + (i === 0 ? 'font-weight:600;background:#FBF1D6;' : '') + '">' + e(c) + '</td>'; }).join('') + '</tr>'; }).join('')
-              + '</table></div>';
-          }).join('')
-          + (pieces ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;">' + pieces + '</div>' : '')
-          + '</div>';
+        var id = /@/.test(p.messageId || '') ? String(p.messageId).replace(/^<|>$/g, '') : ''; // identifiant Gmail réel seulement
+        var lien = id ? 'https://mail.google.com/mail/?authuser=belledonne.multiservices%40gmail.com#search/rfc822msgid%3A' + encodeURIComponent(id) : '';
+        return '<div style="border-top:1px solid #F0DDB0;padding-top:7px;display:flex;flex-direction:column;gap:5px;">'
+          + '<div style="font-size:12.5px;color:#4A3B1A;"><b>' + e(p.de || p.email || 'Expéditeur inconnu') + '</b> · ' + d(p.at) + '</div>'
+          + '<div style="font-size:12.5px;color:#4A3B1A;">« ' + e(p.objet || '') + ' »</div>'
+          + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">'
+          + (lien ? '<a href="' + e(lien) + '" target="_blank" rel="noopener" style="' + btn + '">Ouvrir dans Gmail</a>' : '')
+          + (p.recherche ? '<span style="font-size:12px;color:#6B5A33;">Recherche :</span><code style="font-size:11.5px;background:#fff;border:1px solid #F0DDB0;border-radius:5px;padding:2px 6px;user-select:all;">' + e(p.recherche) + '</code>'
+            + '<button type="button" style="' + btn + '" onclick="event.stopPropagation();var b=this;navigator.clipboard.writeText(this.dataset.r).then(function(){b.textContent=\'Copié\';setTimeout(function(){b.textContent=\'Copier\'},1400)}).catch(function(){})" data-r="' + e(p.recherche) + '">Copier</button>' : '')
+          + '</div></div>';
       }).join('') + '</div>';
   };
   // Ouvrir le dossier vaut lecture : le badge « Précision » de la ligne disparaît (sans toucher à updatedAt)
