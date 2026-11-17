@@ -3986,7 +3986,9 @@ var LIB_ETAPE = { validation: 'Validation', planification: 'Planification', pilo
 var CLS_ETAPE = { validation: 'psg-passe', planification: 'psg-prevu', pilotage: 'psg-auj', afacturer: 'psg-annule', cloture: 'psg-ok', attente: 'psg-passe', pannule: 'psg-annule', annuleDef: 'psg-retard' };
 function etiquetteEtape(item) { var e = fileDe(item); return '<span class="psg ' + CLS_ETAPE[e] + '" style="text-decoration:none;">' + LIB_ETAPE[e] + '</span>'; }
 
-var parAnciennete = function(x, y){ return dateArrivee(x).localeCompare(dateArrivee(y)); };
+// Validation (17/11) : même référence que Planification, la date écrite sur le BC / PL, repli sur l'arrivée.
+function dateBonOuArrivee(item) { return dateBonValide(item) || dateArrivee(item); }
+var parAnciennete = function(x, y){ return dateBonOuArrivee(x).localeCompare(dateBonOuArrivee(y)); };
 var parRecent = function(x, y){ return String(y.updatedAt || dateArrivee(y)).localeCompare(String(x.updatedAt || dateArrivee(x))); };
 var colAttente = { titre: 'Attente', cell: function(i){ var n = joursDepuis(dateArrivee(i)); var c = n === null ? '' : n > DELAI_PLANIF_JOURS ? 'psg-retard' : n >= 2 ? 'psg-annule' : 'psg-recu'; return '<span class="psg ' + c + '" style="text-decoration:none;">' + (n === null ? '—' : n + ' j') + '</span>'; } };
 
@@ -4028,13 +4030,13 @@ var FILES_SUIVI = [
     reduit: true,
     colonnes: [
       { titre: 'Contrôles', cell: function(i){ var b = []; if (estDoublon(i)) b.push('<span class="psg psg-retard" title="' + titreDoublon(i).replace(/"/g, '&quot;') + '">⚠ Doublon possible</span>'); if (estIncomplet(i)) b.push('<span class="psg psg-annule" style="text-decoration:none;" title="' + manquesDe(i).join(', ') + ' manquant(s)">⚠ Incomplet</span>'); return b.length ? '<div class="frise">' + b.join('') + '</div>' : '<span class="psg psg-recu">✓ OK</span>'; } },
-      { titre: 'Arrivé', cell: function(i){ return '<span style="font-size:12px;">' + libJours(joursDepuis(dateArrivee(i))) + '</span>'; } },
+      { titre: 'Attente', cell: function(i){ var n = joursOuvresDepuis(dateBonOuArrivee(i)); var c = n === null ? '' : n > DELAI_PLANIF_JOURS ? 'psg-retard' : n >= 2 ? 'psg-annule' : 'psg-recu'; return '<span class="psg ' + c + '" style="text-decoration:none;" title="Jours ouvrés depuis la date du bon (hors samedi et dimanche)">' + (n === null ? '—' : n + ' j') + '</span>'; } },
     ],
     kpis: function(l){
-      var vieux = l.map(function(i){ return joursDepuis(dateArrivee(i)); }).filter(function(n){ return n !== null; });
+      var vieux = l.map(function(i){ return joursOuvresDepuis(dateBonOuArrivee(i)); }).filter(function(n){ return n !== null; });
       return [
         { val: l.length, lib: 'BC à valider' },
-        { val: vieux.length ? libJours(Math.max.apply(null, vieux)) : '—', lib: 'plus ancien' },
+        { val: vieux.length ? Math.max.apply(null, vieux) + ' j' : '—', lib: 'plus ancien (j ouvrés)' },
         { val: l.filter(estDoublon).length, lib: 'doublon(s) possible(s)', alerte: true, cle: 'dbl', filtre: estDoublon },
         { val: l.filter(estIncomplet).length, lib: 'incomplet(s)', alerte: true, cle: 'inc', filtre: estIncomplet },
       ];
