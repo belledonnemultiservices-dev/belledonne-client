@@ -882,19 +882,14 @@ function descriptionAuto(item, adresse) {
 }
 // Rendez-vous d'un technicien sur un passage principal : son titre, son adresse, sa description
 // (sinon automatique) + observations du dossier, toujours + ses rapports Kizeo
-// Description automatique d'un rendez-vous (ou description d'avant le 17/11) + observations du dossier
-function descAgendaAuto(item, adresse, descAncienne) {
-  let desc = (descAncienne || "").trim() || descriptionAuto(item, adresse);
-  const obs = String(item.observations || "").trim();
-  if (obs && !desc.includes(obs)) desc += (desc ? "\n" : "") + "Observations : " + obs;
-  return desc;
-}
+// Texte du carré Description d'un rendez-vous : saisi à la main (descLibre), sinon les observations du dossier
+const descCarre = (item, a) => a && a.descLibre && (a.desc || "").trim() ? a.desc.trim() : String(item.observations || "").trim();
 function contenuAgenda(item, p, ps, nom) {
   const a = (p.agendaTech || {})[nom] || { titre: p.titre, adresse: p.adresse, desc: p.desc };
   const adresse = (a.adresse || "").trim() || item.adresse || "";
-  // Description écrite dans le carré depuis le 17/11 (descLibre) : envoyée telle quelle, elle contient
-  // déjà les observations (le carré est pré-rempli). Sinon : automatique + observations, comme avant.
-  let desc = a.descLibre && (a.desc || "").trim() ? a.desc.trim() : descAgendaAuto(item, adresse, a.desc);
+  // Décidé le 17/11 : la description Google = uniquement le carré Description de l'app. Le carré
+  // reprend les observations du dossier tant qu'il n'a pas été modifié (descLibre), puis le texte saisi.
+  let desc = descCarre(item, a);
   const t = nom ? techParNom(nom) : null;
   const noms = [p].concat(ps.filter(j => j.jumeau && j.statut !== "annule" && j.num === p.num))
     .filter(x => x.kzForm && x.kzNom && (x.kzTech ? x.kzTech === nom : (t && t.kizeoUserId && String(x.kzDest) === String(t.kizeoUserId)))).map(x => x.kzNom);
@@ -968,8 +963,8 @@ function rendrePassages(item) {
       <div class="pl-tbloc-tete"><b>${esc(nom)}</b>${etatA ? etatHtml(...LIB_AGENDA[etatA]) : ""}</div>
       <div class="pl-grille">
         <div class="pl-champ"><label>Titre agenda</label><input data-af="titre" value="${esc(a.titre)}" placeholder="${esc(titreDefaut(item))}"></div>
-        <div class="pl-champ"><label>Adresse</label><input data-af="adresse" value="${esc(a.adresse)}" placeholder="${esc(item.adresse || "Adresse...")}"></div>
-        <div class="pl-champ large"><label>Description <span style="text-transform:none;font-weight:400;">· ${a.descLibre && a.desc.trim() ? "modifiée à la main, envoyée telle quelle" : "suit le dossier tant que tu ne la modifies pas"} · le nom des rapports Kizeo est ajouté à la suite dans l'agenda</span></label><textarea data-af="desc" rows="6" placeholder="Vide = description automatique (BC, nature, contact, téléphones, adresse, observations)">${esc(a.descLibre && a.desc.trim() ? a.desc : descAgendaAuto(item, (a.adresse || "").trim() || item.adresse || "", a.desc))}</textarea></div>
+        <div class="pl-champ"><label>Adresse</label><input data-af="adresse" value="${esc((a.adresse || "").trim() || item.adresse || "")}" placeholder="Adresse..." title="Reprend l'adresse du dossier tant que tu ne la modifies pas"></div>
+        <div class="pl-champ large"><label>Description <span style="text-transform:none;font-weight:400;">· ${a.descLibre && a.desc.trim() ? "modifiée à la main" : "reprend les observations du dossier tant que tu ne la modifies pas"} · le nom des rapports Kizeo est ajouté à la suite dans l'agenda</span></label><textarea data-af="desc" rows="4" placeholder="Observations du dossier (vides)">${esc(descCarre(item, a))}</textarea></div>
       </div>
       <div class="pl-raps"><div class="pl-raps-tete"><b>Rapports Kizeo</b>${t && t.kizeoUserId ? "" : '<span class="pl-manque" style="font-size:12px;">pas de compte Kizeo (page Techniciens) : envoi impossible</span>'}</div>
         ${raps.map((r, i) => ligneRapport(l, r, i)).join("")}
