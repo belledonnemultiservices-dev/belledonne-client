@@ -3845,13 +3845,18 @@ function joursOuvresDepuis(iso) {
   while (d < fin) { d.setDate(d.getDate() + 1); var j = d.getDay(); if (j !== 0 && j !== 6) n++; }
   return n;
 }
-// Entrée en Planification (classement et attente) :
-// - BC importé : date de validation, sinon (validé avant le 15/11) son arrivée
-// - saisie manuelle : date d'émission du BC si renseignée (décidé le 15/11), sinon la date de saisie
+// Entrée en Planification (classement et attente). Décidé le 17/11 : l'attente part de la
+// date écrite sur le BC / PL (dateEmission lue dans le PDF), import auto comme saisie manuelle.
+// Repli si elle manque ou est incohérente (postérieure à l'arrivée dans l'app) : validation, puis arrivée.
+function dateBonValide(item) {
+  var e = String(item.dateEmission || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e)) return '';
+  var arrivee = String(item.createdAt || '').substring(0, 10);
+  if (arrivee && e > arrivee) return '';
+  return e;
+}
 function entreePlanif(item) {
-  if (item.validatedAt) return item.validatedAt;
-  if (item.source !== 'auto' && item.dateEmission) return item.dateEmission;
-  return dateArrivee(item);
+  return dateBonValide(item) || item.validatedAt || dateArrivee(item);
 }
 function attentePlanif(item) { return joursOuvresDepuis(entreePlanif(item)); }
 function etapesPlanif(item) { return typeof window.etatsEtapesPlanif === 'function' ? window.etatsEtapesPlanif(item) : null; }
@@ -4034,7 +4039,7 @@ var FILES_SUIVI = [
         { val: l.filter(estIncomplet).length, lib: 'incomplet(s)', alerte: true, cle: 'inc', filtre: estIncomplet },
       ];
     } },
-  // Décidé le 15/11 : plus ancien en premier, attente en jours ouvrés depuis la validation,
+  // Décidé le 15/11 : plus ancien en premier, attente en jours ouvrés (depuis la date du BC / PL, 17/11),
   // une colonne Avancement (les 5 étapes de la fenêtre de planification) à la place de
   // Techniciens / Passages / Notifs, ni statut, ni regroupement par commune.
   { cle: 'planification', label: 'Planification', test: function(i){ return fileDe(i) === 'planification'; },
@@ -4043,7 +4048,7 @@ var FILES_SUIVI = [
     reduit: true,
     colonnes: [
       { titre: 'Avancement', cell: avancementHtml },
-      { titre: 'Attente', cell: function(i){ var n = attentePlanif(i); var c = n === null ? '' : n > DELAI_PLANIF_JOURS ? 'psg-retard' : n >= 2 ? 'psg-annule' : 'psg-recu'; return '<span class="psg ' + c + '" style="text-decoration:none;" title="Jours ouvrés depuis la validation (hors samedi et dimanche)">' + (n === null ? '—' : n + ' j') + '</span>'; } },
+      { titre: 'Attente', cell: function(i){ var n = attentePlanif(i); var c = n === null ? '' : n > DELAI_PLANIF_JOURS ? 'psg-retard' : n >= 2 ? 'psg-annule' : 'psg-recu'; return '<span class="psg ' + c + '" style="text-decoration:none;" title="Jours ouvrés depuis la date du bon (hors samedi et dimanche)">' + (n === null ? '—' : n + ' j') + '</span>'; } },
     ],
     kpis: function(l){
       var vieux = l.map(attentePlanif).filter(function(n){ return n !== null; });
