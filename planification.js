@@ -787,7 +787,7 @@ function lignesDepuis(item) {
     const techs = (p.techs || []).slice();
     // Rendez-vous par technicien ; un passage d'avant reprend son titre, son adresse et sa description pour chacun
     const agenda = {};
-    techs.forEach(n => { const a = (p.agendaTech || {})[n]; agenda[n] = a ? { titre: a.titre || "", adresse: a.adresse || "", desc: a.desc || "" } : { titre: p.titre || "", adresse: p.adresse || "", desc: p.desc || "" }; });
+    techs.forEach(n => { const a = (p.agendaTech || {})[n]; agenda[n] = a ? { titre: a.titre || "", adresse: a.adresse || "", desc: a.desc || "", descLibre: !!a.descLibre } : { titre: p.titre || "", adresse: p.adresse || "", desc: p.desc || "" }; });
     return { ref: p, pid: p.passageId || uuid(), num: p.num, annule: p.statut === "annule", remplace: p.remplace || null,
       debut: (p.debut || "").substring(0, 16), fin: (p.fin || "").substring(0, 16), techs, agenda, rapports: [] };
   });
@@ -882,12 +882,19 @@ function descriptionAuto(item, adresse) {
 }
 // Rendez-vous d'un technicien sur un passage principal : son titre, son adresse, sa description
 // (sinon automatique) + observations du dossier, toujours + ses rapports Kizeo
+// Description automatique d'un rendez-vous (ou description d'avant le 17/11) + observations du dossier
+function descAgendaAuto(item, adresse, descAncienne) {
+  let desc = (descAncienne || "").trim() || descriptionAuto(item, adresse);
+  const obs = String(item.observations || "").trim();
+  if (obs && !desc.includes(obs)) desc += (desc ? "\n" : "") + "Observations : " + obs;
+  return desc;
+}
 function contenuAgenda(item, p, ps, nom) {
   const a = (p.agendaTech || {})[nom] || { titre: p.titre, adresse: p.adresse, desc: p.desc };
   const adresse = (a.adresse || "").trim() || item.adresse || "";
-  let desc = (a.desc || "").trim() || descriptionAuto(item, adresse);
-  const obs = String(item.observations || "").trim();
-  if (obs && !desc.includes(obs)) desc += (desc ? "\n" : "") + "Observations : " + obs;
+  // Description écrite dans le carré depuis le 17/11 (descLibre) : envoyée telle quelle, elle contient
+  // déjà les observations (le carré est pré-rempli). Sinon : automatique + observations, comme avant.
+  let desc = a.descLibre && (a.desc || "").trim() ? a.desc.trim() : descAgendaAuto(item, adresse, a.desc);
   const t = nom ? techParNom(nom) : null;
   const noms = [p].concat(ps.filter(j => j.jumeau && j.statut !== "annule" && j.num === p.num))
     .filter(x => x.kzForm && x.kzNom && (x.kzTech ? x.kzTech === nom : (t && t.kizeoUserId && String(x.kzDest) === String(t.kizeoUserId)))).map(x => x.kzNom);
@@ -901,6 +908,9 @@ function agendaAJour(item, p, ps, nom) {
   const e = (p.calEmpreintes || {})[nom];
   if (e) return e === empreinteAgenda(item, p, ps, nom);
   if (p.calEmpreinte) return false;
+  // Passage déjà passé par cette synchronisation (calEmpreintes présent) sans repère pour ce technicien :
+  // l'envoi précédent a échoué, le rendez-vous est à refaire (bug du 17/11 : affiché « à jour » à tort)
+  if (p.calEmpreintes && typeof p.calEmpreintes === "object") return false;
   // Rendez-vous posé par l'ancienne fiche sans repère de synchronisation : considéré à jour, comme
   // dans le Suivi (il sera mis à jour à la prochaine vraie modification du passage, sans doublon)
   if (!p.calSync) return true;
@@ -959,7 +969,7 @@ function rendrePassages(item) {
       <div class="pl-grille">
         <div class="pl-champ"><label>Titre agenda</label><input data-af="titre" value="${esc(a.titre)}" placeholder="${esc(titreDefaut(item))}"></div>
         <div class="pl-champ"><label>Adresse</label><input data-af="adresse" value="${esc(a.adresse)}" placeholder="${esc(item.adresse || "Adresse...")}"></div>
-        <div class="pl-champ large"><label>Description <span style="text-transform:none;font-weight:400;">· les observations du dossier et le nom de ses rapports Kizeo sont ajoutés dans l'agenda</span></label><textarea data-af="desc" placeholder="Laisse vide pour la description automatique (BC, nature, contact, téléphones, adresse)">${esc(a.desc)}</textarea></div>
+        <div class="pl-champ large"><label>Description <span style="text-transform:none;font-weight:400;">· ${a.descLibre && a.desc.trim() ? "modifiée à la main, envoyée telle quelle" : "suit le dossier tant que tu ne la modifies pas"} · le nom des rapports Kizeo est ajouté à la suite dans l'agenda</span></label><textarea data-af="desc" rows="6" placeholder="Vide = description automatique (BC, nature, contact, téléphones, adresse, observations)">${esc(a.descLibre && a.desc.trim() ? a.desc : descAgendaAuto(item, (a.adresse || "").trim() || item.adresse || "", a.desc))}</textarea></div>
       </div>
       <div class="pl-raps"><div class="pl-raps-tete"><b>Rapports Kizeo</b>${t && t.kizeoUserId ? "" : '<span class="pl-manque" style="font-size:12px;">pas de compte Kizeo (page Techniciens) : envoi impossible</span>'}</div>
         ${raps.map((r, i) => ligneRapport(l, r, i)).join("")}
@@ -1033,7 +1043,10 @@ function rendrePassages(item) {
     const f = inp.dataset.af;
     inp.oninput = () => {
       const l = ligneDe(inp), nom = techDe(inp);
-      (l.agenda[nom] = l.agenda[nom] || agendaVide())[f] = inp.value;
+      const ag = (l.agenda[nom] = l.agenda[nom] || agendaVide());
+      ag[f] = inp.value;
+      // Carré Description modifié : il devient le texte envoyé tel quel ; vidé, il redevient automatique
+      if (f === "desc") ag.descLibre = !!inp.value.trim();
       // Le nom de son 1er rapport suit son titre agenda en direct (s'il n'a pas été modifié à la main)
       if (f === "titre") {
         const r = l.rapports.find(x => !x.annule && x.tech === nom);
@@ -1279,7 +1292,7 @@ async function enregistrerPassages(item, silencieux) {
       // Rendez-vous de chaque technicien ; le 1er technicien alimente aussi titre/adresse/description
       // du passage, lus par le reste de l'app (vue Semaine, ancienne fiche)
       const agendaTech = {};
-      l.techs.forEach(n => { const a = l.agenda[n] || agendaVide(); agendaTech[n] = { titre: a.titre.trim(), adresse: a.adresse.trim(), desc: a.desc.trim() }; });
+      l.techs.forEach(n => { const a = l.agenda[n] || agendaVide(); agendaTech[n] = { titre: a.titre.trim(), adresse: a.adresse.trim(), desc: a.desc.trim() }; if (a.descLibre && a.desc.trim()) agendaTech[n].descLibre = true; });
       const a0 = agendaTech[l.techs[0]] || agendaVide();
       l.rapports.forEach((r, k) => {
         // Base : la version en base (envoi Kizeo, rendez-vous, notifications faits entre-temps)
