@@ -2044,7 +2044,7 @@ function buildKizeoControl(n) {
     document.getElementById('fClient')?.value || '',
     num);
   const selId = kizeoPush ? kizeoPush.kizeoFormDocId : (lie ? lie.id : '');
-  const formOpts = forms.map(f => `<option value="${f.id}" ${String(selId) === String(f.id) ? 'selected' : ''}>${(f.nom||'Formulaire').replace(/"/g,'&quot;')}${lie && lie.id === f.id ? ' (lié)' : ''}</option>`).join('');
+  const formOpts = window.optionsRapportsKizeo(forms, selId, lie ? lie.id : null);
   const techOpts = techMatches.map(t => `<option value="${t.kizeoUserId}" ${kizeoPush && String(kizeoPush.recipientUserId) === String(t.kizeoUserId) ? 'selected' : ''}>${(t.nomComplet||t.nom).replace(/"/g,'&quot;')}</option>`).join('');
   // Libellé : vide par défaut, recopié du titre agenda tant qu'il n'a pas été
   // saisi à la main sur ce passage. Le libellé du dernier envoi prime.
@@ -4341,6 +4341,47 @@ function lignesPassagesAnnonce(passages) {
 }
 function libNumPassage(p) { if (estAffichage(p)) return '📌 Affichage'; var n = p && p.num != null && p.num !== '' ? Number(p.num) : 1; return CERCLES[n - 1] || '#' + n; }
 window.CERCLES = CERCLES;
+// ── Liste des rapports Kizeo rangée par sections (21/11) ──
+// Sections reconnues d'après le nom du formulaire ; dans chaque section : 1er passage, passage suivant,
+// vacant, puis le reste (parties communes après les logements). Un formulaire non reconnu va dans « Autres ».
+var SECTIONS_KIZEO = [
+  { titre: 'Désinsectisation Montées', test: function(n){ return /émargement|emargement|affiche/.test(n); } },
+  { titre: 'CCAS', test: function(n){ return /ccas/.test(n); } },
+  { titre: 'Garanties', test: function(n){ return /garantie/.test(n); } },
+  { titre: 'Campagnes ACTIS', test: function(n){ return /actis/.test(n); } },
+  { titre: 'Blattes', test: function(n){ return /blatte/.test(n); } },
+  { titre: 'Punaises de lit', test: function(n){ return /punaise/.test(n); } },
+  { titre: 'Dératisation', test: function(n){ return /dératisation|deratisation|rats|souris/.test(n); } },
+  { titre: 'Guêpes / Frelons', test: function(n){ return /guêpe|guepe|frelon/.test(n); } },
+  { titre: 'Autres', test: function(){ return true; } }
+];
+var ORDRE_SECTIONS_KIZEO = ['Blattes', 'Punaises de lit', 'Dératisation', 'Guêpes / Frelons', 'Désinsectisation Montées', 'CCAS', 'Garanties', 'Campagnes ACTIS', 'Autres'];
+function rangRapportKizeo(n) {
+  var r = /affiche/.test(n) ? -1 : /libre/.test(n) ? -1 : /1er|passage 1|\(passage 1\)/.test(n) ? 0 : /suivant|2nd|2e /.test(n) ? 1 : /vacant/.test(n) ? 2 : 3;
+  if (/parties communes|partie commune|\bpc\b/.test(n)) r += 10;
+  if (/punaise/.test(n) && /ccas/.test(n)) r += 10;
+  if (/ancien/.test(n)) r += 20;
+  return r;
+}
+window.optionsRapportsKizeo = function(forms, selId, lieId) {
+  var groupes = {};
+  (forms || []).forEach(function(f){
+    var n = String(f.nom || '').toLowerCase();
+    var s = SECTIONS_KIZEO.find(function(x){ return x.test(n); }).titre;
+    (groupes[s] = groupes[s] || []).push(f);
+  });
+  var e = function(v){ return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
+  return ORDRE_SECTIONS_KIZEO.filter(function(t){ return groupes[t]; }).map(function(t){
+    var liste = groupes[t].slice().sort(function(a, b){
+      var na = String(a.nom || '').toLowerCase(), nb = String(b.nom || '').toLowerCase();
+      return (rangRapportKizeo(na) - rangRapportKizeo(nb)) || na.localeCompare(nb, 'fr');
+    });
+    return '<optgroup label="' + e(t) + '">' + liste.map(function(f){
+      return '<option value="' + e(f.id) + '"' + (selId != null && String(selId) === String(f.id) ? ' selected' : '') + '>' + e(f.nom || 'Formulaire') + (lieId && String(lieId) === String(f.id) ? ' (lié)' : '') + '</option>';
+    }).join('') + '</optgroup>';
+  }).join('');
+};
+
 function jjmm(d) { return d ? d.substring(8,10) + '/' + d.substring(5,7) : ''; }
 // ── Stand-by d'un passage annulé (16/11) ──
 // Passage annulé encore sans suite (ni replanifié, ni abandonné), le plus récent
@@ -5780,7 +5821,7 @@ function buildKizeoControlT(n) {
   if (!techMatches.length) return wrap(`<span style="font-size:11px;color:var(--text-muted);">Assignez un technicien ayant un ID Kizeo (fiche Techniciens) sur ce passage.</span>`);
   let kizeoPush = null;
   try { kizeoPush = JSON.parse(document.getElementById('passageT_' + n)?.dataset.kizeoPush || 'null'); } catch(e) { kizeoPush = null; }
-  const formOpts = forms.map(f => `<option value="${f.id}" ${kizeoPush && kizeoPush.kizeoFormDocId === f.id ? 'selected' : ''}>${(f.nom||'Formulaire').replace(/"/g,'&quot;')}</option>`).join('');
+  const formOpts = window.optionsRapportsKizeo(forms, kizeoPush ? kizeoPush.kizeoFormDocId : null, null);
   const techOpts = techMatches.map(t => `<option value="${t.kizeoUserId}" ${kizeoPush && String(kizeoPush.recipientUserId) === String(t.kizeoUserId) ? 'selected' : ''}>${(t.nomComplet||t.nom).replace(/"/g,'&quot;')}</option>`).join('');
   const num = parseInt(document.getElementById('fPassageNumT' + n)?.value) || n;
   // Même règle que la modale intervention : vide par défaut, miroir du titre agenda.
