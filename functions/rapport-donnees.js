@@ -144,8 +144,9 @@ function trierChamps(valeurs, definitions, clesTechniques, valeursRacine) {
       continue;
     }
     if (TYPES_PHOTO.has(type)) {
-      const media = String(brute || "").trim();
-      if (media) resultat.photos.push({ cle, libelle: def.caption || cle, media });
+      // Un champ photo peut porter plusieurs photos, séparées par des virgules (21/11)
+      String(brute || "").split(",").map(m => m.trim()).filter(Boolean)
+        .forEach(media => resultat.photos.push({ cle, libelle: def.caption || cle, media }));
       continue;
     }
     if (type === TYPE_SIGNATURE) {
@@ -192,6 +193,8 @@ function lireSoumission(submission, formDef, mapping) {
         champs: titre ? t.champs.slice(1) : t.champs,
         sections: t.sections,
         photos: t.photos,
+        // Signature propre à la ligne (ex. signature du locataire sur une feuille d'émargement, 21/11)
+        signature: t.signature,
       });
     });
   }
@@ -219,7 +222,10 @@ function listerMedias(rapport) {
   const out = [];
   rapport.photos.forEach(p => out.push({ ...p, ligne: null }));
   if (rapport.signature) out.push({ ...rapport.signature, ligne: null, signature: true });
-  rapport.lignes.forEach(l => l.photos.forEach(p => out.push({ ...p, ligne: l.index })));
+  rapport.lignes.forEach(l => {
+    l.photos.forEach(p => out.push({ ...p, ligne: l.index }));
+    if (l.signature) out.push({ ...l.signature, ligne: l.index, signature: true });
+  });
   return out;
 }
 
@@ -253,10 +259,10 @@ async function telechargerMedias(rapport, { kizeoGet, deposer }) {
       const url = await deposer(m, r.body, typeImage(r.body));
       // Replacement à l'identique dans la structure lue.
       const cible = m.signature
-        ? rapport.signature
+        ? (m.ligne === null ? rapport.signature : rapport.lignes[m.ligne].signature)
         : (m.ligne === null
-            ? rapport.photos.find(p => p.cle === m.cle)
-            : rapport.lignes[m.ligne].photos.find(p => p.cle === m.cle));
+            ? rapport.photos.find(p => p.cle === m.cle && p.media === m.media)
+            : rapport.lignes[m.ligne].photos.find(p => p.cle === m.cle && p.media === m.media));
       if (cible) { cible.url = url; nb++; }
     } catch (e) {
       erreurs.push({ cle: m.cle, ligne: m.ligne, raison: e.message });

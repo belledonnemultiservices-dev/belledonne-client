@@ -21,7 +21,9 @@ const ETAPES_COURTES = ["Dossier", "Passages", "Notifications", "Récapitulatif"
 const estTache = (item) => !!item && item.clientType === "tache";
 const TYPES_TACHE = { devis: "Devis", inspection: "Inspection / diagnostic", affiches: "Pose d'affiches", cles: "Récupération de clés", autre: "Autre" };
 const libTypeTache = (item) => item.typeIntervention === "autre" ? (item.typeInterventionAutre || "Autre") : (TYPES_TACHE[item.typeIntervention] || item.nature || "Tâche");
-const nomsEtapes = (item) => estTache(item) ? ["Tâche", "Passages, agenda & Kizeo", "Notifications (facultatif)", "Récapitulatif"] : ETAPES;
+const nomsEtapes = (item) => estTache(item) ? ["Tâche", "Passages, agenda & Kizeo", "Notifications (facultatif)", "Récapitulatif"] : estMontee(item) ? ["Dossier", "Passages, agenda & Kizeo", "Notifications & affichage", "Récapitulatif"] : ETAPES;
+// Nature « Désinsectisation Montées » (17/11) : affiches de hall et avis individuels à l'étape Notifications
+const estMontee = (item) => /^d[ée]sinsectisation\s+mont[ée]es?$/i.test(String((item && item.nature) || "").trim());
 // Rapport Kizeo exigé ? Bon : sauf « Aucun rapport » choisi ; tâche : seulement si un formulaire est choisi ou parti
 const rapportExige = (item, b) => !b ? !estTache(item) : estTache(item) ? (!!b.kzForm || !!b.kizeoPush) : (b.kzForm === undefined || !!b.kzForm || !!b.kizeoPush);
 const DERNIERE = ETAPES.length - 1;
@@ -778,7 +780,7 @@ function rapportDepuis(item, p, num, techs, agenda) {
   const kp = p.kizeoPush || null;
   const lie = !estTache(item) && window._findKizeoFormLie ? window._findKizeoFormLie(item.nature || "", item.client || "", num) : null;
   const tech = techDuRapport(p, techs);
-  const titreTech = ((agenda[tech] || {}).titre || "").trim() || titreDefaut(item);
+  const titreTech = ((agenda[tech] || {}).titre || "").trim() || titreDefaut(item, p);
   return { pid: p.passageId || uuid(), ref: p, annule: p.statut === "annule", tech,
     formId: String(p.kzForm ?? (kp ? kp.kizeoFormDocId : (lie ? lie.id : "")) ?? ""),
     // Nom saisi à la main ; pour un rapport parti avant le 15/11 (pas de kzNom), le nom déjà envoyé
@@ -792,7 +794,7 @@ function lignesDepuis(item) {
     // Rendez-vous par technicien ; un passage d'avant reprend son titre, son adresse et sa description pour chacun
     const agenda = {};
     techs.forEach(n => { const a = (p.agendaTech || {})[n]; agenda[n] = a ? { titre: a.titre || "", adresse: a.adresse || "", desc: a.desc || "", descLibre: !!a.descLibre } : { titre: p.titre || "", adresse: p.adresse || "", desc: p.desc || "" }; });
-    return { ref: p, pid: p.passageId || uuid(), num: p.num, annule: p.statut === "annule", remplace: p.remplace || null,
+    return { ref: p, pid: p.passageId || uuid(), num: p.num, role: p.role || "", annule: p.statut === "annule", remplace: p.remplace || null,
       debut: (p.debut || "").substring(0, 16), fin: (p.fin || "").substring(0, 16), techs, agenda, rapports: [] };
   });
   L.forEach(l => { const r = rapportDepuis(item, l.ref, l.num, l.techs, l.agenda); r.pid = l.pid; l.rapports.push(r); });
@@ -840,7 +842,7 @@ function problemesLigne(l, L) {
   if (l.annule || vierge(l)) return [];
   L = L.filter(a => !vierge(a));
   const pb = [];
-  if (!l.num || l.num < 1) pb.push("numéro de passage invalide");
+  if (l.role !== "affichage" && (!l.num || l.num < 1)) pb.push("numéro de passage invalide");
   else if (L.some(a => a !== l && !a.annule && a.num === l.num && !(a.ref && a.ref.kizeoPush && l.ref && l.ref.kizeoPush))) pb.push("numéro déjà pris par un autre passage (pour un 2e rapport, utilise « + Ajouter un rapport »)");
   if (!l.debut) pb.push("date de début manquante");
   const an = (v) => parseInt(String(v).slice(0, 4), 10);
@@ -856,7 +858,7 @@ function problemesLigne(l, L) {
 const formParId = (id) => (window._kizeoForms || []).find(f => String(f.id) === String(id));
 // Destinataire Kizeo d'un rapport : son technicien, s'il a un compte Kizeo
 function destDe(l, r) { const t = r.tech ? techParNom(r.tech) : null; return t && t.kizeoUserId ? t : null; }
-const titreAuto = (item, l, nom) => (((l.agenda || {})[nom] || {}).titre || "").trim() || titreDefaut(item);
+const titreAuto = (item, l, nom) => (((l.agenda || {})[nom] || {}).titre || "").trim() || titreDefaut(item, l);
 // Le 1er rapport d'un technicien reprend son titre agenda tant qu'on ne l'a pas modifié ; les suivants se nomment à la main
 const premierDuTech = (l, r) => l.rapports.filter(x => !x.annule && x.tech === r.tech)[0] === r;
 function nomRapport(item, l, r) {
@@ -898,7 +900,7 @@ function contenuAgenda(item, p, ps, nom) {
   const noms = [p].concat(ps.filter(j => j.jumeau && j.statut !== "annule" && j.num === p.num))
     .filter(x => x.kzForm && x.kzNom && (x.kzTech ? x.kzTech === nom : (t && t.kizeoUserId && String(x.kzDest) === String(t.kizeoUserId)))).map(x => x.kzNom);
   if (noms.length) desc += "\n\n" + (noms.length > 1 ? "Rapports Kizeo à remplir :" : "Rapport Kizeo à remplir :") + "\n" + noms.map(n => "• " + n).join("\n");
-  return { titre: (a.titre || "").trim() || titreDefaut(item), adresse, desc };
+  return { titre: (a.titre || "").trim() || titreDefaut(item, p), adresse, desc };
 }
 const empreinteAgenda = (item, p, ps, nom) => JSON.stringify([p.debut, p.fin, (p.techs || []).slice().sort(), contenuAgenda(item, p, ps, nom)]);
 // Rendez-vous d'un technicien à jour ? Empreinte par technicien (calEmpreintes) ; un passage
@@ -924,6 +926,55 @@ function etatAgendaTech(item, p, ps, nom) {
 const LIB_AGENDA = { ok: ["ok", "✓ agenda à jour"], maj: ["att", "agenda à mettre à jour"], manque: ["ko", "✕ pas dans l'agenda"], sans: ["att", "pas d'agenda (page Techniciens)"] };
 
 let minuteriePassages = null, sauvegardeEnCours = null, aRefaire = false;
+// ── Montées (20/11) : le 2nd passage ne part qu'avec les absents du 1er ──
+// montee.p1 est rangé par le serveur à la réception de l'émargement du 1er passage.
+function etatMontee2(item, l) {
+  if (!estMontee(item) || !l || l.annule || Number(l.num) !== 2) return null;
+  const m1 = item.montee && item.montee.p1;
+  if (!m1 || !Array.isArray(m1.logements)) return { recu: false, absents: [], refus: 0 };
+  // « absents » = logements à repasser : absents et non accessibles (21/11)
+  return { recu: true, absents: m1.logements.filter(x => x.statut === "absent" || x.statut === "inaccessible"), refus: m1.logements.filter(x => x.statut === "refus").length, total: m1.logements.length,
+    auto: (item.montee && item.montee.p2Auto) || null, parti: !!(l.ref && l.ref.kizeoPush), envoi: l.ref && l.ref.kizeoPush };
+}
+const FORM_MONTEE_2 = "1220725";
+const FORM_AFFICHAGE = "1221723";
+const DELAI_AFFICHAGE_JOURS = 7; // décidé le 21/11 : 7 jours minimum entre la pose et le 1er passage
+function bandeauAffichage(l, L, item) {
+  if (!l || l.role !== "affichage" || l.annule) return "";
+  const style = (fond, bord) => `margin:10px 0 4px;padding:9px 12px;border-radius:8px;font-size:12.5px;line-height:1.5;background:${fond};border:1px solid ${bord};`;
+  const p1 = L.find(x => x.role !== "affichage" && Number(x.num) === 1 && !x.annule && x.debut);
+  const m = (item && item.montee && item.montee.affichage) || null;
+  const recu = m ? `<div style="margin-top:4px;"><b>Rapport de pose reçu</b> : affiches posées le ${esc(m.poseesLe ? m.poseesLe.split("-").reverse().join("/") : "")}${m.heure ? " à " + esc(m.heure) : ""}.</div>` : "";
+  const texte = "<b>Pose des affiches.</b> Une tâche dans l'agenda du technicien, avec le rapport « Affiches » sur son téléphone. La date est annoncée au client avec celles de la désinsectisation.";
+  if (!l.debut || !p1) return `<div style="${style("#F4F6FB", "#DDE3F0")}">${texte}${recu}</div>`;
+  const jours = Math.floor((new Date(p1.debut.substring(0, 10) + "T12:00") - new Date(l.debut.substring(0, 10) + "T12:00")) / 86400000);
+  if (jours < 0) return `<div style="${style("#FDECEA", "#F5C6C0")}">${texte}<div style="margin-top:4px;"><b>⚠ La pose est prévue après le 1er passage.</b> Elle doit avoir lieu au moins ${DELAI_AFFICHAGE_JOURS} jours avant.</div>${recu}</div>`;
+  if (jours < DELAI_AFFICHAGE_JOURS) return `<div style="${style("#FFF7E6", "#F5D9A8")}">${texte}<div style="margin-top:4px;"><b>⚠ Pose prévue ${jours} jour${jours > 1 ? "s" : ""} avant le 1er passage</b> : ${DELAI_AFFICHAGE_JOURS} jours minimum demandés.</div>${recu}</div>`;
+  return `<div style="${style("#E8F9F2", "#BFE9D6")}">${texte}<div style="margin-top:4px;">Pose ${jours} jours avant le 1er passage ✓</div>${recu}</div>`;
+}
+function bandeauMontee2(e) {
+  if (!e) return "";
+  const style = (fond, bord) => `margin:10px 0 4px;padding:9px 12px;border-radius:8px;font-size:12.5px;line-height:1.5;background:${fond};border:1px solid ${bord};`;
+  if (!e.recu) return `<div style="${style("#F4F6FB", "#DDE3F0")}"><b>2nd passage pour les absents.</b> Dès le retour de l'émargement du 1er passage, le formulaire part tout seul sur le Kizeo du technicien ci-dessous, pré-rempli avec les seuls absents et logements non accessibles. S'il n'y en a aucun, ce passage est retiré automatiquement.</div>`;
+  if (!e.absents.length) return `<div style="${style("#E8F9F2", "#BFE9D6")}"><b>Aucun absent ni logement non accessible au 1er passage</b> (${e.total} logement${e.total > 1 ? "s" : ""}${e.refus ? ", " + e.refus + " refus" : ""}) : ce 2nd passage n'est pas nécessaire.
+    <div style="margin-top:6px;"><button class="pl-btn petit" data-a="monteeSansP2">Retirer le 2nd passage</button> <span class="pl-note">les rendez-vous sont retirés de l'agenda</span></div></div>`;
+  const liste = e.absents.map(x => "n° " + (x.numero || "?") + (x.etage !== "" ? " (ét. " + x.etage + ")" : "")).join(", ");
+  const nbInacc = e.absents.filter(x => x.statut === "inaccessible").length, nbAbs = e.absents.length - nbInacc;
+  const tete = `<b>${[nbAbs ? nbAbs + " absent" + (nbAbs > 1 ? "s" : "") : "", nbInacc ? nbInacc + " non accessible" + (nbInacc > 1 ? "s" : "") : ""].filter(Boolean).join(" et ")} au 1er passage</b>${e.refus ? ", " + e.refus + " refus (non renvoyé" + (e.refus > 1 ? "s" : "") + ")" : ""}`;
+  const quand = (iso) => iso ? new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(" ", " à ") : "";
+  // Envoi automatique à la réception du 1er passage (21/11)
+  if (e.parti) {
+    // Liste réellement envoyée (mémorisée à l'envoi automatique) ; écart signalé si le 1er passage a changé depuis
+    const envoyes = e.auto && e.auto.action === "envoye" && Array.isArray(e.auto.envoyes) ? e.auto.envoyes : null;
+    const listeEnvoyee = envoyes ? envoyes.map(x => "n° " + (x.numero || "?") + (x.etage !== "" ? " (ét. " + x.etage + ")" : "")).join(", ") : liste;
+    const ecart = envoyes && listeEnvoyee !== liste;
+    return `<div style="${style(ecart ? "#FFF7E6" : "#E8F9F2", ecart ? "#F5D9A8" : "#BFE9D6")}">${tete}. Formulaire du 2nd passage envoyé${envoyes ? " automatiquement" : ""} à ${esc((e.envoi && e.envoi.technicien) || "")} le ${esc(quand(e.envoi && e.envoi.at))}, avec ces logements : <span style="color:#4A6078;">${esc(listeEnvoyee)}</span>`
+      + (ecart ? `<div style="margin-top:6px;"><b>Le 1er passage a été modifié depuis</b> : absents aujourd'hui ${esc(liste || "aucun")}. Vérifie avec le technicien, et renvoie le formulaire si besoin.</div>` : "") + `</div>`;
+  }
+  if (e.auto && e.auto.action === "echec") return `<div style="${style("#FDECEA", "#F5C6C0")}">${tete}. <b>Envoi automatique impossible</b> : ${esc(e.auto.raison || "")}. Corrige si besoin, puis envoie le formulaire avec le bouton ci-dessous. Logements : <span style="color:#4A6078;">${esc(liste)}</span></div>`;
+  return `<div style="${style("#FFF7E6", "#F5D9A8")}">${tete}. Le formulaire du 2nd passage part pré-rempli avec ces logements : <span style="color:#4A6078;">${esc(liste)}</span></div>`;
+}
+
 function rendrePassages(item) {
   if (!etat.lignes) etat.lignes = lignesDepuis(item);
   const L = etat.lignes;
@@ -948,12 +999,13 @@ function rendrePassages(item) {
     const btnManuel = recu ? "" : pBase
       ? `<button class="pl-btn petit" data-a="manuelRap" title="Déposer le rapport en PDF à la main${rec ? " (remplace le rapport Kizeo attendu)" : ""}">📎 PDF</button>`
       : `<button class="pl-btn petit" disabled style="opacity:.45;cursor:not-allowed;" title="Enregistre d'abord le passage (date et technicien) pour déposer un rapport">📎 PDF</button>`;
-    const action = !r.formId || !destDe(l, r) || recu ? "" : etatR === "manque" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Envoyer</button>` : etatR === "modifie" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Renvoyer</button><button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler</button>` : "";
+    const m2 = etatMontee2(dossier() || item, l);
+    const action = m2 && (!m2.recu || !m2.absents.length) && !recu ? "" : !r.formId || !destDe(l, r) || recu ? "" : etatR === "manque" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Envoyer</button>` : etatR === "modifie" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Renvoyer</button><button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler</button>` : "";
     return `<div class="pl-rap" data-r="${k}">
       <span class="pl-rap-n">${i + 1}.</span>
       <select data-rf="formId"><option value="">— Aucun rapport Kizeo —</option>${forms.map(f => `<option value="${esc(f.id)}"${String(r.formId) === String(f.id) ? " selected" : ""}>${esc(f.nom || "Formulaire")}${lie && String(lie.id) === String(f.id) ? " (lié)" : ""}</option>`).join("")}</select>
       <input data-rf="nom" value="${esc(premier ? nom : r.nom)}" placeholder="${premier ? "" : "Nom du rapport (à saisir)"}" title="${premier ? "Reprend le titre agenda tant que tu ne le modifies pas" : "Nom du rapport dans l'application du technicien"}"${r.formId && !nom ? ' style="border-color:#E74C3C;"' : ""}>
-      <span class="pl-rap-etat">${lienRecu || (etatR ? etatHtml(...LIB_KZ[etatR]) : "")}</span>
+      <span class="pl-rap-etat">${lienRecu || (m2 && etatR === "manque" && (!m2.recu || !m2.absents.length) ? etatHtml("na", !m2.recu ? "attend le 1er passage" : "inutile") : etatR ? etatHtml(...LIB_KZ[etatR]) : "")}</span>
       <span class="pl-rap-act">${action}${btnManuel}${r.formId || k > 0 ? `<button class="pl-btn petit" data-a="retirerRap" title="Supprimer ce rapport">✕</button>` : ""}</span>
     </div>`;
   };
@@ -966,7 +1018,7 @@ function rendrePassages(item) {
     return `<div class="pl-tbloc${i % 2 ? " alt" : ""}" data-tech="${esc(nom)}">
       <div class="pl-tbloc-tete"><b>${esc(nom)}</b>${etatA ? etatHtml(...LIB_AGENDA[etatA]) : ""}</div>
       <div class="pl-grille">
-        <div class="pl-champ"><label>Titre agenda</label><input data-af="titre" value="${esc(a.titre)}" placeholder="${esc(titreDefaut(item))}"></div>
+        <div class="pl-champ"><label>Titre agenda</label><input data-af="titre" value="${esc(a.titre)}" placeholder="${esc(titreDefaut(item, l))}"></div>
         <div class="pl-champ"><label>Adresse</label><input data-af="adresse" value="${esc((a.adresse || "").trim() || item.adresse || "")}" placeholder="Adresse..." title="Reprend l'adresse du dossier tant que tu ne la modifies pas"></div>
         <div class="pl-champ large"><label>Description <span style="text-transform:none;font-weight:400;">· ${a.descLibre && a.desc.trim() ? "modifiée à la main" : "reprend les observations du dossier tant que tu ne la modifies pas"} · le nom des rapports Kizeo est ajouté à la suite dans l'agenda</span></label><textarea data-af="desc" rows="4" placeholder="Observations du dossier (vides)">${esc(descCarre(item, a))}</textarea></div>
       </div>
@@ -995,21 +1047,30 @@ function rendrePassages(item) {
     const p = enBase.find(x => x.passageId === l.pid);
     return `<div class="pl-passage teinte-${k % 4}" data-k="${k}">
       <div class="pl-psg-l1">
-        <div class="pl-psg-num"><label>Passage</label><div style="display:flex;align-items:center;gap:4px;"><input type="number" min="1" data-f="num" value="${esc(l.num)}"><span class="pl-cercle">${cercle(l.num)}</span></div></div>
+        ${l.role === "affichage"
+          ? `<div class="pl-psg-num"><label>Tâche</label><div style="display:flex;align-items:center;gap:4px;height:34px;"><span class="pl-cercle" style="font-size:13px;white-space:nowrap;">📌 Pose d'affiches</span></div></div>`
+          : `<div class="pl-psg-num"><label>Passage</label><div style="display:flex;align-items:center;gap:4px;"><input type="number" min="1" data-f="num" value="${esc(l.num)}"><span class="pl-cercle">${cercle(l.num)}</span></div></div>`}
         <div class="pl-champ"><label>Début</label>${dt("debut", l.debut)}</div>
         <div class="pl-champ"><label>Fin</label>${dt("fin", l.fin)}</div>
         <div class="pl-psg-actions"><button class="pl-btn petit" data-a="suppr" title="Supprimer ce passage">✕</button></div>
       </div>
       <div class="pl-champ"><label>Technicien(s)</label><div class="pl-techs">${techs.map(t => `<span class="pl-tech${l.techs.includes(nomTech(t)) ? " on" : ""}" data-t="${esc(nomTech(t))}">${esc(nomTech(t))}</span>`).join("")}</div>
 </div>
+      ${bandeauAffichage(l, L, dossier() || item)}
+      ${bandeauMontee2(etatMontee2(dossier() || item, l))}
       ${l.techs.map((nom, i) => blocTech(l, nom, p, i)).join("")}
       ${pb.length ? `<div class="pl-psg-pb">⚠ ${pb.map(esc).join(" · ")}</div>` : ""}
     </div>`;
   };
+  // Montée : le rapport du 2nd passage est l'émargement 2nd passage, proposé d'office
+  const fAff = forms.find(f => String(f.formId) === FORM_AFFICHAGE);
+  if (fAff) L.forEach(l => { if (l.role === "affichage" && !l.annule) l.rapports.forEach(r => { if (!r.annule && !r.formId && !(r.ref && r.ref.kizeoPush)) r.formId = String(fAff.id); }); });
+  const f2 = forms.find(f => String(f.formId) === FORM_MONTEE_2);
+  if (f2) L.forEach(l => { if (etatMontee2(dossier() || item, l)) l.rapports.forEach(r => { if (!r.annule && !r.formId && !(r.ref && r.ref.kizeoPush)) r.formId = String(f2.id); }); });
   $(".pl-corps").innerHTML = `
     <p class="pl-intro">Chaque modification est enregistrée toute seule et l'agenda de chaque technicien suit : rendez-vous créé, déplacé ou retiré. Chaque rapport Kizeo s'envoie avec son bouton.</p>
     ${L.map(carte).join("") || '<p class="pl-note" style="margin:6px 0 12px;">Aucun passage pour ce dossier. Le dossier reste en Planification tant qu\'il n\'a pas de passage.</p>'}
-    <div class="pl-actions"><button class="pl-btn" data-a="ajout">+ Ajouter un passage</button>
+    <div class="pl-actions">${estMontee(dossier() || item) && !L.some(x => x.role === "affichage" && !x.annule) ? '<button class="pl-btn" data-a="ajoutAffichage">+ Ajouter la pose d\'affiches</button>' : ""}<button class="pl-btn" data-a="ajout">+ Ajouter un passage</button>
       <button class="pl-btn" data-a="dupli">Dupliquer le dernier à +</button><input id="plEcart" type="number" min="1" value="15" style="width:60px;height:34px;border:1px solid rgba(13,27,42,.15);border-radius:7px;padding:0 8px;"> jours</div>`;
   const ligneDe = (el) => L[Number(el.closest(".pl-passage").dataset.k)];
   // Passage touché à la main : son rendez-vous sera mis à jour même s'il vient de l'ancienne fiche
@@ -1170,6 +1231,23 @@ function rendrePassages(item) {
     L.splice(L.indexOf(l), 1);
     change(true);
   });
+  // Pose d'affiches (21/11) : n° 0, rôle « affichage », proposée 7 jours avant le 1er passage
+  const bAff = $(".pl-corps [data-a=ajoutAffichage]");
+  if (bAff) bAff.onclick = () => {
+    const l = nouvelleLigne(item, 0);
+    l.role = "affichage";
+    const p1 = L.find(x => x.role !== "affichage" && Number(x.num) === 1 && !x.annule && x.debut);
+    if (p1) { l.debut = decaler(p1.debut, -DELAI_AFFICHAGE_JOURS * 24 * 60); l.fin = decaler(l.debut, 60); }
+    L.unshift(l);
+    change(true);
+  };
+  document.querySelectorAll(".pl-corps [data-a=monteeSansP2]").forEach(b => b.onclick = async () => {
+    const l = ligneDe(b);
+    if (!confirm("Aucun absent au 1er passage : retirer le 2nd passage ?\n\nSes rendez-vous seront retirés de l'agenda.")) return;
+    L.splice(L.indexOf(l), 1);
+    change(true);
+    if (window._ajouterJournal) { try { await window._ajouterJournal(item.id, ["2nd passage retiré : aucun absent au 1er passage"]); } catch (e) { /* trace facultative */ } }
+  });
   document.querySelectorAll(".pl-corps [data-a=ajoutRap]").forEach(b => b.onclick = () => {
     const l = ligneDe(b), nom = techDe(b);
     // Le rapport porté par le passage, s'il est encore vide et sans technicien valable, sert en premier
@@ -1278,7 +1356,7 @@ async function enregistrerPassages(item, silencieux) {
   const vivants = L.filter(l => !l.annule);
   const enDefaut = vivants.map(l => ({ l, pb: problemesLigne(l, L) })).filter(x => x.pb.length);
   if (enDefaut.length) {
-    const msg = "passage " + enDefaut[0].l.num + " : " + enDefaut[0].pb[0];
+    const msg = (enDefaut[0].l.role === "affichage" ? "pose d'affiches" : "passage " + enDefaut[0].l.num) + " : " + enDefaut[0].pb[0];
     if (silencieux) indiquerAuto("⚠ Non enregistré : " + msg, true); else showToast(msg.charAt(0).toUpperCase() + msg.slice(1) + ".", true);
     return false;
   }
@@ -1316,6 +1394,8 @@ async function enregistrerPassages(item, silencieux) {
           if (jumeau) { base.calEvents = {}; base.calSync = ""; base.calEmpreinte = ""; base.calEmpreintes = {}; }
         }
         base.num = l.num; base.jumeau = jumeau; base.passageId = r.pid;
+        // Montées (21/11) : passage de pose d'affiches, n° 0, rôle « affichage »
+        if (l.role === "affichage" && !jumeau) { base.role = "affichage"; base.libelle = "Pose d'affiches"; } else if (base.role === "affichage") delete base.role;
         // Replanification (16/11) : le nouveau passage sait lequel il remplace, l'annulé sait qu'il est replanifié
         if (l.remplace && !jumeau) base.remplace = l.remplace;
         if (l.annule && !jumeau && !base.suite) {
@@ -1413,8 +1493,10 @@ async function requeteAgenda(payload) {
   return r.json();
 }
 // Titre par défaut d'un rendez-vous ; ajoute un libellé s'il y en a un
-const titreDefaut = (item, p) => (estTache(item) ? ["Tâche · " + libTypeTache(item), item.client || item.adresse] : [item.nature || "Intervention", item.client, item.bc ? "BC " + item.bc : item.pl ? "PL " + item.pl : ""]).concat(p && p.libelle ? [p.libelle] : []).filter(Boolean).join(" — ");
-const nomPassage = (p) => (p.jumeau ? "↳ " : "") + cercle(p.num) + (p.libelle ? ' <span style="color:#0D1B2A;font-weight:600;">' + esc(p.libelle) + '</span>' : "");
+const titreDefaut = (item, p) => p && p.role === "affichage"
+  ? ["Pose d'affiches", item.nature || "", item.client, item.bc ? "BC " + item.bc : item.pl ? "PL " + item.pl : ""].filter(Boolean).join(" — ")
+  : (estTache(item) ? ["Tâche · " + libTypeTache(item), item.client || item.adresse] : [item.nature || "Intervention", item.client, item.bc ? "BC " + item.bc : item.pl ? "PL " + item.pl : ""]).concat(p && p.libelle ? [p.libelle] : []).filter(Boolean).join(" — ");
+const nomPassage = (p) => p.role === "affichage" ? '📌 <span style="color:#0D1B2A;font-weight:600;">Pose d\'affiches</span>' : (p.jumeau ? "↳ " : "") + cercle(p.num) + (p.libelle ? ' <span style="color:#0D1B2A;font-weight:600;">' + esc(p.libelle) + '</span>' : "");
 // Met les passages (modifiés en place : calEvents, calSync, calEmpreintes) en accord avec l'agenda.
 // Un rendez-vous par technicien, avec son contenu. Ne contacte Google que pour ce qui a changé.
 async function synchroniserAgenda(item, passages, aRetirer) {
@@ -1461,14 +1543,14 @@ function journalPassages(avant, apres) {
   const lignes = [];
   Object.values(ap).forEach(p => {
     const o = av[p.passageId];
-    const n = "Passage " + p.num;
-    if (!o) { if (p.debut) lignes.push(n + (p.remplace ? " replanifié" : " ajouté") + " : " + fmt(p.debut) + (p.techs && p.techs.length ? ", " + p.techs.join(", ") : "") + (p.remplace ? " (remplace le passage annulé)" : "")); return; }
+    const n = p.role === "affichage" ? "Pose d'affiches" : "Passage " + p.num;
+    if (!o) { if (p.debut) lignes.push(n + (p.remplace ? " replanifié" : p.role === "affichage" ? " ajoutée" : " ajouté") + " : " + fmt(p.debut) + (p.techs && p.techs.length ? ", " + p.techs.join(", ") : "") + (p.remplace ? " (remplace le passage annulé)" : "")); return; }
     if (o.num !== p.num) lignes.push("Passage " + o.num + " devient passage " + p.num + " (passages avancés après une annulation)");
-    if ((o.debut || "") !== (p.debut || "")) lignes.push(n + " déplacé : " + fmt(o.debut) + " → " + fmt(p.debut));
+    if ((o.debut || "") !== (p.debut || "")) lignes.push(n + (p.role === "affichage" ? " déplacée : " : " déplacé : ") + fmt(o.debut) + " → " + fmt(p.debut));
     const ta = (o.techs || []).slice().sort().join(", "), tb = (p.techs || []).slice().sort().join(", ");
     if (ta !== tb) lignes.push(n + " : technicien " + (ta || "aucun") + " → " + (tb || "aucun"));
   });
-  Object.values(av).forEach(o => { if (!ap[o.passageId]) lignes.push("Passage " + o.num + " supprimé (" + fmt(o.debut) + ")"); });
+  Object.values(av).forEach(o => { if (!ap[o.passageId]) lignes.push((o.role === "affichage" ? "Pose d'affiches supprimée" : "Passage " + o.num + " supprimé") + " (" + fmt(o.debut) + ")"); });
   return lignes;
 }
 
@@ -1493,18 +1575,23 @@ function notifFaite(item, champ) {
   const ns = actifs(item).filter(p => !p.jumeau).map(p => norm(item, p)).filter(Boolean);
   return ns.length > 0 && ns.every(p => window.notifOk(window.notifPassage(item, p, champ)));
 }
-const MOYENS_NOTIF = [["tel", "Téléphone"], ["sms", "SMS"], ["email", "Email hors app"], ["oral", "De vive voix"], ["autre", "Autre"]];
+const MOYENS_NOTIF = [["tel", "Téléphone"], ["sms", "SMS"], ["email", "Email hors app"], ["oral", "De vive voix"], ["affichage", "Affiche et avis de passage"], ["autre", "Autre"]];
 // Formulaire « Prévenu autrement ? » (16/11) : date, moyen, note ; couvre tous les passages en cours
 function formNotifManuelle(type) {
   const auj = new Date(), iso = auj.getFullYear() + "-" + String(auj.getMonth() + 1).padStart(2, "0") + "-" + String(auj.getDate()).padStart(2, "0");
+  // Locataire (21/11) : la date peut être future (affiches et avis posés plus tard). Sur une montée,
+  // pré-rempli avec la date de la pose d'affiches et le moyen « Affiche et avis de passage ».
+  const it = (typeof dossier === "function" && dossier()) || null;
+  const pose = type === "locataire" && it && estMontee(it) ? actifs(it).find(p => p.role === "affichage" && p.debut) : null;
+  const date = pose ? pose.debut.substring(0, 10) : iso, moyen = pose ? "affichage" : "";
   return `<tr class="pl-manuel"><td colspan="3"><div class="pl-manuel-form">
     <b>${type === "locataire" ? "Locataire" : "Client"} prévenu autrement</b>
-    <label>Le <input type="date" data-m="date" value="${iso}" max="${iso}"></label>
-    <label>Par <select data-m="moyen">${MOYENS_NOTIF.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+    <label>Le <input type="date" data-m="date" value="${date}"${type === "locataire" ? "" : ` max="${iso}"`}></label>
+    <label>Par <select data-m="moyen">${MOYENS_NOTIF.map(([v, l]) => `<option value="${v}"${v === moyen ? " selected" : ""}>${l}</option>`).join("")}</select></label>
     <input type="text" data-m="note" placeholder="Note (facultatif)" style="flex:1;min-width:140px;">
     <button class="pl-btn" data-a="manAnnuler">Annuler</button>
     <button class="pl-btn prim" data-a="manValider">Valider</button>
-  </div><div class="pl-note" style="margin-top:6px;">Couvre tous les passages en cours. Aucun email n'est envoyé.</div></td></tr>`;
+  </div><div class="pl-note" style="margin-top:6px;">Couvre tous les passages en cours. Aucun email n'est envoyé.${type === "locataire" ? " La date peut être à venir (affichage prévu)." : ""}</div></td></tr>`;
 }
 // Validations manuelles déjà faites, avec « Retirer » en cas d'erreur
 function listeNotifManuelles(item, type) {
@@ -1547,11 +1634,12 @@ function rendreNotifications(item) {
         <td style="text-align:right;white-space:nowrap;">${lienManuel("bailleur", "notifBailleur")}<button class="pl-btn indigo" data-a="client">Notifier le client</button></td></tr>
       ${etat.formManuel === "bailleur" ? formNotifManuelle("bailleur") : ""}
       <tr><td><b>Locataire</b><div class="pl-note">${esc(item.nomClient || "")}</div></td>
-        <td>${item.emailClient ? etatNotif(item, "notifLocataire") + listeNotifManuelles(item, "locataire") : etatHtml("na", "pas d'email locataire")}</td>
-        <td style="text-align:right;white-space:nowrap;">${item.emailClient ? lienManuel("locataire", "notifLocataire") + '<button class="pl-btn indigo" data-a="loc">Notifier le locataire</button>' : '<button class="pl-btn" data-a="ajoutEmail">Ajouter son email</button>'}</td></tr>
-      ${etat.formManuel === "locataire" && item.emailClient ? formNotifManuelle("locataire") : ""}
+        <td>${item.emailClient ? etatNotif(item, "notifLocataire") + listeNotifManuelles(item, "locataire") : etatHtml("na", "pas d'email locataire") + listeNotifManuelles(item, "locataire")}</td>
+        <td style="text-align:right;white-space:nowrap;">${item.emailClient ? lienManuel("locataire", "notifLocataire") + '<button class="pl-btn indigo" data-a="loc">Notifier le locataire</button>' : lienManuel("locataire", "notifLocataire") + '<button class="pl-btn" data-a="ajoutEmail">Ajouter son email</button>'}</td></tr>
+      ${etat.formManuel === "locataire" ? formNotifManuelle("locataire") : ""}
     </tbody></table>
     <p class="pl-note" style="margin-top:12px;">La fenêtre d'envoi s'ouvre à gauche. Une fois l'email parti, ferme-la : la coche se met à jour ici.</p>`;
+  if (estMontee(item)) { $(".pl-corps").insertAdjacentHTML("beforeend", blocAffichage(item)); brancherAffichage(item); }
   const ouvrirNotif = (onglet) => {
     if (!window.openNotifFromItem) return;
     window._nsForcerReport = !!vueReport; // « Renotifier » : toujours le message de report
@@ -1569,7 +1657,7 @@ function rendreNotifications(item) {
     const type = etat.formManuel, val = k => ($(`.pl-manuel [data-m=${k}]`) || {}).value || "";
     const jour = val("date"), auj = new Date();
     const max = auj.getFullYear() + "-" + String(auj.getMonth() + 1).padStart(2, "0") + "-" + String(auj.getDate()).padStart(2, "0");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(jour) || jour > max) { alert("Choisis une date valide, pas dans le futur."); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(jour) || (type !== "locataire" && jour > max)) { alert(type === "locataire" ? "Choisis une date valide." : "Choisis une date valide, pas dans le futur."); return; }
     // Aujourd'hui : l'heure actuelle ; un autre jour : midi
     const ts = jour === max ? auj.toISOString() : new Date(jour + "T12:00:00").toISOString();
     mv.disabled = true; mv.textContent = "Enregistrement…";
@@ -1587,6 +1675,168 @@ function rendreNotifications(item) {
     catch (e) { alert("Retrait impossible : " + e.message); b.disabled = false; }
   });
   navigation("Continuer →");
+}
+
+// ── Affichage d'une montée (17/11, refondu le 20/11) ──────────────
+// Modèles Belledonne du dossier AFF (corrigés) dans modeles-affichage/ :
+//   affiche de hall A4 et avis individuels (4 par A4), en version 1 ou 2 passages.
+// Le modèle est choisi automatiquement d'après le nombre de passages planifiés.
+// Dates écrites dans les cadres, coordonnées masquées si on le décoche.
+const JOURS_FR = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+const hFr = (t) => { const [h, m] = String(t || "").split(":"); return h ? Number(h) + "h" + (m || "00") : ""; };
+function creneauFr(p, court) {
+  if (!p || !p.debut) return "";
+  const j = new Date(p.debut.substring(0, 10) + "T12:00:00");
+  const hd = hFr(p.debut.substring(11, 16)), hf = p.fin ? hFr(p.fin.substring(11, 16)) : "";
+  if (court) {
+    const jour = JOURS_FR[j.getDay()].slice(0, 3) + ". " + String(j.getDate()).padStart(2, "0") + "/" + String(j.getMonth() + 1).padStart(2, "0") + "/" + j.getFullYear();
+    return jour + (hd ? (hf ? ", " + hd + "-" + hf : ", dès " + hd) : "");
+  }
+  const jour = JOURS_FR[j.getDay()] + " " + j.getDate() + " " + MOIS_FR[j.getMonth()] + " " + j.getFullYear();
+  return jour + (hd ? (hf ? ", de " + hd + " à " + hf : ", à partir de " + hd) : "");
+}
+const majuscule = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+function passagesMontee(item) {
+  const ps = actifs(item).filter(p => !p.jumeau && p.debut && p.role !== "affichage").sort((a, b) => String(a.debut).localeCompare(String(b.debut)));
+  return { ps, p1: ps[0] || null, p2: ps[1] || null, nb: ps.length };
+}
+// « Pour une montée comprenant 20 logements » -> 20
+// (cherché aussi dans les observations et les notes : la nature est remplacée par « Désinsectisation Montées »)
+const logementsDe = (item) => { const m = [item.nature, item.observations, item.notes].map(x => String(x || "")).join(" ").match(/(\d+)\s*logements?/i); return m ? Number(m[1]) : 0; };
+function reglagesAffichage(item) {
+  const a = item.affichage || {};
+  const documents = ["affiche+avis", "affiche", "avis"].includes(a.documents) ? a.documents : (a.mode === "affiche+avis" ? "affiche+avis" : "affiche");
+  return {
+    documents,
+    contactAffiche: a.contactAffiche !== false,
+    contactAvis: a.contactAvis !== false,
+    nbAvis: Number(a.nbAvis) > 0 ? Number(a.nbAvis) : (logementsDe(item) || 4),
+    poseesLe: a.poseesLe || "",
+  };
+}
+function blocAffichage(item) {
+  const r = reglagesAffichage(item);
+  const { p1, p2, nb } = passagesMontee(item);
+  const deux = nb >= 2;
+  const avecAffiche = r.documents !== "avis", avecAvis = r.documents !== "affiche";
+  const pages = Math.ceil(r.nbAvis / 4);
+  const modele = !p1 ? "" : deux ? "modèle 2 passages" : "modèle 1 passage";
+  const auj = new Date(); const ajd = auj.getFullYear() + "-" + String(auj.getMonth() + 1).padStart(2, "0") + "-" + String(auj.getDate()).padStart(2, "0");
+  // Mêmes pastilles que le choix des techniciens (.pl-tech), même tableau que les notifications (.pl-table)
+  const pastille = (attrs, txt, on) => `<span class="pl-tech${on ? " on" : ""}" ${attrs}>${txt}</span>`;
+  const coord = (cle, actif) => `<div class="pl-techs" style="margin-top:2px;">${pastille(`data-contact="${cle}" data-val="oui"`, "Coordonnées affichées", actif)}${pastille(`data-contact="${cle}" data-val="non"`, "Coordonnées masquées", !actif)}</div>`;
+  return `<div class="pl-section" style="margin-top:22px;">Affichage de la montée</div>
+    <p class="pl-intro" style="margin-top:10px;">Modèles Belledonne : les dates et heures sont reprises des passages, le modèle 1 ou 2 passages suit leur nombre.</p>
+    <table class="pl-table"><tbody>
+      <tr><td style="width:160px;"><b>Documents</b></td><td colspan="2"><div class="pl-techs">
+        ${pastille('data-docs="affiche+avis"', "Affiche + avis individuels", r.documents === "affiche+avis")}${pastille('data-docs="affiche"', "Affiche seule", r.documents === "affiche")}${pastille('data-docs="avis"', "Avis seuls", r.documents === "avis")}
+      </div></td></tr>
+      <tr><td><b>Dates annoncées</b><div class="pl-note">${modele ? esc(modele) : "aucun passage"}</div></td><td colspan="2">
+        ${p1 ? `<div>${deux ? '<span class="pl-note">1er passage</span> ' : ""}${esc(creneauFr(p1))}</div>` : '<span class="pl-note">Planifie au moins un passage (étape Passages).</span>'}
+        ${deux ? `<div style="margin-top:3px;"><span class="pl-note">2e passage</span> ${esc(creneauFr(p2))}</div>` : ""}
+        ${nb > 2 ? `<div class="pl-note" style="margin-top:3px;">${nb - 2} autre(s) passage(s) non repris sur les documents</div>` : ""}
+      </td></tr>
+      ${avecAffiche ? `<tr><td><b>Affiche de hall</b><div class="pl-note">A4, une par montée</div></td>
+        <td>${coord("plAffContactAff", r.contactAffiche)}</td>
+        <td style="text-align:right;white-space:nowrap;"><button class="pl-btn indigo" data-a="affGenerer"${p1 ? "" : " disabled"}>Générer l'affiche</button></td></tr>` : ""}
+      ${avecAvis ? `<tr><td><b>Avis individuels</b><div class="pl-note">4 par A4, à découper</div></td>
+        <td>${coord("plAffContactAvis", r.contactAvis)}
+          <div style="display:flex;gap:6px;align-items:center;margin-top:7px;"><input type="number" id="plAffNbAvis" min="1" max="400" value="${r.nbAvis}" style="width:62px;height:30px;border:1px solid rgba(13,27,42,.15);border-radius:7px;padding:0 8px;font:13px 'DM Sans',sans-serif;"><span class="pl-note">avis, soit ${pages} page${pages > 1 ? "s" : ""}</span></div></td>
+        <td style="text-align:right;white-space:nowrap;"><button class="pl-btn indigo" data-a="avisGenerer"${p1 ? "" : " disabled"}>Générer les avis</button></td></tr>` : ""}
+    </tbody></table>
+    <p class="pl-note" style="margin-top:12px;">Le PDF s'ouvre dans un nouvel onglet, prêt à imprimer. La distribution des avis se valide sur la ligne Locataire (« Prévenu autrement ? », par affiche et avis de passage).</p>`;
+}
+function brancherAffichage(item) {
+  const enregistrer = async (maj, journal) => {
+    const it = dossier() || item;
+    const data = { affichage: { ...(it.affichage || {}), ...maj } };
+    await window._updateSuivi(it.id, data);
+    Object.assign(it, data);
+    if (journal && window._ajouterJournal) await window._ajouterJournal(it.id, [journal]);
+    rendre();
+  };
+  document.querySelectorAll("[data-docs]").forEach(x => x.onclick = () => enregistrer({ documents: x.dataset.docs, mode: null }));
+  document.querySelectorAll("[data-contact]").forEach(btn => btn.onclick = () => {
+    const oui = btn.dataset.val === "oui";
+    enregistrer(btn.dataset.contact === "plAffContactAff" ? { contactAffiche: oui } : { contactAvis: oui });
+  });
+  const nb = $("#plAffNbAvis"); if (nb) nb.onchange = () => { const n = Math.max(1, Math.min(400, parseInt(nb.value, 10) || 1)); enregistrer({ nbAvis: n }); };
+  const ga = $("[data-a=affGenerer]"); if (ga) ga.onclick = () => genererAffichage(dossier() || item, "affiche", ga);
+  const gv = $("[data-a=avisGenerer]"); if (gv) gv.onclick = () => genererAffichage(dossier() || item, "avis", gv);
+  const bp = $("[data-a=affPosees]"); if (bp) bp.onclick = async () => {
+    const j = ($("#plAffDate") || {}).value || "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(j)) { alert("Choisis une date valide."); return; }
+    bp.disabled = true;
+    const verbe = reglagesAffichage(dossier() || item).documents === "avis" ? "Avis distribués" : "Affiches posées dans la montée";
+    try { await enregistrer({ poseesLe: j }, verbe + " le " + j.split("-").reverse().join("/")); }
+    catch (e) { alert("Enregistrement impossible : " + e.message); bp.disabled = false; }
+  };
+  const br = $("[data-a=affRetirer]"); if (br) br.onclick = () => enregistrer({ poseesLe: "" });
+}
+
+let _pdfLib = null, _zonesAff = null;
+async function outilsAffichage() {
+  if (!_pdfLib) _pdfLib = await import("https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm");
+  if (!_zonesAff) _zonesAff = await (await fetch("modeles-affichage/zones.json", { cache: "no-store" })).json();
+  return { lib: _pdfLib, zones: _zonesAff };
+}
+// Écrit un texte centré (affiche) ou aligné à gauche (avis) en réduisant la taille jusqu'à ce qu'il tienne
+function ecrireAjuste(page, texte, police, { x0, x1, y, max, min, centre }) {
+  let t = max;
+  const larg = x1 - x0;
+  while (t > min && police.widthOfTextAtSize(texte, t) > larg) t -= 0.5;
+  const w = police.widthOfTextAtSize(texte, t);
+  page.drawText(texte, { x: centre ? x0 + (larg - w) / 2 : x0, y: centre ? y - t * 0.28 : y, size: t, font: police });
+}
+async function genererAffichage(item, type, bouton) {
+  const { p1, p2, nb } = passagesMontee(item);
+  if (!p1) { alert("Planifie d'abord au moins un passage."); return; }
+  const r = reglagesAffichage(item);
+  const deux = nb >= 2;
+  const onglet = window.open("", "_blank");
+  if (!onglet) { alert("Le navigateur a bloqué le nouvel onglet : autorise les fenêtres pour ce site."); return; }
+  onglet.document.write("<p style='font-family:sans-serif;padding:20px'>Préparation du PDF…</p>");
+  const libelle = bouton ? bouton.textContent : "";
+  if (bouton) { bouton.disabled = true; bouton.textContent = "Préparation…"; }
+  try {
+    const { lib, zones } = await outilsAffichage();
+    const { PDFDocument, StandardFonts, rgb } = lib;
+    const nomModele = (type === "affiche" ? "affiche-" : "avis-") + (deux ? "2-passages" : "1-passage") + ".pdf";
+    const z = zones[nomModele];
+    const modele = await PDFDocument.load(await (await fetch("modeles-affichage/" + nomModele, { cache: "no-store" })).arrayBuffer());
+    const doc = await PDFDocument.create();
+    const gras = await doc.embedFont(StandardFonts.HelveticaBold);
+    const blanc = (page, c) => page.drawRectangle({ x: c.x0, y: c.y0, width: c.x1 - c.x0, height: c.y1 - c.y0, color: rgb(1, 1, 1) });
+    const dates = deux ? [p1, p2] : [p1];
+    if (type === "affiche") {
+      const [page] = await doc.copyPages(modele, [0]);
+      doc.addPage(page);
+      z.dates.forEach((zd, i) => {
+        const txt = (deux ? (i === 0 ? "1er passage : " : "2e passage : ") : "") + creneauFr(dates[i]);
+        ecrireAjuste(page, deux ? txt : majuscule(txt), gras, { x0: zd.x0 + 22, x1: zd.x1 - 22, y: zd.yCentre, max: 19, min: 10, centre: true });
+      });
+      if (!r.contactAffiche) blanc(page, z.contact);
+    } else {
+      const pages = Math.ceil(r.nbAvis / 4);
+      for (let n = 0; n < pages; n++) {
+        const [page] = await doc.copyPages(modele, [0]);
+        doc.addPage(page);
+        z.avis.forEach(av => {
+          av.dates.forEach((zd, i) => ecrireAjuste(page, majuscule(creneauFr(dates[i], true)), gras, { x0: zd.x0 + 1, x1: zd.x1, y: zd.yBase, max: 10.5, min: 7 }));
+          if (!r.contactAvis) blanc(page, av.contact);
+        });
+      }
+    }
+    doc.setTitle((type === "affiche" ? "Affiche" : "Avis de passage") + " · " + (item.adresse || ""));
+    const url = URL.createObjectURL(new Blob([await doc.save()], { type: "application/pdf" }));
+    onglet.location.href = url;
+  } catch (e) {
+    onglet.close();
+    alert("Génération impossible : " + e.message);
+  } finally {
+    if (bouton) { bouton.disabled = false; bouton.textContent = libelle; }
+  }
 }
 
 // ── Récapitulatif ──────────────────────────────────────────────────
@@ -1654,15 +1904,18 @@ function manquesPlanification(item) {
   if (!pr.length) { m.push("Aucun passage daté"); return m; }
   pr.forEach(p => {
     const n = norm(item, p);
-    if (!(p.techs || []).length) m.push("Passage " + p.num + " : aucun technicien");
-    else if (n && window.etatAgenda(n) !== "ok") m.push("Passage " + p.num + " : rendez-vous agenda pas à jour");
+    const nomP = p.role === "affichage" ? "Pose d'affiches" : "Passage " + p.num;
+    if (!(p.techs || []).length) m.push(nomP + " : aucun technicien");
+    else if (n && window.etatAgenda(n) !== "ok") m.push(nomP + " : rendez-vous agenda pas à jour");
   });
   ps.forEach(p => {
     const b = bruts.find(x => x.passageId && x.passageId === p.passageId) || p;
     const veut = rapportExige(item, b);
     const n = norm(item, p);
     const e = n ? window.etatKizeo(item, n) : "manque";
-    if (veut && e !== "ok" && e !== "recu") m.push("Passage " + p.num + " : rapport Kizeo " + (b.kzNom ? "« " + b.kzNom + " » " : "") + (e === "ecart" ? "chez le mauvais technicien (à renvoyer)" : "pas envoyé"));
+    // Montée (21/11) : le rapport du 2nd passage part automatiquement au retour du 1er
+    if (estMontee(item) && p.role !== "affichage" && Number(p.num) === 2 && !p.jumeau && !b.kizeoPush) return;
+    if (veut && e !== "ok" && e !== "recu") m.push((p.role === "affichage" ? "Pose d'affiches" : "Passage " + p.num) + " : rapport Kizeo " + (b.kzNom ? "« " + b.kzNom + " » " : "") + (e === "ecart" ? "chez le mauvais technicien (à renvoyer)" : "pas envoyé"));
   });
   return m;
 }

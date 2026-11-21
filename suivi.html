@@ -1841,7 +1841,7 @@ function addPassage(value = '', calEventId = '') {
     savedDesc = value.desc || '';
     savedAdresse = value.adresse || '';
     savedTechs = Array.isArray(value.techs) ? value.techs : (value.tech ? [value.tech] : []);
-    savedNum = value.num || null;
+    savedNum = value.num ?? null;
     savedKizeoPush = value.kizeoPush || null;
     savedStatut = value.statut || '';
     savedManualRapport = value.manualRapport || null;
@@ -2795,7 +2795,7 @@ function passagesDropdown(passages) {
   const valid = passages.filter(Boolean);
   const first = fmtPassage(valid[0]);
   if (valid.length === 1) return `<span style="font-size:12px;white-space:nowrap;">${first}</span>`;
-  const opts = valid.map((p,i) => { const num = p.num || (i+1); const lbl = ORDINALS[num-1] || num+'e'; return `<option>${lbl} passage : ${fmtPassage(p)}</option>`; }).join('');
+  const opts = valid.map((p,i) => { const num = p.num ?? (i+1); const lbl = ORDINALS[num-1] || num+'e'; return `<option>${lbl} passage : ${fmtPassage(p)}</option>`; }).join('');
   return `<select style="font-size:11px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--bg);color:var(--text-mid);cursor:pointer;max-width:200px;" onclick="event.stopPropagation()">
     <option>${valid.length} passage${valid.length>1?'s':''} ▾</option>${opts}</select>`;
 }
@@ -2963,10 +2963,7 @@ window.openNotifFromItem = async function(item) {
   // Un jumeau est la même visite que son passage principal : une seule date annoncée.
   // Un passage annulé n'est plus annoncé (16/11).
   const passages = (item.passages || []).filter(p => p && !(typeof p === 'object' && (p.jumeau || p.statut === 'annule')));
-  const passagesStr = passages.map((p, i) => {
-    const debut = typeof p === 'object' ? (p.debut || '') : (p.includes('|') ? p.split('|')[0] : p);
-    return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
-  }).join('\n');
+  const passagesStr = lignesPassagesAnnonce(passages);
   const bc = item.bc || '';
   const pl = item.pl || '';
   const devis = item.devis || '';
@@ -3126,10 +3123,7 @@ window.openNotifSuivi = async function() {
 
   // Build passages string from form
   const passages = getPassageDates().filter(p => !(p && typeof p === 'object' && p.jumeau));
-  const passagesStr = passages.filter(Boolean).map((p, i) => {
-    const debut = typeof p === 'object' ? (p.debut || '') : (p.includes('|') ? p.split('|')[0] : p);
-    return (i===0?'1er':(i+1)+'e') + ' passage : le ' + fmtDate(debut);
-  }).join('\n');
+  const passagesStr = lignesPassagesAnnonce(passages.filter(Boolean));
 
   const bc = document.getElementById('fBC')?.value || '';
   const pl = document.getElementById('fPL')?.value || '';
@@ -3744,7 +3738,7 @@ function passagesNorm(item) {
     if (typeof p === 'string') { var x = p.split('|'); return { num: i+1, debut: x[0]||'', fin: x[1]||'', techs: [], statut: '' }; }
     var cal = (p.calEvents && typeof p.calEvents === 'object') ? p.calEvents : ((item.calEventIds || [])[i] || {});
     if (typeof cal !== 'object' || cal === null) cal = cal ? { _: cal } : {};
-    return { num: p.num || (i+1), passageId: p.passageId || null, kzForm: p.kzForm, kzNom: p.kzNom || (p.kizeoPush ? String(p.kizeoPush.libelle || '').replace(/ \(\d+\)$/, '') : ''), jumeau: !!p.jumeau, libelle: p.libelle || '', adresse: p.adresse || '', titre: p.titre || '', debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null, calSync: p.calSync || '', annulation: p.annulation || null, suite: p.suite || null, remplace: p.remplace || null };
+    return { num: p.num ?? (i+1), role: p.role || '', passageId: p.passageId || null, kzForm: p.kzForm, kzNom: p.kzNom || (p.kizeoPush ? String(p.kizeoPush.libelle || '').replace(/ \(\d+\)$/, '') : ''), jumeau: !!p.jumeau, libelle: p.libelle || '', adresse: p.adresse || '', titre: p.titre || '', debut: p.debut||'', fin: p.fin||'', techs: Array.isArray(p.techs) ? p.techs : [], statut: p.statut||'', kizeo: !!p.kizeoPush, kizeoTech: p.kizeoPush ? (p.kizeoPush.technicien || '') : '', kizeoLe: p.kizeoPush ? (p.kizeoPush.at || '') : '', calEvents: cal, notifs: p.notifs || null, calSync: p.calSync || '', annulation: p.annulation || null, suite: p.suite || null, remplace: p.remplace || null };
   }).sort(function(a, b){ return (a.num||0) - (b.num||0) || (a.jumeau ? 1 : 0) - (b.jumeau ? 1 : 0); });
   // Jumeau (15/11) : même visite que son passage principal, autre type d'intervention. Il en
   // reprend date, créneau, techniciens, rendez-vous agenda et notifications ; seuls son
@@ -3908,7 +3902,10 @@ function passagesSansRapport(item) {
   return passagesActifs(item).filter(function(p){ var rec = recPassage(item, p); return p.debut && p.debut.substring(0, 10) < jourLocal(0) && !(rec && rec.statut !== 'en-attente'); });
 }
 function rapportsNonEnvoyes(item) {
-  return passagesNorm(item).filter(function(p){ var rec = recPassage(item, p); return rec && ['a-relire', 'a-traiter', 'archive'].indexOf(rec.statut) !== -1; });
+  var l = passagesNorm(item).filter(function(p){ var rec = recPassage(item, p); return rec && !estRapportIntegre(rec) && ['a-relire', 'a-traiter', 'archive'].indexOf(rec.statut) !== -1; });
+  var c = consolideDe(item);
+  if (c && c.statut !== 'envoye') l.push({ num: 'consolide', consolide: true });
+  return l;
 }
 // État du rapport du passage 1. Avec des jumeaux n° 1 : « envoyé » seulement quand tous le sont,
 // sinon l'état le moins avancé (le dossier attend le dernier rapport).
@@ -3940,6 +3937,10 @@ function aNouveauPassage(item) {
 // Un passage est exécuté quand son rapport est envoyé au client (passage passé sans
 // suivi Kizeo, ex. rapport manuel : compté comme exécuté, l'app ne peut pas le savoir).
 function passageExecute(item, p) {
+  if (estMonteeSuivi(item)) {
+    var c = consolideDe(item);
+    if (c) return c.statut === 'envoye';
+  }
   var rec = recPassage(item, p);
   // Tâche : le rapport reçu suffit (pas d'envoi client obligatoire)
   if (rec) return item.clientType === 'tache' ? rec.statut !== 'en-attente' : rec.statut === 'envoye';
@@ -4135,7 +4136,7 @@ var FILES_SUIVI = [
     colonnes: [
       { titre: 'Annulation', cell: function(i){
         var c = constatAnnulation(i), t = function(v){ return String(v).replace(/</g, '&lt;'); };
-        var num = c.p ? (CERCLES[(c.p.num || 1) - 1] || '#' + c.p.num) + ' ' : '';
+        var num = c.p ? libNumPassage(c.p) + ' ' : '';
         var quoi = c.statut === 'absent' ? 'Absent' : c.statut ? 'Annulation' : 'Annulé';
         var prov = c.provenance === 'technicien' ? 'technicien' : c.provenance === 'app' ? "depuis l'app" : '';
         return '<div style="font-size:12px;max-width:260px;"><b>' + num + quoi + '</b>' + (c.p && c.p.debut ? ' du ' + jjmm(c.p.debut.substring(0, 10)) : '')
@@ -4148,7 +4149,7 @@ var FILES_SUIVI = [
         if (!a) return '<span style="font-size:12px;color:var(--text-muted)">aucun</span>';
         var col = { depasse: '#C0392B', rouge: '#E74C3C', orange: '#B9770E', gris: 'var(--text-mid)' }[a.niveau];
         return '<span style="font-size:12px;white-space:nowrap;font-weight:' + (a.niveau === 'gris' ? 500 : 700) + ';color:' + col + ';" title="Toujours dans l\'agenda du technicien et dans Kizeo : à replanifier ou à supprimer">'
-          + (CERCLES[(a.p.num || 1) - 1] || '#' + a.p.num) + ' ' + jjmm(a.p.debut.substring(0, 10)) + ' · ' + (a.jours < 0 ? 'dépassé' : a.jours === 0 ? "aujourd'hui" : 'dans ' + a.jours + ' j') + '</span>';
+          + libNumPassage(a.p) + ' ' + jjmm(a.p.debut.substring(0, 10)) + ' · ' + (a.jours < 0 ? 'dépassé' : a.jours === 0 ? "aujourd'hui" : 'dans ' + a.jours + ' j') + '</span>';
       } },
       { titre: 'Annulé', cell: function(i){ return '<span style="font-size:12px;">' + libJours(joursDepuis(constatAnnulation(i).le)) + '</span>'; } },
     ],
@@ -4326,6 +4327,20 @@ function majAffichageVue() {
 function basculerPlusFiltres() { plusFiltres = !plusFiltres; majAffichageVue(); }
 
 var CERCLES = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
+// Numéro affiché d'un passage ; la pose d'affiches d'une montée (rôle « affichage », n° 0) a son libellé (21/11)
+function estAffichage(p) { return !!p && (p.role === 'affichage'); }
+// Lignes de passages annoncées au client (21/11) : la pose d'affiches d'une montée en premier,
+// puis les passages de désinsectisation numérotés à partir de 1.
+function lignesPassagesAnnonce(passages) {
+  var obj = function(p){ return p && typeof p === 'object'; };
+  var debutDe = function(p){ return obj(p) ? (p.debut || '') : (String(p).indexOf('|') >= 0 ? String(p).split('|')[0] : String(p)); };
+  var aff = passages.filter(function(p){ return obj(p) && p.role === 'affichage'; });
+  var autres = passages.filter(function(p){ return !(obj(p) && p.role === 'affichage'); });
+  return aff.map(function(p){ return 'Pose des affiches : le ' + fmtDate(debutDe(p)); })
+    .concat(autres.map(function(p, i){ return (i === 0 ? '1er' : (i + 1) + 'e') + ' passage : le ' + fmtDate(debutDe(p)); })).join('\n');
+}
+function libNumPassage(p) { if (estAffichage(p)) return '📌 Affichage'; var n = p && p.num != null && p.num !== '' ? Number(p.num) : 1; return CERCLES[n - 1] || '#' + n; }
+window.CERCLES = CERCLES;
 function jjmm(d) { return d ? d.substring(8,10) + '/' + d.substring(5,7) : ''; }
 // ── Stand-by d'un passage annulé (16/11) ──
 // Passage annulé encore sans suite (ni replanifié, ni abandonné), le plus récent
@@ -4503,8 +4518,13 @@ function envoyerRelanceSms() {
 }
 var LIEN_ACTION_RAPPORT = { relire: 'relire', envoyer: 'envoyer', retard: 'renvoyer' };
 // État du formulaire Kizeo d'un passage : 'ok', 'recu', 'manque' ou 'ecart' (envoyé à un autre technicien).
+// Montée (21/11) : le 2nd passage part tout seul au retour du 1er, sauf échec de l'envoi automatique
+function kizeoAutoMontee(item, p) {
+  return !!etatMonteeP2(item, p) && !p.kizeo && !(item.montee && item.montee.p2Auto && item.montee.p2Auto.action === 'echec');
+}
 function etatKizeo(item, p) {
   var rec = recPassage(item, p);
+  if (!rec && kizeoAutoMontee(item, p)) return 'na';
   // Tâche sans rapport prévu : rien à envoyer ('na')
   // « Aucun rapport Kizeo » choisi (kzForm vide), ou tâche sans rapport : rien à envoyer ('na')
   if (!rec && !p.kizeo && (p.kzForm === '' || (item.clientType === 'tache' && !p.kzForm))) return 'na';
@@ -4644,7 +4664,7 @@ function libPassageSemaine(p) {
   var d = (p.debut || '').substring(0, 10);
   var j = d ? JOURS_COURTS[new Date(d + 'T12:00:00').getDay()] + ' ' + jjmm(d) : 'sans date';
   var h = p.debut && p.debut.length > 10 ? ' ' + p.debut.substring(11, 16) : '';
-  return '<div class="ck-l ps-l' + (d && d === jourLocal(0) ? ' ps-auj' : '') + '"><b>' + (CERCLES[(p.num || 1) - 1] || '#' + p.num) + '</b> ' + j + '<span class="ps-h">' + h + '</span>'
+  return '<div class="ck-l ps-l' + (d && d === jourLocal(0) ? ' ps-auj' : '') + '"><b>' + libNumPassage(p) + '</b> ' + j + '<span class="ps-h">' + h + '</span>'
     + (p.techs.length ? ' · ' + p.techs.map(function(t){ return t.split(' ')[0]; }).join(', ') : ' · <span style="color:#E74C3C;">sans technicien</span>') + '</div>';
 }
 // Étape 5 : 'ok' (reçu), 'retard', 'manque' (formulaire envoyé, passage fait, rien reçu),
@@ -4663,6 +4683,7 @@ function etapeRapportRecu(item, p) {
 function etapeRapportEnvoye(item, p) {
   var rec = recPassage(item, p);
   if (!rec) return null;
+  if (estRapportIntegre(rec)) return 'integre';
   if (rec.statut === 'envoye') return 'ok';
   if (rec.statut === 'a-relire') return 'relire';
   if (rec.statut === 'a-traiter' || rec.statut === 'archive') return 'envoyer';
@@ -4686,6 +4707,9 @@ function actionSemaine(item, ps) {
     if (!fait) {
       var prep = prepPassage(item, p);
       if (prep.agenda) return bouton("Mettre à l'agenda", "ouvrirPlanification('" + id + "',1)", prep.details.join(' · ') + n);
+      var m2 = etatMonteeP2(item, p);
+      if (m2 && m2.recu && !m2.absents) return bouton('Retirer le 2nd passage', "ouvrirPlanification('" + id + "',1)", 'Aucun absent ni logement non accessible au 1er passage : le 2nd passage est inutile');
+      if (m2 && m2.recu && !p.kizeo) return bouton('Envoyer le 2nd passage', "ouvrirPlanification('" + id + "',1)", m2.absents + ' logement(s) à repasser (absents ou non accessibles) : formulaire pré-rempli avec ces logements');
       if (prep.details.length) return bouton('Envoyer Kizeo', "ouvrirPlanification('" + id + "',1)", prep.details.join(' · ') + n);
       if (item.clientType === 'tache') continue;
       if (!notifOk(notifPassage(item, p, 'notifBailleur'))) return bouton('Notifier le client', "ouvrirPlanification('" + id + "',2)", 'Client pas encore prévenu' + n);
@@ -4699,10 +4723,13 @@ function actionSemaine(item, ps) {
       for (var j2 = 0; j2 < rs.length; j2++) {
         var r6 = etapeRapportEnvoye(item, rs[j2]), rec = recPassage(item, rs[j2]);
         if (r6 === 'relire') return '<a class="btn-next" href="' + lienRapport(rec.id, 'relire') + '" title="« ' + nomRapportPs(rs[j2]) + ' »' + n + '">Relire le rapport</a>';
+        if (rec && (rec.typeRapport === 'emargement-montee' || rec.typeRapport === 'affichage-montee')) continue; // intégré au consolidé (21/11)
         if (r6 === 'envoyer') return '<a class="btn-next" href="' + lienRapport(rec.id, 'envoyer') + '" title="« ' + nomRapportPs(rs[j2]) + ' »' + n + '">Envoyer le rapport</a>';
       }
     }
   }
+  var cA = estMonteeSuivi(item) ? consolideDe(item) : null;
+  if (cA && cA.statut !== 'envoye') return '<a class="btn-next" href="' + lienRapport(cA.id, 'envoyer') + '" title="Rapport consolidé de la montée : à envoyer au client">Envoyer le consolidé</a>';
   return '<button class="btn-next neutre" onclick="ouvrirPlanification(\'' + id + '\',1)">Ouvrir</button>';
 }
 // ── Pilotage (15/11) : un passage = une ligne, ses rapports en badges ──
@@ -4713,14 +4740,30 @@ function rapportsDuPassage(item, p) {
 }
 function nomRapportPs(r) { return r.kzNom || r.libelle || ('passage ' + r.num); }
 // Préparation d'un passage à venir : rendez-vous agenda à jour + rapports Kizeo envoyés au bon technicien
+// ── Désinsectisation Montées (20/11) ──────────────────────────────
+// montee.p1 : émargement du 1er passage rangé par le serveur (présent / absent / refus
+// par logement). Le 2nd passage ne part qu'avec les absents ; sans absent, il est retiré.
+function consolideDe(item) { return (window._consolideParSuivi && item && window._consolideParSuivi[item.id]) || null; }
+// Émargements et rapport de pose : ne partent jamais seuls, ils sont dans le consolidé
+function estRapportIntegre(rec) { return !!rec && (rec.typeRapport === 'emargement-montee' || rec.typeRapport === 'affichage-montee'); }
+function estMonteeSuivi(item) { return /^d[ée]sinsectisation\s+mont[ée]es?$/i.test(String((item && item.nature) || '').trim()); }
+function etatMonteeP2(item, p) {
+  if (!estMonteeSuivi(item) || !p || p.jumeau || Number(p.num) !== 2) return null;
+  var m1 = item.montee && item.montee.p1;
+  if (!m1) return { recu: false, absents: 0 };
+  return { recu: true, absents: m1.aRepasser != null ? Number(m1.aRepasser) : (Number(m1.absents) || 0) }; // absents + non accessibles
+}
 function prepPassage(item, p) {
   var d = (p.debut || '').substring(0, 10);
   if (!d || d < jourLocal(0) || p.statut === 'annule') return { etat: 'na', details: [], agenda: false };
   var det = [], agenda = false;
   var a = etatAgenda(p);
   if (a !== 'ok') { agenda = true; det.push(a === 'manque' ? "Pas dans l'agenda" : a === 'partiel' ? "Pas dans l'agenda de tous les techniciens" : "Rendez-vous agenda à mettre à jour"); }
+  var m2 = etatMonteeP2(item, p);
   rapportsDuPassage(item, p).forEach(function(r){
     var e = etatKizeo(item, r);
+    // Montée (20/11) : rien à envoyer tant que l'émargement du 1er passage n'est pas revenu
+    if (m2 && e === 'manque' && (!m2.recu || !m2.absents)) return;
     if (e === 'manque') det.push('Rapport « ' + nomRapportPs(r) + ' » pas envoyé');
     else if (e === 'ecart') det.push('Rapport « ' + nomRapportPs(r) + ' » chez ' + (r.kizeoTech || 'un autre technicien') + ', à renvoyer');
   });
@@ -4752,7 +4795,7 @@ function badgesRapports(item, p, quoi) {
     var nom = '« ' + nomRapportPs(r) + ' »' + (r.kizeoTech ? ' · ' + r.kizeoTech : '');
     if (quoi === 'kizeo') {
       var k = etatKizeo(item, r);
-      var t = (nom + (k === 'ok' ? ' : envoyé' : k === 'recu' ? ' : rapport reçu' : k === 'ecart' ? ' : chez un autre technicien, à renvoyer' : k === 'na' ? ' : aucun rapport prévu' : ' : pas encore envoyé')).replace(/"/g, '&quot;');
+      var t = (nom + (k === 'ok' ? ' : envoyé' : k === 'recu' ? ' : rapport reçu' : k === 'ecart' ? ' : chez un autre technicien, à renvoyer' : k === 'na' ? (kizeoAutoMontee(item, r) ? ' : partira automatiquement au retour du 1er passage' : ' : aucun rapport prévu') : ' : pas encore envoyé')).replace(/"/g, '&quot;');
       return (k === 'ok' || k === 'recu' ? MARQUES.ok : k === 'ecart' ? MARQUES.att : k === 'na' ? MARQUES.na : MARQUES.ko).replace('<span ', '<span title="' + t + '" ');
     }
     if (quoi === 'recu') {
@@ -4767,6 +4810,10 @@ function badgesRapports(item, p, quoi) {
         : MARQUES.na.replace('<span ', '<span title="' + (nom + (e === 'na' ? ' : pas de rapport prévu' : e === 'horsKizeo' ? ' : pas de suivi Kizeo (rapport manuel ?)' : ' : pas encore dû')).replace(/"/g, '&quot;') + '" ');
     }
     var e6 = etapeRapportEnvoye(item, r);
+    if (e6 === 'integre') {
+      var c6 = consolideDe(item), envoyeC = c6 && c6.statut === 'envoye';
+      return '<span class="ck-act envoi" style="opacity:.28;cursor:default;pointer-events:none;" title="' + (nom + (envoyeC ? ' : envoyé au client dans le rapport consolidé' : ' : sera envoyé au client dans le rapport consolidé')).replace(/"/g, '&quot;') + '">' + SVG_ENVOI + '</span>';
+    }
     return e6 === 'ok' ? MARQUES.ok.replace('<span ', '<span title="' + (nom + ' : envoyé au client').replace(/"/g, '&quot;') + '" ')
       : e6 === 'relire' ? MARQUES.na.replace('<span ', '<span title="' + (nom + ' : à relire d\'abord (loupe)').replace(/"/g, '&quot;') + '" ')
       : e6 === 'envoyer' ? boutonRapport(recPassage(item, r).id, 'envoyer', nom + ' : validé, à envoyer au client')
@@ -4789,18 +4836,29 @@ function ligneSemaine(item, nbCols) {
   h += '<td>' + refHtml(item) + '</td>';
   h += '<td><div class="cn-client">' + (item.client || '—') + badgePrecision(item) + (item.nature && item.clientType !== 'tache' ? ' <span class="cn-nature">· ' + item.nature + '</span>' : '') + (fileDe(item) !== 'pilotage' ? ' ' + etiquetteEtape(item) : '') + (item.clientType !== 'tache' && item.enFacturation && fileDe(item) === 'pilotage' ? ' <span class="psg psg-ok" style="text-decoration:none;" title="Facture émise : le dossier reste En cours tant qu\'il reste des passages à exécuter">Facturé</span>' : '') + '</div><div class="cn-nature">' + (item.adresse || '—') + (item.nomClient ? ' · ' + item.nomClient : '') + '</div></td>';
   var classe = function(p){ return p.statut === 'annule' ? 'ps-annule' : dansSemaine[cleP(p)] ? 'ps-in' : 'ps-out'; };
+  // Montées (21/11) : une rangée de plus pour le rapport consolidé (consultation et envoi au client)
+  var consL = estMonteeSuivi(item) ? consolideDe(item) : null;
+  var rangCons = function(quoi){
+    if (!consL) return '';
+    var nomC = '« Rapport consolidé »' + (consL.synthese ? ' · ' + consL.synthese.traites + '/' + consL.synthese.logements + ' traités' : '');
+    var x = quoi === 'lib' ? '<div class="ck-l ps-l"><b>📄</b> <span style="font-weight:600;color:#1DA870;">Rapport consolidé</span></div>'
+      : quoi === 'recu' ? (consL.fileUrl ? iconeRapport(consL, nomC) : marque('ok', nomC + ' : créé'))
+      : quoi === 'envoye' ? (consL.statut === 'envoye' ? marque('ok', nomC + ' : envoyé au client') : boutonRapport(consL.id, 'envoyer', nomC + ' : à envoyer au client'))
+      : '<div class="ck-l"><span style="color:var(--text-muted)">·</span></div>';
+    return '<div class="ps-row ps-in" style="border-top:1px dashed rgba(13,27,42,.12);">' + x + '</div>';
+  };
   var colonne = function(rendu){ return tous.map(function(p){ return '<div class="ps-row ' + classe(p) + '">' + (p.statut === 'annule' ? (rendu === libPassageSemaine ? rendu(p) : marque('na', 'Passage annulé')) : rendu(p)) + '</div>'; }).join(''); };
-  h += '<td>' + (tous.length ? colonne(libPassageSemaine) : '<span class="cn-nature">aucun passage</span>') + '</td>';
+  h += '<td>' + (tous.length ? colonne(libPassageSemaine) : '<span class="cn-nature">aucun passage</span>') + rangCons('lib') + '</td>';
   // Colonnes séparées (15/11) : un ancien dossier peut avoir l'agenda à jour sans Kizeo, ou l'inverse
   h += '<td class="ck-td">' + colonne(function(p){
     var e = etatAgenda(p);
     return e === 'ok' ? marque('ok', "Dans l'agenda de " + (p.techs.join(', ') || 'du technicien')) : e === 'partiel' ? marque('att', "Pas dans l'agenda de tous les techniciens du passage") : e === 'desync' ? marque('att', "Rendez-vous à mettre à jour : date, heure ou technicien modifiés depuis") : marque('ko', "Pas encore dans l'agenda du technicien");
-  }) + '</td>';
-  h += '<td class="ck-td">' + colonne(function(p){ return badgesRapports(item, p, 'kizeo'); }) + '</td>';
-  h += '<td class="ck-td">' + colonne(function(p){ return notifCellule(item, p, 'notifBailleur'); }) + '</td>';
-  h += '<td class="ck-td">' + colonne(function(p){ return notifCellule(item, p, 'notifLocataire'); }) + '</td>';
-  h += '<td class="ck-td">' + colonne(function(p){ return badgesRapports(item, p, 'recu'); }) + '</td>';
-  h += '<td class="ck-td">' + colonne(function(p){ return badgesRapports(item, p, 'envoye'); }) + '</td>';
+  }) + rangCons('vide') + '</td>';
+  h += '<td class="ck-td">' + colonne(function(p){ return badgesRapports(item, p, 'kizeo'); }) + rangCons('vide') + '</td>';
+  h += '<td class="ck-td">' + colonne(function(p){ return notifCellule(item, p, 'notifBailleur'); }) + rangCons('vide') + '</td>';
+  h += '<td class="ck-td">' + colonne(function(p){ return notifCellule(item, p, 'notifLocataire'); }) + rangCons('vide') + '</td>';
+  h += '<td class="ck-td">' + colonne(function(p){ return badgesRapports(item, p, 'recu'); }) + rangCons('recu') + '</td>';
+  h += '<td class="ck-td">' + colonne(function(p){ return badgesRapports(item, p, 'envoye'); }) + rangCons('envoye') + '</td>';
   h += '<td style="white-space:nowrap;"><div style="display:flex;gap:5px;justify-content:flex-start;align-items:center;">' + actionSemaine(item, ps) + '<button class="btn-ellipsis" onclick="ouvrirMenuSuivi(event,\'' + item.id + '\')" title="Autres actions">⋯</button></div></td>';
   h += '</tr>';
   // Historique des notifications (menu ⋯)
@@ -5168,7 +5226,7 @@ window._passageIncoherent = function(passages) {
     const p = passages[i] || {};
     if (!p.debut || !p.fin) continue;
     const td = Date.parse(p.debut), tf = Date.parse(p.fin);
-    if (!isNaN(td) && !isNaN(tf) && tf < td) return p.num || (i + 1);
+    if (!isNaN(td) && !isNaN(tf) && tf < td) return p.num ?? (i + 1);
   }
   return null;
 };
@@ -5791,7 +5849,7 @@ function addPassageT(value = '', calEventId = '') {
   if (value && typeof value === 'object') {
     debut = value.debut || ''; fin = value.fin || ''; savedTitre = value.titre || ''; savedDesc = value.desc || '';
     savedAdresse = value.adresse || ''; savedTechs = Array.isArray(value.techs) ? value.techs : (value.tech ? [value.tech] : []);
-    savedNum = value.num || null; savedKizeoPush = value.kizeoPush || null; savedStatut = value.statut || '';
+    savedNum = value.num ?? null; savedKizeoPush = value.kizeoPush || null; savedStatut = value.statut || '';
     savedPassageId = value.passageId || null;
   } else if (typeof value === 'string') {
     [debut, fin] = value.includes('|') ? value.split('|') : [value, ''];
@@ -6700,7 +6758,7 @@ onAuthStateChanged(auth, async (user) => {
   // Notification faite autrement (téléphone, SMS, email hors app...) validée à la main (16/11).
   // Même trace qu'un envoi depuis l'app (heure dans notifBailleur/notifLocataire, et sur chaque
   // passage en cours avec la date annoncée), plus la mention « manuel » : moyen, note, qui, quand.
-  const LIB_MOYEN_NOTIF = { tel: 'par téléphone', sms: 'par SMS', email: 'par email hors app', oral: 'de vive voix', autre: 'autrement' };
+  const LIB_MOYEN_NOTIF = { tel: 'par téléphone', sms: 'par SMS', email: 'par email hors app', oral: 'de vive voix', affichage: 'par affiche et avis de passage', autre: 'autrement' };
   window.LIB_MOYEN_NOTIF = LIB_MOYEN_NOTIF;
   const champNotif = type => type === 'locataire' ? 'notifLocataire' : 'notifBailleur';
   const majFicheOuverte = passages => document.querySelectorAll('[id^="passage_"], [id^="passageT_"]').forEach(div => {
@@ -6844,7 +6902,7 @@ onAuthStateChanged(auth, async (user) => {
         kizeoDataIdRemplace: a.kizeoDataId || null, refInterneRemplace: a.refInterne || null });
       recId = attendu.id;
     } else {
-      const n = Number(p.num) || Number(num) || 1;
+      const n = p.num != null && p.num !== '' ? Number(p.num) : (Number(num) || 1);
       const ref2 = await addDoc(collection(db, 'reception-rapports'), { ...commun,
         suiviId, passageId: passageId || null, numPassage: n, client: s.client || '', bc: reference, reference,
         passageLabel: n === 1 ? '1er passage' : n + 'ème passage', libelle: p.kzNom || p.libelle || '',
@@ -6854,7 +6912,7 @@ onAuthStateChanged(auth, async (user) => {
     // Affichage immédiat, sans attendre l'écoute temps réel
     const e = { id: recId, statut: 'a-traiter', passageId: passageId || null, fileUrl, type: 'pdf', origine: 'manuel', relances: [] };
     if (passageId) { window._receptionsParPid = window._receptionsParPid || {}; window._receptionsParPid[passageId] = e; }
-    window._receptionsParPassage[suiviId + '::' + (Number(p.num) || num)] = e;
+    window._receptionsParPassage[suiviId + '::' + (p.num != null && p.num !== '' ? Number(p.num) : num)] = e;
     if (window.filterTable) window.filterTable();
     return recId;
   };
@@ -6870,10 +6928,18 @@ onAuthStateChanged(auth, async (user) => {
   const RANG_RECEPTION = { 'en-attente': 0, 'a-relire': 1, 'a-traiter': 2, 'archive': 2, 'envoye': 3 };
   // Deuxième index par passageId : distingue les passages jumeaux de même n° (15/11).
   onSnapshot(collection(db, 'reception-rapports'), (snap) => {
-    const m = {}, parPid = {};
-    const plusAvance = (a, b) => !a || (RANG_RECEPTION[b.statut] ?? -1) > (RANG_RECEPTION[a.statut] ?? -1);
+    const m = {}, parPid = {}, cons = {};
+    // Montées (21/11) : à étape égale, le rapport consolidé passe devant l'émargement du même passage
+    const rang = (x) => (RANG_RECEPTION[x.statut] ?? -1) + (x.typeRapport === 'consolide-montee' ? 0.5 : 0);
+    const plusAvance = (a, b) => !a || rang(b) > rang(a);
     snap.docs.forEach(d => {
       const r = d.data();
+      // Montées (21/11) : le rapport consolidé est rangé à part, sur sa propre ligne du Pilotage
+      if (r.typeRapport === 'consolide-montee' && r.suiviId) {
+        const c = { id: d.id, statut: r.statut, fileUrl: r.fileUrl || null, type: r.type || 'pdf', typeRapport: r.typeRapport, synthese: r.synthese || null, arriveeAt: r.arriveeAt || '' };
+        if (!cons[r.suiviId] || (RANG_RECEPTION[c.statut] ?? -1) >= (RANG_RECEPTION[cons[r.suiviId].statut] ?? -1)) cons[r.suiviId] = c;
+        return;
+      }
       if (!r.suiviId || r.numPassage == null) return;
       const e = { id: d.id, statut: r.statut, passageId: r.passageId || null, origine: r.origine || '', dateFin: r.dateFin || null, technicien: r.technicien || '', absence: r.absence || null, notifiedAt: r.notifiedAt || null, fileUrl: r.fileUrl || null, type: r.type || '', typeRapport: r.typeRapport || '', relances: [].concat(Array.isArray(r.relancesWhatsapp) ? r.relancesWhatsapp : [], Array.isArray(r.relancesSms) ? r.relancesSms : []).sort() };
       const k = r.suiviId + '::' + r.numPassage;
@@ -6882,6 +6948,7 @@ onAuthStateChanged(auth, async (user) => {
     });
     window._receptionsParPassage = m;
     window._receptionsParPid = parPid;
+    window._consolideParSuivi = cons;
     if (window.filterTable) window.filterTable();
   }, (e) => console.warn('reception-rapports (frise):', e.message));
 });

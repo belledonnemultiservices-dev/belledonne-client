@@ -457,7 +457,7 @@ async function majStatutApresPassage1(suiviId) {
   const actifs1 = passages.filter(p => String(p.num) === "1" && p.statut !== "annule");
   if (!actifs1.length) { await updateDoc(doc(db, "suivi", suiviId), { statut: "Passage annulé" }); return; }
   const recs = (await getDocs(query(collection(db, "reception-rapports"), where("suiviId", "==", suiviId), where("numPassage", "==", 1)))).docs.map(d => d.data());
-  const envoyes = recs.filter(r => r.statut === "envoye" && r.typeRapport !== "absence-annulation");
+  const envoyes = recs.filter(r => r.statut === "envoye" && r.typeRapport !== "absence-annulation" && r.typeRapport !== "emargement-montee" && r.typeRapport !== "affichage-montee");
   // Un seul passage n° 1 : n'importe quel rapport envoyé du n° 1 compte (anciens rapports sans passageId)
   const ok = actifs1.length === 1 ? envoyes.some(r => !r.passageId || !actifs1[0].passageId || r.passageId === actifs1[0].passageId)
     : actifs1.every(p => envoyes.some(r => r.passageId && r.passageId === p.passageId));
@@ -471,14 +471,14 @@ async function majStatutApresEnvoi(suiviId, numPassage) {
   if (!sSnap.exists()) return;
   const d = sSnap.data();
   if (["Terminé", "Annulé", "En attente"].includes(d.statut)) return;
-  const actifs = (Array.isArray(d.passages) ? d.passages : []).filter(p => p && typeof p === "object" && p.statut !== "annule");
+  const actifs = (Array.isArray(d.passages) ? d.passages : []).filter(p => p && typeof p === "object" && p.statut !== "annule" && p.role !== "affichage");
   if (!actifs.length) return;
   const min = Math.min(...actifs.map(p => Number(p.num) || 0));
   if (Number(numPassage) !== min) return;
   if (min === 1) return majStatutApresPassage1(suiviId);
   const groupe = actifs.filter(p => Number(p.num) === min);
   const recs = (await getDocs(query(collection(db, "reception-rapports"), where("suiviId", "==", suiviId), where("numPassage", "==", min)))).docs.map(x => x.data());
-  const envoyes = recs.filter(r => r.statut === "envoye" && r.typeRapport !== "absence-annulation");
+  const envoyes = recs.filter(r => r.statut === "envoye" && r.typeRapport !== "absence-annulation" && r.typeRapport !== "emargement-montee" && r.typeRapport !== "affichage-montee");
   if (groupe.every(p => envoyes.some(r => !p.passageId || !r.passageId || r.passageId === p.passageId))) await updateDoc(doc(db, "suivi", suiviId), { statut: "Terminé" });
 }
 // Passage annulé (16/11) : passage barré avec son constat (statut, motif, provenance), dossier
@@ -743,7 +743,7 @@ menu.addEventListener("click", e => { if (e.target.closest("button,a")) fermerMe
 document.addEventListener("click", e => { if (!menu.contains(e.target)) fermerMenu(); });
 window.addEventListener("scroll", fermerMenu, true);
 
-const peutRenvoyer = (r) => !!(r.suiviId && r.numPassage && r.kizeoFormDocId && r.recipientUserId);
+const peutRenvoyer = (r) => !!(r.suiviId && r.numPassage != null && r.kizeoFormDocId && r.recipientUserId);
 
 // Une seule action mise en avant par ligne : la prochaine étape du circuit.
 function actionPrincipale(r) {
@@ -753,6 +753,9 @@ function actionPrincipale(r) {
       : `<button class="btn-a btn-primaire" disabled title="Rapport ancien : repasser par le Suivi pour renvoyer">Renvoyer</button>`;
   }
   if (!r.suiviId && r.statut !== "envoye") return `<button class="btn-a btn-primaire" onclick="openRattacher('${r.id}')">Rattacher</button>`;
+  if (r.typeRapport === "emargement-montee" || r.typeRapport === "affichage-montee") return r.donnees
+    ? `<button class="btn-a" onclick="openRelecture('${r.id}')" title="Une correction est reportée automatiquement dans le rapport consolidé (s'il n'est pas déjà envoyé)">Relire / corriger</button>`
+    : (r.fileUrl ? `<a class="btn-a btn-open" href="${r.fileUrl}" target="_blank">Ouvrir</a>` : "");
   if (r.statut === "a-relire") {
     return r.donnees
       ? `<button class="btn-a btn-primaire" onclick="openRelecture('${r.id}')">Relire et valider</button>`
@@ -789,6 +792,9 @@ function cellType(r) {
   return `<div style="display:flex;flex-direction:column;gap:3px;">
     <span class="badge-type ${r.type === "excel" ? "badge-excel" : "badge-pdf"}">${r.type === "excel" ? "Excel" : "PDF"}</span>
     ${r.typeRapport === "absence-annulation" ? `<span class="badge-type" style="background:#FDECEA;color:#E74C3C;">Absence/Annulation</span>` : ""}
+    ${r.typeRapport === "consolide-montee" ? `<span class="badge-type" style="background:#E8F9F2;color:#1DA870;" title="${r.synthese ? r.synthese.traites + "/" + r.synthese.logements + " logements traités (" + r.synthese.taux + " %)" : ""}">Consolidé montée</span>` : ""}
+    ${r.typeRapport === "emargement-montee" ? `<span class="badge-type" style="background:#EEF2FF;color:#4338CA;">Émargement</span>` : ""}
+    ${r.typeRapport === "affichage-montee" ? `<span class="badge-type" style="background:#FFF7E6;color:#B4541A;">Affichage</span>` : ""}
     ${r.erreurReconstruction ? `<span class="badge-type" style="background:#FEF3C7;color:#B45309;" title="Reconstruction PDF échouée : ${String(r.erreurReconstruction).replace(/"/g, "&quot;")} — l'Excel de Kizeo a été déposé à la place.">⚠ PDF non reconstruit</span>` : ""}
   </div>`;
 }
@@ -807,7 +813,7 @@ function ligneBureau(r) {
     <div>${fmtDate(r.arriveeAt)}</div><div>${cellClient(r)}</div><div>${cellBc(r)}</div><div>${cellPassage(r)}</div>
     <div class="cell-muted" style="font-size:12px;line-height:1.3;">${r.technicien || "—"}</div>
     <div>${cellLibelle(r)}</div><div>${cellType(r)}</div>
-    <div><span class="badge-statut ${STATUT_CLASS[r.statut] || "st-a-traiter"}">${STATUT_LABEL[r.statut] || r.statut}</span></div>
+    <div><span class="badge-statut ${/^(emargement|affichage)-montee$/.test(r.typeRapport || "") && r.statut !== "en-attente" ? "st-envoye" : (STATUT_CLASS[r.statut] || "st-a-traiter")}">${/^(emargement|affichage)-montee$/.test(r.typeRapport || "") && r.statut !== "en-attente" ? "Dans le consolidé" : (STATUT_LABEL[r.statut] || r.statut)}</span></div>
     <div>${cellVoir(r)}</div>
     <div>${actionsCell(r)}</div></div>`;
 }
@@ -840,9 +846,11 @@ function render() {
   const correspond = (r) => !q || [r.client, r.bc, r.technicien, r.reference, r.libelle].some(v => (v || "").toLowerCase().includes(q));
   const docs = allDocs.filter(correspond);
 
-  const bureau = docs.filter(r => STATUTS_BUREAU.includes(r.statut));
+  // Montées (21/11) : un émargement ne part jamais seul, il est intégré au rapport consolidé
+  const estEmargement = (r) => (r.typeRapport === "emargement-montee" || r.typeRapport === "affichage-montee") && r.statut !== "en-attente";
+  const bureau = docs.filter(r => STATUTS_BUREAU.includes(r.statut) && !estEmargement(r));
   const attente = docs.filter(r => r.statut === "en-attente");
-  const envoyes = docs.filter(r => r.statut === "envoye");
+  const envoyes = docs.filter(r => r.statut === "envoye" || estEmargement(r));
   const nbRetard = attente.filter(isOverdue).length;
 
   // Compteurs des onglets
@@ -959,7 +967,7 @@ document.getElementById("replaceInput").addEventListener("change", async (e) => 
 // ── RENVOYER (nouveau push Kizeo, pré-rempli avec les réponses précédentes) ──
 window.renvoyer = async function(id) {
   const r = allDocs.find(x => x.id === id);
-  if (!r || !r.suiviId || !r.numPassage || !r.kizeoFormDocId || !r.recipientUserId) {
+  if (!r || !r.suiviId || r.numPassage == null || !r.kizeoFormDocId || !r.recipientUserId) {
     alert("Informations insuffisantes pour renvoyer directement : ouvre l'intervention dans le Suivi.");
     return;
   }
@@ -1309,7 +1317,7 @@ window.searchSuivi = async function() {
       html += `<label class="passage-opt"><input type="radio" name="rattPassage" value="1" checked> 1er passage (aucun passage enregistré, par défaut)</label>`;
     } else {
       passages.forEach((p, i) => {
-        const num = p.num || (i + 1);
+        const num = p.num ?? (i + 1);
         const label = String(num) === "1" ? "1er passage" : num + "ème passage";
         html += `<label class="passage-opt"><input type="radio" name="rattPassage" value="${num}" ${i === 0 ? "checked" : ""}> ${label}${p.debut ? " — " + String(p.debut).split("T")[0] : ""}</label>`;
       });

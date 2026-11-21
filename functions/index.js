@@ -1259,35 +1259,63 @@ exports.kizeoListUsers = functions
 // Entrée : { suiviId, numPassage, kizeoFormDocId, recipientUserId }.
 // Écrit un ref_interne unique "{suiviId}::{numPassage}" (lien de rattachement)
 // + pré-remplit référence/passage/client/adresse/date selon le mapping.
-exports.pushKizeoForm = functions
-  .region("europe-west1")
-  .runWith({ secrets: [KIZEO_API_TOKEN] })
-  .https.onRequest(async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
-    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+// ── Désinsectisation Montées (20/11) ──────────────────────────────
+// Émargement par logement : le 1er passage (formulaire 1012138) revient avec un
+// tableau présent / absent / non accessible / refus. Absents et non accessibles
+// sont repris au 2nd passage (décidé le 21/11). Il est rangé sur le dossier (montee.p1) et le
+// 2nd passage (1220725) part pré-rempli avec les seuls absents. Les refus ne
+// sont pas renvoyés : ils figureront au rapport consolidé.
+const aRepasser = (l) => l && (l.statut === "absent" || l.statut === "inaccessible");
+const estMonteeSuivi = (s) => /^d[ée]sinsectisation\s+mont[ée]es?$/i.test(String((s && s.nature) || "").trim());
+function logementsDeSoumission(fields) {
+  const val = (c) => (c && typeof c === "object" && "value" in c) ? c.value : (c ?? "");
+  const cle = Object.keys(fields || {}).find(k => Array.isArray(val(fields[k])) && val(fields[k]).some(x => x && typeof x === "object"));
+  if (!cle) return null;
+  const lignes = val(fields[cle]).filter(x => x && typeof x === "object");
+  const colonne = (row, re) => { const k = Object.keys(row).find(c => re.test(c)); return k ? String(val(row[k]) ?? "").trim() : ""; };
+  return lignes.map((row, i) => {
+    const statut = colonne(row, /^statut/i).toLowerCase();
+    // Motifs distincts (21/11) : refus d'un côté, non accessible de l'autre
+    const motifRefus = colonne(row, /^motif(?!.*access).*refus|^motif_?refus/i);
+    const motifInaccessible = colonne(row, /^motif.*access/i);
+    return {
+      ordre: i + 1,
+      nom: colonne(row, /^nom/i),
+      numero: colonne(row, /logement|lgmt/i),
+      etage: colonne(row, /^etage/i),
+      statut: /accessible/.test(statut) ? "inaccessible" : statut.startsWith("abs") ? "absent" : statut.startsWith("ref") ? "refus" : statut.startsWith("pr") ? "present" : statut,
+      niveau: colonne(row, /niveau/i),
+      motifRefus,
+      motifInaccessible,
+      observation: colonne(row, /observation/i),
+    };
+  });
+}
 
-    const { suiviId, numPassage, passageId, kizeoFormDocId, recipientUserId, libelle } = req.body || {};
-    if (!suiviId || !numPassage || !kizeoFormDocId) { res.status(400).json({ error: "suiviId, numPassage et kizeoFormDocId requis" }); return; }
+// Cœur de l'envoi d'un formulaire Kizeo pour un passage du Suivi. Partagé par le
+// bouton (pushKizeoForm) et l'envoi automatique du 2nd passage des Montées.
+// Retourne { status, body } comme le ferait la réponse HTTP.
+async function envoyerFormulaireKizeo(token, params) {
+
+    const { suiviId, numPassage, passageId, kizeoFormDocId, recipientUserId, libelle } = params || {};
+    if (!suiviId || numPassage == null || numPassage === "" || !kizeoFormDocId) { return { status: 400, body: { error: "suiviId, numPassage et kizeoFormDocId requis" } }; }
     const recipient = parseInt(recipientUserId, 10);
-    if (!recipient) { res.status(400).json({ error: "Technicien Kizeo (recipientUserId) manquant ou invalide" }); return; }
+    if (!recipient) { return { status: 400, body: { error: "Technicien Kizeo (recipientUserId) manquant ou invalide" } }; }
 
     const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(admin.app(), "belledonne-client");
 
     // Config du formulaire
     const formSnap = await db.collection("kizeo-forms").doc(String(kizeoFormDocId)).get();
-    if (!formSnap.exists) { res.status(404).json({ error: "Formulaire Kizeo introuvable" }); return; }
+    if (!formSnap.exists) { return { status: 404, body: { error: "Formulaire Kizeo introuvable" } }; }
     const form = formSnap.data();
     const mapping = form.mapping || {};
-    if (!form.formId) { res.status(400).json({ error: "formId manquant dans la config" }); return; }
-    if (!mapping.refInterne) { res.status(400).json({ error: "Champ Référence interne non associé dans la config" }); return; }
+    if (!form.formId) { return { status: 400, body: { error: "formId manquant dans la config" } }; }
+    if (!mapping.refInterne) { return { status: 400, body: { error: "Champ Référence interne non associé dans la config" } }; }
 
     // Doc suivi (source de vérité)
     const sSnap = await db.collection("suivi").doc(String(suiviId)).get();
-    if (!sSnap.exists) { res.status(404).json({ error: "Intervention introuvable" }); return; }
+    if (!sSnap.exists) { return { status: 404, body: { error: "Intervention introuvable" } }; }
     const s = sSnap.data();
     const passages = Array.isArray(s.passages) ? s.passages : [];
     // Un même numéro de passage peut exister en double (contrat récurrent relancé) :
@@ -1318,7 +1346,7 @@ exports.pushKizeoForm = functions
     const renvois = existingData ? (existingData.renvois || 0) + 1 : 0;
 
     // Construction des champs à pousser (uniquement les champs mappés)
-    const passageLabel = String(numPassage) === "1" ? "1er passage" : numPassage + "ème passage";
+    const passageLabel = passage.role === "affichage" ? "Pose d'affiches" : String(numPassage) === "1" ? "1er passage" : numPassage + "ème passage";
     // Libellé laissé tel quel, vide compris : le nom du rapport est celui saisi
     // dans le Suivi (recopié du titre agenda), sans repli automatique.
     let baseLibelle = (libelle && String(libelle).trim()) || "";
@@ -1339,7 +1367,7 @@ exports.pushKizeoForm = functions
     const fields = {};
     if (existingData && existingData.kizeoDataId) {
       try {
-        const prev = await kizeoRequest(KIZEO_API_TOKEN.value(), "GET", "/forms/" + encodeURIComponent(form.formId) + "/data/" + encodeURIComponent(existingData.kizeoDataId));
+        const prev = await kizeoRequest(token, "GET", "/forms/" + encodeURIComponent(form.formId) + "/data/" + encodeURIComponent(existingData.kizeoDataId));
         if (prev.status === 200) {
           const prevParsed = JSON.parse(prev.body);
           const prevFields = (prevParsed.data || prevParsed).fields || {};
@@ -1359,13 +1387,36 @@ exports.pushKizeoForm = functions
       if (fid) fields[fid] = { value: appValues[key] }; // les champs de l'app priment sur les valeurs reprises
     });
 
-    const r = await kizeoRequest(KIZEO_API_TOKEN.value(), "POST", "/forms/" + encodeURIComponent(form.formId) + "/push", {
+    // Montées : le 2nd passage ne reprend que les logements absents au 1er
+    if (estMonteeSuivi(s) && Number(numPassage) >= 2 && !passage.jumeau) {
+      const m1 = s.montee && s.montee.p1;
+      if (!m1 || !Array.isArray(m1.logements)) { return { status: 409, body: { error: "L'émargement du 1er passage n'est pas encore revenu : le 2nd passage partira avec ses absents dès sa réception." } }; }
+      const absents = m1.logements.filter(aRepasser);
+      if (!absents.length) { return { status: 409, body: { error: "Aucun absent ni logement non accessible au 1er passage : ce 2nd passage n'est pas nécessaire." } }; }
+      let def = null;
+      try { def = await definitionFormulaire(token, form.formId); } catch(e) { console.error("Montée: définition du formulaire indisponible:", e.message); }
+      const champs = def ? ((def.form || def).fields || {}) : {};
+      const cleTab = Object.keys(champs).find(k => champs[k] && champs[k].type === "subform");
+      if (!cleTab) { return { status: 400, body: { error: "Le formulaire du 2nd passage n'a pas de tableau de logements." } }; }
+      const cols = Object.keys(champs[cleTab].columns || {});
+      const col = (re) => cols.find(c => re.test(c));
+      const cNom = col(/^nom/i), cNum = col(/logement|lgmt/i), cEtage = col(/^etage/i);
+      fields[cleTab] = { value: absents.map(l => {
+        const ligne = {};
+        if (cNom) ligne[cNom] = { value: l.nom || "" };
+        if (cNum) ligne[cNum] = { value: l.numero || "" };
+        if (cEtage) ligne[cEtage] = { value: l.etage || "" };
+        return ligne;
+      }) };
+      console.log(`Montée: 2nd passage de suivi/${suiviId} pré-rempli avec ${absents.length} logement(s) à repasser`);
+    }
+
+    const r = await kizeoRequest(token, "POST", "/forms/" + encodeURIComponent(form.formId) + "/push", {
       recipient_user_id: recipient,
       fields,
     });
     if (r.status < 200 || r.status >= 300) {
-      res.status(502).json({ error: "Kizeo a refusé le push (" + r.status + ")", detail: (r.body || r.error || "").slice(0, 300) });
-      return;
+      return { status: 502, body: { error: "Kizeo a refusé le push (" + r.status + ")", detail: (r.body || r.error || "").slice(0, 300) } };
     }
     console.log("Kizeo push OK:", suiviId, "passage", numPassage, "-> user", recipient, renvois > 0 ? `(renvoi ${renvois})` : "");
 
@@ -1440,8 +1491,202 @@ exports.pushKizeoForm = functions
       console.error("Kizeo push : mise à jour du badge Suivi échouée:", e.message);
     }
 
-    res.status(200).json({ success: true, refInterne: appValues.refInterne, renvois });
+    return { status: 200, body: { success: true, refInterne: appValues.refInterne, renvois } };
+}
+
+exports.pushKizeoForm = functions
+  .region("europe-west1")
+  .runWith({ secrets: [KIZEO_API_TOKEN] })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    try { await verifyAdmin(req); } catch(e) { res.status(e.code || 401).json({ error: e.msg || "Non autorisé" }); return; }
+    const r = await envoyerFormulaireKizeo(KIZEO_API_TOKEN.value(), req.body || {});
+    res.status(r.status).json(r.body);
   });
+
+// Montées : suite automatique du 1er passage (décidé le 21/11). À la réception de
+// l'émargement du 1er passage :
+//   - des absents  -> le 2nd passage part tout seul sur le Kizeo de son technicien,
+//                     pré-rempli avec les absents (même chemin que le bouton) ;
+//   - aucun absent -> le 2nd passage est retiré, rendez-vous ôtés de l'agenda ;
+//   - impossible   -> rien n'est envoyé, la raison est notée (montee.p2Auto) et le
+//                     bouton manuel du Pilotage reste disponible.
+// Un 1er passage reçu à nouveau après l'envoi du 2nd ne renvoie rien : il est signalé.
+async function retirerRdvPassage(db, p) {
+  const echecs = [];
+  const cal = p.calEvents || {};
+  const noms = Object.keys(cal).filter(n => n !== "_" && cal[n]);
+  if (!noms.length) return echecs;
+  let calendar = null;
+  try {
+    const { google } = require("googleapis");
+    const auth = new google.auth.GoogleAuth({ credentials: JSON.parse(GCAL_SA.value()), scopes: ["https://www.googleapis.com/auth/calendar"] });
+    calendar = google.calendar({ version: "v3", auth });
+  } catch(e) { console.error("Montée: agenda inaccessible:", e.message); return noms; }
+  for (const nom of noms) {
+    try {
+      const t = await db.collection("techniciens").where("nomComplet", "==", nom).limit(1).get();
+      const email = t.empty ? "" : (t.docs[0].data().email || "");
+      if (!email) { echecs.push(nom); continue; }
+      await calendar.events.delete({ calendarId: email, eventId: cal[nom] });
+    } catch(e) { if (!(e && (e.code === 404 || e.code === 410))) { console.error(`Montée: rendez-vous de ${nom} non retiré:`, e.message); echecs.push(nom); } }
+  }
+  return echecs;
+}
+
+async function monteeApresPassage1(db, token, suiviId) {
+  const { FieldValue } = require("firebase-admin/firestore");
+  const ref = db.collection("suivi").doc(suiviId);
+  const s = (await ref.get()).data() || {};
+  const m1 = s.montee && s.montee.p1;
+  if (!m1) return;
+  const passages = Array.isArray(s.passages) ? s.passages : [];
+  const p2 = passages.find(p => Number(p.num) === 2 && !p.jumeau && p.statut !== "annule");
+  const maintenant = new Date().toISOString();
+  const journal = (texte, autres) => ref.update({ ...(autres || {}), journal: FieldValue.arrayUnion({ at: new Date().toISOString(), par: "Automatique", texte }) });
+  if (!p2) return;
+  const nbARepasser = (m1.logements || []).filter(aRepasser).length;
+  if (p2.kizeoPush) {
+    await journal(`Émargement du 1er passage reçu à nouveau alors que le 2nd passage est déjà parti : vérifier les logements à repasser (${nbARepasser} au dernier retour).`);
+    return;
+  }
+  if (!nbARepasser) {
+    const echecs = await retirerRdvPassage(db, p2);
+    const restants = passages.filter(p => p !== p2);
+    await journal("2nd passage retiré automatiquement : aucun absent ni logement non accessible au 1er passage"
+      + (echecs.length ? `. Rendez-vous à retirer à la main dans l'agenda de : ${echecs.join(", ")}` : ""),
+      { passages: restants, "montee.p2Auto": { action: "retire", at: maintenant, agendaARetirer: echecs } });
+    console.log(`Montée: 2nd passage de suivi/${suiviId} retiré (aucun absent)`);
+    return "retire";
+  }
+  const echec = async (raison) => {
+    await journal(`2nd passage non envoyé automatiquement : ${raison}. À envoyer depuis la planification.`, { "montee.p2Auto": { action: "echec", at: maintenant, raison } });
+    console.warn(`Montée: 2nd passage de suivi/${suiviId} non envoyé : ${raison}`);
+  };
+  // Formulaire : celui préparé sur le passage, sinon l'émargement 2nd passage (1220725)
+  let formDocId = p2.kzForm || "";
+  if (!formDocId) {
+    const f = await db.collection("kizeo-forms").where("formId", "==", "1220725").limit(1).get();
+    if (f.empty) return echec("formulaire 2nd passage (1220725) absent de la configuration Kizeo");
+    formDocId = f.docs[0].id;
+  }
+  // Technicien : celui du rapport préparé, sinon le premier du passage
+  const nomTech = p2.kzTech || (Array.isArray(p2.techs) ? p2.techs[0] : "") || "";
+  if (!nomTech) return echec("aucun technicien sur le 2nd passage");
+  let dest = p2.kzDest || "";
+  if (!dest) {
+    const t = await db.collection("techniciens").where("nomComplet", "==", nomTech).limit(1).get();
+    dest = t.empty ? "" : String(t.docs[0].data().kizeoUserId || "");
+  }
+  if (!dest) return echec(`${nomTech} n'a pas de compte Kizeo`);
+  const libelle = p2.kzNom || p2.titre || [s.nature, s.client, s.bc ? "BC " + s.bc : ""].filter(Boolean).join(" — ");
+  const r = await envoyerFormulaireKizeo(token, { suiviId, numPassage: 2, passageId: p2.passageId || null, kizeoFormDocId: formDocId, recipientUserId: dest, libelle });
+  if (r.status !== 200) return echec((r.body && r.body.error) || ("erreur " + r.status));
+  // Le passage garde la trace du rapport préparé, comme après un envoi depuis la planification
+  const frais = ((await ref.get()).data() || {}).passages || [];
+  const maj = frais.map(p => (p2.passageId ? p.passageId === p2.passageId : (Number(p.num) === 2 && !p.jumeau))
+    ? { ...p, kzForm: formDocId, kzTech: nomTech, kzDest: String(dest), kzNom: p.kzNom || libelle } : p);
+  await journal(`2nd passage envoyé automatiquement à ${nomTech} sur Kizeo, pré-rempli avec ${nbARepasser} logement(s) à repasser (absents ou non accessibles)`,
+    { passages: maj, "montee.p2Auto": { action: "envoye", at: maintenant, technicien: nomTech, absents: nbARepasser,
+      envoyes: m1.logements.filter(aRepasser).map(l => ({ numero: l.numero, etage: l.etage })) } });
+  console.log(`Montée: 2nd passage de suivi/${suiviId} envoyé automatiquement à ${nomTech}`);
+}
+
+// Montées : rapport consolidé (21/11). Créé tout seul quand les deux émargements
+// sont revenus (ou le 1er seul s'il n'y avait aucun absent), à partir des données
+// des rapports reçus. Il arrive dans Gestion rapports « Prêt à envoyer » ; c'est
+// lui, rattaché au passage 1, dont l'envoi fait passer le dossier en « Terminé »,
+// donc en « À facturer ». Régénéré après une correction d'émargement en relecture,
+// tant qu'il n'est pas parti au client.
+const JOURS_FR_M = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const MOIS_FR_M = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+function creneauLisible(p) {
+  if (!p || !p.debut) return "";
+  const j = new Date(String(p.debut).substring(0, 10) + "T12:00:00");
+  const h = String(p.debut).substring(11, 16);
+  return `${JOURS_FR_M[j.getDay()]} ${j.getDate()} ${MOIS_FR_M[j.getMonth()]} ${j.getFullYear()}` + (h ? ", " + Number(h.split(":")[0]) + "h" + h.split(":")[1] : "");
+}
+
+async function monteeConsolider(db, suiviId, origine) {
+  const { FieldValue } = require("firebase-admin/firestore");
+  const ref = db.collection("suivi").doc(suiviId);
+  const s = (await ref.get()).data() || {};
+  const m = s.montee || {};
+  if (!m.p1) return null;
+  const passages = Array.isArray(s.passages) ? s.passages : [];
+  const pas1 = passages.find(p => Number(p.num) === 1 && !p.jumeau && p.statut !== "annule") || {};
+  const pas2 = passages.find(p => Number(p.num) === 2 && !p.jumeau && p.statut !== "annule") || null;
+  // 2nd passage prévu mais pas encore revenu : on attend
+  if (pas2 && !m.p2) return null;
+  // Pose d'affiches prévue (21/11) : le consolidé attend aussi son rapport
+  const pasAff = passages.find(p => p.role === "affichage" && !p.jumeau && p.statut !== "annule") || null;
+  if (pasAff && !m.affichage) return null;
+
+  const recDe = async (kizeoDataId) => {
+    if (!kizeoDataId) return null;
+    const q = await db.collection("reception-rapports").where("kizeoDataId", "==", String(kizeoDataId)).limit(1).get();
+    return q.empty ? null : { id: q.docs[0].id, ...q.docs[0].data() };
+  };
+  const rec1 = await recDe(m.p1.kizeoDataId);
+  const rec2 = m.p2 ? await recDe(m.p2.kizeoDataId) : null;
+  const recAff = m.affichage ? await recDe(m.affichage.kizeoDataId) : null;
+  if (!rec1 || !rec1.donnees) { console.warn(`Montée: consolidé de suivi/${suiviId} impossible, données du 1er passage absentes`); return null; }
+
+  // Déjà envoyé au client : on ne le remplace pas
+  const existants = await db.collection("reception-rapports").where("suiviId", "==", suiviId).where("typeRapport", "==", "consolide-montee").get();
+  const existant = existants.docs.find(d => d.data().statut !== "envoye") || null;
+  if (!existant && existants.docs.some(d => d.data().statut === "envoye")) {
+    await ref.update({ journal: FieldValue.arrayUnion({ at: new Date().toISOString(), par: "Automatique", texte: "Émargement modifié après l'envoi du rapport consolidé : le consolidé déjà envoyé n'a pas été remplacé." }) });
+    return null;
+  }
+
+  const { genererConsolide } = require("./rapport-montee");
+  const tech1 = rec1.technicien || m.p1.technicien || "";
+  const tech2 = rec2 ? (rec2.technicien || m.p2.technicien || "") : "";
+  const out = await genererConsolide({
+    client: s.client || "", bc: s.bc || s.pl || s.devis || "", adresse: s.adresse || "", nature: s.nature || "",
+    affichage: m.affichage ? { date: m.affichage.poseesLe ? m.affichage.poseesLe.split("-").reverse().join("/") + (m.affichage.heure ? " à " + m.affichage.heure : "") : "", observation: m.affichage.observation || "", rapport: recAff ? recAff.donnees : null } : null,
+    passages: [
+      { date: creneauLisible(pas1), technicien: tech1, rapport: rec1.donnees },
+      rec2 ? { date: creneauLisible(pas2), technicien: tech2, rapport: rec2.donnees } : null,
+    ],
+  }, fetchBuffer);
+
+  const bucket = admin.storage().bucket("belledonne-client.firebasestorage.app");
+  const reference = s.bc || s.pl || s.devis || "";
+  const chemin = `reception/${s.client || "_inconnu"}/${Date.now()}_Rapport_consolide_${reference || suiviId}.pdf`.replace(/\s+/g, "_");
+  const token = crypto.randomUUID();
+  await bucket.file(chemin).save(out.pdf, { contentType: "application/pdf", metadata: { metadata: { firebaseStorageDownloadTokens: token } } });
+  const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(chemin)}?alt=media&token=${token}`;
+
+  const now = new Date().toISOString();
+  const sy = out.synthese;
+  const donneesDoc = {
+    suiviId, passageId: pas1.passageId || null, numPassage: 1,
+    passageLabel: rec2 ? "Consolidé 2 passages" : "Consolidé (1 passage)",
+    libelle: "Rapport consolidé — " + (s.nature || "Désinsectisation Montées"),
+    typeRapport: "consolide-montee", origine: "montee", type: "pdf",
+    client: s.client || "", bc: reference, reference,
+    technicien: [...new Set([tech1, tech2].filter(Boolean))].join(", "),
+    fileUrl, statut: "a-traiter", arriveeAt: now, updatedAt: now,
+    refInterne: suiviId + "::consolide",
+    kizeoDataId: null, donnees: null,
+    sources: { p1: rec1.id, p2: rec2 ? rec2.id : null, affichage: recAff ? recAff.id : null },
+    synthese: sy, pagesLogements: out.pagesLogements, photosManquantes: out.photosManquantes,
+  };
+  let recId;
+  if (existant) { await existant.ref.update(donneesDoc); recId = existant.id; }
+  else { const r = await db.collection("reception-rapports").add({ ...donneesDoc, createdAt: now }); recId = r.id; }
+  await ref.update({
+    "montee.consolide": { receptionId: recId, at: now, synthese: sy },
+    journal: FieldValue.arrayUnion({ at: now, par: "Automatique", texte: `Rapport consolidé ${existant ? "régénéré" : "créé"}${origine ? " (" + origine + ")" : ""} : ${sy.traites}/${sy.logements} logements traités (${sy.taux} %), ${sy.absents} absent(s), ${sy.inaccessibles} non accessible(s), ${sy.refus} refus. À envoyer depuis Gestion rapports.` }),
+  });
+  console.log(`Montée: consolidé de suivi/${suiviId} ${existant ? "régénéré" : "créé"} -> reception-rapports/${recId} (${out.pdf.length} octets, ${sy.traites}/${sy.logements} traités)`);
+  return recId;
+}
 
 // ── RÉCEPTION D'UNE SOUMISSION (commun au webhook et au pull) ─────
 // Lit la soumission Kizeo, résout le rattachement via ref_interne, télécharge
@@ -1718,14 +1963,14 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
   }
 
   let suiviId = null, client = "", bc = "", numPassage = null, passageLabel = "";
-  let passagesSuivi = [];
+  let passagesSuivi = [], monteeSuivi = false;
   // dossier::n° ou, pour un passage jumeau, dossier::n°::passageId
   const m = refInterne.match(/^(.+?)::(\d+)(?:::([A-Za-z0-9_-]+))?$/);
   const passageIdRef = m && m[3] ? m[3] : null;
   if (m) {
     const candidateSuiviId = m[1];
     numPassage = parseInt(m[2], 10);
-    passageLabel = numPassage === 1 ? "1er passage" : numPassage + "ème passage";
+    passageLabel = numPassage === 0 ? "Pose d'affiches" : numPassage === 1 ? "1er passage" : numPassage + "ème passage";
     try {
       const sSnap = await db.collection("suivi").doc(candidateSuiviId).get();
       if (sSnap.exists) {
@@ -1734,6 +1979,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
         client = s.client || "";
         bc = s.bc || s.pl || s.devis || "";
         passagesSuivi = Array.isArray(s.passages) ? s.passages : [];
+        monteeSuivi = estMonteeSuivi(s);
       }
     } catch(e) {
       console.error("Kizeo: résolution suivi échouée:", e.message);
@@ -1817,7 +2063,9 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
       kizeoGet: (p) => kizeoRequest(token, "GET", p, null, true),
       deposer: async (m, buffer, type) => {
         const ext2 = type === "image/png" ? "png" : type === "image/gif" ? "gif" : "jpg";
-        const nom = `${dossierPhotos}/${m.ligne === null ? "r" : "l" + m.ligne}_${m.cle}.${ext2}`;
+        // Suffixe tiré du média : plusieurs photos d'un même champ ne s'écrasent pas (21/11)
+        const suffixe = String(m.media || "").replace(/[^A-Za-z0-9]/g, "").slice(-10);
+        const nom = `${dossierPhotos}/${m.ligne === null ? "r" : "l" + m.ligne}_${m.cle}${suffixe ? "_" + suffixe : ""}.${ext2}`;
         const tk = crypto.randomUUID();
         await bucket.file(nom).save(buffer, { contentType: type, metadata: { metadata: { firebaseStorageDownloadTokens: tk } } });
         photosPaths.push(nom);
@@ -1942,7 +2190,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     numPassage,
     passageLabel,
     type: relecture ? "pdf" : (ext === "pdf" ? "pdf" : typeSortie),
-    typeRapport: (passageNonRealise || formConf.nature === "absence-annulation") ? "absence-annulation" : "intervention",
+    typeRapport: (passageNonRealise || formConf.nature === "absence-annulation") ? "absence-annulation" : (monteeSuivi && !passageIdRef ? (numPassage === 0 ? "affichage-montee" : "emargement-montee") : "intervention"),
     // Constat relevé sur place. Qualifie la ligne dans Gestion rapports et
     // porte ce qu'a déclaré le technicien ; le rapport lui-même suit le
     // circuit ordinaire.
@@ -1976,6 +2224,53 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
     const ref = await db.collection("reception-rapports").add(docData);
     console.log(`Kizeo: soumission ${dataId} reçue -> reception-rapports/${ref.id}`);
   }
+
+  // Montées (21/11) : rapport de pose d'affiches (passage n° 0). Date de pose rangée sur le
+  // dossier (« Affiches posées le » se remplit seul), puis le consolidé s'il n'attendait plus que lui.
+  if (monteeSuivi && !passageIdRef && numPassage === 0) {
+    try {
+      const { FieldValue } = require("firebase-admin/firestore");
+      const val = (c) => (c && typeof c === "object" && "value" in c) ? c.value : (c ?? "");
+      const cleDate = Object.keys(fields).find(k => /date/i.test(k));
+      const cleObs = Object.keys(fields).find(k => /observation/i.test(k));
+      const brute = String(val(fields[cleDate]) || "").trim(); // "2026-11-16 09:30"
+      const jour = /^\d{4}-\d{2}-\d{2}/.test(brute) ? brute.substring(0, 10) : now.substring(0, 10);
+      const heure = /\d{2}:\d{2}/.test(brute.substring(11)) ? brute.substring(11, 16).replace(":", "h") : "";
+      await db.collection("suivi").doc(suiviId).update({
+        "montee.affichage": { kizeoDataId: String(dataId), recuAt: now, technicien, poseesLe: jour, heure, observation: String(val(fields[cleObs]) || "").trim() },
+        "affichage.poseesLe": jour,
+        journal: FieldValue.arrayUnion({ at: now, par: "Automatique", texte: `Affiches posées le ${jour.split("-").reverse().join("/")}${heure ? " à " + heure : ""} (rapport du technicien)` }),
+      });
+      console.log(`Montée: pose d'affiches rangée sur suivi/${suiviId} (${jour})`);
+      await monteeConsolider(db, suiviId, "retour du rapport d'affichage");
+    } catch(e) { console.error(`Montée: rapport d'affichage non rangé pour ${dataId}:`, e.message); }
+  }
+
+  // Montées : résultat par logement rangé sur le dossier (montee.p1, montee.p2)
+  if (monteeSuivi && !passageIdRef && numPassage) {
+    try {
+      const logements = logementsDeSoumission(fields);
+      if (logements) {
+        const compte = (st) => logements.filter(l => l.statut === st).length;
+        await db.collection("suivi").doc(suiviId).update({ ["montee.p" + numPassage]: {
+          kizeoDataId: String(dataId), recuAt: now, technicien, logements,
+          presents: compte("present"), absents: compte("absent"), inaccessibles: compte("inaccessible"), refus: compte("refus"),
+          aRepasser: logements.filter(aRepasser).length,
+        } });
+        console.log(`Montée: émargement du passage ${numPassage} rangé sur suivi/${suiviId} (${logements.length} logement(s), ${compte("absent")} absent(s), ${compte("refus")} refus)`);
+        let suite = null;
+        if (numPassage === 1) {
+          try { suite = await monteeApresPassage1(db, token, suiviId); }
+          catch(e) { console.error(`Montée: suite automatique du 1er passage échouée pour suivi/${suiviId}:`, e.message); }
+        }
+        // Consolidé : au retour du 2nd passage, ou du 1er quand il n'y avait aucun absent
+        if (numPassage === 2 || suite === "retire") {
+          try { await monteeConsolider(db, suiviId, numPassage === 2 ? "retour du 2nd passage" : "aucun absent"); }
+          catch(e) { console.error(`Montée: rapport consolidé non créé pour suivi/${suiviId}:`, e.message); }
+        }
+      }
+    } catch(e) { console.error(`Montée: émargement non rangé pour ${dataId}:`, e.message); }
+  }
   return true;
 }
 
@@ -1985,7 +2280,7 @@ async function receiveKizeoSubmission(db, token, formId, dataId, origine) {
 // à faire tourner (KIZEO_WEBHOOK_SECRET) s'il est un jour compromis.
 exports.kizeoWebhook = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 300, memory: "1GB", secrets: [KIZEO_API_TOKEN, KIZEO_WEBHOOK_SECRET] })
+  .runWith({ timeoutSeconds: 300, memory: "1GB", secrets: [KIZEO_API_TOKEN, KIZEO_WEBHOOK_SECRET, GCAL_SA] })
   .https.onRequest(async (req, res) => {
     if (req.get("X-Kizeo-Secret") !== KIZEO_WEBHOOK_SECRET.value()) {
       res.status(401).json({ error: "Non autorisé" });
@@ -2015,7 +2310,7 @@ exports.kizeoWebhook = functions
 // le canal "espace-client" et les marque lues une fois traitées.
 exports.kizeoPull = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: [KIZEO_API_TOKEN] })
+  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: [KIZEO_API_TOKEN, GCAL_SA] })
   .pubsub.schedule("every 15 minutes")
   .timeZone("Europe/Paris")
   .onRun(async () => {
@@ -2084,7 +2379,7 @@ exports.kizeoPull = functions
 // et ne marque rien comme lu (le pull reste seul à le faire).
 exports.kizeoRattrapage = functions
   .region("europe-west1")
-  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: [KIZEO_API_TOKEN] })
+  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: [KIZEO_API_TOKEN, GCAL_SA] })
   .pubsub.schedule("every day 05:30")
   .timeZone("Europe/Paris")
   .onRun(async () => {
@@ -4942,6 +5237,12 @@ exports.validerRapport = functions
       // rejoint "a-traiter" en étant validé.
       if (r.statut === "a-relire") maj.statut = "a-traiter";
       await ref.update(maj);
+
+      // Montées : une correction d'émargement se répercute dans le consolidé (s'il n'est pas déjà parti)
+      if ((r.typeRapport === "emargement-montee" || r.typeRapport === "affichage-montee") && r.suiviId) {
+        try { await monteeConsolider(db, r.suiviId, "émargement corrigé en relecture"); }
+        catch(e) { console.error("validerRapport: consolidé non régénéré:", e.message); }
+      }
 
       console.log(`validerRapport: ${rapportId} -> PDF ${Math.round(out.pdf.length / 1024)} ko, ${out.nbLignes} ligne(s), ${out.photosManquantes} photo(s) manquante(s)`);
       res.status(200).json({ fileUrl, nbLignes: out.nbLignes, photosManquantes: out.photosManquantes, taille: out.pdf.length });
