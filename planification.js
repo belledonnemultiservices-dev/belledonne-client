@@ -1724,8 +1724,9 @@ function reglagesAffichage(item) {
   const documents = ["affiche+avis", "affiche", "avis"].includes(a.documents) ? a.documents : (a.mode === "affiche+avis" ? "affiche+avis" : "affiche");
   return {
     documents,
-    contactAffiche: a.contactAffiche !== false,
-    contactAvis: a.contactAvis !== false,
+    // Coordonnées masquées par défaut (21/11) : affichées seulement si on l'a choisi sur le dossier
+    contactAffiche: a.contactAffiche === true,
+    contactAvis: a.contactAvis === true,
     nbAvis: Number(a.nbAvis) > 0 ? Number(a.nbAvis) : (logementsDe(item) || 4),
     poseesLe: a.poseesLe || "",
   };
