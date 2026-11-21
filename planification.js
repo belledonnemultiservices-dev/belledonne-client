@@ -889,7 +889,8 @@ function descriptionAuto(item, adresse) {
 // Rendez-vous d'un technicien sur un passage principal : son titre, son adresse, sa description
 // (sinon automatique) + observations du dossier, toujours + ses rapports Kizeo
 // Texte du carré Description d'un rendez-vous : saisi à la main (descLibre), sinon les observations du dossier
-const descCarre = (item, a) => a && a.descLibre && (a.desc || "").trim() ? a.desc.trim() : String(item.observations || "").trim();
+// Une description vidée à la main reste vide (21/11) : elle ne reprend plus les observations toute seule
+const descCarre = (item, a) => a && a.descLibre ? String(a.desc || "").trim() : String(item.observations || "").trim();
 function contenuAgenda(item, p, ps, nom) {
   const a = (p.agendaTech || {})[nom] || { titre: p.titre, adresse: p.adresse, desc: p.desc };
   const adresse = (a.adresse || "").trim() || item.adresse || "";
@@ -1020,7 +1021,7 @@ function rendrePassages(item) {
       <div class="pl-grille">
         <div class="pl-champ"><label>Titre agenda</label><input data-af="titre" value="${esc(a.titre)}" placeholder="${esc(titreDefaut(item, l))}"></div>
         <div class="pl-champ"><label>Adresse</label><input data-af="adresse" value="${esc((a.adresse || "").trim() || item.adresse || "")}" placeholder="Adresse..." title="Reprend l'adresse du dossier tant que tu ne la modifies pas"></div>
-        <div class="pl-champ large"><label>Description <span style="text-transform:none;font-weight:400;">· ${a.descLibre && a.desc.trim() ? "modifiée à la main" : "reprend les observations du dossier tant que tu ne la modifies pas"} · le nom des rapports Kizeo est ajouté à la suite dans l'agenda</span></label><textarea data-af="desc" rows="4" placeholder="Observations du dossier (vides)">${esc(descCarre(item, a))}</textarea></div>
+        <div class="pl-champ large"><label>Description <span style="text-transform:none;font-weight:400;">· ${a.descLibre ? (a.desc.trim() ? "modifiée à la main" : "vidée à la main") + ` <button type="button" class="pl-lien" data-a="descAuto" style="margin:0 0 0 4px;font-size:inherit;">reprendre les observations</button>` : "reprend les observations du dossier tant que tu ne la modifies pas"} · le nom des rapports Kizeo est ajouté à la suite dans l'agenda</span></label><textarea data-af="desc" rows="4" placeholder="Observations du dossier (vides)">${esc(descCarre(item, a))}</textarea></div>
       </div>
       <div class="pl-raps"><div class="pl-raps-tete"><b>Rapports Kizeo</b>${t && t.kizeoUserId ? "" : '<span class="pl-manque" style="font-size:12px;">pas de compte Kizeo (page Techniciens) : envoi impossible</span>'}</div>
         ${raps.map((r, i) => ligneRapport(l, r, i)).join("")}
@@ -1105,8 +1106,8 @@ function rendrePassages(item) {
       const l = ligneDe(inp), nom = techDe(inp);
       const ag = (l.agenda[nom] = l.agenda[nom] || agendaVide());
       ag[f] = inp.value;
-      // Carré Description modifié : il devient le texte envoyé tel quel ; vidé, il redevient automatique
-      if (f === "desc") ag.descLibre = !!inp.value.trim();
+      // Carré Description modifié : il devient le texte envoyé tel quel, y compris vide (21/11)
+      if (f === "desc") ag.descLibre = true;
       // Le nom de son 1er rapport suit son titre agenda en direct (s'il n'a pas été modifié à la main)
       if (f === "titre") {
         const r = l.rapports.find(x => !x.annule && x.tech === nom);
@@ -1248,6 +1249,13 @@ function rendrePassages(item) {
     change(true);
     if (window._ajouterJournal) { try { await window._ajouterJournal(item.id, ["2nd passage retiré : aucun absent au 1er passage"]); } catch (e) { /* trace facultative */ } }
   });
+  // « reprendre les observations » : la description redevient automatique
+  document.querySelectorAll(".pl-corps [data-a=descAuto]").forEach(b => b.onclick = () => {
+    const l = ligneDe(b), nom = techDe(b);
+    const ag = (l.agenda[nom] = l.agenda[nom] || agendaVide());
+    ag.desc = ""; ag.descLibre = false;
+    change(true);
+  });
   document.querySelectorAll(".pl-corps [data-a=ajoutRap]").forEach(b => b.onclick = () => {
     const l = ligneDe(b), nom = techDe(b);
     // Le rapport porté par le passage, s'il est encore vide et sans technicien valable, sert en premier
@@ -1369,7 +1377,7 @@ async function enregistrerPassages(item, silencieux) {
       // Rendez-vous de chaque technicien ; le 1er technicien alimente aussi titre/adresse/description
       // du passage, lus par le reste de l'app (vue Semaine, ancienne fiche)
       const agendaTech = {};
-      l.techs.forEach(n => { const a = l.agenda[n] || agendaVide(); agendaTech[n] = { titre: a.titre.trim(), adresse: a.adresse.trim(), desc: a.desc.trim() }; if (a.descLibre && a.desc.trim()) agendaTech[n].descLibre = true; });
+      l.techs.forEach(n => { const a = l.agenda[n] || agendaVide(); agendaTech[n] = { titre: a.titre.trim(), adresse: a.adresse.trim(), desc: a.desc.trim() }; if (a.descLibre) agendaTech[n].descLibre = true; });
       const a0 = agendaTech[l.techs[0]] || agendaVide();
       l.rapports.forEach((r, k) => {
         // Base : la version en base (envoi Kizeo, rendez-vous, notifications faits entre-temps)
@@ -1501,8 +1509,14 @@ const nomPassage = (p) => p.role === "affichage" ? '📌 <span style="color:#0D1
 // Un rendez-vous par technicien, avec son contenu. Ne contacte Google que pour ce qui a changé.
 async function synchroniserAgenda(item, passages, aRetirer) {
   const erreurs = [];
-  const supprimer = async (nom, ev) => { const t = techParNom(nom); if (t && t.email && ev) { try { await requeteAgenda({ technicienEmail: t.email, operation: "delete", calEventId: ev }); } catch (e) { /* déjà absent */ } } };
-  for (const [nom, ev] of aRetirer) await supprimer(nom, ev);
+  // Correctif du 21/11 : un rendez-vous encore référencé par un passage conservé n'est jamais supprimé,
+  // et un rendez-vous supprimé pendant cette synchronisation est recréé, jamais « mis à jour »
+  // (chez Google, mettre à jour un rendez-vous supprimé le laisse supprimé).
+  const utilises = new Set();
+  passages.forEach(p => { if (p.statut !== "annule" && !p.jumeau && p.debut) (p.techs || []).forEach(n => { const ev = (p.calEvents || {})[n]; if (ev) utilises.add(ev); }); });
+  const supprimes = new Set();
+  const supprimer = async (nom, ev) => { const t = techParNom(nom); if (t && t.email && ev) { try { await requeteAgenda({ technicienEmail: t.email, operation: "delete", calEventId: ev }); supprimes.add(ev); } catch (e) { /* déjà absent */ } } };
+  for (const [nom, ev] of aRetirer) { if (!utilises.has(ev)) await supprimer(nom, ev); }
   for (const p of passages) {
     const cal = { ...(p.calEvents || {}) };
     const actif = p.statut !== "annule" && !p.jumeau && p.debut;
@@ -1517,11 +1531,12 @@ async function synchroniserAgenda(item, passages, aRetirer) {
         if (!t || !t.email) { erreurs.push(nom + " : pas d'agenda configuré (page Techniciens)"); continue; }
         const emp = empreinteAgenda(item, p, passages, nom);
         const c = contenuAgenda(item, p, passages, nom);
+        if (cal[nom] && supprimes.has(cal[nom])) delete cal[nom]; // supprimé à l'instant : à recréer
         if (cal[nom] && agendaAJour(item, p, passages, nom)) { emps[nom] = emp; continue; } // déjà à jour
         const base = { technicienEmail: t.email, passages: [p.debut + "|" + (p.fin || "")], customSummary: c.titre, customDescription: c.desc, adresse: c.adresse, colorId: t.calendarColorId || null, nature: item.nature || "", nomClient: item.nomClient || "", bc: item.bc || item.pl || "", observations: item.observations || "", interventionId: item.id };
         try {
           const r = cal[nom] ? await requeteAgenda({ ...base, operation: "update", calEventId: cal[nom] }) : await requeteAgenda(base);
-          if (r.success || r.created > 0 || r.updated > 0) { if (!cal[nom]) cal[nom] = (r.results && r.results[0] && r.results[0].eventId) || ""; if (cal[nom]) emps[nom] = emp; }
+          if (r.success || r.created > 0 || r.updated > 0) { const idRetour = r.results && r.results[0] && r.results[0].eventId; if (idRetour) cal[nom] = idRetour; else if (!cal[nom]) cal[nom] = ""; if (cal[nom]) emps[nom] = emp; }
           else { echec = true; erreurs.push(nom + " : " + ((r.errors && r.errors[0] && r.errors[0].error) || r.error || "refusé")); }
         } catch (e) { echec = true; erreurs.push(nom + " : " + e.message); }
       }

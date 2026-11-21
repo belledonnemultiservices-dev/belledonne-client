@@ -1769,7 +1769,8 @@ async function updatePassageInCalendar(n) {
         ? await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], operation: 'update', calEventId: existingEventId, customSummary: document.getElementById('fTitre'+n)?.value||'', customDescription: document.getElementById('fDesc'+n)?.value||'', adresse: document.getElementById('fAdresseCal'+n)?.value||'', colorId: tech.calendarColorId||null })
         : await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], customSummary: document.getElementById('fTitre'+n)?.value||'', customDescription: document.getElementById('fDesc'+n)?.value||'', adresse: document.getElementById('fAdresseCal'+n)?.value||'', colorId: tech.calendarColorId||null });
       if (result.success || result.created > 0) {
-        if (!existingEventId) calMap[techName] = result.results?.[0]?.eventId || '';
+        // Rendez-vous recréé par le serveur (l'ancien était supprimé, 21/11) : on retient le nouvel identifiant
+        if (!existingEventId || result.results?.[0]?.recree) calMap[techName] = result.results?.[0]?.eventId || '';
         updated++;
       } else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
     } catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }
@@ -5618,7 +5619,8 @@ async function updatePassageInCalendarT(n) {
         ? await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], operation: 'update', calEventId: existingEventId, customSummary: document.getElementById('fTitreT'+n)?.value||'', customDescription: document.getElementById('fDescT'+n)?.value||'', adresse: document.getElementById('fAdresseCalT'+n)?.value||'', colorId: tech.calendarColorId||null })
         : await _calendarRequest({ technicienEmail: tech.email, passages: [debut+'|'+fin], customSummary: document.getElementById('fTitreT'+n)?.value||'', customDescription: document.getElementById('fDescT'+n)?.value||'', adresse: document.getElementById('fAdresseCalT'+n)?.value||'', colorId: tech.calendarColorId||null });
       if (result.success || result.created > 0) {
-        if (!existingEventId) calMap[techName] = result.results?.[0]?.eventId || '';
+        // Rendez-vous recréé par le serveur (l'ancien était supprimé, 21/11) : on retient le nouvel identifiant
+        if (!existingEventId || result.results?.[0]?.recree) calMap[techName] = result.results?.[0]?.eventId || '';
         updated++;
       } else showToast('Erreur pour ' + techName + ' : ' + (result.errors?.[0]?.error||result.error||'Erreur'), true);
     } catch(err) { showToast('Erreur réseau (' + techName + ') : ' + err.message, true); }

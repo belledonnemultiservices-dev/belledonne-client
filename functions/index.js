@@ -736,9 +736,19 @@ exports.addToCalendar = functions
 
         try {
           if (operation === 'update' && calEventId) {
-            const patchResult = await calendar.events.patch({ calendarId: technicienEmail, eventId: calEventId, resource: event });
-            results.push({ passage, eventId: patchResult.data.id });
-            console.log("Événement mis à jour:", patchResult.data.id);
+            // Correctif du 21/11 : chez Google, mettre à jour un rendez-vous supprimé le laisse supprimé.
+            // S'il est annulé ou introuvable, on en crée un nouveau et on renvoie son identifiant.
+            let patchResult = null;
+            try { patchResult = await calendar.events.patch({ calendarId: technicienEmail, eventId: calEventId, resource: event }); }
+            catch (e) { if (!(e.code === 404 || e.code === 410 || e.status === 404 || e.status === 410)) throw e; }
+            if (patchResult && patchResult.data && patchResult.data.status !== "cancelled") {
+              results.push({ passage, eventId: patchResult.data.id });
+              console.log("Événement mis à jour:", patchResult.data.id);
+            } else {
+              const insertResult = await calendar.events.insert({ calendarId: technicienEmail, resource: event });
+              results.push({ passage, eventId: insertResult.data.id, htmlLink: insertResult.data.htmlLink, recree: true });
+              console.log("Événement recréé (l'ancien", calEventId, "était supprimé):", insertResult.data.id, "pour", technicienEmail);
+            }
           } else {
             const insertResult = await calendar.events.insert({ calendarId: technicienEmail, resource: event });
             results.push({ passage, eventId: insertResult.data.id, htmlLink: insertResult.data.htmlLink });
