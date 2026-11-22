@@ -74,11 +74,25 @@ const versChamps = (champs, titreSection) => champs
     valeur: c.valeur,
   }));
 
-const versImages = (photos) => photos.map(p => ({
-  titre: p.libelle,
-  dataUri: p.dataUri || null,
-  erreur: p.erreur || (p.dataUri ? null : "indisponible"),
-}));
+// Légende sous chaque photo (22/11). Un nom de champ générique (« image1 »,
+// « Photo 8 », « Photos ») n'apprend rien au client : le bloc porte déjà le
+// titre « Photos ». Et quand un champ multi-photo en contient dix, la même
+// légende répétée sous chacune ne dit rien non plus : elle n'est gardée que
+// si elle est propre à une seule photo.
+const LEGENDE_GENERIQUE = /^(images?|photos?)\s*\d*\s*:?\s*$/i;
+const versImages = (photos) => {
+  const nb = {};
+  photos.forEach(p => { const l = String(p.libelle || "").trim(); nb[l] = (nb[l] || 0) + 1; });
+  return photos.map(p => {
+    const libelle = String(p.libelle || "").trim();
+    const titre = (!libelle || LEGENDE_GENERIQUE.test(libelle) || nb[libelle] > 1) ? "" : libelle;
+    return {
+      titre,
+      dataUri: p.dataUri || null,
+      erreur: p.erreur || (p.dataUri ? null : "indisponible"),
+    };
+  });
+};
 
 function construire(rapport, logoDataUri) {
   const entete = (rapport.entete || []);

@@ -156,6 +156,21 @@ function trierChamps(valeurs, definitions, clesTechniques, valeursRacine) {
     }
     resultat.champs.push(decrireChamp(cle, def, brute));
   }
+
+  // Photo orpheline : présente dans la soumission mais absente de la définition
+  // actuelle du formulaire. Cas typique (22/11) : un technicien a commencé son
+  // rapport sur l'ancienne version (image_2 à image_7) et l'envoie après le
+  // passage à un champ multi-photo unique. La soumission porte son propre type,
+  // on s'y fie pour ne ramasser que des photos, jamais un champ saisi. Une photo
+  // prise sur le terrain ne doit pas disparaître en silence du rapport.
+  for (const [cle, champ] of Object.entries(valeurs || {})) {
+    if (Object.prototype.hasOwnProperty.call(definitions, cle)) continue;
+    if (!champ || typeof champ !== "object" || !TYPES_PHOTO.has(champ.type)) continue;
+    if (String(champ.hidden) === "true") continue;
+    if (estTechnique(cle, clesTechniques)) continue;
+    String(valeurBrute(champ) || "").split(",").map(m => m.trim()).filter(Boolean)
+      .forEach(media => resultat.photos.push({ cle, libelle: "Photo", media, orpheline: true }));
+  }
   return resultat;
 }
 
