@@ -1581,6 +1581,8 @@ window.doEnvoyer = async function(mode) {
         catch(e) { console.warn("Marquage passage annulé échoué:", e.message); }
       }
       showToast((wantsEmail ? sent + " email(s) envoyé(s)" : "Ajouté à l'espace client") + (wantsEspace && wantsEmail ? ", ajouté à l'espace client." : "."));
+      // Envoi différé (25/11) : le Suivi propose d'envoyer le rapport Kizeo du passage suivant
+      if (!isAbsAnnul && r.statut !== "envoye" && r.suiviId && r.numPassage != null) versSuivi({ type: "gr-envoye", suiviId: r.suiviId, numPassage: r.numPassage });
       closeEnvoi();
     } catch(e) {
       alert((wantsEmail ? "Envoi fait mais erreur" : "Erreur") + " d'enregistrement : " + e.message);

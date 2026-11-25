@@ -248,7 +248,8 @@ function etatsEtapes(item) {
   // Rapport Kizeo exigé sauf « Aucun rapport Kizeo » choisi (kzForm vide) sur un passage jamais envoyé
   const bruts = passagesBruts(item);
   const veutKizeo = (n) => rapportExige(item, bruts.find(x => x.passageId && x.passageId === n.passageId));
-  const kizeoOk = ns.filter(veutKizeo).every(p => { const e = window.etatKizeo(item, p); return e === "ok" || e === "recu"; });
+  // Envoi différé (25/11) : le rapport d'un passage suivant, préparé, partira depuis le Pilotage
+  const kizeoOk = ns.filter(veutKizeo).every(p => { const e = window.etatKizeo(item, p); return e === "ok" || e === "recu" || e === "differe"; });
   const clientOk = nsPr.length > 0 && nsPr.every(p => window.notifOk(window.notifPassage(item, p, "notifBailleur")));
   const locOk = !item.emailClient || (nsPr.length > 0 && nsPr.every(p => window.notifOk(window.notifPassage(item, p, "notifLocataire"))));
   const rep = window.modeReport ? window.modeReport(item) : null;
@@ -871,13 +872,14 @@ function etatRapportKz(item, l, r) {
   const p = (dossier() ? passagesBruts(dossier()) : []).find(x => x.passageId === r.pid);
   const e = n ? window.etatKizeo(item, n) : "manque";
   if (e === "recu") return "recu";
+  if (e === "differe") return "differe";
   if (e === "manque" || !p || !p.kizeoPush) return "manque";
   const t = destDe(l, r);
   const kp = p.kizeoPush;
   if (String(kp.kizeoFormDocId) !== String(r.formId) || !t || String(kp.recipientUserId) !== String(t.kizeoUserId) || sansSuffixe(kp.libelle) !== nomRapport(item, l, r)) return "modifie";
   return "ok";
 }
-const LIB_KZ = { ok: ["ok", "✓ envoyé"], recu: ["ok", "✓ rapport reçu"], modifie: ["att", "modifié : à renvoyer"], manque: ["ko", "✕ à envoyer"] };
+const LIB_KZ = { ok: ["ok", "✓ envoyé"], recu: ["ok", "✓ rapport reçu"], modifie: ["att", "modifié : à renvoyer"], manque: ["ko", "✕ à envoyer"], differe: ["na", "prêt · s'envoie depuis le Pilotage après le passage précédent"] };
 // ── Agenda ──
 function descriptionAuto(item, adresse) {
   const tels = Array.isArray(item.coordonnees) ? item.coordonnees : item.coordonnees ? [item.coordonnees] : [];
@@ -1001,7 +1003,7 @@ function rendrePassages(item) {
       ? `<button class="pl-btn petit" data-a="manuelRap" title="Déposer le rapport en PDF à la main${rec ? " (remplace le rapport Kizeo attendu)" : ""}">📎 PDF</button>`
       : `<button class="pl-btn petit" disabled style="opacity:.45;cursor:not-allowed;" title="Enregistre d'abord le passage (date et technicien) pour déposer un rapport">📎 PDF</button>`;
     const m2 = etatMontee2(dossier() || item, l);
-    const action = m2 && (!m2.recu || !m2.absents.length) && !recu ? "" : !r.formId || !destDe(l, r) || recu ? "" : etatR === "manque" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Envoyer</button>` : etatR === "modifie" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Renvoyer</button><button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler</button>` : "";
+    const action = m2 && (!m2.recu || !m2.absents.length) && !recu ? "" : !r.formId || !destDe(l, r) || recu ? "" : etatR === "manque" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Envoyer</button>` : etatR === "differe" ? `<button class="pl-btn petit" data-a="envoyerRap" title="Envoie dès maintenant ce rapport sur le téléphone du technicien, sans attendre le passage précédent">Envoyer maintenant</button>` : etatR === "modifie" ? `<button class="pl-btn indigo petit" data-a="envoyerRap">Renvoyer</button><button class="pl-btn petit" data-a="annulerModif" title="Revenir à ce qui a été envoyé sur Kizeo (formulaire, technicien, nom)">↺ Annuler</button>` : "";
     return `<div class="pl-rap" data-r="${k}">
       <span class="pl-rap-n">${i + 1}.</span>
       <select data-rf="formId"><option value="">— Aucun rapport Kizeo —</option>${window.optionsRapportsKizeo ? window.optionsRapportsKizeo(forms, r.formId, lie ? lie.id : null) : ""}</select>
@@ -1069,7 +1071,7 @@ function rendrePassages(item) {
   const f2 = forms.find(f => String(f.formId) === FORM_MONTEE_2);
   if (f2) L.forEach(l => { if (etatMontee2(dossier() || item, l)) l.rapports.forEach(r => { if (!r.annule && !r.formId && !(r.ref && r.ref.kizeoPush)) r.formId = String(f2.id); }); });
   $(".pl-corps").innerHTML = `
-    <p class="pl-intro">Chaque modification est enregistrée toute seule et l'agenda de chaque technicien suit : rendez-vous créé, déplacé ou retiré. Chaque rapport Kizeo s'envoie avec son bouton.</p>
+    <p class="pl-intro">Chaque modification est enregistrée toute seule et l'agenda de chaque technicien suit : rendez-vous créé, déplacé ou retiré. ${estMontee(dossier() || item) ? "Chaque rapport Kizeo s'envoie avec son bouton." : "Seul le rapport Kizeo du 1er passage s'envoie ici ; ceux des passages suivants sont préparés et partiront depuis le Pilotage."}</p>
     ${L.map(carte).join("") || '<p class="pl-note" style="margin:6px 0 12px;">Aucun passage pour ce dossier. Le dossier reste en Planification tant qu\'il n\'a pas de passage.</p>'}
     <div class="pl-actions">${estMontee(dossier() || item) && !L.some(x => x.role === "affichage" && !x.annule) ? '<button class="pl-btn" data-a="ajoutAffichage">+ Ajouter la pose d\'affiches</button>' : ""}<button class="pl-btn" data-a="ajout">+ Ajouter un passage</button>
       <button class="pl-btn" data-a="dupli">Dupliquer le dernier à +</button><input id="plEcart" type="number" min="1" value="15" style="width:60px;height:34px;border:1px solid rgba(13,27,42,.15);border-radius:7px;padding:0 8px;"> jours</div>`;
@@ -1472,12 +1474,13 @@ async function envoyerRapport(item, l, r, bouton) {
   if ((await enregistrerPassages(dossier() || item, false)) === false) return; // le rapport doit exister en base
   const it = dossier() || item;
   const e = etatRapportKz(it, l, r);
-  if (e !== "manque" && e !== "modifie") { showToast("Ce rapport est déjà à jour sur Kizeo."); return; }
+  if (e !== "manque" && e !== "modifie" && e !== "differe") { showToast("Ce rapport est déjà à jour sur Kizeo."); return; }
   const nom = nomRapport(it, l, r);
   if (!nom) { showToast("Donne un nom à ce rapport avant de l'envoyer.", true); return; }
   const t = destDe(l, r);
   if (!t) { showToast((r.tech || "Ce technicien") + " n'a pas de compte Kizeo (page Techniciens).", true); return; }
   const ancien = e === "modifie" ? (passagesBruts(it).find(p => p.passageId === r.pid) || {}).kizeoPush : null;
+  if (e === "differe" && !confirm("⚠ Rapport du passage " + l.num + " : normalement, il part depuis le Pilotage une fois le rapport du passage précédent envoyé au client, pour que le technicien ne se trompe pas de formulaire.\n\nL'envoyer quand même dès maintenant ?")) return;
   if (!confirm((ancien ? "Renvoyer" : "Envoyer") + " le rapport « " + nom + " » à " + nomTech(t) + " sur Kizeo ?"
     + (ancien ? "\n\nL'ancien formulaire reste sur le téléphone, à supprimer à la main dans Kizeo :\n• « " + ancien.libelle + " »" + (ancien.technicien ? " (chez " + ancien.technicien + ")" : "") : ""))) return;
   if (bouton) { bouton.disabled = true; bouton.textContent = "Envoi…"; }
@@ -1862,12 +1865,12 @@ function rendreRecap(item) {
   const lignes = ns.map(p => {
     const k0 = window.etatKizeo(item, p);
     // Jumeau : même visite, seul son rapport Kizeo est à part
-    if (p.jumeau) return `<tr><td class="pl-cercle">${nomPassage(p)}</td><td>${m("na", "–")}</td><td>${k0 === "ok" || k0 === "recu" ? m("ok", "✓") : k0 === "ecart" ? m("att", "!") : m("ko", "✕")}</td><td>${m("na", "–")}</td><td>${m("na", "–")}</td></tr>`;
+    if (p.jumeau) return `<tr><td class="pl-cercle">${nomPassage(p)}</td><td>${m("na", "–")}</td><td>${k0 === "differe" ? m("na", "plus tard") : k0 === "ok" || k0 === "recu" ? m("ok", "✓") : k0 === "ecart" ? m("att", "!") : m("ko", "✕")}</td><td>${m("na", "–")}</td><td>${m("na", "–")}</td></tr>`;
     const a = window.etatAgenda(p), k = k0;
     const c = window.notifPassage(item, p, "notifBailleur"), l = window.notifPassage(item, p, "notifLocataire");
     return `<tr><td class="pl-cercle">${nomPassage(p)} <span style="color:#0D1B2A;font-weight:400;">${window.fmtDate ? window.fmtDate(p.debut) : p.debut} · ${esc(p.techs.join(", "))}</span></td>
       <td>${a === "ok" ? m("ok", "✓") : a === "manque" ? m("ko", "✕") : m("att", "!")}</td>
-      <td>${k === "ok" || k === "recu" ? m("ok", "✓") : k === "ecart" ? m("att", "!") : m("ko", "✕")}</td>
+      <td>${k === "differe" ? m("na", "plus tard") : k === "ok" || k === "recu" ? m("ok", "✓") : k === "ecart" ? m("att", "!") : m("ko", "✕")}</td>
       <td>${window.notifOk(c) ? m("ok", "✓") : c && c.change ? m("att", "!") : m("ko", "✕")}</td>
       <td>${!item.emailClient ? m("na", "–") : window.notifOk(l) ? m("ok", "✓") : l && l.change ? m("att", "!") : m("ko", "✕")}</td></tr>`;
   });
@@ -1880,7 +1883,7 @@ function rendreRecap(item) {
     <table class="pl-table pl-recap"><thead><tr><th>Passage</th><th>Agenda</th><th>Kizeo</th><th>Client</th><th>Locataire</th></tr></thead><tbody>${lignes.join("") || '<tr><td colspan="5">Aucun passage</td></tr>'}</tbody></table>
     ${manque.length ? `<div class="pl-psg-pb" style="margin-top:12px;">À terminer avant de passer En cours :<br>${manque.map(x => "• " + esc(x)).join("<br>")}</div>` : ""}
     ${!manque.length && manqueNotif.length ? `<div class="pl-psg-pb" style="margin-top:12px;background:#FFF4E5;color:#B45309;">Rappel :<br>${manqueNotif.map(x => "• " + esc(x)).join("<br>")}</div>` : ""}
-    <p class="pl-note" style="margin-top:12px;">Les rapports (reçu, envoyé au client) se suivront après l'intervention, dans le Pilotage quotidien.</p>`;
+    <p class="pl-note" style="margin-top:12px;">Les rapports (reçu, envoyé au client) se suivront après l'intervention, dans le Pilotage quotidien.${ns.some(p => window.etatKizeo(item, p) === "differe") ? " Le rapport Kizeo d'un passage suivant (« plus tard ») est prêt : il s'envoie d'un clic depuis le Pilotage, une fois le rapport du passage précédent envoyé au client." : ""}</p>`;
   pied(`<button class="pl-btn" data-a="prec">← Précédent</button><span class="pl-espace"></span>${manque.length ? `<button class="pl-btn" data-a="aller">Reprendre l'étape Passages →</button>` : ""}<button class="pl-btn prim" data-a="fin">Terminer</button>`);
   $(".pl-pied [data-a=prec]").onclick = () => { etat.etape--; rendre(); };
   const ba = $(".pl-pied [data-a=aller]"); if (ba) ba.onclick = () => { etat.etape = 1; etat.lignes = null; rendre(); };
@@ -1931,6 +1934,7 @@ function manquesPlanification(item) {
     const e = n ? window.etatKizeo(item, n) : "manque";
     // Montée (21/11) : le rapport du 2nd passage part automatiquement au retour du 1er
     if (estMontee(item) && p.role !== "affichage" && Number(p.num) === 2 && !p.jumeau && !b.kizeoPush) return;
+    if (e === "differe") return; // envoi différé (25/11) : partira depuis le Pilotage
     if (veut && e !== "ok" && e !== "recu") m.push((p.role === "affichage" ? "Pose d'affiches" : "Passage " + p.num) + " : rapport Kizeo " + (b.kzNom ? "« " + b.kzNom + " » " : "") + (e === "ecart" ? "chez le mauvais technicien (à renvoyer)" : "pas envoyé"));
   });
   return m;
